@@ -3,7 +3,6 @@ import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 import { defineConfig, globalIgnores } from 'eslint/config'
-import tailwindcss from '@tailwindcss/eslint-plugin'
 
 export default defineConfig([
   globalIgnores(['dist']),
@@ -13,7 +12,6 @@ export default defineConfig([
       js.configs.recommended,
       reactHooks.configs['recommended-latest'],
       reactRefresh.configs.vite,
-      tailwindcss.configs['flat/recommended'],
     ],
     settings: {
       'import/resolver': {

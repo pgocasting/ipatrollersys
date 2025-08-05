@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useTheme } from "./ThemeContext";
+import { useFirebase } from "./hooks/useFirebase";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -131,6 +132,7 @@ import {
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { isDarkMode } = useTheme();
+  const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -144,6 +146,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [newActionReport, setNewActionReport] = useState({
     department: "",
     municipality: "",
@@ -159,34 +163,58 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
 
   useEffect(() => {
-    // Load action items based on active tab
-    // In a real application, this would fetch data from your API/database
-    setLoading(true);
-    
-    // Simulate API call - replace this with actual data fetching
-    setTimeout(() => {
-      // Example of how to fetch real data:
-      // fetch(`/api/action-items?department=${activeTab}`)
-      //   .then(response => response.json())
-      //   .then(data => {
-      //     setActionItems(data);
-      //     setLoading(false);
-      //   })
-      //   .catch(error => {
-      //     console.error('Error fetching action items:', error);
-      //     setLoading(false);
-      //   });
-      
-      // For now, set empty array - replace with real data
-      setActionItems([]);
-      setLoading(false);
-    }, 500);
-  }, [activeTab]);
+    // Load action items from Firestore
+    const loadActionReports = async () => {
+      setLoading(true);
+      try {
+        const result = await getActionReports();
+        if (result.success) {
+          // Filter by active tab if needed
+          const filteredReports = result.data.filter(report => 
+            activeTab === "all" || report.department === activeTab
+          );
+          setActionItems(filteredReports);
+        } else {
+          console.error('Error loading action reports:', result.error);
+          setActionItems([]);
+        }
+      } catch (error) {
+        console.error('Error loading action reports:', error);
+        setActionItems([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadActionReports();
+  }, [activeTab, getActionReports]);
 
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
+
+  // Municipalities by district mapping
+  const municipalitiesByDistrict = {
+    "1ST DISTRICT": [
+      "Abucay",
+      "Orani", 
+      "Samal",
+      "Hermosa"
+    ],
+    "2ND DISTRICT": [
+      "Balanga City",
+      "Pilar",
+      "Orion",
+      "Limay"
+    ],
+    "3RD DISTRICT": [
+      "Bagac",
+      "Dinalupihan", 
+      "Mariveles",
+      "Morong"
+    ]
+  };
 
   const districts = [
     { id: "", name: "All Districts" },
@@ -302,7 +330,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         alert(`Viewing details for: ${item.what}\n\nMunicipality: ${item.municipality}\nDistrict: ${item.district}\nWhen: ${formatDate(item.when)}\nWhere: ${item.where}\nWho: ${item.who}\nWhy: ${item.why}\nHow: ${item.how}\nAction Taken: ${item.actionTaken}\nOther Info: ${item.otherInfo}`);
         break;
       case "edit":
-        alert(`Edit functionality for: ${item.what}\n\nThis would open an edit form in a real application.`);
+        setEditingItem(item);
+        setShowEditModal(true);
         break;
       case "delete":
         setSelectedItem(item);
@@ -313,12 +342,22 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedItem) {
-      setActionItems(prevItems => prevItems.filter(item => item.id !== selectedItem.id));
-      setShowDeleteModal(false);
-      setSelectedItem(null);
-      alert(`Successfully deleted: ${selectedItem.what}`);
+      try {
+        const result = await deleteActionReport(selectedItem.id);
+        if (result.success) {
+          setActionItems(prevItems => prevItems.filter(item => item.id !== selectedItem.id));
+          setShowDeleteModal(false);
+          setSelectedItem(null);
+          alert(`Successfully deleted: ${selectedItem.what}`);
+        } else {
+          alert(`Error deleting action report: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error deleting action report:', error);
+        alert('Error deleting action report. Please try again.');
+      }
     }
   };
 
@@ -408,33 +447,43 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     setShowAddModal(true);
   };
 
-  const handleSubmitActionReport = () => {
-    const newReport = {
-      id: `action-${Date.now()}`,
-      ...newActionReport,
-      status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
-      priority: "medium",
-      patrolCount: 0,
-      incidentCount: 0,
-      icon: AlertCircle
-    };
+  const handleSubmitActionReport = async () => {
+    try {
+      const newReport = {
+        id: `action-${Date.now()}`,
+        ...newActionReport,
+        status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
+        priority: "medium",
+        patrolCount: 0,
+        incidentCount: 0,
+        icon: "AlertCircle"
+      };
 
-    setActionItems(prevItems => [...prevItems, newReport]);
-    setShowAddModal(false);
-    setNewActionReport({
-      department: "",
-      municipality: "",
-      district: "",
-      what: "",
-      when: new Date(),
-      where: "",
-      who: "",
-      why: "",
-      how: "",
-      actionTaken: "",
-      otherInfo: ""
-    });
-    alert("Action report added successfully!");
+      const result = await saveActionReport(newReport);
+      if (result.success) {
+        setActionItems(prevItems => [...prevItems, newReport]);
+        setShowAddModal(false);
+        setNewActionReport({
+          department: "",
+          municipality: "",
+          district: "",
+          what: "",
+          when: new Date(),
+          where: "",
+          who: "",
+          why: "",
+          how: "",
+          actionTaken: "",
+          otherInfo: ""
+        });
+        alert("Action report added successfully!");
+      } else {
+        alert(`Error saving action report: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error submitting action report:', error);
+      alert('Error saving action report. Please try again.');
+    }
   };
 
   const handleCancelAdd = () => {
@@ -454,530 +503,507 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
+  const handleEditActionReport = async () => {
+    try {
+      const updatedReport = {
+        ...editingItem,
+        status: editingItem.actionTaken === "Resolved" ? "resolved" : "pending"
+      };
+
+      const result = await updateActionReport(editingItem.id, updatedReport);
+      if (result.success) {
+        setActionItems(prevItems => 
+          prevItems.map(item => 
+            item.id === editingItem.id ? updatedReport : item
+          )
+        );
+        setShowEditModal(false);
+        setEditingItem(null);
+        alert("Action report updated successfully!");
+      } else {
+        alert(`Error updating action report: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating action report:', error);
+      alert('Error updating action report. Please try again.');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setShowEditModal(false);
+    setEditingItem(null);
+  };
+
+  const handleEditInputChange = (field, value) => {
+    setEditingItem(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      
+      // If municipality is being changed, automatically set the corresponding district
+      if (field === 'municipality') {
+        // Find which district this municipality belongs to
+        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+          if (municipalities.includes(value)) {
+            updated.district = district;
+            break;
+          }
+        }
+      }
+      
+      return updated;
+    });
+  };
+
   const handleInputChange = (field, value) => {
-    setNewActionReport(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setNewActionReport(prev => {
+      const updated = {
+        ...prev,
+        [field]: value
+      };
+      
+      // If municipality is being changed, automatically set the corresponding district
+      if (field === 'municipality') {
+        // Find which district this municipality belongs to
+        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+          if (municipalities.includes(value)) {
+            updated.district = district;
+            break;
+          }
+        }
+      }
+      
+      return updated;
+    });
   };
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className={`w-full transition-all duration-300 ${
+      <div className={`w-full h-screen flex flex-col transition-all duration-300 ${
         isDarkMode 
-          ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
-          : 'bg-gradient-to-br from-blue-50 via-white to-indigo-50'
+          ? 'bg-gray-900' 
+          : 'bg-gray-50'
       }`}>
-        {/* Modern Header */}
-        <div className={`relative overflow-hidden backdrop-blur-sm shadow-sm border-b transition-all duration-300 ${
+        {/* Compact Header */}
+        <div className={`flex-shrink-0 px-6 py-4 border-b transition-all duration-300 ${
           isDarkMode 
-            ? 'bg-gray-800/90 border-gray-700/50' 
-            : 'bg-white/90 border-gray-200/50'
+            ? 'bg-gray-800 border-gray-700' 
+            : 'bg-white border-gray-200'
         }`}>
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-indigo-600/5"></div>
-          <div className="relative px-3 sm:px-4 py-3 sm:py-4">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100/80 dark:bg-blue-900/40 rounded-lg backdrop-blur-sm">
-                    <Activity className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    Action Center
-                  </h1>
-                </div>
-                <p className={`text-xs sm:text-sm lg:text-base transition-colors duration-300 ${
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
+                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                  Action Center
+                </h1>
+                <p className={`text-sm transition-colors duration-300 ${
                   isDarkMode ? 'text-gray-300' : 'text-gray-600'
                 }`}>
-                  Centralized monitoring and management dashboard for all departmental activities
+                  Centralized monitoring and management dashboard
                 </p>
               </div>
-                                              <div className="flex flex-wrap gap-1 sm:gap-2 lg:gap-3">
-                   <Button 
-                     onClick={handleAddActionReport}
-                     variant="outline" 
-                     size="sm"
-                     className={`backdrop-blur-sm text-xs sm:text-sm transition-all duration-300 ${
-                       isDarkMode 
-                         ? 'bg-gray-800/90 border-orange-600 hover:bg-orange-900/20 text-orange-300' 
-                         : 'bg-white/90 border-orange-200 hover:bg-orange-50'
-                     }`}
-                   >
-                     <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                     Add Report
-                   </Button>
-                   <Button 
-                     onClick={() => {
-                       setLoading(true);
-                       setTimeout(() => setLoading(false), 500);
-                     }} 
-                     variant="outline" 
-                     size="sm"
-                     disabled={loading}
-                     className={`backdrop-blur-sm text-xs sm:text-sm transition-all duration-300 ${
-                       isDarkMode 
-                         ? 'bg-gray-800/90 border-blue-600 hover:bg-blue-900/20 text-blue-300' 
-                         : 'bg-white/90 border-blue-200 hover:bg-blue-50'
-                     }`}
-                   >
-                     <RefreshCw className={`h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
-                     Refresh
-                   </Button>
-                   <Button onClick={exportToPDF} variant="outline" size="sm" className={`backdrop-blur-sm text-xs sm:text-sm transition-all duration-300 ${
-                     isDarkMode 
-                       ? 'bg-gray-800/90 border-green-600 hover:bg-green-900/20 text-green-300' 
-                       : 'bg-white/90 border-green-200 hover:bg-green-50'
-                   }`}>
-                     <FileText className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                     Export to PDF
-                   </Button>
-                   <Button onClick={handlePrint} variant="outline" size="sm" className={`backdrop-blur-sm text-xs sm:text-sm transition-all duration-300 ${
-                     isDarkMode 
-                       ? 'bg-gray-800/90 border-purple-600 hover:bg-purple-900/20 text-purple-300' 
-                       : 'bg-white/90 border-purple-200 hover:bg-purple-50'
-                   }`}>
-                     <Printer className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                     Print
-                   </Button>
-                 </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleAddActionReport}
+                variant="outline" 
+                size="sm"
+                className="text-xs"
+              >
+                <Plus className="h-3 w-3 mr-1" />
+                Add Report
+              </Button>
+              <Button 
+                onClick={() => {
+                  setLoading(true);
+                  setTimeout(() => setLoading(false), 500);
+                }} 
+                variant="outline" 
+                size="sm"
+                disabled={loading}
+                className="text-xs"
+              >
+                <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button onClick={exportToPDF} variant="outline" size="sm" className="text-xs">
+                <Download className="h-3 w-3 mr-1" />
+                Export
+              </Button>
+              <Button onClick={handlePrint} variant="outline" size="sm" className="text-xs">
+                <Printer className="h-3 w-3 mr-1" />
+                Print
+              </Button>
             </div>
           </div>
         </div>
 
-        {/* Modern Department Navigation */}
-        <div className="px-2 sm:px-3 lg:px-4 py-1 sm:py-2">
-          <div className="max-w-6xl mx-auto">
-            <div className={`backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border overflow-hidden transition-all duration-300 ${
-              isDarkMode 
-                ? 'bg-gray-800/70 border-gray-700/30' 
-                : 'bg-white/70 border-gray-200/30'
-            }`}>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-1 p-1">
-                                 <button
-                   onClick={() => {
-                     setActiveTab("pnp");
-                     setActiveMunicipality("all");
-                   }}
-                   className={`relative group p-3 sm:p-4 rounded-lg transition-all duration-300 ${
-                     activeTab === "pnp"
-                       ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg transform scale-105"
-                       : isDarkMode 
-                         ? "bg-gray-700/60 hover:bg-blue-900/20 text-gray-300"
-                         : "bg-white/60 hover:bg-blue-50 text-gray-700"
-                   }`}
-                 >
-                   <div className="flex flex-col items-center text-center space-y-1 sm:space-y-2">
-                     <div className={`p-1.5 sm:p-2 rounded-full ${
-                       activeTab === "pnp" 
-                         ? "bg-white/20" 
-                         : isDarkMode ? "bg-blue-900/40" : "bg-blue-100/80"
-                     }`}>
-                       <Shield className={`h-3 w-3 sm:h-5 sm:w-5 ${
-                         activeTab === "pnp" ? "text-white" : isDarkMode ? "text-blue-400" : "text-blue-600"
-                       }`} />
-                     </div>
-                     <div>
-                       <h3 className="font-semibold text-xs sm:text-sm">PNP</h3>
-                       <p className="text-xs opacity-80">Police Operations</p>
-                     </div>
-                   </div>
-                 </button>
-                
-                                 <button
-                   onClick={() => {
-                     setActiveTab("agriculture");
-                     setActiveMunicipality("all");
-                   }}
-                   className={`relative group p-3 sm:p-4 rounded-lg transition-all duration-300 ${
-                     activeTab === "agriculture"
-                       ? "bg-gradient-to-br from-green-500 to-green-600 text-white shadow-lg transform scale-105"
-                       : isDarkMode 
-                         ? "bg-gray-700/60 hover:bg-green-900/20 text-gray-300"
-                         : "bg-white/60 hover:bg-green-50 text-gray-700"
-                   }`}
-                 >
-                   <div className="flex flex-col items-center text-center space-y-1 sm:space-y-2">
-                     <div className={`p-1.5 sm:p-2 rounded-full ${
-                       activeTab === "agriculture" 
-                         ? "bg-white/20" 
-                         : isDarkMode ? "bg-green-900/40" : "bg-green-100/80"
-                     }`}>
-                       <TrendingUp className={`h-3 w-3 sm:h-5 sm:w-5 ${
-                         activeTab === "agriculture" ? "text-white" : isDarkMode ? "text-green-400" : "text-green-600"
-                       }`} />
-                     </div>
-                     <div>
-                       <h3 className="font-semibold text-xs sm:text-sm">Agriculture</h3>
-                       <p className="text-xs opacity-80">Bantay Dagat</p>
-                     </div>
-                   </div>
-                 </button>
-                 
-                 <button
-                   onClick={() => {
-                     setActiveTab("pgenro");
-                     setActiveMunicipality("all");
-                   }}
-                   className={`relative group p-3 sm:p-4 rounded-lg transition-all duration-300 ${
-                     activeTab === "pgenro"
-                       ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg transform scale-105"
-                       : isDarkMode 
-                         ? "bg-gray-700/60 hover:bg-purple-900/20 text-gray-300"
-                         : "bg-white/60 hover:bg-purple-50 text-gray-700"
-                   }`}
-                 >
-                   <div className="flex flex-col items-center text-center space-y-1 sm:space-y-2">
-                     <div className={`p-1.5 sm:p-2 rounded-full ${
-                       activeTab === "pgenro" 
-                         ? "bg-white/20" 
-                         : isDarkMode ? "bg-purple-900/40" : "bg-purple-100/80"
-                     }`}>
-                       <AlertCircle className={`h-3 w-3 sm:h-5 sm:w-5 ${
-                         activeTab === "pgenro" ? "text-white" : isDarkMode ? "text-purple-400" : "text-purple-600"
-                       }`} />
-                     </div>
-                     <div>
-                       <h3 className="font-semibold text-xs sm:text-sm">PG-Enro</h3>
-                       <p className="text-xs opacity-80">Environment</p>
-                     </div>
-                   </div>
-                 </button>
-              </div>
+        {/* Compact Department Navigation */}
+        <div className="flex-shrink-0 px-6 py-2">
+          <div className={`rounded-lg shadow-sm border overflow-hidden transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-gray-800 border-gray-700' 
+              : 'bg-white border-gray-200'
+          }`}>
+            <div className="grid grid-cols-3 gap-1 p-1">
+              <button
+                onClick={() => {
+                  setActiveTab("pnp");
+                  setActiveMunicipality("all");
+                }}
+                className={`relative group p-2 rounded-lg transition-all duration-300 ${
+                  activeTab === "pnp"
+                    ? "bg-blue-500 text-white shadow-lg"
+                    : isDarkMode 
+                      ? "bg-gray-700 hover:bg-blue-900/20 text-gray-300"
+                      : "bg-white hover:bg-blue-50 text-gray-700"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-1">
+                  <div className={`p-1 rounded-full ${
+                    activeTab === "pnp" 
+                      ? "bg-white/20" 
+                      : isDarkMode ? "bg-blue-900/40" : "bg-blue-100/80"
+                  }`}>
+                    <Shield className={`h-3 w-3 ${
+                      activeTab === "pnp" ? "text-white" : isDarkMode ? "text-blue-400" : "text-blue-600"
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-xs">PNP</h3>
+                    <p className="text-xs opacity-80">Police Operations</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setActiveTab("agriculture");
+                  setActiveMunicipality("all");
+                }}
+                className={`relative group p-2 rounded-lg transition-all duration-300 ${
+                  activeTab === "agriculture"
+                    ? "bg-green-500 text-white shadow-lg"
+                    : isDarkMode 
+                      ? "bg-gray-700 hover:bg-green-900/20 text-gray-300"
+                      : "bg-white hover:bg-green-50 text-gray-700"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-1">
+                  <div className={`p-1 rounded-full ${
+                    activeTab === "agriculture" 
+                      ? "bg-white/20" 
+                      : isDarkMode ? "bg-green-900/40" : "bg-green-100/80"
+                  }`}>
+                    <TrendingUp className={`h-3 w-3 ${
+                      activeTab === "agriculture" ? "text-white" : isDarkMode ? "text-green-400" : "text-green-600"
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-xs">Agriculture</h3>
+                    <p className="text-xs opacity-80">Bantay Dagat</p>
+                  </div>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => {
+                  setActiveTab("pgenro");
+                  setActiveMunicipality("all");
+                }}
+                className={`relative group p-2 rounded-lg transition-all duration-300 ${
+                  activeTab === "pgenro"
+                    ? "bg-purple-500 text-white shadow-lg"
+                    : isDarkMode 
+                      ? "bg-gray-700 hover:bg-purple-900/20 text-gray-300"
+                      : "bg-white hover:bg-purple-50 text-gray-700"
+                }`}
+              >
+                <div className="flex flex-col items-center text-center space-y-1">
+                  <div className={`p-1 rounded-full ${
+                    activeTab === "pgenro" 
+                      ? "bg-white/20" 
+                      : isDarkMode ? "bg-purple-900/40" : "bg-purple-100/80"
+                  }`}>
+                    <AlertCircle className={`h-3 w-3 ${
+                      activeTab === "pgenro" ? "text-white" : isDarkMode ? "text-purple-400" : "text-purple-600"
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-xs">PG-Enro</h3>
+                    <p className="text-xs opacity-80">Environment</p>
+                  </div>
+                </div>
+              </button>
             </div>
           </div>
         </div>
 
-        {/* Modern Municipality Selector - Only show for PNP */}
-        {activeTab === "pnp" && (
-          <div className="px-2 sm:px-3 lg:px-4 py-1 sm:py-2">
-            <div className="max-w-6xl mx-auto">
-              <div className={`backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border p-2 sm:p-3 transition-all duration-300 ${
-                isDarkMode 
-                  ? 'bg-gray-800/70 border-gray-700/30' 
-                  : 'bg-white/70 border-gray-200/30'
-              }`}>
-                <div className="mb-2 sm:mb-3">
-                  <h3 className={`text-base sm:text-lg font-semibold mb-1 sm:mb-2 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                  }`}>Select Municipality</h3>
-                  <p className={`text-xs sm:text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Filter activities by specific municipality</p>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
-                                     <button
-                     onClick={() => setActiveMunicipality("all")}
-                     className={`relative group p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-300 ${
-                       activeMunicipality === "all"
-                         ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg transform scale-105"
-                         : isDarkMode 
-                           ? "bg-gray-700/60 hover:bg-blue-900/20 text-gray-300 border border-gray-600/30"
-                           : "bg-white/60 hover:bg-blue-50 text-gray-700 border border-gray-200/30"
-                     }`}
-                   >
-                     <div className="text-center">
-                       <div className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 rounded-full flex items-center justify-center ${
-                         activeMunicipality === "all" ? "bg-white/20" : isDarkMode ? "bg-blue-900/40" : "bg-blue-100/80"
-                       }`}>
-                         <MapPin className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                           activeMunicipality === "all" ? "text-white" : isDarkMode ? "text-blue-400" : "text-blue-600"
-                         }`} />
-                       </div>
-                       <span className="text-xs font-medium">All Areas</span>
-                     </div>
-                   </button>
-                                     {["Abucay", "Orani", "Samal", "Hermosa", "Balanga", "Pilar", "Orion", "Limay", "Bagac", "Dinalupihan", "Mariveles", "Morong"].map(municipality => (
-                     <button
-                       key={municipality}
-                       onClick={() => setActiveMunicipality(municipality)}
-                       className={`relative group p-3 sm:p-4 rounded-lg sm:rounded-xl transition-all duration-300 ${
-                         activeMunicipality === municipality
-                           ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-lg transform scale-105"
-                           : isDarkMode 
-                             ? "bg-gray-700/60 hover:bg-blue-900/20 text-gray-300 border border-gray-600/30"
-                             : "bg-white/60 hover:bg-blue-50 text-gray-700 border border-gray-200/30"
-                       }`}
-                     >
-                       <div className="text-center">
-                         <div className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-1 sm:mb-2 rounded-full flex items-center justify-center ${
-                           activeMunicipality === municipality ? "bg-white/20" : isDarkMode ? "bg-blue-900/40" : "bg-blue-100/80"
-                         }`}>
-                           <Building2 className={`h-3 w-3 sm:h-4 sm:w-4 ${
-                             activeMunicipality === municipality ? "text-white" : isDarkMode ? "text-blue-400" : "text-blue-600"
-                           }`} />
-                         </div>
-                         <span className="text-xs font-medium">{municipality}</span>
-                       </div>
-                     </button>
-                   ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Modern Filters & Search */}
-        <div className="px-2 sm:px-3 lg:px-4 py-1 sm:py-2">
-          <div className="max-w-6xl mx-auto">
-            <div className={`backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border p-2 sm:p-3 transition-all duration-300 ${
+
+        {/* Main Content Area - Takes remaining space */}
+        <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
+          {/* Filters & Search */}
+          <div className="flex-shrink-0 mb-3">
+            <div className={`rounded-lg shadow-sm border p-3 transition-all duration-300 ${
               isDarkMode 
-                ? 'bg-gray-800/70 border-gray-700/30' 
-                : 'bg-white/70 border-gray-200/30'
+                ? 'bg-gray-800 border-gray-700' 
+                : 'bg-white border-gray-200'
             }`}>
-                             <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                <div className={`p-2 rounded-lg backdrop-blur-sm ${
+              <div className="flex items-center gap-3 mb-3">
+                <div className={`p-2 rounded-lg ${
                   isDarkMode ? 'bg-blue-900/40' : 'bg-blue-100/80'
                 }`}>
-                  <Filter className={`h-4 w-4 sm:h-5 sm:w-5 ${
+                  <Filter className={`h-4 w-4 ${
                     isDarkMode ? 'text-blue-400' : 'text-blue-600'
                   }`} />
                 </div>
                 <div>
-                  <h3 className={`text-base sm:text-lg font-semibold transition-colors duration-300 ${
+                  <h3 className={`text-base font-semibold transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-800'
                   }`}>Filters & Search</h3>
-                  <p className={`text-xs sm:text-sm transition-colors duration-300 ${
+                  <p className={`text-xs transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>Refine your data view</p>
                 </div>
               </div>
               
-                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                 <div className="space-y-2">
-                   <label className={`text-xs sm:text-sm font-medium transition-colors duration-300 ${
-                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                   }`}>Month</label>
-                   <select
-                     value={selectedMonth}
-                     onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                     className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs sm:text-sm ${
-                       isDarkMode 
-                         ? 'border-gray-600 bg-gray-700/60' 
-                         : 'border-gray-200 bg-white/60'
-                     }`}
-                   >
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <label className={`text-xs font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Month</label>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-700 text-white' 
+                        : 'border-gray-200 bg-white text-gray-900'
+                    }`}
+                  >
                     {months.map((month, index) => (
                       <option key={index} value={index}>{month}</option>
                     ))}
                   </select>
                 </div>
                 
-                                 <div className="space-y-2">
-                   <label className={`text-xs sm:text-sm font-medium transition-colors duration-300 ${
-                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                   }`}>Year</label>
-                   <select
-                     value={selectedYear}
-                     onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                     className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs sm:text-sm ${
-                       isDarkMode 
-                         ? 'border-gray-600 bg-gray-700/60' 
-                         : 'border-gray-200 bg-white/60'
-                     }`}
-                   >
-                     {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                       <option key={year} value={year}>{year}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className={`text-xs sm:text-sm font-medium transition-colors duration-300 ${
-                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                   }`}>District</label>
-                   <select
-                     value={selectedDistrict}
-                     onChange={(e) => setSelectedDistrict(e.target.value)}
-                     className={`w-full p-2 sm:p-3 rounded-lg sm:rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs sm:text-sm ${
-                       isDarkMode 
-                         ? 'border-gray-600 bg-gray-700/60' 
-                         : 'border-gray-200 bg-white/60'
-                     }`}
-                   >
-                     {districts.map((district) => (
-                       <option key={district.id} value={district.id}>{district.name}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className={`text-xs sm:text-sm font-medium transition-colors duration-300 ${
-                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                   }`}>Search</label>
-                   <div className="relative">
-                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
-                     <Input
-                       type="text"
-                       placeholder="Search actions..."
-                       value={searchTerm}
-                       onChange={(e) => setSearchTerm(e.target.value)}
-                       className={`pl-8 sm:pl-10 p-2 sm:p-3 rounded-lg sm:rounded-xl border backdrop-blur-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs sm:text-sm ${
-                         isDarkMode 
-                           ? 'border-gray-600 bg-gray-700/60' 
-                           : 'border-gray-200 bg-white/60'
-                       }`}
-                     />
-                     {searchTerm && (
-                       <button
-                         onClick={() => setSearchTerm("")}
-                         className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                       >
-                         <X className="h-3 w-3 sm:h-4 sm:w-4" />
-                       </button>
-                     )}
-                   </div>
-                 </div>
+                <div className="space-y-1">
+                  <label className={`text-xs font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Year</label>
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-700 text-white' 
+                        : 'border-gray-200 bg-white text-gray-900'
+                    }`}
+                  >
+                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className={`text-xs font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>District</label>
+                  <select
+                    value={selectedDistrict}
+                    onChange={(e) => setSelectedDistrict(e.target.value)}
+                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-700 text-white' 
+                        : 'border-gray-200 bg-white text-gray-900'
+                    }`}
+                  >
+                    {districts.map((district) => (
+                      <option key={district.id} value={district.id}>{district.name}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className={`text-xs font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                  }`}>Search</label>
+                  <div className="relative">
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                    <Input
+                      type="text"
+                      placeholder="Search actions..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className={`pl-8 p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-700 text-white' 
+                          : 'border-gray-200 bg-white text-gray-900'
+                      }`}
+                    />
+                    {searchTerm && (
+                      <button
+                        onClick={() => setSearchTerm("")}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
               
-                             <div className="flex justify-end mt-3 sm:mt-4">
-                 <Button
-                   onClick={() => {
-                     setSearchTerm("");
-                     setSelectedDistrict("");
-                     setSelectedMonth(new Date().getMonth());
-                     setSelectedYear(new Date().getFullYear());
-                   }}
-                   variant="outline"
-                   size="sm"
-                   className="bg-white/90 backdrop-blur-sm border-gray-200 hover:bg-gray-50 dark:bg-gray-700/90 dark:border-gray-600 dark:hover:bg-gray-600 text-xs sm:text-sm"
-                 >
-                   <RotateCcw className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                   Clear All Filters
-                 </Button>
-               </div>
+              <div className="flex justify-end mt-3">
+                <Button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDistrict("");
+                    setSelectedMonth(new Date().getMonth());
+                    setSelectedYear(new Date().getFullYear());
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Clear All Filters
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Modern Summary Dashboard */}
-        <div className="px-2 sm:px-3 lg:px-4 py-1 sm:py-2">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3">
+          {/* Summary Cards */}
+          <div className="flex-shrink-0 mb-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
               {/* Total Actions Card */}
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-blue-100 text-xs font-medium">Total Actions</p>
-                    <p className="text-lg sm:text-xl font-bold">{totalActions}</p>
+                    <p className="text-lg font-bold">{totalActions}</p>
                     <p className="text-blue-200 text-xs">All activities</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <Activity className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <Activity className="h-4 w-4" />
                   </div>
                 </div>
               </div>
 
               {/* Pending Actions Card */}
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-orange-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-orange-100 text-xs font-medium">Pending</p>
-                    <p className="text-lg sm:text-xl font-bold">{pendingActions}</p>
+                    <p className="text-lg font-bold">{pendingActions}</p>
                     <p className="text-orange-200 text-xs">Awaiting action</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <Clock className="h-4 w-4" />
                   </div>
                 </div>
               </div>
 
               {/* Resolved Actions Card */}
-              <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-green-100 text-xs font-medium">Resolved</p>
-                    <p className="text-lg sm:text-xl font-bold">{resolvedActions}</p>
+                    <p className="text-lg font-bold">{resolvedActions}</p>
                     <p className="text-green-200 text-xs">Completed</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <CheckCircle className="h-4 w-4" />
                   </div>
                 </div>
               </div>
 
               {/* High Priority Card */}
-              <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-red-100 text-xs font-medium">High Priority</p>
-                    <p className="text-lg sm:text-xl font-bold">{highPriorityActions}</p>
+                    <p className="text-lg font-bold">{highPriorityActions}</p>
                     <p className="text-red-200 text-xs">Urgent attention</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <AlertTriangle className="h-4 w-4" />
                   </div>
                 </div>
               </div>
 
               {/* Total Patrols Card */}
-              <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-indigo-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-indigo-100 text-xs font-medium">Total Patrols</p>
-                    <p className="text-lg sm:text-xl font-bold">{totalPatrols}</p>
+                    <p className="text-lg font-bold">{totalPatrols}</p>
                     <p className="text-indigo-200 text-xs">Security rounds</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <Shield className="h-4 w-4" />
                   </div>
                 </div>
               </div>
 
               {/* Incidents Card */}
-              <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg p-3 sm:p-4 text-white shadow-lg">
+              <div className="bg-purple-500 rounded-lg p-3 text-white shadow-lg">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-purple-100 text-xs font-medium">Incidents</p>
-                    <p className="text-lg sm:text-xl font-bold">{totalIncidents}</p>
+                    <p className="text-lg font-bold">{totalIncidents}</p>
                     <p className="text-purple-200 text-xs">Reported cases</p>
                   </div>
-                  <div className="p-1.5 sm:p-2 bg-white/20 rounded-full">
-                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                    <AlertCircle className="h-4 w-4" />
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Modern Action Items Table */}
-        <div className="px-2 sm:px-3 lg:px-4 py-1 sm:py-2 pb-4">
-          <div className="max-w-6xl mx-auto">
-            <div className="bg-white/70 dark:bg-gray-800/70 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-gray-200/30 dark:border-gray-700/30 overflow-hidden">
-              <div className="p-2 sm:p-3 border-b border-gray-200/30 dark:border-gray-700/30">
+          {/* Action Items Table */}
+          <div className="flex-1 min-h-0">
+            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden h-full flex flex-col">
+              <div className="p-4 border-b border-gray-700">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100/80 dark:bg-green-900/40 rounded-lg backdrop-blur-sm">
-                      <BarChart3 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                    <div className="p-2 bg-green-100/80 dark:bg-green-900/40 rounded-lg">
+                      <BarChart3 className="h-5 w-5 text-green-600 dark:text-green-400" />
                     </div>
                     <div>
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-800 dark:text-gray-200">Action Items</h3>
-                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Detailed view of all activities</p>
+                      <h3 className="text-lg font-semibold text-white">Action Items</h3>
+                      <p className="text-sm text-gray-400">Detailed view of all activities</p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="bg-blue-100/80 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 text-xs sm:text-sm">
+                  <Badge variant="secondary" className="bg-blue-100/80 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 text-sm">
                     {sortedItems.length} items
                   </Badge>
                 </div>
               </div>
               
-              <div className="p-4 sm:p-6">
+              <div className="flex-1 overflow-auto p-4">
                 {loading ? (
-                  <div className="flex items-center justify-center py-8 sm:py-12">
+                  <div className="flex items-center justify-center py-12">
                     <div className="flex items-center gap-3">
-                      <RefreshCw className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-blue-500" />
-                      <span className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">Loading action items...</span>
+                      <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                      <span className="text-gray-400 text-base">Loading action items...</span>
                     </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
-                        <tr className="border-b border-gray-200/50 dark:border-gray-700/50">
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">
+                        <tr className="border-b border-gray-700">
+                          <th className="text-left p-4 font-semibold text-gray-300">
                             <button
                               onClick={() => handleSort("municipality")}
-                              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
                             >
                               Municipality
                               {sortBy === "municipality" && (
@@ -985,10 +1011,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">
+                          <th className="text-left p-4 font-semibold text-gray-300">
                             <button
                               onClick={() => handleSort("district")}
-                              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
                             >
                               District
                               {sortBy === "district" && (
@@ -996,11 +1022,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">What</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">
+                          <th className="text-left p-4 font-semibold text-gray-300">What</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">
                             <button
                               onClick={() => handleSort("when")}
-                              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
                             >
                               When
                               {sortBy === "when" && (
@@ -1008,56 +1034,56 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Where</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Who</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Why</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">How</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Action Taken</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Other Information</th>
-                          <th className="text-left p-4 font-semibold text-gray-700 dark:text-gray-300">Actions</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Where</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Who</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Why</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">How</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Action Taken</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Other Information</th>
+                          <th className="text-left p-4 font-semibold text-gray-300">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {sortedItems.map((item) => {
                           const IconComponent = item.icon;
                           return (
-                            <tr key={item.id} className="border-b border-gray-100/50 dark:border-gray-700/50 hover:bg-gray-50/50 dark:hover:bg-gray-700/30 transition-colors duration-200">
+                            <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors duration-200">
                               <td className="p-4">
                                 <div className="flex items-center gap-3">
                                   <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
                                     <IconComponent className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                                   </div>
-                                  <span className="font-medium text-gray-800 dark:text-gray-200">{item.municipality}</span>
+                                  <span className="font-medium text-white">{item.municipality}</span>
                                 </div>
                               </td>
                               <td className="p-4">
-                                <Badge variant="outline" className="bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300">
+                                <Badge variant="outline" className="bg-gray-700 text-gray-300 border-gray-600">
                                   {item.district}
                                 </Badge>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-700 dark:text-gray-300" title={item.what}>
+                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.what}>
                                   {item.what}
                                 </span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm text-gray-600 dark:text-gray-400">
+                                <span className="text-sm text-gray-400">
                                   {formatDate(item.when)}
                                 </span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{item.where}</span>
+                                <span className="text-sm text-gray-300">{item.where}</span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm text-gray-700 dark:text-gray-300">{item.who}</span>
+                                <span className="text-sm text-gray-300">{item.who}</span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-700 dark:text-gray-300" title={item.why}>
+                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.why}>
                                   {item.why}
                                 </span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-700 dark:text-gray-300" title={item.how}>
+                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.how}>
                                   {item.how}
                                 </span>
                               </td>
@@ -1071,7 +1097,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 </Badge>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-700 dark:text-gray-300" title={item.otherInfo}>
+                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.otherInfo}>
                                   {item.otherInfo}
                                 </span>
                               </td>
@@ -1113,11 +1139,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </table>
                     
                     {sortedItems.length === 0 && (
-                      <div className="text-center py-8 sm:py-12">
-                        <div className="p-3 sm:p-4 bg-gray-100 dark:bg-gray-700 rounded-full w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 flex items-center justify-center">
-                          <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-gray-400" />
+                      <div className="text-center py-12">
+                        <div className="p-4 bg-gray-700 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+                          <AlertTriangle className="h-8 w-8 text-gray-400" />
                         </div>
-                        <p className="text-gray-600 dark:text-gray-400 text-sm sm:text-base">No action items found matching your criteria.</p>
+                        <p className="text-gray-400 text-base">No action items found matching your criteria.</p>
                       </div>
                     )}
                   </div>
@@ -1127,201 +1153,618 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
-                 {/* Add Action Report Modal */}
-         {showAddModal && (
-           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-             <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto ${
-               isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
-             }`}>
-               <div className="flex items-center gap-3 mb-4 sm:mb-6">
-                 <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
-                   <FileText className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                 </div>
-                 <h3 className="text-xl font-semibold">Add New Action Report</h3>
-               </div>
-               
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4 mb-4 sm:mb-6">
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Department *</label>
-                   <select
-                     value={newActionReport.department}
-                     onChange={(e) => handleInputChange('department', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   >
-                     <option value="">Select Department</option>
-                     <option value="pnp">PNP</option>
-                     <option value="agriculture">Agriculture / Bantay Dagat</option>
-                     <option value="pg-enro">PG-Enro / Agriculture</option>
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Municipality *</label>
-                   <select
-                     value={newActionReport.municipality}
-                     onChange={(e) => handleInputChange('municipality', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   >
-                     <option value="">Select Municipality</option>
-                     {["Abucay", "Orani", "Samal", "Hermosa", "Balanga", "Pilar", "Orion", "Limay", "Bagac", "Dinalupihan", "Mariveles", "Morong"].map(municipality => (
-                       <option key={municipality} value={municipality}>{municipality}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">District *</label>
-                   <select
-                     value={newActionReport.district}
-                     onChange={(e) => handleInputChange('district', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   >
-                     <option value="">Select District</option>
-                     {districts.slice(1).map((district) => (
-                       <option key={district.id} value={district.name}>{district.name}</option>
-                     ))}
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">What *</label>
-                   <Input
-                     type="text"
-                     placeholder="Describe what happened..."
-                     value={newActionReport.what}
-                     onChange={(e) => handleInputChange('what', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">When *</label>
-                   <Input
-                     type="datetime-local"
-                     value={newActionReport.when.toISOString().slice(0, 16)}
-                     onChange={(e) => handleInputChange('when', new Date(e.target.value))}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Where *</label>
-                   <Input
-                     type="text"
-                     placeholder="Location of the incident..."
-                     value={newActionReport.where}
-                     onChange={(e) => handleInputChange('where', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Who *</label>
-                   <Input
-                     type="text"
-                     placeholder="Personnel involved..."
-                     value={newActionReport.who}
-                     onChange={(e) => handleInputChange('who', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Why</label>
-                   <Input
-                     type="text"
-                     placeholder="Reason for the action..."
-                     value={newActionReport.why}
-                     onChange={(e) => handleInputChange('why', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">How</label>
-                   <Input
-                     type="text"
-                     placeholder="Method or procedure used..."
-                     value={newActionReport.how}
-                     onChange={(e) => handleInputChange('how', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                   />
-                 </div>
-                 
-                 <div className="space-y-2">
-                   <label className="text-sm font-medium">Action Taken *</label>
-                   <select
-                     value={newActionReport.actionTaken}
-                     onChange={(e) => handleInputChange('actionTaken', e.target.value)}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                     required
-                   >
-                     <option value="">Select Action</option>
-                     <option value="Under investigation">Under investigation</option>
-                     <option value="Resolved">Resolved</option>
-                     <option value="Pending">Pending</option>
-                     <option value="In progress">In progress</option>
-                   </select>
-                 </div>
-                 
-                 <div className="space-y-2 md:col-span-2">
-                   <label className="text-sm font-medium">Other Information</label>
-                   <textarea
-                     placeholder="Additional details and notes..."
-                     value={newActionReport.otherInfo}
-                     onChange={(e) => handleInputChange('otherInfo', e.target.value)}
-                     rows={3}
-                     className="w-full p-3 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                   />
-                 </div>
-               </div>
-               
-               <div className="flex gap-3 justify-end">
-                 <Button onClick={handleCancelAdd} variant="outline">
-                   Cancel
-                 </Button>
-                 <Button onClick={handleSubmitActionReport} className="bg-orange-600 hover:bg-orange-700">
-                   <Save className="h-4 w-4 mr-2" />
-                   Save Report
-                 </Button>
-               </div>
-             </div>
-           </div>
-         )}
+        {/* Add Action Report Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+              isDarkMode 
+                ? 'bg-gray-900 text-white border-gray-700' 
+                : 'bg-white text-gray-900 border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${
+                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                  }`}>
+                    <FileText className={`h-6 w-6 ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Add New Action Report</h3>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>Create a new action report entry</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCancelAdd}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Department <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newActionReport.department}
+                    onChange={(e) => handleInputChange('department', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Department</option>
+                    <option value="pnp">PNP</option>
+                    <option value="agriculture">Agriculture / Bantay Dagat</option>
+                    <option value="pg-enro">PG-Enro / Agriculture</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Municipality <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newActionReport.municipality}
+                    onChange={(e) => handleInputChange('municipality', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Municipality</option>
+                    {Object.values(municipalitiesByDistrict).flat().map(municipality => (
+                      <option key={municipality} value={municipality}>{municipality}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    District <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newActionReport.district}
+                    disabled
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-700 text-gray-400 cursor-not-allowed' 
+                        : 'border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed'
+                    }`}
+                    required
+                  >
+                    <option value="">{newActionReport.municipality ? 'Auto-detected' : 'Select Municipality First'}</option>
+                    {newActionReport.district && (
+                      <option value={newActionReport.district}>{newActionReport.district}</option>
+                    )}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    What <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Describe what happened..."
+                    value={newActionReport.what}
+                    onChange={(e) => handleInputChange('what', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    When <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="datetime-local"
+                    value={newActionReport.when.toISOString().slice(0, 16)}
+                    onChange={(e) => handleInputChange('when', new Date(e.target.value))}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Where <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Location of the incident..."
+                    value={newActionReport.where}
+                    onChange={(e) => handleInputChange('where', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Who <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Personnel involved..."
+                    value={newActionReport.who}
+                    onChange={(e) => handleInputChange('who', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Why
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Reason for the action..."
+                    value={newActionReport.why}
+                    onChange={(e) => handleInputChange('why', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    How
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Method or procedure used..."
+                    value={newActionReport.how}
+                    onChange={(e) => handleInputChange('how', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Action Taken <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={newActionReport.actionTaken}
+                    onChange={(e) => handleInputChange('actionTaken', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Action</option>
+                    <option value="Under investigation">Under investigation</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In progress">In progress</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Other Information
+                  </label>
+                  <textarea
+                    placeholder="Additional details and notes..."
+                    value={newActionReport.otherInfo}
+                    onChange={(e) => handleInputChange('otherInfo', e.target.value)}
+                    rows={3}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 resize-none ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  onClick={handleCancelAdd} 
+                  variant="outline"
+                  className={`${
+                    isDarkMode 
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleSubmitActionReport} 
+                  className={`${
+                    isDarkMode 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Save Report
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
-         {/* Delete Confirmation Modal */}
-         {showDeleteModal && (
-           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-             <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full ${
-               isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
-             }`}>
-               <div className="flex items-center gap-3 mb-3 sm:mb-4">
-                 <AlertTriangle className="h-6 w-6 text-red-500" />
-                 <h3 className="text-lg font-semibold">Confirm Delete</h3>
-               </div>
-               <p className="mb-4 sm:mb-6">
-                 Are you sure you want to delete this action item?
-                 <br />
-                 <strong>{selectedItem?.what}</strong>
-               </p>
-               <div className="flex gap-3 justify-end">
-                 <Button onClick={cancelDelete} variant="outline">
-                   Cancel
-                 </Button>
-                 <Button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
-                   Delete
-                 </Button>
-               </div>
-             </div>
-           </div>
-         )}
+        {/* Edit Action Report Modal */}
+        {showEditModal && editingItem && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+              isDarkMode 
+                ? 'bg-gray-900 text-white border-gray-700' 
+                : 'bg-white text-gray-900 border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${
+                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                  }`}>
+                    <Edit className={`h-6 w-6 ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Edit Action Report</h3>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>Update action report details</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCancelEdit}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Department <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editingItem.department}
+                    onChange={(e) => handleEditInputChange('department', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Department</option>
+                    <option value="pnp">PNP</option>
+                    <option value="agriculture">Agriculture / Bantay Dagat</option>
+                    <option value="pg-enro">PG-Enro / Agriculture</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Municipality <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editingItem.municipality}
+                    onChange={(e) => handleEditInputChange('municipality', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Municipality</option>
+                    {Object.values(municipalitiesByDistrict).flat().map(municipality => (
+                      <option key={municipality} value={municipality}>{municipality}</option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    District <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editingItem.district}
+                    disabled
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-700 text-gray-400 cursor-not-allowed' 
+                        : 'border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed'
+                    }`}
+                    required
+                  >
+                    <option value="">{editingItem.municipality ? 'Auto-detected' : 'Select Municipality First'}</option>
+                    {editingItem.district && (
+                      <option value={editingItem.district}>{editingItem.district}</option>
+                    )}
+                  </select>
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    What <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Describe what happened..."
+                    value={editingItem.what}
+                    onChange={(e) => handleEditInputChange('what', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    When <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="datetime-local"
+                    value={editingItem.when.toISOString ? editingItem.when.toISOString().slice(0, 16) : new Date(editingItem.when).toISOString().slice(0, 16)}
+                    onChange={(e) => handleEditInputChange('when', new Date(e.target.value))}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Where <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Location of the incident..."
+                    value={editingItem.where}
+                    onChange={(e) => handleEditInputChange('where', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Who <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Personnel involved..."
+                    value={editingItem.who}
+                    onChange={(e) => handleEditInputChange('who', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Why
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Reason for the action..."
+                    value={editingItem.why}
+                    onChange={(e) => handleEditInputChange('why', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    How
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Method or procedure used..."
+                    value={editingItem.how}
+                    onChange={(e) => handleEditInputChange('how', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Action Taken <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={editingItem.actionTaken}
+                    onChange={(e) => handleEditInputChange('actionTaken', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  >
+                    <option value="">Select Action</option>
+                    <option value="Under investigation">Under investigation</option>
+                    <option value="Resolved">Resolved</option>
+                    <option value="Pending">Pending</option>
+                    <option value="In progress">In progress</option>
+                  </select>
+                </div>
+                
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Other Information
+                  </label>
+                  <textarea
+                    placeholder="Additional details and notes..."
+                    value={editingItem.otherInfo}
+                    onChange={(e) => handleEditInputChange('otherInfo', e.target.value)}
+                    rows={3}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 resize-none ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  onClick={handleCancelEdit} 
+                  variant="outline"
+                  className={`${
+                    isDarkMode 
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleEditActionReport} 
+                  className={`${
+                    isDarkMode 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  Update Report
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {showDeleteModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full ${
+              isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+            }`}>
+              <div className="flex items-center gap-3 mb-3 sm:mb-4">
+                <AlertTriangle className="h-6 w-6 text-red-500" />
+                <h3 className="text-lg font-semibold">Confirm Delete</h3>
+              </div>
+              <p className="mb-4 sm:mb-6">
+                Are you sure you want to delete this action item?
+                <br />
+                <strong>{selectedItem?.what}</strong>
+              </p>
+              <div className="flex gap-3 justify-end">
+                <Button onClick={cancelDelete} variant="outline">
+                  Cancel
+                </Button>
+                <Button onClick={confirmDelete} className="bg-red-600 hover:bg-red-700">
+                  Delete
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </Layout>
   );

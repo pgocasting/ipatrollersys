@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
@@ -322,6 +322,62 @@ export const useFirebase = () => {
     }
   };
 
+  // Action Reports functions
+  const saveActionReport = useCallback(async (actionReport) => {
+    try {
+      const docRef = doc(db, 'actionReports', actionReport.id);
+      await setDoc(docRef, {
+        ...actionReport,
+        createdAt: new Date().toISOString(),
+        createdBy: user?.uid || user?.email,
+        updatedAt: new Date().toISOString()
+      });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }, [user]);
+
+  const getActionReports = useCallback(async () => {
+    try {
+      const q = query(collection(db, 'actionReports'));
+      const querySnapshot = await getDocs(q);
+      const reports = [];
+      
+      querySnapshot.forEach((doc) => {
+        reports.push({ id: doc.id, ...doc.data() });
+      });
+      
+      return { success: true, data: reports };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }, []);
+
+  const updateActionReport = useCallback(async (reportId, updates) => {
+    try {
+      const docRef = doc(db, 'actionReports', reportId);
+      await updateDoc(docRef, {
+        ...updates,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.uid || user?.email
+      });
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }, [user]);
+
+  const deleteActionReport = useCallback(async (reportId) => {
+    try {
+      const docRef = doc(db, 'actionReports', reportId);
+      await deleteDoc(docRef);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }, []);
+
   return {
     user,
     loading,
@@ -338,6 +394,10 @@ export const useFirebase = () => {
     updateUser,
     deleteUser,
     getCurrentUserRole,
-    hasPermission
+    hasPermission,
+    saveActionReport,
+    getActionReports,
+    updateActionReport,
+    deleteActionReport
   };
 }; 

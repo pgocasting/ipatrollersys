@@ -6,8 +6,6 @@ import { Alert, AlertDescription } from "./components/ui/alert";
 import { Loader2 } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
 import { useTheme } from "./ThemeContext";
-import { initializeFirestore, checkAdminUser } from "./utils/initFirestore";
-import { createDefaultAdmin, testFirebaseLogin } from "./utils/initFirebaseAuth";
 
 export default function Login({ onLogin }) {
   const [formData, setFormData] = useState({
@@ -61,73 +59,7 @@ export default function Login({ onLogin }) {
     }));
   };
 
-  // Debug function to initialize Firestore
-  const handleInitializeFirestore = async () => {
-    try {
-      console.log('🔧 Manually initializing Firestore...');
-      const result = await initializeFirestore();
-      if (result.success) {
-        alert('✅ Firestore initialized successfully! You can now login.');
-      } else {
-        alert('❌ Failed to initialize Firestore: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error initializing Firestore:', error);
-      alert('❌ Error: ' + error.message);
-    }
-  };
 
-  // Debug function to check admin user
-  const handleCheckAdminUser = async () => {
-    try {
-      console.log('🔍 Checking admin user...');
-      const result = await checkAdminUser();
-      if (result.success) {
-        if (result.exists) {
-          alert('✅ Admin user exists in Firestore');
-        } else {
-          alert('❌ Admin user not found in Firestore');
-        }
-      } else {
-        alert('❌ Error checking admin user: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error checking admin user:', error);
-      alert('❌ Error: ' + error.message);
-    }
-  };
-
-  // Debug function to create Firebase admin user
-  const handleCreateFirebaseAdmin = async () => {
-    try {
-      console.log('🔧 Creating Firebase admin user...');
-      const result = await createDefaultAdmin();
-      if (result.success) {
-        alert('✅ Firebase admin user created successfully!');
-      } else {
-        alert('ℹ️ ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error creating Firebase admin:', error);
-      alert('❌ Error: ' + error.message);
-    }
-  };
-
-  // Debug function to test Firebase login
-  const handleTestFirebaseLogin = async () => {
-    try {
-      console.log('🔧 Testing Firebase login...');
-      const result = await testFirebaseLogin('admin@ipatroller.gov.ph', 'admin123456');
-      if (result.success) {
-        alert('✅ Firebase login test successful!');
-      } else {
-        alert('❌ Firebase login test failed: ' + result.error);
-      }
-    } catch (error) {
-      console.error('Error testing Firebase login:', error);
-      alert('❌ Error: ' + error.message);
-    }
-  };
 
   return (
     <div className={`min-h-screen flex items-stretch transition-all duration-300 ${
@@ -423,65 +355,9 @@ export default function Login({ onLogin }) {
               )}
             </Button>
                 </div>
-
-                {/* Debug buttons - remove in production */}
-                <div className="mt-4 space-y-2">
-                  <Button
-                    type="button"
-                    onClick={handleCreateFirebaseAdmin}
-                    variant="outline"
-                    size="sm"
-                    className={`w-full text-xs ${
-                      isDarkMode 
-                        ? 'bg-green-900/20 border-green-700 text-green-300 hover:bg-green-900/30' 
-                        : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'
-                    }`}
-                  >
-                    🔐 Create Firebase Admin
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleTestFirebaseLogin}
-                    variant="outline"
-                    size="sm"
-                    className={`w-full text-xs ${
-                      isDarkMode 
-                        ? 'bg-purple-900/20 border-purple-700 text-purple-300 hover:bg-purple-900/30' 
-                        : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
-                    }`}
-                  >
-                    🧪 Test Firebase Login
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleInitializeFirestore}
-                    variant="outline"
-                    size="sm"
-                    className={`w-full text-xs ${
-                      isDarkMode 
-                        ? 'bg-yellow-900/20 border-yellow-700 text-yellow-300 hover:bg-yellow-900/30' 
-                        : 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:bg-yellow-100'
-                    }`}
-                  >
-                    🔧 Initialize Firestore
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleCheckAdminUser}
-                    variant="outline"
-                    size="sm"
-                    className={`w-full text-xs ${
-                      isDarkMode 
-                        ? 'bg-blue-900/20 border-blue-700 text-blue-300 hover:bg-blue-900/30' 
-                        : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                    }`}
-                  >
-                    🔍 Check Admin User
-                  </Button>
-                </div>
           </form>
 
-              {/* Enhanced Footer */}
+                {/* Enhanced Footer */}
               <div className="text-center mt-8 pt-6 border-t border-gray-200/50">
                 <p className="text-sm text-gray-600 font-medium">
                   © 2025 Patrol System. All rights reserved.
