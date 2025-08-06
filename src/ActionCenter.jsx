@@ -597,7 +597,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className={`text-3xl font-bold transition-colors duration-300 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
                   Action Center
                 </h1>
                 <p className={`text-sm transition-colors duration-300 ${

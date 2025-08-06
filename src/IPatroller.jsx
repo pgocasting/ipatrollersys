@@ -55,8 +55,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingMunicipality, setEditingMunicipality] = useState(null);
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
-  const [selectedMonth, setSelectedMonth] = useState(6); // July (0-indexed)
-  const [selectedYear, setSelectedYear] = useState(2025);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth()); // Current month (0-indexed)
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear()); // Current year
   const [searchTerm, setSearchTerm] = useState("");
   const [activeTab, setActiveTab] = useState("daily"); // "daily" or "status"
   const [expandedDistricts, setExpandedDistricts] = useState({
@@ -77,9 +77,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const generateDates = (month, year) => {
     const dates = [];
     const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const currentDate = new Date();
+    const isCurrentMonth = month === currentDate.getMonth() && year === currentDate.getFullYear();
     
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
+      const isCurrentDay = isCurrentMonth && day === currentDate.getDate();
       dates.push({
         date: date,
         dayName: date.toLocaleDateString('en-US', { weekday: 'short' }),
@@ -88,7 +91,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           weekday: 'short', 
           month: 'short', 
           day: 'numeric' 
-        })
+        }),
+        isCurrentDay: isCurrentDay
       });
     }
     return dates;
@@ -907,20 +911,25 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                    'Connection Error'}
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className={`text-sm font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
-                  Current: {String(selectedMonth + 1).padStart(2, '0')}-{selectedYear}
-                </span>
-                {availableMonths.length > 0 && (
-                  <span className={`text-xs transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
-                    ({availableMonths.length} months available)
-                  </span>
-                )}
-              </div>
+                        <div className="flex items-center gap-2">
+            <span className={`text-sm font-medium transition-colors duration-300 ${
+              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+            }`}>
+              Current: {String(selectedMonth + 1).padStart(2, '0')}-{selectedYear}
+            </span>
+            {selectedMonth === new Date().getMonth() && selectedYear === new Date().getFullYear() && (
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 text-xs">
+                Current Month
+              </Badge>
+            )}
+            {availableMonths.length > 0 && (
+              <span className={`text-xs transition-colors duration-300 ${
+                isDarkMode ? 'text-gray-400' : 'text-gray-500'
+              }`}>
+                ({availableMonths.length} months available)
+              </span>
+            )}
+          </div>
             </div>
                     </div>
         </div>
@@ -983,6 +992,21 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <option value={11}>December</option>
               </select>
           </div>
+          
+          <Button
+            variant="outline"
+            onClick={() => {
+              setSelectedMonth(new Date().getMonth());
+              setSelectedYear(new Date().getFullYear());
+            }}
+            className={`transition-colors duration-300 ${
+              isDarkMode ? 'border-blue-600 text-blue-300 hover:bg-blue-800' : 'border-blue-300 text-blue-700 hover:bg-blue-50'
+            }`}
+            title="Go to current month"
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Current Month
+          </Button>
 
           <div className="flex items-center gap-2">
             <label className={`text-sm font-medium transition-colors duration-300 ${
@@ -1187,11 +1211,16 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       // Daily Counts Tab - Show all dates with input fields
                       selectedDates.map((date, index) => (
                         <th key={index} className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                          date.isCurrentDay 
+                            ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-400' 
+                            : isDarkMode ? 'text-gray-400' : 'text-gray-500'
                         }`}>
                           <div className="flex flex-col items-center">
                             <span className="text-xs">{date.dayName}</span>
-                            <span className="text-xs">{date.dayNumber}</span>
+                            <span className={`text-xs ${date.isCurrentDay ? 'font-bold' : ''}`}>{date.dayNumber}</span>
+                            {date.isCurrentDay && (
+                              <div className="w-2 h-2 bg-blue-500 rounded-full mt-1"></div>
+                            )}
                       </div>
                     </th>
                       ))
@@ -1309,26 +1338,31 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             
                             {activeTab === "daily" ? (
                               // Daily Counts Tab - Show input fields for each day
-                              item.data.map((value, dayIndex) => (
-                                <td key={dayIndex} className="px-2 py-3 text-center">
-                                  <div className="space-y-1">
-                                    <Input
-                                      type="number"
-                                      min="0"
-                                      max="20"
-                                      value={value || ''}
-                                      onChange={(e) => handleAddPatrolData(item.municipality, item.district, dayIndex, e.target.value)}
-                                      className={`w-16 h-8 text-center text-xs transition-colors duration-300 ${
-                                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                                      }`}
-                                      placeholder="0"
-                                    />
-                                    <Badge className={`text-xs ${getStatusColor(value)}`}>
-                                      {getStatusText(value)}
-                                    </Badge>
-                                  </div>
-                                </td>
-                              ))
+                              item.data.map((value, dayIndex) => {
+                                const isCurrentDay = selectedDates[dayIndex]?.isCurrentDay;
+                                return (
+                                  <td key={dayIndex} className={`px-2 py-3 text-center ${isCurrentDay ? 'bg-blue-50 dark:bg-blue-900/20' : ''}`}>
+                                    <div className="space-y-1">
+                                      <Input
+                                        type="number"
+                                        min="0"
+                                        max="20"
+                                        value={value || ''}
+                                        onChange={(e) => handleAddPatrolData(item.municipality, item.district, dayIndex, e.target.value)}
+                                        className={`w-16 h-8 text-center text-xs transition-colors duration-300 ${
+                                          isCurrentDay 
+                                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/30 dark:border-blue-400' 
+                                            : isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
+                                        }`}
+                                        placeholder="0"
+                                      />
+                                      <Badge className={`text-xs ${getStatusColor(value)}`}>
+                                        {getStatusText(value)}
+                                      </Badge>
+                                    </div>
+                                  </td>
+                                );
+                              })
                             ) : (
                               // Status Tab - Show only summary data
                               <>

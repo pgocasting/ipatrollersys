@@ -7,6 +7,22 @@ import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
 import { useTheme } from "./ThemeContext";
+import { db } from "./firebase";
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  orderBy,
+  onSnapshot,
+  writeBatch,
+  deleteDoc,
+  addDoc,
+  updateDoc
+} from "firebase/firestore";
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
@@ -335,6 +351,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   ];
   
   const [incidents, setIncidents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [firestoreStatus, setFirestoreStatus] = useState('connecting');
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -348,6 +366,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   
   // PDF Edit Interface State
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
+  const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfReportData, setPdfReportData] = useState({
     memorandum: {
       for: 'The Provincial Director, Bataan Police Provincial Office',
@@ -392,16 +412,288 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     priority: "Medium",
   });
 
-  const handleAddIncident = () => {
+  // Firestore functions
+  const loadIncidents = async () => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('connecting');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const incidentsData = [];
+      const seenIds = new Set();
+      
+      querySnapshot.forEach((doc) => {
+        const incidentData = {
+          id: doc.id,
+          ...doc.data()
+        };
+        
+        // Skip if we've already seen this ID
+        if (seenIds.has(incidentData.id)) {
+          console.warn('⚠️ Skipping duplicate incident ID:', incidentData.id);
+          return;
+        }
+        
+        seenIds.add(incidentData.id);
+        
+        // Clean the data when loading from Firestore
+        const cleanedIncident = cleanIncidentData(incidentData);
+        incidentsData.push(cleanedIncident);
+      });
+      
+      setIncidents(incidentsData);
+      setFirestoreStatus('connected');
+      console.log('✅ Loaded incidents from Firestore:', incidentsData.length);
+    } catch (error) {
+      console.error('❌ Error loading incidents:', error);
+      setFirestoreStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveIncident = async (incidentData) => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const docRef = await addDoc(incidentsRef, {
+        ...incidentData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      
+      setFirestoreStatus('connected');
+      console.log('✅ Incident saved to Firestore with ID:', docRef.id);
+      return docRef.id;
+    } catch (error) {
+      console.error('❌ Error saving incident:', error);
+      setFirestoreStatus('error');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const updateIncident = async (incidentId, incidentData) => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentRef = doc(db, 'incidents', incidentId);
+      
+      // Check if document exists before updating
+      const docSnap = await getDoc(incidentRef);
+      if (!docSnap.exists()) {
+        console.warn('⚠️ Document not found, creating new one with auto-generated ID');
+        // Create new document with auto-generated ID instead of using the old ID
+        const incidentsRef = collection(db, 'incidents');
+        const newDocRef = await addDoc(incidentsRef, {
+          ...incidentData,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+        console.log('✅ New incident created with ID:', newDocRef.id);
+      } else {
+        // Update existing document
+        await updateDoc(incidentRef, {
+          ...incidentData,
+          updatedAt: new Date().toISOString()
+        });
+        console.log('✅ Incident updated in Firestore:', incidentId);
+      }
+      
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error updating incident:', error);
+      setFirestoreStatus('error');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteIncident = async (incidentId) => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentRef = doc(db, 'incidents', incidentId);
+      await deleteDoc(incidentRef);
+      
+      setFirestoreStatus('connected');
+      console.log('✅ Incident deleted from Firestore:', incidentId);
+    } catch (error) {
+      console.error('❌ Error deleting incident:', error);
+      setFirestoreStatus('error');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const clearAllIncidents = async () => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      
+      await batch.commit();
+      setIncidents([]);
+      setFirestoreStatus('connected');
+      console.log('✅ All incidents cleared from Firestore');
+    } catch (error) {
+      console.error('❌ Error clearing incidents:', error);
+      setFirestoreStatus('error');
+      throw error;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const cleanupDuplicateIncidents = async () => {
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const incidentsMap = new Map();
+      const batch = writeBatch(db);
+      let duplicatesRemoved = 0;
+      
+      querySnapshot.forEach((doc) => {
+        const incidentData = doc.data();
+        const key = incidentData.incidentType + '_' + incidentData.date + '_' + incidentData.location;
+        
+        if (incidentsMap.has(key)) {
+          // This is a duplicate, remove it
+          batch.delete(doc.ref);
+          duplicatesRemoved++;
+          console.log('🗑️ Removing duplicate incident:', doc.id);
+        } else {
+          incidentsMap.set(key, doc);
+        }
+      });
+      
+      if (duplicatesRemoved > 0) {
+        await batch.commit();
+        console.log(`✅ Removed ${duplicatesRemoved} duplicate incidents from Firestore`);
+        // Reload incidents after cleanup
+        await loadIncidents();
+      } else {
+        console.log('✅ No duplicate incidents found');
+      }
+      
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error cleaning up duplicate incidents:', error);
+      setFirestoreStatus('error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load incidents on component mount
+  useEffect(() => {
+    loadIncidents();
+  }, []);
+
+  // Clean existing data when incidents are loaded
+  useEffect(() => {
+    if (incidents.length > 0) {
+      const cleanedIncidents = incidents.map(incident => cleanIncidentData(incident));
+      
+      // Remove duplicates by ID, keeping the most recent one
+      const uniqueIncidents = cleanedIncidents.reduce((acc, incident) => {
+        const existingIndex = acc.findIndex(item => item.id === incident.id);
+        if (existingIndex === -1) {
+          acc.push(incident);
+        } else {
+          // Replace with the more recent version (based on updatedAt or createdAt)
+          const existing = acc[existingIndex];
+          const existingTime = existing.updatedAt || existing.createdAt || '';
+          const newTime = incident.updatedAt || incident.createdAt || '';
+          
+          if (newTime > existingTime) {
+            acc[existingIndex] = incident;
+          }
+        }
+        return acc;
+      }, []);
+      
+      // Only update if there were changes
+      const hasChanges = uniqueIncidents.length !== incidents.length || 
+        uniqueIncidents.some((incident, index) => 
+          JSON.stringify(incident) !== JSON.stringify(incidents[index])
+        );
+      
+      if (hasChanges) {
+        console.log('Cleaning existing incident data and removing duplicates...');
+        console.log(`Original count: ${incidents.length}, Cleaned count: ${uniqueIncidents.length}`);
+        setIncidents(uniqueIncidents);
+      }
+      
+      // Debug: Check for duplicate IDs
+      const ids = uniqueIncidents.map(incident => incident.id);
+      const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+      if (duplicateIds.length > 0) {
+        console.warn('⚠️ Found duplicate incident IDs:', duplicateIds);
+      } else {
+        console.log('✅ No duplicate IDs found');
+      }
+    }
+  }, [incidents.length]); // Only run when incidents array length changes
+
+  const handleAddIncident = async () => {
+    try {
     // Auto-identify incident type if not specified
-    const finalIncidentType = newIncident.incidentType || identifyIncidentType(newIncident.description);
-    
-    const incident = {
+      let finalIncidentType = newIncident.incidentType || identifyIncidentType(newIncident.description);
+      
+      // Format "Other" type with description from "What" field
+      if (finalIncidentType === "Other" && newIncident.description) {
+        finalIncidentType = `Other (${newIncident.description})`;
+      }
+      
+      // Validate and clean the incident data
+      const validatedIncident = cleanIncidentData({
       ...newIncident,
-      incidentType: finalIncidentType,
-      id: incidents.length + 1,
-    };
-    setIncidents([...incidents, incident]);
+        incidentType: finalIncidentType
+      });
+      
+      const extractedMonth = extractMonthFromDate(validatedIncident.date);
+      const extractedYear = extractYearFromDate(validatedIncident.date);
+      
+      console.log('📅 Date extraction:', {
+        input: validatedIncident.date,
+        extractedMonth,
+        extractedYear
+      });
+      
+      const incidentData = {
+        ...validatedIncident,
+        month: extractedMonth,
+        year: extractedYear,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Save to Firestore
+      await saveIncident(incidentData);
+      
+      // Reload incidents from Firestore
+      await loadIncidents();
+      
+      // Reset form
     setNewIncident({
       incidentType: "",
       location: "",
@@ -426,6 +718,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       priority: "Medium",
     });
     setShowAddModal(false);
+    } catch (error) {
+      console.error('Error adding incident:', error);
+      alert('Error adding incident. Please try again.');
+    }
   };
 
   // Function to handle district change and update municipality
@@ -440,14 +736,86 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     });
   };
 
-  const handleEditIncident = () => {
-    setIncidents(
-      incidents.map((incident) =>
-        incident.id === editingIncident.id ? editingIncident : incident
-      )
-    );
+  // Function to handle incident type change with "Other" formatting
+  const handleIncidentTypeChange = (incidentType) => {
+    let finalIncidentType = incidentType;
+    
+    // Format "Other" type with description from "What" field
+    if (incidentType === "Other" && newIncident.description) {
+      finalIncidentType = `Other (${newIncident.description})`;
+      console.log('🔄 Formatting Other type:', finalIncidentType);
+    }
+    
+    setNewIncident({
+      ...newIncident,
+      incidentType: finalIncidentType
+    });
+  };
+
+  // Function to handle description change and update "Other" type formatting
+  const handleDescriptionChange = (description) => {
+    let finalIncidentType = newIncident.incidentType;
+    
+    // If type is "Other", update the formatting with new description
+    if (newIncident.incidentType === "Other" || newIncident.incidentType.startsWith("Other (")) {
+      if (description) {
+        finalIncidentType = `Other (${description})`;
+        console.log('🔄 Updating Other type with description:', finalIncidentType);
+      } else {
+        finalIncidentType = "Other";
+        console.log('🔄 Clearing Other type description');
+      }
+    }
+    
+    setNewIncident({
+      ...newIncident,
+      description: description,
+      incidentType: finalIncidentType
+    });
+  };
+
+  const handleEditIncident = async () => {
+    try {
+      // Format "Other" type with description from "What" field
+      let finalIncidentType = editingIncident.incidentType;
+      if (finalIncidentType === "Other" && editingIncident.description) {
+        finalIncidentType = `Other (${editingIncident.description})`;
+      }
+      
+      // Validate and clean the incident data before updating
+      const validatedIncident = validateIncidentForEdit({
+        ...editingIncident,
+        incidentType: finalIncidentType
+      });
+      
+      const extractedMonth = extractMonthFromDate(validatedIncident.date);
+      const extractedYear = extractYearFromDate(validatedIncident.date);
+      
+      console.log('📅 Date extraction (edit):', {
+        input: validatedIncident.date,
+        extractedMonth,
+        extractedYear
+      });
+      
+      const incidentData = {
+        ...validatedIncident,
+        month: extractedMonth,
+        year: extractedYear,
+        updatedAt: new Date().toISOString()
+      };
+      
+      // Update in Firestore
+      await updateIncident(String(editingIncident.id), incidentData);
+      
+      // Reload incidents from Firestore
+      await loadIncidents();
+      
     setEditingIncident(null);
     setShowEditModal(false);
+    } catch (error) {
+      console.error('Error updating incident:', error);
+      alert('Error updating incident. Please try again.');
+    }
   };
 
   // Function to handle district change in edit modal
@@ -462,8 +830,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     });
   };
 
-  const handleDeleteIncident = (id) => {
-    setIncidents(incidents.filter((incident) => incident.id !== id));
+  const handleDeleteIncident = async (id) => {
+    if (window.confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
+      try {
+        await deleteIncident(String(id));
+        await loadIncidents(); // Reload from Firestore
+      } catch (error) {
+        console.error('Error deleting incident:', error);
+        alert('Error deleting incident. Please try again.');
+      }
+    }
   };
 
   // Import Excel functionality
@@ -471,7 +847,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     fileInputRef.current?.click();
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -488,7 +864,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     
     if (isCSV) {
       // Handle CSV files - treat as single month data
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const text = e.target.result;
           const lines = text.split('\n');
@@ -542,8 +918,34 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           }
           
           if (importedIncidents.length > 0) {
-            setIncidents(importedIncidents); // Replace all existing data
-            alert(`Successfully imported ${importedIncidents.length} incidents from CSV!`);
+            // Save imported incidents to Firestore
+            try {
+              setLoading(true);
+              setFirestoreStatus('saving');
+              
+              const batch = writeBatch(db);
+              const incidentsRef = collection(db, 'incidents');
+              
+              importedIncidents.forEach(incident => {
+                const docRef = doc(incidentsRef);
+                batch.set(docRef, {
+                  ...incident,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+              });
+              
+              await batch.commit();
+              await loadIncidents(); // Reload from Firestore
+              setFirestoreStatus('connected');
+              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+            } catch (error) {
+              console.error('Error saving imported incidents:', error);
+              setFirestoreStatus('error');
+              alert('Error saving imported incidents to database. Please try again.');
+            } finally {
+              setLoading(false);
+            }
           } else {
             alert('No valid data found in the CSV file.');
           }
@@ -555,7 +957,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       reader.readAsText(file);
     } else {
       // Handle Excel files using XLSX library
-      reader.onload = (e) => {
+      reader.onload = async (e) => {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
@@ -625,8 +1027,34 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           });
           
           if (importedIncidents.length > 0) {
-            setIncidents(importedIncidents); // Replace all existing data
-            alert(`Successfully imported ${importedIncidents.length} incidents from Excel!`);
+            // Save imported incidents to Firestore
+            try {
+              setLoading(true);
+              setFirestoreStatus('saving');
+              
+              const batch = writeBatch(db);
+              const incidentsRef = collection(db, 'incidents');
+              
+              importedIncidents.forEach(incident => {
+                const docRef = doc(incidentsRef);
+                batch.set(docRef, {
+                  ...incident,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+              });
+              
+              await batch.commit();
+              await loadIncidents(); // Reload from Firestore
+              setFirestoreStatus('connected');
+              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+            } catch (error) {
+              console.error('Error saving imported incidents:', error);
+              setFirestoreStatus('error');
+              alert('Error saving imported incidents to database. Please try again.');
+            } finally {
+              setLoading(false);
+            }
           } else {
             alert('No valid data found in the Excel file.');
           }
@@ -645,59 +1073,174 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   // Function to reset data to sample data with proper municipality detection
 
 
-  // Helper function to extract month from date
+  // Helper function to extract month from date text
   const extractMonthFromDate = (dateString) => {
     if (!dateString) return '';
     
-    try {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {
-        // Try to parse different date formats
         const monthNames = [
           'January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'
         ];
         
-        // Check if dateString contains month name
+    const monthAbbreviations = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+    ];
+    
+    // First try to parse as a Date object
+    try {
+      const date = new Date(dateString);
+      if (!isNaN(date.getTime())) {
+        return monthNames[date.getMonth()];
+      }
+    } catch (error) {
+      // Continue to text parsing
+    }
+    
+    // Check if dateString contains month name (full name)
         for (let i = 0; i < monthNames.length; i++) {
           if (dateString.toLowerCase().includes(monthNames[i].toLowerCase())) {
             return monthNames[i];
           }
         }
-        return '';
+    
+    // Check if dateString contains month abbreviation
+    for (let i = 0; i < monthAbbreviations.length; i++) {
+      if (dateString.toLowerCase().includes(monthAbbreviations[i].toLowerCase())) {
+        return monthNames[i];
       }
-      
-      const monthNames = [
-        'January', 'February', 'March', 'April', 'May', 'June',
-        'July', 'August', 'September', 'October', 'November', 'December'
-      ];
-      return monthNames[date.getMonth()];
-    } catch (error) {
-      return '';
     }
+    
+    // Try to extract month from MM/DD/YYYY or DD/MM/YYYY format
+    const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dateMatch) {
+      const [_, first, second, year] = dateMatch;
+      // Assume MM/DD/YYYY format (you can adjust this logic if needed)
+      const monthIndex = parseInt(first) - 1;
+      if (monthIndex >= 0 && monthIndex < 12) {
+        return monthNames[monthIndex];
+      }
+    }
+    
+    // Try to extract month from YYYY-MM-DD format
+    const isoMatch = dateString.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      const [_, year, month, day] = isoMatch;
+      const monthIndex = parseInt(month) - 1;
+      if (monthIndex >= 0 && monthIndex < 12) {
+        return monthNames[monthIndex];
+      }
+    }
+    
+    return '';
   };
 
-  // Helper function to extract year from date
+  // Helper function to extract year from date text
   const extractYearFromDate = (dateString) => {
     if (!dateString) return '';
     
+    // First try to parse as a Date object
     try {
       const date = new Date(dateString);
       if (!isNaN(date.getTime())) {
         return date.getFullYear().toString();
       }
-      
-      // Try to extract year from string
-      const yearMatch = dateString.match(/\b(20\d{2})\b/);
-      return yearMatch ? yearMatch[1] : '';
     } catch (error) {
-      return '';
+      // Continue to text parsing
     }
+    
+    // Try to extract year from various formats
+    
+    // YYYY-MM-DD format
+    const isoMatch = dateString.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (isoMatch) {
+      return isoMatch[1];
+    }
+    
+    // MM/DD/YYYY or DD/MM/YYYY format
+    const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dateMatch) {
+      return dateMatch[3];
+    }
+    
+    // Any 4-digit year in the text
+      const yearMatch = dateString.match(/\b(20\d{2})\b/);
+    if (yearMatch) {
+      return yearMatch[1];
+    }
+    
+    // Try to find year in various formats
+    const yearPatterns = [
+      /\b(20\d{2})\b/,  // 2024, 2023, etc.
+      /\b(19\d{2})\b/,  // 1999, 1998, etc.
+      /\b(\d{4})\b/     // Any 4-digit number
+    ];
+    
+    for (const pattern of yearPatterns) {
+      const match = dateString.match(pattern);
+      if (match) {
+        const year = parseInt(match[1]);
+        if (year >= 1900 && year <= 2100) {
+          return year.toString();
+        }
+      }
+    }
+    
+      return '';
   };
 
+  // Data validation and cleaning functions
+  const cleanIncidentData = (incident) => {
+    const cleaned = { ...incident };
+    
+    // Clean date field - allow any text input but validate basic format
+    if (cleaned.date && typeof cleaned.date === 'string') {
+      // If the date field contains text that looks like a description, clear it
+      if (cleaned.date.length > 100 || cleaned.date.includes('Arrest') || cleaned.date.includes('resident')) {
+        console.log('Clearing invalid date field:', cleaned.date);
+        cleaned.date = '';
+      }
+      // For text input, we allow any reasonable date format
+      // Just ensure it's not empty and not too long
+      if (cleaned.date.trim() === '') {
+        cleaned.date = '';
+      }
+    }
+    
+    // Ensure all required fields are strings
+    cleaned.incidentType = cleaned.incidentType || '';
+    cleaned.location = cleaned.location || '';
+    cleaned.description = cleaned.description || '';
+    cleaned.officer = cleaned.officer || '';
+    cleaned.status = cleaned.status || 'Pending';
+    
+    return cleaned;
+  };
 
+  const validateIncidentForEdit = (incident) => {
+    const cleaned = cleanIncidentData(incident);
+    
+    // For text input, just ensure the date field is a reasonable string
+    if (cleaned.date && typeof cleaned.date === 'string') {
+      // Trim whitespace and ensure it's not too long
+      cleaned.date = cleaned.date.trim();
+      if (cleaned.date.length > 100) {
+        cleaned.date = cleaned.date.substring(0, 100);
+      }
+    }
+    
+    return cleaned;
+  };
 
-  const filteredIncidents = incidents.filter((incident) => {
+  // Ensure unique incidents by ID to prevent duplicate keys
+  const uniqueIncidents = incidents.reduce((acc, incident) => {
+    if (!acc.find(item => item.id === incident.id)) {
+      acc.push(incident);
+    }
+    return acc;
+  }, []);
+
+  const filteredIncidents = uniqueIncidents.filter((incident) => {
     const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
     const matchesSearch = searchTerm === "" || 
@@ -1284,8 +1827,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     setShowPdfEditModal(true);
   };
 
+  // Preview PDF Report
+  const previewPdfReport = () => {
+    setShowPdfPreviewModal(true);
+  };
+
   // Export Incidents to PDF (after editing)
-  const exportIncidentsToPDF = () => {
+  const exportIncidentsToPDF = async () => {
+    setIsGeneratingPdf(true);
     try {
       console.log('Starting PDF export...');
       
@@ -1325,227 +1874,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return;
       }
       
-      // Create PDF with default page size (a4)
-      const doc = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4',
-        lineHeight: 1.5,
-        margins: { // Add margins
-        top: 20,
-        bottom: 20,
-          left: 20,
-          right: 20
-        }
-      });
-      
-      // Initialize autoTable plugin
-      if (typeof autoTable === 'function') {
-        autoTable(doc, {
-          // Add a dummy table to initialize the plugin
-          head: [['']],
-          body: [['']]
-        });
-      } else {
-        console.error('autoTable is not a function:', typeof autoTable);
-        throw new Error('PDF table plugin not available');
-      }
-      
-      // Set default line height
-      const lineHeight = 7;
-      
-      // Page 1: MEMORANDUM Header and Overview - Clean format without colors
-      const leftMargin = 25;
-      const contentMargin = 45;
-      
-      // MEMORANDUM title - bold, uppercase, left-aligned (no background color)
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('MEMORANDUM', leftMargin, 20);
-      
-      // Memorandum details with exact spacing from picture
-      doc.setFontSize(11);
-      let yPos = 35;
-      
-      // FOR line
-      doc.setFont('helvetica', 'bold');
-      doc.text('FOR', leftMargin, yPos);
-      doc.text(':', leftMargin + 15, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(pdfReportData.memorandum.for, contentMargin, yPos);
-      yPos += lineHeight;
-      
-      // FROM line
-      doc.setFont('helvetica', 'bold');
-      doc.text('FROM', leftMargin, yPos);
-      doc.text(':', leftMargin + 15, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(pdfReportData.memorandum.from, contentMargin, yPos);
-      yPos += lineHeight;
-      
-      // DATE line
-      doc.setFont('helvetica', 'bold');
-      doc.text('DATE', leftMargin, yPos);
-      doc.text(':', leftMargin + 15, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(pdfReportData.memorandum.date, contentMargin, yPos);
-      yPos += lineHeight;
-      
-      // SUBJECT line
-      doc.setFont('helvetica', 'bold');
-      doc.text('SUBJECT', leftMargin, yPos);
-      doc.text(':', leftMargin + 15, yPos);
-      doc.setFont('helvetica', 'normal');
-      doc.text(pdfReportData.memorandum.subject, contentMargin, yPos);
-      yPos += lineHeight * 2;
-      
-      // Add custom notes if provided
-      if (pdfReportData.customNotes && pdfReportData.customNotes.trim()) {
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'normal');
-        const notesLines = doc.splitTextToSize(pdfReportData.customNotes, doc.internal.pageSize.width - leftMargin * 2);
-        notesLines.forEach(line => {
-          doc.text(line, leftMargin, yPos);
-          yPos += lineHeight;
-        });
-        yPos += lineHeight;
-      }
-      
-      // Section 1: Data Cleaning & Categorization
-      if (pdfReportData.includeSections.dataCleaning) {
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-        doc.text('1. Data Cleaning & Categorization', leftMargin, yPos);
-        
-        // Add underline for section header
-        doc.setLineWidth(0.2);
-        doc.line(leftMargin, yPos + 1, doc.internal.pageSize.width - leftMargin, yPos + 1);
-        
-        doc.setFontSize(11);
-      doc.setFont('helvetica', 'normal');
-      
-        // Main content - Dynamic based on actual data
-        yPos += lineHeight;
-      
-      // Process incident types for categorization
+      // Initialize actual incident types object at the beginning of the function
       let actualIncidentTypes = {};
+      
+      // Count actual incident types from the data
       filtered.forEach(incident => {
         const identifiedType = identifyIncidentType(incident.description || incident.incidentType || '');
         actualIncidentTypes[identifiedType] = (actualIncidentTypes[identifiedType] || 0) + 1;
       });
       
-      // Generate report text based on actual data
-      let reportText = `This report provides a comprehensive analysis of ${filtered.length} incidents recorded in the Province of Bataan for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}. All entries were reviewed for completeness and accuracy.`;
-      const splitReportText = doc.splitTextToSize(reportText, doc.internal.pageSize.width - leftMargin * 2);
-      doc.text(splitReportText, leftMargin, yPos);
-      
-      // Incident categorization based on actual data
-      yPos += splitReportText.length * 5 + lineHeight;
-      doc.setFont('helvetica', 'bold');
-      doc.text('The incidents are categorized as follows:', leftMargin, yPos);
-      
-      // Show actual incident types found in the data
-      yPos += lineHeight;
-      const subIndent = leftMargin + 10;
-      
-      if (Object.keys(actualIncidentTypes).length > 0) {
-        // Categorize into Index and Non-Index crimes
-        const indexCrimes = ['Murder', 'Homicide', 'Physical Injury', 'Rape', 'Robbery', 'Theft', 'Carnapping'];
-        const nonIndexCrimes = ['Drug-related', 'Traffic Accident', 'Traffic Violation', 'Suicide', 'Illegal Firearms', 'Police Operation'];
-        
-        // Index Crimes
-      doc.setFont('helvetica', 'bold');
-        doc.text('• Index Crimes:', leftMargin, yPos);
-        yPos += lineHeight;
-        
-        const indexCrimeTypes = Object.entries(actualIncidentTypes)
-          .filter(([type]) => indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
-          .sort(([,a], [,b]) => b - a);
-        
-        if (indexCrimeTypes.length > 0) {
-          indexCrimeTypes.forEach(([type, count]) => {
-            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            const wrappedText = doc.splitTextToSize(text, doc.internal.pageSize.width - subIndent - leftMargin);
-            doc.text(wrappedText, subIndent, yPos);
-            yPos += wrappedText.length * 5;
-          });
-        } else {
-          const noIndexText = `  - No index crimes recorded`;
-          const wrappedText = doc.splitTextToSize(noIndexText, doc.internal.pageSize.width - subIndent - leftMargin);
-          doc.text(wrappedText, subIndent, yPos);
-          yPos += wrappedText.length * 5;
-        }
-        
-        yPos += lineHeight;
-        
-        // Non-Index Crimes & Other Incidents
-      doc.setFont('helvetica', 'bold');
-        doc.text('• Non-Index Crimes & Other Incidents:', leftMargin, yPos);
-        yPos += lineHeight;
-        
-        const nonIndexCrimeTypes = Object.entries(actualIncidentTypes)
-          .filter(([type]) => nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
-          .sort(([,a], [,b]) => b - a);
-        
-        if (nonIndexCrimeTypes.length > 0) {
-          nonIndexCrimeTypes.forEach(([type, count]) => {
-            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            const wrappedText = doc.splitTextToSize(text, doc.internal.pageSize.width - subIndent - leftMargin);
-            doc.text(wrappedText, subIndent, yPos);
-            yPos += wrappedText.length * 5;
-          });
-        } else {
-          const noNonIndexText = `  - No non-index crimes recorded`;
-          const wrappedText = doc.splitTextToSize(noNonIndexText, doc.internal.pageSize.width - subIndent - leftMargin);
-          doc.text(wrappedText, subIndent, yPos);
-          yPos += wrappedText.length * 5;
-        }
-        
-        // Other incidents not categorized
-        const otherTypes = Object.entries(actualIncidentTypes)
-          .filter(([type]) => !indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())) && 
-                               !nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
-          .sort(([,a], [,b]) => b - a);
-        
-        if (otherTypes.length > 0) {
-          yPos += lineHeight;
-          doc.setFont('helvetica', 'bold');
-          doc.text('• Other Incidents:', leftMargin, yPos);
-          yPos += lineHeight;
-          
-          otherTypes.forEach(([type, count]) => {
-            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            const wrappedText = doc.splitTextToSize(text, doc.internal.pageSize.width - subIndent - leftMargin);
-            doc.text(wrappedText, subIndent, yPos);
-            yPos += wrappedText.length * 5;
-          });
-        }
-      } else {
-        const noIncidentsText = `• No incidents were recorded in the provided dataset for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}.`;
-        const wrappedText = doc.splitTextToSize(noIncidentsText, doc.internal.pageSize.width - subIndent - leftMargin);
-        doc.text(wrappedText, subIndent, yPos);
-        yPos += wrappedText.length * 5;
-      }
-      } // End of Section 1 conditional
-
-      // Section 2: Summary Generation
-      if (pdfReportData.includeSections.summaryGeneration) {
-        yPos += 10;
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-        doc.text('2. Summary Generation', leftMargin, yPos);
-        
-        // Add underline for section header
-        doc.setLineWidth(0.2);
-        doc.line(leftMargin, yPos + 1, doc.internal.pageSize.width - leftMargin, yPos + 1);
-        yPos += 10;
-      
-      // We'll generate the dynamic summary after municipalityData is processed
-
-      // Create table headers
-      const headers = [['Municipality/City', 'Total Incidents', 'Breakdown']];
-      
-      // Get all municipalities and their incident counts
+      // Initialize municipality data processing at the beginning of the function
       const municipalityData = {};
       console.log('Processing incidents for municipality data...');
       
@@ -1574,7 +1912,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         };
       });
       
-      // Process incidents
+      // Process incidents for municipality data
       filtered.forEach(incident => {
         try {
           // Priority 1: Try to detect municipality from location first (most reliable)
@@ -1623,7 +1961,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           municipalityData[municipality].total++;
           
           // Categorize incident using the identifyIncidentType function
-          // Try description first, then incidentType, then a combination
           const description = incident.description || '';
           const incidentType = incident.incidentType || '';
           const location = incident.location || '';
@@ -1631,69 +1968,26 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           
           const identifiedType = identifyIncidentType(combinedText);
           
-          // Debug logging
-          console.log(`Incident in ${municipality}:`, {
-            description: description,
-            incidentType: incidentType,
-            location: location,
-            combinedText: combinedText,
-            identifiedType: identifiedType
-          });
-          
-          // Log the breakdown data being stored
-          console.log(`Storing for ${municipality}: ${identifiedType} (current count: ${municipalityData[municipality].types[identifiedType] || 0})`);
-          
-          // Store the identified type in the types object
+          // Store the identified type in municipality data
           municipalityData[municipality].types[identifiedType] = (municipalityData[municipality].types[identifiedType] || 0) + 1;
           
-          // Also update the specific category counters for backward compatibility
-          const typeLower = identifiedType.toLowerCase();
-          if (typeLower.includes('traffic') || typeLower.includes('vehicular')) {
-            municipalityData[municipality].vehicular++;
-          } else if (typeLower.includes('drug')) {
-            municipalityData[municipality].drugRelated++;
-          } else if (typeLower.includes('carnap')) {
-            municipalityData[municipality].carnapping++;
-          } else if (typeLower.includes('theft')) {
-            municipalityData[municipality].theft++;
-          } else if (typeLower.includes('robbery')) {
-            municipalityData[municipality].robbery++;
-          } else if (typeLower.includes('homicide') || typeLower.includes('murder')) {
-            municipalityData[municipality].homicide++;
-          } else if (typeLower.includes('physical') || typeLower.includes('injury') || typeLower.includes('assault')) {
-            municipalityData[municipality].physicalInjury++;
-          } else if (typeLower.includes('firearm')) {
-            municipalityData[municipality].illegalFirearms++;
-          } else if (typeLower.includes('suicide')) {
-            municipalityData[municipality].suicide++;
-          } else if (typeLower.includes('police') || typeLower.includes('operation')) {
-            municipalityData[municipality].policeOps++;
-          } else {
-            municipalityData[municipality].otherLaw++;
-          }
-          
-        } catch (err) {
-          console.error('Error processing incident:', err, incident);
+        } catch (error) {
+          console.error('Error processing incident for municipality data:', error, incident);
         }
       });
       
-      // Now generate dynamic content for Data Cleaning section
+      // Initialize report text variable at the beginning of the function
+      let reportText = '';
+      
+      // Update report text with dynamic content
+      if (filtered.length > 0) {
       const municipalitiesWithData = Object.entries(municipalityData).filter(([municipality, data]) => data.total > 0).length;
       const totalMunicipalities = allMunicipalities.length;
-      
-      // Count actual incident types from the data
-      filtered.forEach(incident => {
-        const identifiedType = identifyIncidentType(incident.description || incident.incidentType || '');
-        actualIncidentTypes[identifiedType] = (actualIncidentTypes[identifiedType] || 0) + 1;
-      });
-      
       const uniqueIncidentTypes = Object.keys(actualIncidentTypes).length;
       const topIncidentTypes = Object.entries(actualIncidentTypes)
             .sort(([,a], [,b]) => b - a)
         .slice(0, 3);
       
-      // Update report text with dynamic content
-      if (filtered.length > 0) {
         reportText = `This report provides a comprehensive analysis of ${filtered.length} incidents recorded in the Province of Bataan for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}. The data has been processed from ${municipalitiesWithData} out of ${totalMunicipalities} municipalities and categorized into ${uniqueIncidentTypes} distinct incident types. `;
         
         if (topIncidentTypes.length > 0) {
@@ -1706,7 +2000,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         reportText = `This report provides a comprehensive analysis of ${filtered.length} incidents recorded in the Province of Bataan for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}. No incidents were recorded during this period. All entries were reviewed for completeness and accuracy.`;
       }
 
-            // Convert to array and sort by total incidents
+      // Initialize sortedMunicipalities at the beginning of the function
       const sortedMunicipalities = Object.entries(municipalityData)
         .sort(([,a], [,b]) => b.total - a.total)
         .map(([municipality, data]) => {
@@ -1730,6 +2024,266 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           breakdown
         ];
       });
+      
+      // Create PDF with auto-fit settings
+      const doc = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+        lineHeight: 1.5,
+        margins: { // Optimized margins for better content fitting
+          top: 15,
+          bottom: 15,
+          left: 15,
+          right: 15
+        }
+      });
+      
+      // Enhanced auto-fit helper function to check page overflow and add new pages
+      const checkPageOverflow = (yPosition, requiredSpace = 15) => {
+        const pageHeight = doc.internal.pageSize.height;
+        const bottomMargin = 25; // Increased bottom margin for better spacing
+        const availableSpace = pageHeight - bottomMargin;
+        
+        if (yPosition + requiredSpace > availableSpace) {
+          doc.addPage();
+          return 25; // Reset to top of new page with proper margin
+        }
+        return yPosition;
+      };
+      
+      // Enhanced auto-fit text function that handles overflow with better spacing
+      const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 6) => {
+        if (!text || text.trim() === '') {
+          return y + lineSpacing;
+        }
+        
+        doc.setFontSize(fontSize);
+        const lines = doc.splitTextToSize(text.trim(), maxWidth);
+        let currentY = y;
+        
+        lines.forEach((line, index) => {
+          currentY = checkPageOverflow(currentY, lineSpacing);
+          doc.text(line, x, currentY);
+          currentY += lineSpacing;
+        });
+        
+        return currentY;
+      };
+      
+      // Enhanced section header function with proper spacing
+      const addSectionHeader = (text, yPosition, fontSize = 14) => {
+        const newY = checkPageOverflow(yPosition, 20);
+        
+        doc.setFontSize(fontSize);
+        doc.setFont('helvetica', 'bold');
+        doc.text(text, leftMargin, newY);
+        
+        // Add underline for section header
+        doc.setLineWidth(0.2);
+        doc.line(leftMargin, newY + 2, doc.internal.pageSize.width - leftMargin, newY + 2);
+        
+        return newY + 15; // Return position after header with proper spacing
+      };
+      
+      // Enhanced bullet list function with proper spacing
+      const addBulletList = (items, yPosition, fontSize = 10, indent = 15) => {
+        let currentY = yPosition;
+        
+        items.forEach((item, index) => {
+          currentY = checkPageOverflow(currentY, 8);
+          
+          // Bullet point
+          doc.setFontSize(fontSize);
+          doc.setFont('helvetica', 'bold');
+          doc.text('•', leftMargin, currentY);
+          
+          // Item text
+          const itemText = typeof item === 'string' ? item : `${item.title}: ${item.content}`;
+          const textX = leftMargin + indent;
+          const textWidth = doc.internal.pageSize.width - leftMargin * 2 - indent;
+          
+          currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 6);
+          currentY += 3; // Small gap between items
+        });
+        
+        return currentY;
+      };
+      
+      // Initialize autoTable plugin
+      if (typeof autoTable === 'function') {
+        autoTable(doc, {
+          // Add a dummy table to initialize the plugin
+          head: [['']],
+          body: [['']]
+        });
+      } else {
+        console.error('autoTable is not a function:', typeof autoTable);
+        throw new Error('PDF table plugin not available');
+      }
+      
+      // Set default line height
+      const lineHeight = 7;
+      
+      // Page 1: MEMORANDUM Header and Overview - Enhanced Auto-fit format
+      const leftMargin = 25; // Increased left margin for better spacing
+      const contentMargin = 45; // Increased content margin
+      const maxContentWidth = doc.internal.pageSize.width - leftMargin * 2;
+      
+      // MEMORANDUM title - bold, uppercase, left-aligned with proper spacing
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MEMORANDUM', leftMargin, 25);
+      
+      // Memorandum details with enhanced auto-fit spacing
+      let yPos = 40; // Increased starting position
+      
+      // FOR line
+      yPos = checkPageOverflow(yPos, 12);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(11);
+      doc.text('FOR', leftMargin, yPos);
+      doc.text(':', leftMargin + 20, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
+      yPos += 8; // Increased spacing between fields
+      
+      // FROM line
+      yPos = checkPageOverflow(yPos, 12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('FROM', leftMargin, yPos);
+      doc.text(':', leftMargin + 20, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
+      yPos += 8;
+      
+      // DATE line
+      yPos = checkPageOverflow(yPos, 12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('DATE', leftMargin, yPos);
+      doc.text(':', leftMargin + 20, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
+      yPos += 8;
+      
+      // SUBJECT line
+      yPos = checkPageOverflow(yPos, 12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SUBJECT', leftMargin, yPos);
+      doc.text(':', leftMargin + 20, yPos);
+      doc.setFont('helvetica', 'normal');
+      yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
+      yPos += 15; // Increased spacing before custom notes
+      
+      // Add custom notes if provided
+      if (pdfReportData.customNotes && pdfReportData.customNotes.trim()) {
+        yPos = checkPageOverflow(yPos, 25);
+        yPos = addAutoFitText(pdfReportData.customNotes, leftMargin, yPos, maxContentWidth, 11, 7);
+        yPos += 15; // Increased spacing after custom notes
+      }
+      
+      // Section 1: Data Cleaning & Categorization
+      if (pdfReportData.includeSections.dataCleaning) {
+        yPos = addSectionHeader('1. Data Cleaning & Categorization', yPos + 10);
+        
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'normal');
+      
+        // Main content - Dynamic based on actual data
+        yPos = addAutoFitText(reportText, leftMargin, yPos, maxContentWidth, 11, 7);
+      
+        // Incident categorization based on actual data
+        yPos += 12;
+        doc.setFont('helvetica', 'bold');
+        doc.text('The incidents are categorized as follows:', leftMargin, yPos);
+      
+        // Show actual incident types found in the data
+        yPos += 10;
+        const subIndent = leftMargin + 15;
+      
+      if (Object.keys(actualIncidentTypes).length > 0) {
+        // Categorize into Index and Non-Index crimes
+        const indexCrimes = ['Murder', 'Homicide', 'Physical Injury', 'Rape', 'Robbery', 'Theft', 'Carnapping'];
+        const nonIndexCrimes = ['Drug-related', 'Traffic Accident', 'Traffic Violation', 'Suicide', 'Illegal Firearms', 'Police Operation'];
+        
+        // Index Crimes
+      doc.setFont('helvetica', 'bold');
+        doc.text('• Index Crimes:', leftMargin, yPos);
+        yPos += lineHeight;
+        
+        const indexCrimeTypes = Object.entries(actualIncidentTypes)
+          .filter(([type]) => indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
+          .sort(([,a], [,b]) => b - a);
+        
+        if (indexCrimeTypes.length > 0) {
+          indexCrimeTypes.forEach(([type, count]) => {
+            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+            yPos += 3; // Small gap between items
+          });
+        } else {
+          const noIndexText = `  - No index crimes recorded`;
+          yPos = addAutoFitText(noIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+        }
+        
+        yPos += 10; // Increased spacing between categories
+        
+        // Non-Index Crimes & Other Incidents
+        doc.setFont('helvetica', 'bold');
+        doc.text('• Non-Index Crimes & Other Incidents:', leftMargin, yPos);
+        yPos += 10;
+        
+        const nonIndexCrimeTypes = Object.entries(actualIncidentTypes)
+          .filter(([type]) => nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
+          .sort(([,a], [,b]) => b - a);
+        
+        if (nonIndexCrimeTypes.length > 0) {
+          nonIndexCrimeTypes.forEach(([type, count]) => {
+            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+            yPos += 3; // Small gap between items
+          });
+        } else {
+          const noNonIndexText = `  - No non-index crimes recorded`;
+          yPos = addAutoFitText(noNonIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+        }
+        
+        // Other incidents not categorized
+        const otherTypes = Object.entries(actualIncidentTypes)
+          .filter(([type]) => !indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())) && 
+                               !nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
+          .sort(([,a], [,b]) => b - a);
+        
+        if (otherTypes.length > 0) {
+          yPos += 10; // Increased spacing
+          doc.setFont('helvetica', 'bold');
+          doc.text('• Other Incidents:', leftMargin, yPos);
+          yPos += 10;
+          
+          otherTypes.forEach(([type, count]) => {
+            const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+            yPos += 3; // Small gap between items
+          });
+        }
+      } else {
+        const noIncidentsText = `• No incidents were recorded in the provided dataset for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}.`;
+        yPos = addAutoFitText(noIncidentsText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+      }
+      } // End of Section 1 conditional
+
+      // Section 2: Summary Generation
+      if (pdfReportData.includeSections.summaryGeneration) {
+        yPos = addSectionHeader('2. Summary Generation', yPos + 10);
+
+      // Create table headers
+      const headers = [['Municipality/City', 'Total Incidents', 'Breakdown']];
+      
+      // Now generate dynamic content for Data Cleaning section
+      const municipalitiesWithData = Object.entries(municipalityData).filter(([municipality, data]) => data.total > 0).length;
+      const totalMunicipalities = allMunicipalities.length;
+      
+      // Use the reportText and sortedMunicipalities already defined at the beginning of the function
 
       // Debug: Log all municipalities and their data
       console.log('All municipalities data:', municipalityData);
@@ -1783,25 +2337,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         yPos += 10;
         
         section.content.forEach(content => {
-          const lines = doc.splitTextToSize(content, doc.internal.pageSize.width - leftMargin * 2);
-          doc.text(lines, leftMargin, yPos);
-          yPos += lines.length * 5;
+           yPos = addAutoFitText(content, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 11, 7);
+           yPos += 5; // Small gap between content items
         });
         
-        yPos += 10;
+         yPos += 12; // Increased spacing between sections
       });
       
-      // Add table
+             // Add table with enhanced spacing
       console.log('Generating table with data:', { headers, sortedMunicipalities });
       try {
         let finalY = yPos;
         autoTable(doc, {
           head: headers,
           body: sortedMunicipalities,
-          startY: yPos,
+           startY: yPos + 5, // Add some space before table
           styles: {
             fontSize: 9,
-            cellPadding: 3,
+             cellPadding: 4, // Increased cell padding
             lineWidth: 0.1
           },
           columnStyles: {
@@ -1812,9 +2365,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           headStyles: {
             fontSize: 10,
             fontStyle: 'bold',
-            halign: 'center'
+             halign: 'center',
+             fillColor: [70, 130, 180] // Add header background color
           },
-          margin: { left: 14 },
+           alternateRowStyles: {
+             fillColor: [248, 249, 250] // Alternate row colors
+           },
+           margin: { left: leftMargin, right: leftMargin }, // Use consistent margins
           didDrawCell: function(data) {
             // Update finalY to track the bottom of the table
             if (data.row.index === data.table.body.length - 1 && 
@@ -1824,8 +2381,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           }
         });
         
-        // Update yPos to after table
-        yPos = finalY + 10;
+         // Update yPos to after table with proper spacing
+         yPos = finalY + 15;
       } catch (tableError) {
         console.error('Error generating table:', tableError);
         throw new Error('Failed to generate incident table: ' + tableError.message);
@@ -1924,29 +2481,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       
       // Add new page for Trend & Pattern Analysis (Page 3)
       doc.addPage();
-      yPos = 20;
+      yPos = 25; // Start with proper margin
 
       // 3. Trend & Pattern Analysis
       if (pdfReportData.includeSections.trendAnalysis) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('3. Trend & Pattern Analysis', leftMargin, yPos);
-        yPos += 15;
+        yPos = addSectionHeader('3. Trend & Pattern Analysis', yPos);
 
       // Generate dynamic trend analysis
-      const generateDynamicTrendAnalysis = () => {
+      const generateDynamicTrendAnalysis = (incidentTypes) => {
         const trends = [];
         
         // Dominant Crime Type
-        const topIncidentTypes = Object.entries(actualIncidentTypes)
+        const topIncidentTypes = Object.entries(incidentTypes)
           .sort(([,a], [,b]) => b - a)
           .slice(0, 2);
         
         if (topIncidentTypes.length > 0) {
           const totalIncidents = filtered.length;
           const topType = topIncidentTypes[0];
-          const secondType = topIncidentTypes[1];
           
+          if (topIncidentTypes.length >= 2) {
+            // If we have at least 2 incident types
+            const secondType = topIncidentTypes[1];
           const topPercentage = totalIncidents > 0 ? ((topType[1] / totalIncidents) * 100).toFixed(1) : 0;
           const secondPercentage = totalIncidents > 0 ? ((secondType[1] / totalIncidents) * 100).toFixed(1) : 0;
           
@@ -1954,6 +2510,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             title: 'Dominant Crime Type:',
             content: `${topType[0]} and ${secondType[0]} are the most prevalent issues, with ${topType[1]} and ${secondType[1]} incidents respectively. Together, they account for ${(parseFloat(topPercentage) + parseFloat(secondPercentage)).toFixed(1)}% of all recorded events.`
           });
+          } else {
+            // If we only have 1 incident type
+            const topPercentage = totalIncidents > 0 ? ((topType[1] / totalIncidents) * 100).toFixed(1) : 0;
+            
+            trends.push({
+              title: 'Dominant Crime Type:',
+              content: `${topType[0]} is the most prevalent issue, with ${topType[1]} incidents recorded, accounting for ${topPercentage}% of all recorded events.`
+            });
+          }
         }
         
         // Time of Day Analysis - analyze actual incident times if available
@@ -1993,14 +2558,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         
         // Modus Operandi - based on actual incident types
         const modusOperandi = [];
-        if (actualIncidentTypes['Theft'] > 0) {
-          modusOperandi.push(`Theft: ${actualIncidentTypes['Theft']} incidents recorded, indicating a need for vigilance in commercial and private spaces.`);
+        if (incidentTypes['Theft'] > 0) {
+          modusOperandi.push(`Theft: ${incidentTypes['Theft']} incidents recorded, indicating a need for vigilance in commercial and private spaces.`);
         }
-        if (actualIncidentTypes['Drug-related'] > 0) {
-          modusOperandi.push(`Drug Operations: ${actualIncidentTypes['Drug-related']} drug-related incidents, primarily proactive buy-bust operations.`);
+        if (incidentTypes['Drug-related'] > 0) {
+          modusOperandi.push(`Drug Operations: ${incidentTypes['Drug-related']} drug-related incidents, primarily proactive buy-bust operations.`);
         }
-        if (actualIncidentTypes['Traffic Accident'] > 0) {
-          modusOperandi.push(`Traffic Incidents: ${actualIncidentTypes['Traffic Accident']} vehicular incidents, primarily due to human error.`);
+        if (incidentTypes['Traffic Accident'] > 0) {
+          modusOperandi.push(`Traffic Incidents: ${incidentTypes['Traffic Accident']} vehicular incidents, primarily due to human error.`);
         }
         
         if (modusOperandi.length > 0) {
@@ -2015,20 +2580,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       
       // Display dynamic trend analysis
-      const dynamicTrends = generateDynamicTrendAnalysis();
+      const dynamicTrends = generateDynamicTrendAnalysis(actualIncidentTypes);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
       
       dynamicTrends.forEach((trend, index) => {
-        const text = `${trend.title} ${trend.content}`;
-        const lines = doc.splitTextToSize(text, doc.internal.pageSize.width - leftMargin * 2);
-        doc.text(lines, leftMargin, yPos);
-        yPos += lines.length * 5 + 5;
+        // Add bullet point and bold header
+        doc.setFont('helvetica', 'bold');
+        doc.text(`• ${trend.title}`, leftMargin, yPos);
+        yPos += 8;
+        
+        // Add content in normal font with better spacing
+        doc.setFont('helvetica', 'normal');
+        yPos = addAutoFitText(trend.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
+        yPos += 8; // Increased spacing between trends
         
         if (trend.subItems) {
           trend.subItems.forEach(item => {
-            doc.text(`• ${item}`, leftMargin + 10, yPos);
-            yPos += 5;
+            yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 6);
+            yPos += 3; // Small gap between sub-items
           });
           yPos += 5;
         }
@@ -2039,17 +2609,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       // 4. Root Cause & Contributing Factors (Page 3)
       if (pdfReportData.includeSections.rootCauses) {
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('4. Root Cause & Contributing Factors', leftMargin, yPos);
-        yPos += 15;
+        yPos = addSectionHeader('4. Root Cause & Contributing Factors', yPos + 10);
 
       // Generate dynamic root cause analysis
-      const generateDynamicRootCauses = () => {
+      const generateDynamicRootCauses = (incidentTypes) => {
         const rootCauses = [];
         
         // Socioeconomic Factors - if there are theft, robbery, or drug incidents
-        const socioeconomicCrimes = (actualIncidentTypes['Theft'] || 0) + (actualIncidentTypes['Robbery'] || 0) + (actualIncidentTypes['Drug-related'] || 0);
+        const socioeconomicCrimes = (incidentTypes['Theft'] || 0) + (incidentTypes['Robbery'] || 0) + (incidentTypes['Drug-related'] || 0);
         if (socioeconomicCrimes > 0) {
           rootCauses.push({
             title: 'Socioeconomic Factors:',
@@ -2058,7 +2625,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
         
         // Vehicular Incidents
-        const trafficIncidents = (actualIncidentTypes['Traffic Accident'] || 0) + (actualIncidentTypes['Traffic Violation'] || 0);
+        const trafficIncidents = (incidentTypes['Traffic Accident'] || 0) + (incidentTypes['Traffic Violation'] || 0);
         if (trafficIncidents > 0) {
           rootCauses.push({
             title: 'Vehicular Incidents:',
@@ -2067,18 +2634,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
         
         // Mental Health - if there are suicide incidents
-        if (actualIncidentTypes['Suicide'] > 0) {
+        if (incidentTypes['Suicide'] > 0) {
           rootCauses.push({
             title: 'Mental Health:',
-            content: `${actualIncidentTypes['Suicide']} suicide incidents were recorded, highlighting underlying public health issues requiring multi-agency response.`
+            content: `${incidentTypes['Suicide']} suicide incidents were recorded, highlighting underlying public health issues requiring multi-agency response.`
           });
         }
         
         // Firearms Control - if there are illegal firearms incidents
-        if (actualIncidentTypes['Illegal Firearms'] > 0) {
+        if (incidentTypes['Illegal Firearms'] > 0) {
           rootCauses.push({
             title: 'Firearms Control:',
-            content: `${actualIncidentTypes['Illegal Firearms']} incidents involving illegal firearms were recorded, primarily linked to drug trade operations.`
+            content: `${incidentTypes['Illegal Firearms']} incidents involving illegal firearms were recorded, primarily linked to drug trade operations.`
           });
         }
         
@@ -2094,7 +2661,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       
       // Display dynamic root causes
-      const dynamicRootCauses = generateDynamicRootCauses();
+      const dynamicRootCauses = generateDynamicRootCauses(actualIncidentTypes);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       
@@ -2102,13 +2669,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         // Add bullet point and bold header
         doc.setFont('helvetica', 'bold');
         doc.text(`• ${cause.title}`, leftMargin, yPos);
-        yPos += 7;
+        yPos += 8;
         
-        // Add content in normal font
+        // Add content in normal font with better spacing
         doc.setFont('helvetica', 'normal');
-        const lines = doc.splitTextToSize(cause.content, doc.internal.pageSize.width - leftMargin * 2);
-        doc.text(lines, leftMargin + 10, yPos);
-        yPos += lines.length * 5 + 7;
+        yPos = addAutoFitText(cause.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
+        yPos += 8; // Increased spacing between causes
       });
       } // End of Section 4 conditional
       
@@ -2275,18 +2841,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         yPos += 15;
 
       // Generate dynamic risk forecasting
-      const generateDynamicRiskForecasting = () => {
+      const generateDynamicRiskForecasting = (incidentTypes) => {
         const forecasts = [];
         
         // Short-term Risk Assessment (Next 30 days)
         const shortTermRisks = [];
-        if (actualIncidentTypes['Drug-related'] > 0) {
+        if (incidentTypes['Drug-related'] > 0) {
           shortTermRisks.push(`Continued drug-related activities in high-incident municipalities`);
         }
-        if (actualIncidentTypes['Traffic Accident'] > 0) {
+        if (incidentTypes['Traffic Accident'] > 0) {
           shortTermRisks.push(`Ongoing traffic safety concerns along major thoroughfares`);
         }
-        if (actualIncidentTypes['Theft'] > 0) {
+        if (incidentTypes['Theft'] > 0) {
           shortTermRisks.push(`Persistent theft incidents in commercial areas`);
         }
         
@@ -2307,13 +2873,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           
           mediumTermRisks.push(`Projected ${projectedIncidents} total incidents over the next 3 months based on current trends`);
           
-          if (actualIncidentTypes['Drug-related'] > 0) {
-            const projectedDrug = Math.round((actualIncidentTypes['Drug-related'] / totalIncidents) * projectedIncidents);
+          if (incidentTypes['Drug-related'] > 0) {
+            const projectedDrug = Math.round((incidentTypes['Drug-related'] / totalIncidents) * projectedIncidents);
             mediumTermRisks.push(`Estimated ${projectedDrug} drug-related incidents requiring continued enforcement`);
           }
           
-          if (actualIncidentTypes['Traffic Accident'] > 0) {
-            const projectedTraffic = Math.round((actualIncidentTypes['Traffic Accident'] / totalIncidents) * projectedIncidents);
+          if (incidentTypes['Traffic Accident'] > 0) {
+            const projectedTraffic = Math.round((incidentTypes['Traffic Accident'] / totalIncidents) * projectedIncidents);
             mediumTermRisks.push(`Expected ${projectedTraffic} traffic accidents without intervention`);
           }
         }
@@ -2359,15 +2925,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           mitigationPriorities.push(`Priority focus on ${topMunicipality[0]} with highest incident rate`);
         }
         
-        if (actualIncidentTypes['Drug-related'] > 0) {
+        if (incidentTypes['Drug-related'] > 0) {
           mitigationPriorities.push('Enhanced anti-drug operations and community awareness');
         }
         
-        if (actualIncidentTypes['Traffic Accident'] > 0) {
+        if (incidentTypes['Traffic Accident'] > 0) {
           mitigationPriorities.push('Traffic safety campaigns and infrastructure improvements');
         }
         
-        if (actualIncidentTypes['Theft'] > 0) {
+        if (incidentTypes['Theft'] > 0) {
           mitigationPriorities.push('Increased surveillance and community vigilance programs');
         }
         
@@ -2381,7 +2947,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       
       // Display dynamic risk forecasting
-      const dynamicForecasts = generateDynamicRiskForecasting();
+      const dynamicForecasts = generateDynamicRiskForecasting(actualIncidentTypes);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       
@@ -2405,6 +2971,228 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           yPos += 5;
         }
       });
+      } // End of Section 3 conditional
+
+      // Section 4: Root Cause Analysis
+      if (pdfReportData.includeSections.rootCauseAnalysis) {
+        yPos += 10;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('4. Root Cause Analysis', leftMargin, yPos);
+        
+        // Add underline for section header
+        doc.setLineWidth(0.2);
+        doc.line(leftMargin, yPos + 1, doc.internal.pageSize.width - leftMargin, yPos + 1);
+        yPos += 15;
+
+        // Generate dynamic root cause analysis
+        const generateDynamicRootCauses = (incidentTypes) => {
+          const causes = [];
+          const totalIncidents = Object.values(incidentTypes).reduce((sum, count) => sum + count, 0);
+          
+          if (totalIncidents === 0) {
+            causes.push({
+              title: 'No Data Available:',
+              content: 'No incidents were recorded during this period, making root cause analysis unavailable.'
+            });
+            return causes;
+          }
+
+          // Analyze patterns based on incident types
+          if (incidentTypes['Drug-related'] > 0) {
+            const percentage = ((incidentTypes['Drug-related'] / totalIncidents) * 100).toFixed(1);
+            causes.push({
+              title: 'Drug-Related Incidents:',
+              content: `Drug-related incidents represent ${percentage}% of total cases, indicating potential issues with drug trafficking, substance abuse, or enforcement gaps.`
+            });
+          }
+
+          if (incidentTypes['Traffic Accident'] > 0) {
+            const percentage = ((incidentTypes['Traffic Accident'] / totalIncidents) * 100).toFixed(1);
+            causes.push({
+              title: 'Traffic Safety Issues:',
+              content: `Traffic accidents account for ${percentage}% of incidents, suggesting infrastructure, enforcement, or driver behavior concerns.`
+            });
+          }
+
+          if (incidentTypes['Theft'] > 0) {
+            const percentage = ((incidentTypes['Theft'] / totalIncidents) * 100).toFixed(1);
+            causes.push({
+              title: 'Property Crime Factors:',
+              content: `Theft incidents represent ${percentage}% of cases, potentially indicating economic factors, opportunity, or security gaps.`
+            });
+          }
+
+          if (incidentTypes['Physical Injury'] > 0) {
+            const percentage = ((incidentTypes['Physical Injury'] / totalIncidents) * 100).toFixed(1);
+            causes.push({
+              title: 'Violence and Conflict:',
+              content: `Physical injury cases account for ${percentage}% of incidents, suggesting interpersonal conflicts or public safety concerns.`
+            });
+          }
+
+          return causes;
+        };
+
+        // Display dynamic root cause analysis
+        const dynamicCauses = generateDynamicRootCauses(actualIncidentTypes);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        dynamicCauses.forEach((cause, index) => {
+          // Add bullet point and bold header
+          doc.setFont('helvetica', 'bold');
+          doc.text(`• ${cause.title}`, leftMargin, yPos);
+          yPos += 7;
+          
+          // Add content in normal font
+          doc.setFont('helvetica', 'normal');
+          const lines = doc.splitTextToSize(cause.content, doc.internal.pageSize.width - leftMargin * 2);
+          doc.text(lines, leftMargin + 10, yPos);
+          yPos += lines.length * 5 + 5;
+        });
+      } // End of Section 4 conditional
+
+      // Section 5: Recommendations
+      if (pdfReportData.includeSections.recommendations) {
+        yPos = addSectionHeader('5. Recommendations', yPos + 10);
+
+        // Generate dynamic recommendations
+        const generateDynamicRecommendations = () => {
+          const recommendations = [];
+          
+          // General recommendations based on data patterns
+          recommendations.push({
+            title: 'Enhanced Data Collection:',
+            content: 'Implement standardized reporting procedures to ensure consistent and comprehensive incident documentation.'
+          });
+
+          recommendations.push({
+            title: 'Community Engagement:',
+            content: 'Strengthen community-police partnerships through regular meetings, awareness campaigns, and collaborative initiatives.'
+          });
+
+          recommendations.push({
+            title: 'Resource Allocation:',
+            content: 'Review and optimize resource distribution based on incident patterns and municipality-specific needs.'
+          });
+
+          // Specific recommendations based on incident types
+          if (Object.keys(actualIncidentTypes).length > 0) {
+            const topType = Object.entries(actualIncidentTypes).sort(([,a], [,b]) => b - a)[0];
+            if (topType) {
+              recommendations.push({
+                title: `Focus on ${topType[0]}:`,
+                content: `Develop targeted strategies to address the most common incident type (${topType[0]}) with ${topType[1]} recorded cases.`
+              });
+            }
+          }
+
+          return recommendations;
+        };
+
+        // Display dynamic recommendations
+        const dynamicRecommendations = generateDynamicRecommendations();
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        dynamicRecommendations.forEach((recommendation, index) => {
+          // Add bullet point and bold header
+          doc.setFont('helvetica', 'bold');
+          doc.text(`• ${recommendation.title}`, leftMargin, yPos);
+          yPos += 8;
+          
+          // Add content in normal font with better spacing
+          doc.setFont('helvetica', 'normal');
+          yPos = addAutoFitText(recommendation.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
+          yPos += 8; // Increased spacing between recommendations
+        });
+      } // End of Section 5 conditional
+
+      // Section 6: Risk Forecasting
+      if (pdfReportData.includeSections.riskForecasting) {
+        yPos = addSectionHeader('6. Risk Forecasting', yPos + 10);
+
+        // Generate dynamic risk forecasting
+        const generateDynamicRiskForecasting = (incidentTypes) => {
+          const forecasts = [];
+          const totalIncidents = Object.values(incidentTypes).reduce((sum, count) => sum + count, 0);
+          
+          if (totalIncidents === 0) {
+            forecasts.push({
+              title: 'No Historical Data:',
+              content: 'Without historical incident data, risk forecasting is limited. Establishing baseline data collection is recommended.'
+            });
+            return forecasts;
+          }
+
+          // Seasonal Patterns
+          forecasts.push({
+            title: 'Seasonal Risk Patterns:',
+            content: 'Based on current data patterns, anticipate potential seasonal variations in incident types and adjust resource allocation accordingly.'
+          });
+
+          // Geographic Risk Areas
+          if (sortedMunicipalities.length > 0) {
+            const topMunicipality = sortedMunicipalities[0];
+            forecasts.push({
+              title: 'Geographic Risk Concentration:',
+              content: `${topMunicipality[0]} shows the highest incident concentration. Consider enhanced monitoring and preventive measures in this area.`
+            });
+          }
+
+          // Risk Mitigation Priorities
+          const mitigationPriorities = [];
+          if (sortedMunicipalities.length > 0) {
+            const topMunicipality = sortedMunicipalities[0];
+            mitigationPriorities.push(`Priority focus on ${topMunicipality[0]} with highest incident rate`);
+          }
+          
+          if (incidentTypes['Drug-related'] > 0) {
+            mitigationPriorities.push('Enhanced anti-drug operations and community awareness');
+          }
+          
+          if (incidentTypes['Traffic Accident'] > 0) {
+            mitigationPriorities.push('Traffic safety campaigns and infrastructure improvements');
+          }
+          
+          if (incidentTypes['Theft'] > 0) {
+            mitigationPriorities.push('Increased surveillance and community vigilance programs');
+          }
+          
+          forecasts.push({
+            title: 'Risk Mitigation Priorities:',
+            content: `Recommended focus areas for risk reduction:`,
+            subItems: mitigationPriorities
+          });
+          
+          return forecasts;
+        };
+        
+        // Display dynamic risk forecasting
+        const dynamicForecasts = generateDynamicRiskForecasting(actualIncidentTypes);
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        dynamicForecasts.forEach((forecast, index) => {
+          // Add bullet point and bold header
+          doc.setFont('helvetica', 'bold');
+          doc.text(`• ${forecast.title}`, leftMargin, yPos);
+          yPos += 8;
+          
+          // Add content in normal font with better spacing
+          doc.setFont('helvetica', 'normal');
+          yPos = addAutoFitText(forecast.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
+          yPos += 8; // Increased spacing between forecasts
+          
+          if (forecast.subItems) {
+            forecast.subItems.forEach(item => {
+              yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 6);
+              yPos += 3; // Small gap between sub-items
+          });
+          yPos += 5;
+        }
+      });
       } // End of Section 6 conditional
 
 
@@ -2420,12 +3208,39 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       // Generate filename and save
       const filename = `Crime_Analysis_Report_${selectedMonth === "all" ? "All_Months" : selectedMonth}_${new Date().getFullYear()}.pdf`;
+      
+      try {
       doc.save(filename);
+        console.log('PDF generated successfully:', filename);
+        
+        // Show success message
+        const successMessage = `PDF Report generated successfully!\n\nFilename: ${filename}\nTotal Pages: ${totalPages}\nSections Included: ${Object.keys(pdfReportData.includeSections).filter(key => pdfReportData.includeSections[key]).length}\nTotal Incidents: ${filtered.length}`;
+        alert(successMessage);
+        
+      } catch (saveError) {
+        console.error('Error saving PDF:', saveError);
+        alert('Error saving PDF file. Please check your browser settings and try again.');
+      }
      } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Error generating PDF report. Please try again.');
-     }
-   };
+      
+      // More detailed error handling
+      let errorMessage = 'Error generating PDF report. ';
+      if (error.message.includes('autoTable')) {
+        errorMessage += 'Table plugin not available. Please refresh the page and try again.';
+      } else if (error.message.includes('memory')) {
+        errorMessage += 'Document too large. Please reduce the number of incidents or sections.';
+      } else if (error.message.includes('font')) {
+        errorMessage += 'Font loading error. Please refresh the page and try again.';
+      } else {
+        errorMessage += 'Please try again or contact support if the problem persists.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  }; // End of exportIncidentsToPDF function
 
     // Function to detect municipalities from location text
     const detectMunicipalitiesFromLocation = (locationText, municipalityList) => {
@@ -2699,19 +3514,56 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             }`}>
               Manage and track incident reports with Excel/CSV import support
             </p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`w-2 h-2 rounded-full ${
+                firestoreStatus === 'connected' ? 'bg-green-500' :
+                firestoreStatus === 'connecting' ? 'bg-yellow-500' :
+                firestoreStatus === 'saving' ? 'bg-blue-500' :
+                'bg-red-500'
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                firestoreStatus === 'connected' ? 'text-green-600 dark:text-green-400' :
+                firestoreStatus === 'connecting' ? 'text-yellow-600 dark:text-yellow-400' :
+                firestoreStatus === 'saving' ? 'text-blue-600 dark:text-blue-400' :
+                'text-red-600 dark:text-red-400'
+              }`}>
+                {firestoreStatus === 'connected' ? 'Connected to Firestore' :
+                 firestoreStatus === 'connecting' ? 'Connecting...' :
+                 firestoreStatus === 'saving' ? 'Saving...' :
+                 'Connection Error'}
+              </span>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button
               onClick={handleImportExcel}
               className="bg-green-600 hover:bg-green-700 text-white"
               title="Import Excel/CSV"
+              disabled={loading}
             >
               <Upload className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={loadIncidents}
+              disabled={loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              onClick={cleanupDuplicateIncidents}
+              disabled={loading}
+              className="bg-orange-600 hover:bg-orange-700 text-white"
+              title="Clean Duplicates"
+            >
+              <Trash2 className="w-5 h-5" />
             </Button>
             <Button
               onClick={() => setShowAddModal(true)}
               className="bg-green-600 hover:bg-green-700 text-white"
               title="Add New Incident"
+              disabled={loading}
             >
               <Plus className="w-5 h-5" />
             </Button>
@@ -2719,6 +3571,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               onClick={() => setShowSummaryModal(true)}
               className="bg-indigo-600 hover:bg-indigo-700 text-white"
               title="Summary Insights"
+              disabled={loading}
             >
               <BarChart3 className="w-5 h-5" />
             </Button>
@@ -2750,12 +3603,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <Printer className="w-5 h-5" />
             </Button>
             <Button
-              onClick={() => {
-                setIncidents([]);
-  
+              onClick={async () => {
+                if (window.confirm('Are you sure you want to clear all incidents? This action cannot be undone.')) {
+                  try {
+                    await clearAllIncidents();
+                    alert('All incidents cleared successfully!');
+                  } catch (error) {
+                    console.error('Error clearing incidents:', error);
+                    alert('Error clearing incidents. Please try again.');
+                  }
+                }
               }}
               className="bg-red-600 hover:bg-red-700 text-white"
               title="Clear All Data"
+              disabled={loading}
             >
               <Trash2 className="w-5 h-5" />
             </Button>
@@ -2771,6 +3632,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
           </div>
         </div>
+
+        {/* Loading Indicator */}
+        {loading && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            isDarkMode ? 'bg-blue-900/20 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+              <span className={`text-sm font-medium transition-colors duration-300 ${
+                isDarkMode ? 'text-blue-300' : 'text-blue-700'
+              }`}>
+                {firestoreStatus === 'saving' ? 'Saving to database...' : 
+                 firestoreStatus === 'connecting' ? 'Loading from database...' : 
+                 'Processing...'}
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         {selectedMonth !== "all" && (
@@ -3025,8 +3904,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       </td>
                     </tr>
                   ) : (
-                    filteredIncidents.map((incident) => (
-                    <tr key={incident.id} className={`border-b transition-colors duration-300 ${
+                    filteredIncidents.map((incident, index) => (
+                    <tr key={`${incident.id}-${index}`} className={`border-b transition-colors duration-300 ${
                       isDarkMode ? 'border-gray-700 hover:bg-gray-800/50' : 'border-gray-200 hover:bg-gray-50'
                     }`}>
                       <td className="p-3">
@@ -3133,7 +4012,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                             size="sm"
                             variant="outline"
                             onClick={() => {
-                              setEditingIncident(incident);
+                              const validatedIncident = validateIncidentForEdit(incident);
+                              setEditingIncident(validatedIncident);
                               setShowEditModal(true);
                             }}
                             title="Edit Incident"
@@ -3217,21 +4097,27 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   <select
                     id="incidentType"
                     value={newIncident.incidentType}
-                    onChange={(e) => setNewIncident({...newIncident, incidentType: e.target.value})}
+                    onChange={(e) => handleIncidentTypeChange(e.target.value)}
                     className={`mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isDarkMode 
                         ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
                         : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
                     }`}
                   >
-                    <option value="">Select Department</option>
                     <option value="">Select Incident Type</option>
-                    {incidentTypes.map((type) => (
-                      <option key={type} value={type}>
+                    {incidentTypes.map((type, index) => (
+                      <option key={`${type}-${index}`} value={type}>
                         {type}
                       </option>
                     ))}
                   </select>
+                  {newIncident.incidentType && newIncident.incidentType.startsWith("Other (") && (
+                    <p className={`mt-1 text-xs transition-colors duration-300 ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`}>
+                      ✅ Formatted as: {newIncident.incidentType}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="date" className={`text-sm font-semibold transition-colors duration-300 ${
@@ -3241,7 +4127,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="date"
-                    type="datetime-local"
+                    type="text"
+                    placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={newIncident.date}
                     onChange={(e) => setNewIncident({...newIncident, date: e.target.value})}
                     className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
@@ -3360,7 +4247,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   <Input
                     id="what"
                     value={newIncident.description}
-                    onChange={(e) => setNewIncident({...newIncident, description: e.target.value})}
+                    onChange={(e) => handleDescriptionChange(e.target.value)}
                     placeholder="Describe what happened..."
                     className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
                       isDarkMode 
@@ -3758,8 +4645,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     }`}
                   >
                     <option value="">Select Incident Type</option>
-                    {incidentTypes.map((type) => (
-                      <option key={type} value={type}>
+                    {incidentTypes.map((type, index) => (
+                      <option key={`edit-${type}-${index}`} value={type}>
                         {type}
                       </option>
                     ))}
@@ -3773,8 +4660,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="edit-date"
-                    type="datetime-local"
-                    value={editingIncident.date}
+                    type="text"
+                    placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
+                    value={editingIncident.date || ''}
                     onChange={(e) => setEditingIncident({...editingIncident, date: e.target.value})}
                     className={`mt-1 transition-colors duration-300 ${
                       isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
@@ -4669,7 +5557,7 @@ Check browser console for detailed debug information.`);
 
       {/* PDF Edit Modal */}
       {showPdfEditModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl ${
             isDarkMode ? 'bg-gray-900' : 'bg-white'
           }`}>
@@ -4839,13 +5727,393 @@ Check browser console for detailed debug information.`);
                 Cancel
               </Button>
               <Button
+                variant="outline"
+                onClick={() => {
+                  setShowPdfEditModal(false);
+                  previewPdfReport();
+                }}
+                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+              >
+                Preview
+              </Button>
+              <Button
                 onClick={() => {
                   setShowPdfEditModal(false);
                   exportIncidentsToPDF();
                 }}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                disabled={isGeneratingPdf}
+                className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
               >
-                Generate PDF
+                {isGeneratingPdf ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Generating PDF...
+                  </>
+                ) : (
+                  'Generate PDF'
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreviewModal && (
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
+          <div className={`w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-lg shadow-xl ${
+            isDarkMode ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            <div className={`p-6 border-b ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between">
+                <h2 className={`text-xl font-semibold transition-colors duration-300 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  📄 PDF Report Preview
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPdfPreviewModal(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Memorandum Preview */}
+              <div className={`p-6 border rounded-lg ${
+                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>MEMORANDUM</h3>
+                
+                <div className="space-y-3">
+                  <div className="flex">
+                    <span className={`font-semibold w-20 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>FOR:</span>
+                    <span className={`ml-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{pdfReportData.memorandum.for}</span>
+                  </div>
+                  <div className="flex">
+                    <span className={`font-semibold w-20 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>FROM:</span>
+                    <span className={`ml-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{pdfReportData.memorandum.from}</span>
+                  </div>
+                  <div className="flex">
+                    <span className={`font-semibold w-20 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>DATE:</span>
+                    <span className={`ml-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{pdfReportData.memorandum.date}</span>
+                  </div>
+                  <div className="flex">
+                    <span className={`font-semibold w-20 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>SUBJECT:</span>
+                    <span className={`ml-4 ${
+                      isDarkMode ? 'text-white' : 'text-gray-900'
+                    }`}>{pdfReportData.memorandum.subject}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Custom Notes Preview */}
+              {pdfReportData.customNotes && (
+                <div className={`p-6 border rounded-lg ${
+                  isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+                }`}>
+                  <h3 className={`text-lg font-bold mb-4 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Custom Notes</h3>
+                  <p className={`whitespace-pre-wrap ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>{pdfReportData.customNotes}</p>
+                </div>
+              )}
+
+              {/* Sections Preview */}
+              <div className={`p-6 border rounded-lg ${
+                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>Report Sections</h3>
+                
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {Object.entries(pdfReportData.includeSections).map(([section, included]) => (
+                    <div key={section} className={`flex items-center space-x-2 p-2 rounded ${
+                      included 
+                        ? (isDarkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800')
+                        : (isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600')
+                    }`}>
+                      <span className="text-sm">
+                        {included ? '✓' : '✗'}
+                      </span>
+                      <span className="text-sm">
+                        {section === 'dataCleaning' && 'Data Cleaning & Categorization'}
+                        {section === 'summaryGeneration' && 'Summary Generation'}
+                        {section === 'trendAnalysis' && 'Trend & Pattern Analysis'}
+                        {section === 'rootCauses' && 'Root Cause & Contributing Factors'}
+                        {section === 'recommendations' && 'Actionable Recommendations'}
+                        {section === 'riskForecasting' && 'Risk Forecasting'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Data Summary Preview */}
+              <div className={`p-6 border rounded-lg ${
+                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>Data Summary</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className={`p-4 rounded-lg ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-white'
+                  }`}>
+                    <div className={`text-2xl font-bold ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`}>
+                      {incidents.filter(incident => {
+                        if (filterStatus !== "all" && incident.status !== filterStatus) return false;
+                        if (selectedMonth !== "all") {
+                          const incidentMonth = new Date(incident.date).toLocaleString('en-US', { month: 'long' });
+                          if (incidentMonth !== selectedMonth) return false;
+                        }
+                        if (searchTerm) {
+                          const searchLower = searchTerm.toLowerCase();
+                          return (
+                            incident.description?.toLowerCase().includes(searchLower) ||
+                            incident.location?.toLowerCase().includes(searchLower) ||
+                            incident.incidentType?.toLowerCase().includes(searchLower) ||
+                            incident.municipality?.toLowerCase().includes(searchLower)
+                          );
+                        }
+                        return true;
+                      }).length}
+                    </div>
+                    <div className={`text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Total Incidents</div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-white'
+                  }`}>
+                    <div className={`text-2xl font-bold ${
+                      isDarkMode ? 'text-green-400' : 'text-green-600'
+                    }`}>
+                      {selectedMonth === "all" ? "All Months" : selectedMonth}
+                    </div>
+                    <div className={`text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Reporting Period</div>
+                  </div>
+                  
+                  <div className={`p-4 rounded-lg ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-white'
+                  }`}>
+                    <div className={`text-2xl font-bold ${
+                      isDarkMode ? 'text-purple-400' : 'text-purple-600'
+                    }`}>
+                      {Object.keys(pdfReportData.includeSections).filter(key => pdfReportData.includeSections[key]).length}
+                    </div>
+                    <div className={`text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                    }`}>Sections Included</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Content Preview */}
+              <div className={`p-6 border rounded-lg ${
+                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
+              }`}>
+                <h3 className={`text-lg font-bold mb-4 ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>PDF Content Preview</h3>
+                
+                <div className="space-y-4">
+                  {/* Sample Data Cleaning Section */}
+                  {pdfReportData.includeSections.dataCleaning && (
+                    <div className={`p-4 border-l-4 border-blue-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-blue-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-blue-300' : 'text-blue-700'
+                      }`}>1. Data Cleaning & Categorization</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        This report provides a comprehensive analysis of {incidents.filter(incident => {
+                          if (filterStatus !== "all" && incident.status !== filterStatus) return false;
+                          if (selectedMonth !== "all") {
+                            const incidentMonth = new Date(incident.date).toLocaleString('en-US', { month: 'long' });
+                            if (incidentMonth !== selectedMonth) return false;
+                          }
+                          return true;
+                        }).length} incidents recorded in the Province of Bataan for {selectedMonth === "all" ? "the reporting period" : selectedMonth} {new Date().getFullYear()}. All entries were reviewed for completeness and accuracy.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Summary Generation Section */}
+                  {pdfReportData.includeSections.summaryGeneration && (
+                    <div className={`p-4 border-l-4 border-green-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-green-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-green-300' : 'text-green-700'
+                      }`}>2. Summary Generation</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Municipality breakdown table with incident counts and detailed breakdowns by incident type. Dynamic summary content based on actual data analysis.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Trend Analysis Section */}
+                  {pdfReportData.includeSections.trendAnalysis && (
+                    <div className={`p-4 border-l-4 border-yellow-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-yellow-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+                      }`}>3. Trend & Pattern Analysis</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Dynamic trend analysis including temporal patterns, geographic hotspots, and incident type distributions. Statistical analysis of crime patterns and seasonal variations.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Root Causes Section */}
+                  {pdfReportData.includeSections.rootCauses && (
+                    <div className={`p-4 border-l-4 border-red-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-red-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-red-300' : 'text-red-700'
+                      }`}>4. Root Cause & Contributing Factors</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Analysis of socioeconomic factors, vehicular incidents, mental health considerations, and firearms control issues. Inter-agency collaboration recommendations.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Recommendations Section */}
+                  {pdfReportData.includeSections.recommendations && (
+                    <div className={`p-4 border-l-4 border-purple-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-purple-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-purple-300' : 'text-purple-700'
+                      }`}>5. Actionable Recommendations</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Enhanced police visibility and patrols, targeted law enforcement operations, technology and infrastructure improvements, and inter-agency collaboration strategies.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Risk Forecasting Section */}
+                  {pdfReportData.includeSections.riskForecasting && (
+                    <div className={`p-4 border-l-4 border-indigo-500 ${
+                      isDarkMode ? 'bg-gray-700' : 'bg-indigo-50'
+                    }`}>
+                      <h4 className={`font-semibold mb-2 ${
+                        isDarkMode ? 'text-indigo-300' : 'text-indigo-700'
+                      }`}>6. Risk Forecasting</h4>
+                      <p className={`text-sm ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        Predictive analysis of future incident patterns, risk assessment models, and mitigation priorities based on historical data and current trends.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Sample Municipality Table Preview */}
+                  <div className={`p-4 border-l-4 border-gray-500 ${
+                    isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
+                    <h4 className={`font-semibold mb-2 ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>Municipality Breakdown Table</h4>
+                    <div className={`text-xs border rounded ${
+                      isDarkMode ? 'border-gray-600' : 'border-gray-300'
+                    }`}>
+                      <div className={`grid grid-cols-3 gap-2 p-2 font-semibold ${
+                        isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700'
+                      }`}>
+                        <div>Municipality/City</div>
+                        <div>Total Incidents</div>
+                        <div>Breakdown</div>
+                      </div>
+                      <div className={`grid grid-cols-3 gap-2 p-2 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <div>Balanga City</div>
+                        <div>15</div>
+                        <div>5 Traffic, 3 Theft, 2 Drug-related...</div>
+                      </div>
+                      <div className={`grid grid-cols-3 gap-2 p-2 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        <div>Dinalupihan</div>
+                        <div>12</div>
+                        <div>4 Traffic, 2 Theft, 1 Drug-related...</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={`flex justify-end gap-3 p-6 border-t ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <Button
+                variant="outline"
+                onClick={() => setShowPdfPreviewModal(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowPdfPreviewModal(false);
+                  exportIncidentsToPDF();
+                }}
+                disabled={isGeneratingPdf}
+                className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {isGeneratingPdf ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Generating PDF...
+                  </>
+                ) : (
+                  'Generate PDF'
+                )}
               </Button>
             </div>
           </div>
