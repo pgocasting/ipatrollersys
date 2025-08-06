@@ -288,6 +288,53 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     return "Other";
   };
 
+  // Function to detect municipalities from location text
+  const detectMunicipalitiesFromLocation = (locationText, municipalityList) => {
+    if (!locationText) return [];
+    const detected = [];
+    municipalityList.forEach(municipality => {
+      // More flexible detection - check for any word match
+      const locationLower = locationText.toLowerCase();
+      const municipalityLower = municipality.toLowerCase();
+      
+      // Split municipality name into words for partial matching
+      const municipalityWords = municipalityLower.split(' ').filter(word => word.length > 0);
+      
+      // Check if any word from municipality name is found in location
+      const found = municipalityWords.some(word => {
+        // Skip very short words (less than 3 characters) to avoid false matches
+        if (word.length < 3) return false;
+        
+        // More flexible matching patterns for real data
+        const patterns = [
+          word,
+          word + ',',
+          word + ' ',
+          ' ' + word,
+          word + '.',
+          word + '-',
+          word + '_',
+          word + ' city',
+          word + ' district',
+          word + ' jail',
+          word + ' dormitory',
+          word + ', bataan',
+          word + ', Bataan',
+          word + ' bataan',
+          word + ' Bataan'
+        ];
+        
+        return patterns.some(pattern => locationLower.includes(pattern));
+      });
+      
+      if (found) {
+        detected.push(municipality);
+      }
+    });
+    
+    return detected;
+  };
+
   // Incident types for dropdown
   const incidentTypes = [
     "Traffic Violation",
@@ -381,8 +428,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       summaryGeneration: true,
       trendAnalysis: true,
       rootCauses: true,
-      recommendations: true,
-      riskForecasting: true
+      recommendations: true
     }
   });
 
@@ -1241,6 +1287,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   }, []);
 
   const filteredIncidents = uniqueIncidents.filter((incident) => {
+    // Filter out incidents with "No description available"
+    const hasValidDescription = incident.description && 
+                               incident.description.trim() !== "" && 
+                               incident.description !== "No description available";
+    
     const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
     const matchesSearch = searchTerm === "" || 
@@ -1250,7 +1301,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     
 
     
-    return matchesStatus && matchesMonth && matchesSearch;
+    return hasValidDescription && matchesStatus && matchesMonth && matchesSearch;
   });
 
 
@@ -1339,8 +1390,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     try {
       const workbook = XLSX.utils.book_new();
       
-      // Prepare data for export
-      const exportData = incidents.map(incident => ({
+      // Prepare data for export - filter out incidents with no description
+      const exportData = incidents
+        .filter(incident => incident.description && 
+                           incident.description.trim() !== "" && 
+                           incident.description !== "No description available")
+        .map(incident => ({
         'Incident Type': incident.incidentType,
         'Date': incident.date,
         'Time': incident.time,
@@ -1406,7 +1461,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         'Assigned Officer', 'Action Date', 'Priority', 'Status', 'Follow-up Notes', 'Link'
       ];
       
-      const csvData = incidents.map(incident => [
+      const csvData = incidents
+        .filter(incident => incident.description && 
+                           incident.description.trim() !== "" && 
+                           incident.description !== "No description available")
+        .map(incident => [
         incident.incidentType,
         incident.date,
         incident.time,
@@ -1840,6 +1899,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       
       // Filter incidents based on current filters
       const filtered = incidents.filter(incident => {
+        // Filter out incidents with "No description available"
+        if (!incident.description || 
+            incident.description.trim() === "" || 
+            incident.description === "No description available") {
+          return false;
+        }
+        
         // Filter by status if not "all"
         if (filterStatus !== "all" && incident.status !== filterStatus) {
           return false;
@@ -2040,20 +2106,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       
       // Enhanced auto-fit helper function to check page overflow and add new pages
-      const checkPageOverflow = (yPosition, requiredSpace = 15) => {
+      const checkPageOverflow = (yPosition, requiredSpace = 10) => {
         const pageHeight = doc.internal.pageSize.height;
-        const bottomMargin = 25; // Increased bottom margin for better spacing
+        const bottomMargin = 20; // Adequate bottom margin for page numbers
         const availableSpace = pageHeight - bottomMargin;
         
         if (yPosition + requiredSpace > availableSpace) {
           doc.addPage();
-          return 25; // Reset to top of new page with proper margin
+          return 20; // Reset to top of new page with proper margin
         }
         return yPosition;
       };
       
-      // Enhanced auto-fit text function that handles overflow with better spacing
-      const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 6) => {
+      // Enhanced auto-fit text function that handles overflow with minimal spacing
+      const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 5) => {
         if (!text || text.trim() === '') {
           return y + lineSpacing;
         }
@@ -2071,9 +2137,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return currentY;
       };
       
-      // Enhanced section header function with proper spacing
+      // Enhanced section header function with minimal spacing
       const addSectionHeader = (text, yPosition, fontSize = 14) => {
-        const newY = checkPageOverflow(yPosition, 20);
+        const newY = checkPageOverflow(yPosition, 15);
         
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
@@ -2081,17 +2147,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         
         // Add underline for section header
         doc.setLineWidth(0.2);
-        doc.line(leftMargin, newY + 2, doc.internal.pageSize.width - leftMargin, newY + 2);
+        doc.line(leftMargin, newY + 1, doc.internal.pageSize.width - leftMargin, newY + 1);
         
-        return newY + 15; // Return position after header with proper spacing
+        return newY + 8; // Return position after header with minimal spacing
       };
       
-      // Enhanced bullet list function with proper spacing
+      // Enhanced bullet list function with minimal spacing
       const addBulletList = (items, yPosition, fontSize = 10, indent = 15) => {
         let currentY = yPosition;
         
         items.forEach((item, index) => {
-          currentY = checkPageOverflow(currentY, 8);
+          currentY = checkPageOverflow(currentY, 6);
           
           // Bullet point
           doc.setFontSize(fontSize);
@@ -2103,8 +2169,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const textX = leftMargin + indent;
           const textWidth = doc.internal.pageSize.width - leftMargin * 2 - indent;
           
-          currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 6);
-          currentY += 3; // Small gap between items
+          currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 5);
+          currentY += 2; // Minimal gap between items
         });
         
         return currentY;
@@ -2130,75 +2196,76 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const contentMargin = 45; // Increased content margin
       const maxContentWidth = doc.internal.pageSize.width - leftMargin * 2;
       
-      // MEMORANDUM title - bold, uppercase, left-aligned with proper spacing
+      // MEMORANDUM title - bold, uppercase, left-aligned with minimal spacing
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
-      doc.text('MEMORANDUM', leftMargin, 25);
+      doc.text('MEMORANDUM', leftMargin, 20);
       
-      // Memorandum details with enhanced auto-fit spacing
-      let yPos = 40; // Increased starting position
+      // Memorandum details with minimal spacing
+      let yPos = 30; // Reduced starting position
       
       // FOR line
-      yPos = checkPageOverflow(yPos, 12);
+      yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(11);
       doc.text('FOR', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
-      yPos += 8; // Increased spacing between fields
+      yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
+      yPos += 5; // Minimal spacing between fields
       
       // FROM line
-      yPos = checkPageOverflow(yPos, 12);
+      yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('FROM', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
-      yPos += 8;
+      yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
+      yPos += 5;
       
       // DATE line
-      yPos = checkPageOverflow(yPos, 12);
+      yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('DATE', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
-      yPos += 8;
+      yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
+      yPos += 5;
       
       // SUBJECT line
-      yPos = checkPageOverflow(yPos, 12);
+      yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('SUBJECT', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 7);
-      yPos += 15; // Increased spacing before custom notes
+      yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
+      yPos += 8; // Minimal spacing before custom notes
       
       // Add custom notes if provided
       if (pdfReportData.customNotes && pdfReportData.customNotes.trim()) {
-        yPos = checkPageOverflow(yPos, 25);
-        yPos = addAutoFitText(pdfReportData.customNotes, leftMargin, yPos, maxContentWidth, 11, 7);
-        yPos += 15; // Increased spacing after custom notes
+        yPos = checkPageOverflow(yPos, 10);
+        yPos = addAutoFitText(pdfReportData.customNotes, leftMargin, yPos, maxContentWidth, 11, 5);
+        yPos += 5; // Minimal spacing after custom notes
       }
       
       // Section 1: Data Cleaning & Categorization
       if (pdfReportData.includeSections.dataCleaning) {
-        yPos = addSectionHeader('1. Data Cleaning & Categorization', yPos + 10);
+        yPos = addSectionHeader('1. Data Cleaning & Categorization', yPos + 5);
         
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
       
         // Main content - Dynamic based on actual data
-        yPos = addAutoFitText(reportText, leftMargin, yPos, maxContentWidth, 11, 7);
+        yPos = addAutoFitText(reportText, leftMargin, yPos, maxContentWidth, 11, 5);
       
         // Incident categorization based on actual data
-        yPos += 12;
+        yPos += 8;
+        yPos = checkPageOverflow(yPos, 15);
         doc.setFont('helvetica', 'bold');
         doc.text('The incidents are categorized as follows:', leftMargin, yPos);
       
         // Show actual incident types found in the data
-        yPos += 10;
+        yPos += 6;
         const subIndent = leftMargin + 15;
       
       if (Object.keys(actualIncidentTypes).length > 0) {
@@ -2217,21 +2284,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         
         if (indexCrimeTypes.length > 0) {
           indexCrimeTypes.forEach(([type, count]) => {
+            yPos = checkPageOverflow(yPos, 8);
             const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
-            yPos += 3; // Small gap between items
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
+            yPos += 1; // Minimal gap between items
           });
         } else {
+          yPos = checkPageOverflow(yPos, 8);
           const noIndexText = `  - No index crimes recorded`;
-          yPos = addAutoFitText(noIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+          yPos = addAutoFitText(noIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
         }
         
-        yPos += 10; // Increased spacing between categories
+        yPos += 5; // Minimal spacing between categories
+        yPos = checkPageOverflow(yPos, 10);
         
         // Non-Index Crimes & Other Incidents
         doc.setFont('helvetica', 'bold');
         doc.text('• Non-Index Crimes & Other Incidents:', leftMargin, yPos);
-        yPos += 10;
+        yPos += 5;
         
         const nonIndexCrimeTypes = Object.entries(actualIncidentTypes)
           .filter(([type]) => nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
@@ -2239,13 +2309,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         
         if (nonIndexCrimeTypes.length > 0) {
           nonIndexCrimeTypes.forEach(([type, count]) => {
+            yPos = checkPageOverflow(yPos, 8);
             const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
-            yPos += 3; // Small gap between items
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
+            yPos += 1; // Minimal gap between items
           });
         } else {
+          yPos = checkPageOverflow(yPos, 8);
           const noNonIndexText = `  - No non-index crimes recorded`;
-          yPos = addAutoFitText(noNonIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
+          yPos = addAutoFitText(noNonIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
         }
         
         // Other incidents not categorized
@@ -2255,15 +2327,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           .sort(([,a], [,b]) => b - a);
         
         if (otherTypes.length > 0) {
-          yPos += 10; // Increased spacing
+          yPos += 5; // Minimal spacing
+          yPos = checkPageOverflow(yPos, 10);
           doc.setFont('helvetica', 'bold');
           doc.text('• Other Incidents:', leftMargin, yPos);
-          yPos += 10;
+          yPos += 5;
           
           otherTypes.forEach(([type, count]) => {
+            yPos = checkPageOverflow(yPos, 8);
             const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
-            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
-            yPos += 3; // Small gap between items
+            yPos = addAutoFitText(text, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
+            yPos += 1; // Minimal gap between items
           });
         }
       } else {
@@ -2274,7 +2348,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       // Section 2: Summary Generation
       if (pdfReportData.includeSections.summaryGeneration) {
-        yPos = addSectionHeader('2. Summary Generation', yPos + 10);
+        yPos = addSectionHeader('2. Summary Generation', yPos + 5);
 
       // Create table headers
       const headers = [['Municipality/City', 'Total Incidents', 'Breakdown']];
@@ -2330,59 +2404,72 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       // Display dynamic summary
       const dynamicSummary = generateDynamicSummary();
       dynamicSummary.forEach((section, index) => {
+        yPos = checkPageOverflow(yPos, 15);
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.text(section.title, leftMargin, yPos);
         doc.setFont('helvetica', 'normal');
-        yPos += 10;
+        yPos += 8;
         
         section.content.forEach(content => {
-           yPos = addAutoFitText(content, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 11, 7);
-           yPos += 5; // Small gap between content items
+           yPos = addAutoFitText(content, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 11, 5);
+           yPos += 3; // Small gap between content items
         });
         
-         yPos += 12; // Increased spacing between sections
+         yPos += 8; // Minimal spacing between sections
       });
       
-             // Add table with enhanced spacing
+             // Add table with enhanced spacing and overflow protection
       console.log('Generating table with data:', { headers, sortedMunicipalities });
       try {
+        // Check if we have enough space for the table
+        const estimatedTableHeight = (sortedMunicipalities.length + 1) * 12; // Rough estimate
+        yPos = checkPageOverflow(yPos, estimatedTableHeight);
+        
         let finalY = yPos;
         autoTable(doc, {
           head: headers,
           body: sortedMunicipalities,
-           startY: yPos + 5, // Add some space before table
+          startY: yPos + 5, // Minimal space before table
           styles: {
             fontSize: 9,
-             cellPadding: 4, // Increased cell padding
-            lineWidth: 0.1
+            cellPadding: 3, // Reduced cell padding
+            lineWidth: 0.1,
+            overflow: 'linebreak' // Prevent text overflow
           },
           columnStyles: {
-            0: { cellWidth: 45, fontStyle: 'bold' },
-            1: { cellWidth: 25, halign: 'center' },
-            2: { cellWidth: 'auto' }
+            0: { cellWidth: 50, fontStyle: 'bold' },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 'auto', cellMinWidth: 80 }
           },
           headStyles: {
             fontSize: 10,
             fontStyle: 'bold',
-             halign: 'center',
-             fillColor: [70, 130, 180] // Add header background color
+            halign: 'center',
+            fillColor: [70, 130, 180], // Add header background color
+            textColor: [255, 255, 255] // White text for header
           },
-           alternateRowStyles: {
-             fillColor: [248, 249, 250] // Alternate row colors
-           },
-           margin: { left: leftMargin, right: leftMargin }, // Use consistent margins
+          alternateRowStyles: {
+            fillColor: [248, 249, 250] // Alternate row colors
+          },
+          margin: { left: leftMargin, right: leftMargin }, // Use consistent margins
           didDrawCell: function(data) {
             // Update finalY to track the bottom of the table
             if (data.row.index === data.table.body.length - 1 && 
                 data.column.index === data.table.columns.length - 1) {
               finalY = data.cell.y + data.cell.height;
             }
+          },
+          didDrawPage: function(data) {
+            // Add page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            doc.setFontSize(10);
+            doc.text(`Page ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
           }
         });
         
-         // Update yPos to after table with proper spacing
-         yPos = finalY + 15;
+        // Update yPos to after table with minimal spacing
+        yPos = finalY + 8; // Minimal spacing after table
       } catch (tableError) {
         console.error('Error generating table:', tableError);
         throw new Error('Failed to generate incident table: ' + tableError.message);
@@ -2392,7 +2479,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
       doc.text('B. Crime Hotspots and High-Risk Areas:', leftMargin, yPos);
-      yPos += 10;
+      yPos += 5;
 
       // Generate dynamic crime hotspots content
       const generateDynamicHotspots = () => {
@@ -2458,30 +2545,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.setFont('helvetica', 'normal');
 
       dynamicHotspots.forEach((hotspot, index) => {
-        // Add page break before Barangay Hotspots to move it to page 3
-        if (hotspot.title === 'Barangay Hotspots:') {
+        // Check for page overflow before each hotspot
+        yPos = checkPageOverflow(yPos, 20);
+        
+        // Add page break before Barangay Hotspots if it's a long section
+        if (hotspot.title === 'Barangay Hotspots:' && yPos > doc.internal.pageSize.height * 0.7) {
           doc.addPage();
-          yPos = 20;
+          yPos = 25; // Account for header
         }
         
         const text = `${hotspot.title} ${hotspot.content}`;
-        const lines = doc.splitTextToSize(text, doc.internal.pageSize.width - leftMargin * 2);
-        doc.text(lines, leftMargin, yPos);
-        yPos += lines.length * 5 + 5;
+        yPos = addAutoFitText(text, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 10, 5);
+        yPos += 3;
         
         if (hotspot.subItems) {
           hotspot.subItems.forEach(item => {
-            doc.text(`• ${item}`, leftMargin + 10, yPos);
-            yPos += 5;
+            yPos = addAutoFitText(`• ${item}`, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
+            yPos += 2;
           });
-          yPos += 5;
+          yPos += 3;
         }
       });
       } // End of Section 2 conditional
       
       // Add new page for Trend & Pattern Analysis (Page 3)
       doc.addPage();
-      yPos = 25; // Start with proper margin
+      yPos = 25; // Start with proper margin accounting for header
 
       // 3. Trend & Pattern Analysis
       if (pdfReportData.includeSections.trendAnalysis) {
@@ -2585,31 +2674,34 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           doc.setFont('helvetica', 'normal');
       
       dynamicTrends.forEach((trend, index) => {
+        // Check for page overflow before each trend
+        yPos = checkPageOverflow(yPos, 15);
+        
         // Add bullet point and bold header
         doc.setFont('helvetica', 'bold');
         doc.text(`• ${trend.title}`, leftMargin, yPos);
-        yPos += 8;
+        yPos += 5;
         
-        // Add content in normal font with better spacing
+        // Add content in normal font with minimal spacing
         doc.setFont('helvetica', 'normal');
-        yPos = addAutoFitText(trend.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
-        yPos += 8; // Increased spacing between trends
+        yPos = addAutoFitText(trend.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
+        yPos += 5; // Minimal spacing between trends
         
         if (trend.subItems) {
           trend.subItems.forEach(item => {
-            yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 6);
-            yPos += 3; // Small gap between sub-items
+            yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 5);
+            yPos += 2; // Minimal gap between sub-items
           });
-          yPos += 5;
+          yPos += 3;
         }
       });
       } // End of Section 3 conditional
       
-      yPos += 15;
+      yPos += 8;
 
       // 4. Root Cause & Contributing Factors (Page 3)
       if (pdfReportData.includeSections.rootCauses) {
-        yPos = addSectionHeader('4. Root Cause & Contributing Factors', yPos + 10);
+        yPos = addSectionHeader('4. Root Cause & Contributing Factors', yPos + 5);
 
       // Generate dynamic root cause analysis
       const generateDynamicRootCauses = (incidentTypes) => {
@@ -2666,15 +2758,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.setFont('helvetica', 'normal');
       
       dynamicRootCauses.forEach((cause, index) => {
+        // Check for page overflow before each cause
+        yPos = checkPageOverflow(yPos, 15);
+        
         // Add bullet point and bold header
         doc.setFont('helvetica', 'bold');
         doc.text(`• ${cause.title}`, leftMargin, yPos);
-        yPos += 8;
+        yPos += 5;
         
-        // Add content in normal font with better spacing
+        // Add content in normal font with minimal spacing
         doc.setFont('helvetica', 'normal');
-        yPos = addAutoFitText(cause.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
-        yPos += 8; // Increased spacing between causes
+        yPos = addAutoFitText(cause.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
+        yPos += 5; // Minimal spacing between causes
       });
       } // End of Section 4 conditional
       
@@ -2682,11 +2777,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       // 5. Actionable Recommendations (Page 3)
       if (pdfReportData.includeSections.recommendations) {
-        // 5. Actionable Recommendations
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('5. Actionable Recommendations', leftMargin, yPos);
-        yPos += 15;
+        yPos = addSectionHeader('5. Actionable Recommendations', yPos + 5);
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
@@ -2841,137 +2932,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         yPos += 15;
 
       // Generate dynamic risk forecasting
-      const generateDynamicRiskForecasting = (incidentTypes) => {
-        const forecasts = [];
-        
-        // Short-term Risk Assessment (Next 30 days)
-        const shortTermRisks = [];
-        if (incidentTypes['Drug-related'] > 0) {
-          shortTermRisks.push(`Continued drug-related activities in high-incident municipalities`);
-        }
-        if (incidentTypes['Traffic Accident'] > 0) {
-          shortTermRisks.push(`Ongoing traffic safety concerns along major thoroughfares`);
-        }
-        if (incidentTypes['Theft'] > 0) {
-          shortTermRisks.push(`Persistent theft incidents in commercial areas`);
-        }
-        
-        if (shortTermRisks.length > 0) {
-          forecasts.push({
-            title: 'Short-term Risk Assessment (Next 30 days):',
-            content: `Based on current incident patterns, the following risks are anticipated:`,
-            subItems: shortTermRisks
-          });
-        }
-        
-        // Medium-term Risk Projection (Next 3 months)
-        const mediumTermRisks = [];
-        const totalIncidents = filtered.length;
-        if (totalIncidents > 0) {
-          const avgIncidentsPerMonth = totalIncidents / 1; // Assuming current data is for 1 month
-          const projectedIncidents = Math.round(avgIncidentsPerMonth * 3);
-          
-          mediumTermRisks.push(`Projected ${projectedIncidents} total incidents over the next 3 months based on current trends`);
-          
-          if (incidentTypes['Drug-related'] > 0) {
-            const projectedDrug = Math.round((incidentTypes['Drug-related'] / totalIncidents) * projectedIncidents);
-            mediumTermRisks.push(`Estimated ${projectedDrug} drug-related incidents requiring continued enforcement`);
-          }
-          
-          if (incidentTypes['Traffic Accident'] > 0) {
-            const projectedTraffic = Math.round((incidentTypes['Traffic Accident'] / totalIncidents) * projectedIncidents);
-            mediumTermRisks.push(`Expected ${projectedTraffic} traffic accidents without intervention`);
-          }
-        }
-        
-        if (mediumTermRisks.length > 0) {
-          forecasts.push({
-            title: 'Medium-term Risk Projection (Next 3 months):',
-            content: `Trend analysis suggests the following projections:`,
-            subItems: mediumTermRisks
-          });
-        }
-        
-        // Seasonal Risk Factors
-        const seasonalRisks = [];
-        const currentMonth = new Date().getMonth();
-        
-        // Summer months (March-May) - more outdoor activities
-        if (currentMonth >= 2 && currentMonth <= 4) {
-          seasonalRisks.push('Increased outdoor activities may lead to higher traffic incidents');
-          seasonalRisks.push('Tourist influx could impact incident patterns in coastal municipalities');
-        }
-        // Rainy season (June-October) - weather-related risks
-        else if (currentMonth >= 5 && currentMonth <= 9) {
-          seasonalRisks.push('Weather-related traffic incidents may increase during rainy season');
-          seasonalRisks.push('Flooding could affect response times in low-lying areas');
-        }
-        // Holiday season (November-February) - increased activity
-        else {
-          seasonalRisks.push('Holiday season may see increased theft and traffic incidents');
-          seasonalRisks.push('Higher population movement during festivities');
-        }
-        
-        forecasts.push({
-          title: 'Seasonal Risk Factors:',
-          content: `Current seasonal patterns indicate:`,
-          subItems: seasonalRisks
-        });
-        
-        // Risk Mitigation Priorities
-        const mitigationPriorities = [];
-        if (sortedMunicipalities.length > 0) {
-          const topMunicipality = sortedMunicipalities[0];
-          mitigationPriorities.push(`Priority focus on ${topMunicipality[0]} with highest incident rate`);
-        }
-        
-        if (incidentTypes['Drug-related'] > 0) {
-          mitigationPriorities.push('Enhanced anti-drug operations and community awareness');
-        }
-        
-        if (incidentTypes['Traffic Accident'] > 0) {
-          mitigationPriorities.push('Traffic safety campaigns and infrastructure improvements');
-        }
-        
-        if (incidentTypes['Theft'] > 0) {
-          mitigationPriorities.push('Increased surveillance and community vigilance programs');
-        }
-        
-        forecasts.push({
-          title: 'Risk Mitigation Priorities:',
-          content: `Recommended focus areas for risk reduction:`,
-          subItems: mitigationPriorities
-        });
-        
-        return forecasts;
-      };
-      
-      // Display dynamic risk forecasting
-      const dynamicForecasts = generateDynamicRiskForecasting(actualIncidentTypes);
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      dynamicForecasts.forEach((forecast, index) => {
-        // Add bullet point and bold header
-        doc.setFont('helvetica', 'bold');
-        doc.text(`• ${forecast.title}`, leftMargin, yPos);
-        yPos += 7;
-        
-        // Add content in normal font
-        doc.setFont('helvetica', 'normal');
-        const lines = doc.splitTextToSize(forecast.content, doc.internal.pageSize.width - leftMargin * 2);
-        doc.text(lines, leftMargin + 10, yPos);
-        yPos += lines.length * 5 + 5;
-        
-        if (forecast.subItems) {
-          forecast.subItems.forEach(item => {
-            doc.text(`• ${item}`, leftMargin + 20, yPos);
-            yPos += 5;
-          });
-          yPos += 5;
-        }
-      });
-      } // End of Section 3 conditional
+
 
       // Section 4: Root Cause Analysis
       if (pdfReportData.includeSections.rootCauseAnalysis) {
@@ -3109,108 +3070,42 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         });
       } // End of Section 5 conditional
 
-      // Section 6: Risk Forecasting
-      if (pdfReportData.includeSections.riskForecasting) {
-        yPos = addSectionHeader('6. Risk Forecasting', yPos + 10);
-
-        // Generate dynamic risk forecasting
-        const generateDynamicRiskForecasting = (incidentTypes) => {
-          const forecasts = [];
-          const totalIncidents = Object.values(incidentTypes).reduce((sum, count) => sum + count, 0);
-          
-          if (totalIncidents === 0) {
-            forecasts.push({
-              title: 'No Historical Data:',
-              content: 'Without historical incident data, risk forecasting is limited. Establishing baseline data collection is recommended.'
-            });
-            return forecasts;
-          }
-
-          // Seasonal Patterns
-          forecasts.push({
-            title: 'Seasonal Risk Patterns:',
-            content: 'Based on current data patterns, anticipate potential seasonal variations in incident types and adjust resource allocation accordingly.'
-          });
-
-          // Geographic Risk Areas
-          if (sortedMunicipalities.length > 0) {
-            const topMunicipality = sortedMunicipalities[0];
-            forecasts.push({
-              title: 'Geographic Risk Concentration:',
-              content: `${topMunicipality[0]} shows the highest incident concentration. Consider enhanced monitoring and preventive measures in this area.`
-            });
-          }
-
-          // Risk Mitigation Priorities
-          const mitigationPriorities = [];
-          if (sortedMunicipalities.length > 0) {
-            const topMunicipality = sortedMunicipalities[0];
-            mitigationPriorities.push(`Priority focus on ${topMunicipality[0]} with highest incident rate`);
-          }
-          
-          if (incidentTypes['Drug-related'] > 0) {
-            mitigationPriorities.push('Enhanced anti-drug operations and community awareness');
-          }
-          
-          if (incidentTypes['Traffic Accident'] > 0) {
-            mitigationPriorities.push('Traffic safety campaigns and infrastructure improvements');
-          }
-          
-          if (incidentTypes['Theft'] > 0) {
-            mitigationPriorities.push('Increased surveillance and community vigilance programs');
-          }
-          
-          forecasts.push({
-            title: 'Risk Mitigation Priorities:',
-            content: `Recommended focus areas for risk reduction:`,
-            subItems: mitigationPriorities
-          });
-          
-          return forecasts;
-        };
-        
-        // Display dynamic risk forecasting
-        const dynamicForecasts = generateDynamicRiskForecasting(actualIncidentTypes);
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        dynamicForecasts.forEach((forecast, index) => {
-          // Add bullet point and bold header
-          doc.setFont('helvetica', 'bold');
-          doc.text(`• ${forecast.title}`, leftMargin, yPos);
-          yPos += 8;
-          
-          // Add content in normal font with better spacing
-          doc.setFont('helvetica', 'normal');
-          yPos = addAutoFitText(forecast.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
-          yPos += 8; // Increased spacing between forecasts
-          
-          if (forecast.subItems) {
-            forecast.subItems.forEach(item => {
-              yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 6);
-              yPos += 3; // Small gap between sub-items
-          });
-          yPos += 5;
-        }
-      });
-      } // End of Section 6 conditional
 
 
 
-      // Add page numbers
+
+      // Add page numbers and headers to all pages
       const totalPages = doc.internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        doc.setFontSize(10);
+        
+        // Add page number at bottom
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(`Page ${i} of ${totalPages}`, doc.internal.pageSize.width - 20, doc.internal.pageSize.height - 10, { align: 'right' });
+        doc.text(`Page ${i} of ${totalPages}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 15, { align: 'right' });
+        
+        // Add header line at top of each page (except first page which has memorandum)
+        if (i > 1) {
+          doc.setLineWidth(0.5);
+          doc.line(20, 15, doc.internal.pageSize.width - 20, 15);
+          
+          // Add report title in header
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Crime Analysis Report - Province of Bataan', 20, 12);
+          
+          // Add date in header
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 25, 12, { align: 'right' });
+        }
       }
 
       // Generate filename and save
       const filename = `Crime_Analysis_Report_${selectedMonth === "all" ? "All_Months" : selectedMonth}_${new Date().getFullYear()}.pdf`;
       
       try {
-      doc.save(filename);
+        doc.save(filename);
         console.log('PDF generated successfully:', filename);
         
         // Show success message
@@ -3221,7 +3116,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.error('Error saving PDF:', saveError);
         alert('Error saving PDF file. Please check your browser settings and try again.');
       }
-     } catch (error) {
+    } catch (error) {
       console.error('Error generating PDF:', error);
       
       // More detailed error handling
@@ -3241,53 +3136,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setIsGeneratingPdf(false);
     }
   }; // End of exportIncidentsToPDF function
-
-    // Function to detect municipalities from location text
-    const detectMunicipalitiesFromLocation = (locationText, municipalityList) => {
-      if (!locationText) return [];
-      const detected = [];
-      municipalityList.forEach(municipality => {
-        // More flexible detection - check for any word match
-        const locationLower = locationText.toLowerCase();
-        const municipalityLower = municipality.toLowerCase();
-        
-        // Split municipality name into words for partial matching
-        const municipalityWords = municipalityLower.split(' ').filter(word => word.length > 0);
-        
-        // Check if any word from municipality name is found in location
-        const found = municipalityWords.some(word => {
-          // Skip very short words (less than 3 characters) to avoid false matches
-          if (word.length < 3) return false;
-          
-          // More flexible matching patterns for real data
-          const patterns = [
-            word,
-            word + ',',
-            word + ' ',
-            ' ' + word,
-            word + '.',
-            word + '-',
-            word + '_',
-            word + ' city',
-            word + ' district',
-            word + ' jail',
-            word + ' dormitory',
-            word + ', bataan',
-            word + ', Bataan',
-            word + ' bataan',
-            word + ' Bataan'
-          ];
-          
-          return patterns.some(pattern => locationLower.includes(pattern));
-        });
-        
-        if (found) {
-          detected.push(municipality);
-        }
-      });
-      
-      return detected;
-    };
 
   // Generate summary insights
   const generateSummaryInsights = (filteredData = incidents) => {
@@ -3575,26 +3423,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             >
               <BarChart3 className="w-5 h-5" />
             </Button>
-            <Button
-              onClick={() => {
-                // Simple test first
-                try {
-                  console.log('Testing basic PDF functionality...');
-                  const doc = new jsPDF();
-                  doc.text('Test PDF Export', 20, 20);
-                  doc.save('test-export.pdf');
-                  console.log('Basic test successful');
-                  alert('Basic PDF test successful! Check test-export.pdf');
-                } catch (error) {
-                  console.error('Basic test failed:', error);
-                  alert(`Basic test failed: ${error.message}`);
-                }
-              }}
-              className="bg-yellow-600 hover:bg-yellow-700 text-white"
-              title="Test PDF Export"
-            >
-              <Zap className="w-5 h-5" />
-            </Button>
+
             <Button
                               onClick={showPdfEditInterface}
               className="bg-blue-600 hover:bg-blue-700 text-white"
@@ -3922,7 +3751,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                           <p className={`transition-colors duration-300 ${
                             isDarkMode ? 'text-white' : 'text-gray-900'
                           }`}>
-                            {incident.description || 'No description available'}
+                            {incident.description || '-'}
                           </p>
 
                         </div>
@@ -5689,7 +5518,6 @@ Check browser console for detailed debug information.`);
                         {section === 'trendAnalysis' && 'Trend & Pattern Analysis'}
                         {section === 'rootCauses' && 'Root Cause & Contributing Factors'}
                         {section === 'recommendations' && 'Actionable Recommendations'}
-                        {section === 'riskForecasting' && 'Risk Forecasting'}
                       </Label>
                     </div>
                   ))}
@@ -5867,7 +5695,6 @@ Check browser console for detailed debug information.`);
                         {section === 'trendAnalysis' && 'Trend & Pattern Analysis'}
                         {section === 'rootCauses' && 'Root Cause & Contributing Factors'}
                         {section === 'recommendations' && 'Actionable Recommendations'}
-                        {section === 'riskForecasting' && 'Risk Forecasting'}
                       </span>
                     </div>
                   ))}
@@ -6036,21 +5863,7 @@ Check browser console for detailed debug information.`);
                     </div>
                   )}
 
-                  {/* Sample Risk Forecasting Section */}
-                  {pdfReportData.includeSections.riskForecasting && (
-                    <div className={`p-4 border-l-4 border-indigo-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-indigo-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-indigo-300' : 'text-indigo-700'
-                      }`}>6. Risk Forecasting</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
-                        Predictive analysis of future incident patterns, risk assessment models, and mitigation priorities based on historical data and current trends.
-                      </p>
-                    </div>
-                  )}
+
 
                   {/* Sample Municipality Table Preview */}
                   <div className={`p-4 border-l-4 border-gray-500 ${
