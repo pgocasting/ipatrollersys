@@ -2946,55 +2946,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.line(leftMargin, yPos + 1, doc.internal.pageSize.width - leftMargin, yPos + 1);
         yPos += 15;
 
-        // Generate dynamic root cause analysis
-        const generateDynamicRootCauses = (incidentTypes) => {
-          const causes = [];
-          const totalIncidents = Object.values(incidentTypes).reduce((sum, count) => sum + count, 0);
-          
-          if (totalIncidents === 0) {
-            causes.push({
-              title: 'No Data Available:',
-              content: 'No incidents were recorded during this period, making root cause analysis unavailable.'
-            });
-            return causes;
-          }
-
-          // Analyze patterns based on incident types
-          if (incidentTypes['Drug-related'] > 0) {
-            const percentage = ((incidentTypes['Drug-related'] / totalIncidents) * 100).toFixed(1);
-            causes.push({
-              title: 'Drug-Related Incidents:',
-              content: `Drug-related incidents represent ${percentage}% of total cases, indicating potential issues with drug trafficking, substance abuse, or enforcement gaps.`
-            });
-          }
-
-          if (incidentTypes['Traffic Accident'] > 0) {
-            const percentage = ((incidentTypes['Traffic Accident'] / totalIncidents) * 100).toFixed(1);
-            causes.push({
-              title: 'Traffic Safety Issues:',
-              content: `Traffic accidents account for ${percentage}% of incidents, suggesting infrastructure, enforcement, or driver behavior concerns.`
-            });
-          }
-
-          if (incidentTypes['Theft'] > 0) {
-            const percentage = ((incidentTypes['Theft'] / totalIncidents) * 100).toFixed(1);
-            causes.push({
-              title: 'Property Crime Factors:',
-              content: `Theft incidents represent ${percentage}% of cases, potentially indicating economic factors, opportunity, or security gaps.`
-            });
-          }
-
-          if (incidentTypes['Physical Injury'] > 0) {
-            const percentage = ((incidentTypes['Physical Injury'] / totalIncidents) * 100).toFixed(1);
-            causes.push({
-              title: 'Violence and Conflict:',
-              content: `Physical injury cases account for ${percentage}% of incidents, suggesting interpersonal conflicts or public safety concerns.`
-            });
-          }
-
-          return causes;
-        };
-
         // Display dynamic root cause analysis
         const dynamicCauses = generateDynamicRootCauses(actualIncidentTypes);
         doc.setFontSize(10);
@@ -3018,25 +2969,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       if (pdfReportData.includeSections.recommendations) {
         yPos = addSectionHeader('5. Recommendations', yPos + 10);
 
-        // Generate dynamic recommendations
-        const generateDynamicRecommendations = () => {
-          const recommendations = [];
-          
-          // General recommendations based on data patterns
-          recommendations.push({
-            title: 'Enhanced Data Collection:',
-            content: 'Implement standardized reporting procedures to ensure consistent and comprehensive incident documentation.'
-          });
-
-          recommendations.push({
-            title: 'Community Engagement:',
-            content: 'Strengthen community-police partnerships through regular meetings, awareness campaigns, and collaborative initiatives.'
-          });
-
-          recommendations.push({
-            title: 'Resource Allocation:',
-            content: 'Review and optimize resource distribution based on incident patterns and municipality-specific needs.'
-          });
+        // Display dynamic recommendations
+        const dynamicRecommendations = generateDynamicRecommendations();
 
           // Specific recommendations based on incident types
           if (Object.keys(actualIncidentTypes).length > 0) {
@@ -3084,21 +3018,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.setFont('helvetica', 'normal');
         doc.text(`Page ${i} of ${totalPages}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 15, { align: 'right' });
         
-        // Add header line at top of each page (except first page which has memorandum)
-        if (i > 1) {
-          doc.setLineWidth(0.5);
-          doc.line(20, 15, doc.internal.pageSize.width - 20, 15);
-          
-          // Add report title in header
-          doc.setFontSize(10);
-          doc.setFont('helvetica', 'bold');
-          doc.text('Crime Analysis Report - Province of Bataan', 20, 12);
-          
-          // Add date in header
-          doc.setFontSize(8);
-          doc.setFont('helvetica', 'normal');
-          doc.text(`Generated: ${new Date().toLocaleDateString()}`, doc.internal.pageSize.width - 25, 12, { align: 'right' });
-        }
+
       }
 
       // Generate filename and save

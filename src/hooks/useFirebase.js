@@ -345,7 +345,13 @@ export const useFirebase = () => {
       const reports = [];
       
       querySnapshot.forEach((doc) => {
-        reports.push({ id: doc.id, ...doc.data() });
+        const data = doc.data();
+        // Convert Firestore Timestamps to JavaScript Date objects or strings
+        if (data.when && typeof data.when === 'object' && data.when.seconds) {
+          // Convert Firestore Timestamp to Date
+          data.when = new Date(data.when.seconds * 1000);
+        }
+        reports.push({ id: doc.id, ...data });
       });
       
       return { success: true, data: reports };

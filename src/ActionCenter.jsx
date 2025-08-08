@@ -147,17 +147,21 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedItem, setSelectedItem] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingItem, setViewingItem] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
   const [newActionReport, setNewActionReport] = useState({
     department: "",
     municipality: "",
     district: "",
     what: "",
-    when: new Date(),
+    when: "",
     where: "",
     who: "",
+    gender: "",
     why: "",
     how: "",
+    source: "",
     actionTaken: "",
     otherInfo: ""
   });
@@ -252,21 +256,42 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const filteredItems = actionItems.filter(item => {
-    const matchesSearch = searchTerm === "" || 
-                         item.municipality.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.district.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.what.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.who.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.where.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.why.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.how.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.actionTaken.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         item.otherInfo.toLowerCase().includes(searchTerm.toLowerCase());
+    // Safe search matching across fields
+    const st = String(searchTerm || "").trim().toLowerCase();
+    const includes = (v) => String(v ?? "").toLowerCase().includes(st);
+    const matchesSearch = st === "" ||
+      includes(item.municipality) ||
+      includes(item.district) ||
+      includes(item.what) ||
+      includes(item.who) ||
+      includes(item.where) ||
+      includes(item.why) ||
+      includes(item.how) ||
+      includes(item.source) ||
+      includes(item.actionTaken) ||
+      includes(item.otherInfo);
+
+    // Month/Year filter based on the 'when' field
+    const toDate = (when) => {
+      if (when && typeof when === 'object' && 'seconds' in when) {
+        return new Date(when.seconds * 1000);
+      }
+      if (when instanceof Date) return when;
+      if (typeof when === 'string' && when.trim()) {
+        const d = new Date(when);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      return null;
+    };
+    const d = toDate(item.when);
+    const matchesMonthYear = d ? (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) : false;
+
     const matchesDistrict = !selectedDistrict || item.district === selectedDistrict;
     const matchesDepartment = item.department === activeTab;
-    const matchesMunicipality = activeTab === "pnp" ? 
+    const matchesMunicipality = activeTab === "pnp" ?
       (activeMunicipality === "all" || item.municipality === activeMunicipality) : true;
-    return matchesSearch && matchesDistrict && matchesDepartment && matchesMunicipality;
+
+    return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality;
   });
 
   const sortedItems = [...filteredItems].sort((a, b) => {
@@ -305,13 +330,109 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
   });
 
-  // Calculate totals
+  // Calculate totals (normalized to match table display)
   const totalActions = sortedItems.length;
-  const pendingActions = sortedItems.filter(item => item.status === "pending").length;
-  const resolvedActions = sortedItems.filter(item => item.status === "resolved").length;
+  const normalize = (value) => String(value ?? '').trim().toLowerCase();
+  const isResolved = (item) => normalize(item.status) === 'resolved' || normalize(item.actionTaken) === 'resolved';
+  const isPending = (item) => !isResolved(item);
+  const pendingActions = sortedItems.filter(isPending).length;
+  const resolvedActions = sortedItems.filter(isResolved).length;
   const highPriorityActions = sortedItems.filter(item => item.priority === "high").length;
-  const totalPatrols = sortedItems.reduce((sum, item) => sum + item.patrolCount, 0);
-  const totalIncidents = sortedItems.reduce((sum, item) => sum + item.incidentCount, 0);
+  const totalPatrols = sortedItems.reduce((sum, item) => sum + (item.patrolCount || 0), 0);
+  const totalIncidents = sortedItems.reduce((sum, item) => sum + (item.incidentCount || 0), 0);
+  // Gender-based counting (cards use these)
+  const totalDrugsMale = sortedItems.filter(item => normalize(item.gender) === 'male').length;
+  const totalDrugsFemale = sortedItems.filter(item => normalize(item.gender) === 'female').length;
+  const totalDrugs = totalDrugsMale + totalDrugsFemale;
+
+  // "Illegals" counters (detect via text fields)
+  const ILLEGAL_KEYWORDS = [
+    'illegal',
+    'gambling', 'sugal', 'pagsusugal', 'pasugal',
+    'sakla', 'saklaan',
+    'tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong',
+    'jueteng',
+    'cara y cruz', 'cara y-cruz',
+    'color game', 'fruit game',
+    'video karera', 'videokarera', 'vk',
+    'patulo', 'pa-tulo', 'pa tulo'
+  ].map(k => k.toLowerCase());
+
+  const ILLEGAL_CATEGORIES = {
+    'Sakla': ['sakla', 'saklaan'],
+    'Gambling': ['gambling', 'sugal', 'pagsusugal', 'pasugal', 'jueteng', 'cara y cruz', 'cara y-cruz', 'color game', 'fruit game', 'video karera', 'videokarera', 'vk'],
+    'Tupada': ['tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong'],
+    'Bingo': ['bingo'],
+    'Gro Bar': ['gro bar', 'g.r.o', 'g.r.o.', 'gro', 'bar operation', 'bar girls'],
+    'Patulo': ['patulo', 'pa-tulo', 'pa tulo']
+  };
+
+  const isIllegal = (item) => {
+    const text = [item.what, item.why, item.how, item.otherInfo]
+      .map(v => normalize(v))
+      .join(' ');
+    return ILLEGAL_KEYWORDS.some(kw => text.includes(kw));
+  };
+
+  // Count categories and total unique illegal items (based on categories only)
+  const { illegalCategoryCounts, totalIllegals } = (() => {
+    const counts = Object.fromEntries(Object.keys(ILLEGAL_CATEGORIES).map(k => [k, 0]));
+    let total = 0;
+    sortedItems.forEach(item => {
+      const text = [item.what, item.why, item.how, item.otherInfo]
+        .map(v => normalize(v))
+        .join(' ');
+      let matched = false;
+      for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
+        if (keys.some(kw => text.includes(kw))) {
+          counts[cat] += 1;
+          matched = true;
+        }
+      }
+      if (matched) total += 1; // count each item once in total
+    });
+    return { illegalCategoryCounts: counts, totalIllegals: total };
+  })();
+
+  // Action Taken category counts
+  const ACTION_TAKEN_ALIASES = {
+    'Resolved': ['resolved', 'complete', 'completed', 'closed', 'done'],
+    'Pending': ['pending', 'awaiting action', 'to do', 'todo', 'for action', 'for review'],
+    'Under Investigation': ['under investigation', 'investigation', 'investigating', 'ongoing', 'ongoing investigation'],
+    'Referred': ['referred', 'endorsed', 'forwarded'],
+    'Arrested': ['arrested', 'apprehended']
+  };
+
+  const getActionTakenLabel = (raw) => {
+    const val = normalize(raw);
+    if (!val) return 'Unspecified';
+    for (const [label, keys] of Object.entries(ACTION_TAKEN_ALIASES)) {
+      if (keys.some(k => val.includes(k))) return label;
+    }
+    // Fallback: capitalize first letter of provided text
+    return raw.charAt(0).toUpperCase() + raw.slice(1);
+  };
+
+  const actionTakenCounts = (() => {
+    const counts = {};
+    sortedItems.forEach(item => {
+      const label = getActionTakenLabel(item.actionTaken);
+      counts[label] = (counts[label] || 0) + 1;
+    });
+    return counts;
+  })();
+  
+  // Bantay Dagat specific calculations
+  const totalFishingViolations = sortedItems.reduce((sum, item) => sum + (item.fishingViolations || 0), 0);
+  const totalIllegalFishing = sortedItems.reduce((sum, item) => sum + (item.illegalFishing || 0), 0);
+  const totalFishCaught = sortedItems.reduce((sum, item) => sum + (item.fishCaught || 0), 0);
+  const totalBoatsInspected = sortedItems.reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
+  
+  // PG-ENRO specific calculations
+  const totalEnvironmentalViolations = sortedItems.reduce((sum, item) => sum + (item.environmentalViolations || 0), 0);
+  const totalWasteManagement = sortedItems.reduce((sum, item) => sum + (item.wasteManagement || 0), 0);
+  const totalTreePlanting = sortedItems.reduce((sum, item) => sum + (item.treePlanting || 0), 0);
+  const totalCleanupOperations = sortedItems.reduce((sum, item) => sum + (item.cleanupOperations || 0), 0);
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -327,7 +448,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     
     switch (action) {
       case "view":
-        alert(`Viewing details for: ${item.what}\n\nMunicipality: ${item.municipality}\nDistrict: ${item.district}\nWhen: ${formatDate(item.when)}\nWhere: ${item.where}\nWho: ${item.who}\nWhy: ${item.why}\nHow: ${item.how}\nAction Taken: ${item.actionTaken}\nOther Info: ${item.otherInfo}`);
+        setViewingItem(item);
+        setShowViewModal(true);
         break;
       case "edit":
         setEditingItem(item);
@@ -385,29 +507,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     
     // Add summary statistics
     doc.text(`Total Actions: ${totalActions}`, 14, 75);
-    doc.text(`Pending Actions: ${pendingActions}`, 14, 82);
-    doc.text(`Resolved Actions: ${resolvedActions}`, 14, 89);
-    doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 96);
-    doc.text(`Total Patrols: ${totalPatrols}`, 14, 103);
-    doc.text(`Total Incidents: ${totalIncidents}`, 14, 110);
+    doc.text(`Total Drugs: ${totalDrugs} (Male: ${totalDrugsMale}, Female: ${totalDrugsFemale})`, 14, 82);
+    doc.text(`Pending Actions: ${pendingActions}`, 14, 89);
+    doc.text(`Resolved Actions: ${resolvedActions}`, 14, 96);
+    doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 103);
+    doc.text(`Total Patrols: ${totalPatrols}`, 14, 110);
+    doc.text(`Total Incidents: ${totalIncidents}`, 14, 117);
     
-    // Prepare table data
+    // Prepare table data (hide Why/How in export)
     const tableData = sortedItems.map(item => [
       item.municipality,
       item.district,
       item.what,
-      item.when.toLocaleDateString(),
+      formatDate(item.when),
       item.where,
-      item.who,
-      item.why,
-      item.how,
+      // hide who as requested
+      // item.who,
       item.actionTaken,
       item.otherInfo
     ]);
     
     // Add table
     doc.autoTable({
-      head: [['Municipality', 'District', 'What', 'When', 'Where', 'Who', 'Why', 'How', 'Action Taken', 'Other Information']],
+      head: [['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken', 'Other Information']],
       body: tableData,
       startY: 125,
       styles: {
@@ -434,13 +556,30 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    // Handle Firestore Timestamp objects
+    if (date && typeof date === 'object' && date.seconds) {
+      return new Date(date.seconds * 1000).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    // Handle both Date objects and strings
+    if (typeof date === 'string') {
+      return date; // Return the string as is
+    }
+    if (date instanceof Date) {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+    return date; // Fallback
   };
 
   const handleAddActionReport = () => {
@@ -462,17 +601,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const result = await saveActionReport(newReport);
       if (result.success) {
         setActionItems(prevItems => [...prevItems, newReport]);
-        setShowAddModal(false);
+        // Keep the add modal open to allow adding multiple reports
         setNewActionReport({
           department: "",
           municipality: "",
           district: "",
           what: "",
-          when: new Date(),
+          when: "",
           where: "",
           who: "",
+          gender: "",
           why: "",
           how: "",
+          source: "",
           actionTaken: "",
           otherInfo: ""
         });
@@ -493,7 +634,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       municipality: "",
       district: "",
       what: "",
-      when: new Date(),
+      when: "",
       where: "",
       who: "",
       why: "",
@@ -532,6 +673,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const handleCancelEdit = () => {
     setShowEditModal(false);
     setEditingItem(null);
+  };
+
+  const handleCloseViewModal = () => {
+    setShowViewModal(false);
+    setViewingItem(null);
   };
 
   const handleEditInputChange = (field, value) => {
@@ -882,108 +1028,312 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
           {/* Summary Cards */}
           <div className="flex-shrink-0 mb-3">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-              {/* Total Actions Card */}
-              <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-blue-100 text-xs font-medium">Total Actions</p>
-                    <p className="text-lg font-bold">{totalActions}</p>
-                    <p className="text-blue-200 text-xs">All activities</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              {/* PNP Tab - Drug Related Stats */}
+              {activeTab === "pnp" && (
+                <>
+                  {/* Actions Card */}
+                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">All activities</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <Activity className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
 
-              {/* Pending Actions Card */}
-              <div className="bg-orange-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-orange-100 text-xs font-medium">Pending</p>
-                    <p className="text-lg font-bold">{pendingActions}</p>
-                    <p className="text-orange-200 text-xs">Awaiting action</p>
+                  {/* Drugs Card */}
+                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-red-100 text-xs font-medium">Drugs</p>
+                        <p className="text-lg font-bold">{totalDrugs}</p>
+                        <p className="text-red-200 text-xs">Male: {totalDrugsMale} | Female: {totalDrugsFemale}</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <Clock className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
 
-              {/* Resolved Actions Card */}
-              <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-green-100 text-xs font-medium">Resolved</p>
-                    <p className="text-lg font-bold">{resolvedActions}</p>
-                    <p className="text-green-200 text-xs">Completed</p>
+                  {/* Illegals Total Card */}
+                  <div className="bg-fuchsia-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-fuchsia-100 text-xs font-medium">Illegals</p>
+                        <p className="text-lg font-bold">{totalIllegals}</p>
+                        <p className="text-fuchsia-200 text-xs">
+                          {Object.entries(illegalCategoryCounts)
+                            .filter(([, v]) => v > 0)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ') || 'No categories detected'}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <CheckCircle className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
 
-              {/* High Priority Card */}
-              <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-red-100 text-xs font-medium">High Priority</p>
-                    <p className="text-lg font-bold">{highPriorityActions}</p>
-                    <p className="text-red-200 text-xs">Urgent attention</p>
-                  </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <AlertTriangle className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
+                  
 
-              {/* Total Patrols Card */}
-              <div className="bg-indigo-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-indigo-100 text-xs font-medium">Total Patrols</p>
-                    <p className="text-lg font-bold">{totalPatrols}</p>
-                    <p className="text-indigo-200 text-xs">Security rounds</p>
+                  {/* Pending Card (from Action Taken) */}
+                  <div className="bg-yellow-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-yellow-100 text-xs font-medium">Pending</p>
+                        <p className="text-lg font-bold">{actionTakenCounts['Pending'] || 0}</p>
+                        <p className="text-yellow-200 text-xs">Awaiting action</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <Shield className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
 
-              {/* Incidents Card */}
-              <div className="bg-purple-500 rounded-lg p-3 text-white shadow-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-purple-100 text-xs font-medium">Incidents</p>
-                    <p className="text-lg font-bold">{totalIncidents}</p>
-                    <p className="text-purple-200 text-xs">Reported cases</p>
+                  {/* Resolved Card (from Action Taken) */}
+                  <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-xs font-medium">Resolved</p>
+                        <p className="text-lg font-bold">{actionTakenCounts['Resolved'] || 0}</p>
+                        <p className="text-green-200 text-xs">Completed</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <CheckCircle className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="p-1.5 bg-white/20 rounded-full">
-                    <AlertCircle className="h-4 w-4" />
+                </>
+              )}
+
+              {/* Bantay Dagat Tab - Fishing Related Stats */}
+              {activeTab === "agriculture" && (
+                <>
+                  {/* Actions Card */}
+                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">All activities</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+
+                  {/* Fishing Violations Card */}
+                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-red-100 text-xs font-medium">Fishing Violations</p>
+                        <p className="text-lg font-bold">{totalFishingViolations}</p>
+                        <p className="text-red-200 text-xs">Illegal fishing cases</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Illegal Fishing Card */}
+                  <div className="bg-orange-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-orange-100 text-xs font-medium">Illegal Fishing</p>
+                        <p className="text-lg font-bold">{totalIllegalFishing}</p>
+                        <p className="text-orange-200 text-xs">Unlawful activities</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Target className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Fish Caught Card */}
+                  <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-xs font-medium">Fish Caught</p>
+                        <p className="text-lg font-bold">{totalFishCaught}</p>
+                        <p className="text-green-200 text-xs">Seized fish</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Boats Inspected Card */}
+                  <div className="bg-indigo-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-indigo-100 text-xs font-medium">Boats Inspected</p>
+                        <p className="text-lg font-bold">{totalBoatsInspected}</p>
+                        <p className="text-indigo-200 text-xs">Vessel checks</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Shield className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Taken Breakdown Card */}
+                  <div className="bg-yellow-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-yellow-100 text-xs font-medium">Action Taken</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-yellow-200 text-xs">
+                          {Object.entries(actionTakenCounts)
+                            .filter(([, v]) => v > 0)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ') || 'No actions set'}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* PG-ENRO Tab - Environmental Stats */}
+              {activeTab === "pgenro" && (
+                <>
+                  {/* Actions Card */}
+                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">All activities</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Environmental Violations Card */}
+                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-red-100 text-xs font-medium">Env. Violations</p>
+                        <p className="text-lg font-bold">{totalEnvironmentalViolations}</p>
+                        <p className="text-red-200 text-xs">Environmental cases</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <AlertCircle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Waste Management Card */}
+                  <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-xs font-medium">Waste Management</p>
+                        <p className="text-lg font-bold">{totalWasteManagement}</p>
+                        <p className="text-green-200 text-xs">Waste operations</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <CheckCircle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Tree Planting Card */}
+                  <div className="bg-emerald-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-emerald-100 text-xs font-medium">Tree Planting</p>
+                        <p className="text-lg font-bold">{totalTreePlanting}</p>
+                        <p className="text-emerald-200 text-xs">Trees planted</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <TrendingUp className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cleanup Operations Card */}
+                  <div className="bg-purple-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-100 text-xs font-medium">Cleanup Ops</p>
+                        <p className="text-lg font-bold">{totalCleanupOperations}</p>
+                        <p className="text-purple-200 text-xs">Cleanup activities</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Shield className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Taken Breakdown Card */}
+                  <div className="bg-yellow-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-yellow-100 text-xs font-medium">Action Taken</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-yellow-200 text-xs">
+                          {Object.entries(actionTakenCounts)
+                            .filter(([, v]) => v > 0)
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ') || 'No actions set'}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Clock className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
           {/* Action Items Table */}
           <div className="flex-1 min-h-0">
-            <div className="bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden h-full flex flex-col">
-              <div className="p-4 border-b border-gray-700">
+            <div className={`rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 ${
+              isDarkMode 
+                ? 'bg-gray-800 border-gray-700' 
+                : 'bg-white border-gray-200'
+            }`}>
+              <div className={`p-4 border-b transition-all duration-300 ${
+                isDarkMode ? 'border-gray-700' : 'border-gray-200'
+              }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100/80 dark:bg-green-900/40 rounded-lg">
-                      <BarChart3 className="h-5 w-5 text-green-600 dark:text-green-400" />
+                    <div className={`p-2 rounded-lg ${
+                      isDarkMode ? 'bg-green-900/40' : 'bg-green-100/80'
+                    }`}>
+                      <BarChart3 className={`h-5 w-5 ${
+                        isDarkMode ? 'text-green-400' : 'text-green-600'
+                      }`} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-white">Action Items</h3>
-                      <p className="text-sm text-gray-400">Detailed view of all activities</p>
+                      <h3 className={`text-lg font-semibold transition-colors duration-300 ${
+                        isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>Action Items</h3>
+                      <p className={`text-sm transition-colors duration-300 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Detailed view of all activities</p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="bg-blue-100/80 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400 text-sm">
+                  <Badge variant="secondary" className={`text-sm ${
+                    isDarkMode 
+                      ? 'bg-blue-900/40 text-blue-400' 
+                      : 'bg-blue-100/80 text-blue-800'
+                  }`}>
                     {sortedItems.length} items
                   </Badge>
                 </div>
@@ -993,19 +1343,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center gap-3">
-                      <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
-                      <span className="text-gray-400 text-base">Loading action items...</span>
+                      <RefreshCw className={`h-8 w-8 animate-spin ${
+                        isDarkMode ? 'text-blue-400' : 'text-blue-500'
+                      }`} />
+                      <span className={`text-base transition-colors duration-300 ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Loading action items...</span>
                     </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full table-fixed">
                       <thead>
-                        <tr className="border-b border-gray-700">
-                          <th className="text-left p-4 font-semibold text-gray-300">
+                        <tr className={`border-b transition-all duration-300 ${
+                          isDarkMode ? 'border-gray-700' : 'border-gray-200'
+                        }`}>
+                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
                             <button
                               onClick={() => handleSort("municipality")}
-                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                              className={`flex items-center gap-2 transition-colors ${
+                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
+                              }`}
                             >
                               Municipality
                               {sortBy === "municipality" && (
@@ -1013,10 +1373,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-300">
+                          <th className={`text-left p-4 font-semibold w-28 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
                             <button
                               onClick={() => handleSort("district")}
-                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                              className={`flex items-center gap-2 transition-colors ${
+                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
+                              }`}
                             >
                               District
                               {sortBy === "district" && (
@@ -1024,11 +1388,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-300">What</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">
+                          <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>What</th>
+                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
                             <button
                               onClick={() => handleSort("when")}
-                              className="flex items-center gap-2 hover:text-blue-400 transition-colors"
+                              className={`flex items-center gap-2 transition-colors ${
+                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
+                              }`}
                             >
                               When
                               {sortBy === "when" && (
@@ -1036,70 +1406,313 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Where</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Who</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Why</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">How</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Action Taken</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Other Information</th>
-                          <th className="text-left p-4 font-semibold text-gray-300">Actions</th>
+                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>Where</th>
+                          {/* Temporarily hidden columns */}
+                          {false && (
+                            <>
+                              <th className={`text-left p-4 font-semibold w-28 transition-colors duration-300 ${
+                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                              }`}>Who</th>
+                              <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
+                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                              }`}>Why</th>
+                              <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
+                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                              }`}>How</th>
+                            </>
+                          )}
+                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>Action Taken</th>
+                          <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>Other Information</th>
+                          <th className={`text-left p-4 font-semibold w-24 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
                         {sortedItems.map((item) => {
-                          const IconComponent = item.icon;
+                          // Handle icon rendering properly
+                          const getIconComponent = (iconName) => {
+                            switch (iconName) {
+                              case "AlertCircle":
+                                return AlertCircle;
+                              case "Activity":
+                                return Activity;
+                              case "AlertTriangle":
+                                return AlertTriangle;
+                              case "BarChart3":
+                                return BarChart3;
+                              case "Calendar":
+                                return Calendar;
+                              case "CheckCircle":
+                                return CheckCircle;
+                              case "Clock":
+                                return Clock;
+                              case "Download":
+                                return Download;
+                              case "Eye":
+                                return Eye;
+                              case "Edit":
+                                return Edit;
+                              case "Trash2":
+                                return Trash2;
+                              case "Filter":
+                                return Filter;
+                              case "MapPin":
+                                return MapPin;
+                              case "Printer":
+                                return Printer;
+                              case "RefreshCw":
+                                return RefreshCw;
+                              case "Search":
+                                return Search;
+                              case "Settings":
+                                return Settings;
+                              case "Shield":
+                                return Shield;
+                              case "TrendingUp":
+                                return TrendingUp;
+                              case "Users":
+                                return Users;
+                              case "X":
+                                return X;
+                              case "XCircle":
+                                return XCircle;
+                              case "Zap":
+                                return Zap;
+                              case "Target":
+                                return Target;
+                              case "Flag":
+                                return Flag;
+                              case "Bell":
+                                return Bell;
+                              case "Database":
+                                return Database;
+                              case "Save":
+                                return Save;
+                              case "MoreHorizontal":
+                                return MoreHorizontal;
+                              case "ChevronDown":
+                                return ChevronDown;
+                              case "ChevronUp":
+                                return ChevronUp;
+                              case "ChevronLeft":
+                                return ChevronLeft;
+                              case "ChevronRight":
+                                return ChevronRight;
+                              case "ArrowUp":
+                                return ArrowUp;
+                              case "ArrowDown":
+                                return ArrowDown;
+                              case "ArrowLeft":
+                                return ArrowLeft;
+                              case "ArrowRight":
+                                return ArrowRight;
+                              case "Minus":
+                                return Minus;
+                              case "Maximize2":
+                                return Maximize2;
+                              case "Minimize2":
+                                return Minimize2;
+                              case "RotateCcw":
+                                return RotateCcw;
+                              case "RotateCw":
+                                return RotateCw;
+                              case "ZoomIn":
+                                return ZoomIn;
+                              case "ZoomOut":
+                                return ZoomOut;
+                              case "Move":
+                                return Move;
+                              case "Copy":
+                                return Copy;
+                              case "Scissors":
+                                return Scissors;
+                              case "Link":
+                                return Link;
+                              case "Unlink":
+                                return Unlink;
+                              case "Lock":
+                                return Lock;
+                              case "Unlock":
+                                return Unlock;
+                              case "Key":
+                                return Key;
+                              case "Mail":
+                                return Mail;
+                              case "Phone":
+                                return Phone;
+                              case "MessageSquare":
+                                return MessageSquare;
+                              case "Video":
+                                return Video;
+                              case "Camera":
+                                return Camera;
+                              case "Mic":
+                                return Mic;
+                              case "Headphones":
+                                return Headphones;
+                              case "Volume2":
+                                return Volume2;
+                              case "VolumeX":
+                                return VolumeX;
+                              case "Play":
+                                return Play;
+                              case "Pause":
+                                return Pause;
+                              case "SkipBack":
+                                return SkipBack;
+                              case "SkipForward":
+                                return SkipForward;
+                              case "Rewind":
+                                return Rewind;
+                              case "FastForward":
+                                return FastForward;
+                              case "Shuffle":
+                                return Shuffle;
+                              case "Repeat":
+                                return Repeat;
+                              case "Volume1":
+                                return Volume1;
+                              case "Volume":
+                                return Volume;
+                              case "Speaker":
+                                return Speaker;
+                              case "Radio":
+                                return Radio;
+                              case "Tv":
+                                return Tv;
+                              case "Monitor":
+                                return Monitor;
+                              case "Smartphone":
+                                return Smartphone;
+                              case "Tablet":
+                                return Tablet;
+                              case "Laptop":
+                                return Laptop;
+                              case "Server":
+                                return Server;
+                              case "Mouse":
+                                return Mouse;
+                              case "Keyboard":
+                                return Keyboard;
+                              case "MonitorSpeaker":
+                                return MonitorSpeaker;
+                              case "User":
+                                return User;
+                              case "Home":
+                                return Home;
+                              case "Car":
+                                return Car;
+                              case "Building2":
+                                return Building2;
+                              case "Star":
+                                return Star;
+                              case "Heart":
+                                return Heart;
+                              case "Briefcase":
+                                return Briefcase;
+                              default:
+                                return AlertCircle; // Default fallback
+                            }
+                          };
+                          
+                          const IconComponent = getIconComponent(item.icon);
                           return (
-                            <tr key={item.id} className="border-b border-gray-700 hover:bg-gray-700/30 transition-colors duration-200">
+                            <tr key={item.id} className={`border-b transition-colors duration-200 ${
+                              isDarkMode 
+                                ? 'border-gray-700 hover:bg-gray-700/30' 
+                                : 'border-gray-200 hover:bg-gray-50'
+                            }`}>
                               <td className="p-4">
                                 <div className="flex items-center gap-3">
-                                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                                    <IconComponent className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                  <div className={`p-2 rounded-lg ${
+                                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                                  }`}>
+                                    <IconComponent className={`h-4 w-4 ${
+                                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                                    }`} />
                                   </div>
-                                  <span className="font-medium text-white">{item.municipality}</span>
+                                  <span className={`font-medium transition-colors duration-300 ${
+                                    isDarkMode ? 'text-white' : 'text-gray-900'
+                                  }`}>{item.municipality}</span>
                                 </div>
                               </td>
                               <td className="p-4">
-                                <Badge variant="outline" className="bg-gray-700 text-gray-300 border-gray-600">
+                                <Badge variant="outline" className={`${
+                                  isDarkMode 
+                                    ? 'bg-gray-700 text-gray-300 border-gray-600' 
+                                    : 'bg-gray-100 text-gray-700 border-gray-300'
+                                }`}>
                                   {item.district}
                                 </Badge>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.what}>
+                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                }`} title={item.what}>
                                   {item.what}
                                 </span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm text-gray-400">
+                                <span className={`text-sm transition-colors duration-300 ${
+                                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                                }`}>
                                   {formatDate(item.when)}
                                 </span>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm text-gray-300">{item.where}</span>
+                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                }`}>{item.where}</span>
                               </td>
-                              <td className="p-4">
-                                <span className="text-sm text-gray-300">{item.who}</span>
-                              </td>
-                              <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.why}>
-                                  {item.why}
-                                </span>
-                              </td>
-                              <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.how}>
-                                  {item.how}
-                                </span>
-                              </td>
+                              {false && (
+                                <td className="p-4">
+                                  <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                  }`}>{item.who}</span>
+                                </td>
+                              )}
+                              {false && (
+                                <>
+                                  <td className="p-4">
+                                    <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                    }`} title={item.why}>
+                                      {item.why}
+                                    </span>
+                                  </td>
+                                  <td className="p-4">
+                                    <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                    }`} title={item.how}>
+                                      {item.how}
+                                    </span>
+                                  </td>
+                                </>
+                              )}
                               <td className="p-4">
                                 <Badge className={`${
                                   item.actionTaken === "Resolved" 
-                                    ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" 
-                                    : "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400"
+                                    ? isDarkMode 
+                                      ? "bg-green-900/30 text-green-400" 
+                                      : "bg-green-100 text-green-800"
+                                    : isDarkMode 
+                                      ? "bg-orange-900/30 text-orange-400" 
+                                      : "bg-orange-100 text-orange-800"
                                 }`}>
                                   {item.actionTaken}
                                 </Badge>
                               </td>
                               <td className="p-4">
-                                <span className="text-sm max-w-xs truncate text-gray-300" title={item.otherInfo}>
+                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                }`} title={item.otherInfo}>
                                   {item.otherInfo}
                                 </span>
                               </td>
@@ -1142,10 +1755,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {sortedItems.length === 0 && (
                       <div className="text-center py-12">
-                        <div className="p-4 bg-gray-700 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <AlertTriangle className="h-8 w-8 text-gray-400" />
+                        <div className={`p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center ${
+                          isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
+                        }`}>
+                          <AlertTriangle className={`h-8 w-8 ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                          }`} />
                         </div>
-                        <p className="text-gray-400 text-base">No action items found matching your criteria.</p>
+                        <p className={`text-base transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>No action items found matching your criteria.</p>
                       </div>
                     )}
                   </div>
@@ -1157,11 +1776,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Add Action Report Modal */}
         {showAddModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
               isDarkMode 
-                ? 'bg-gray-900 text-white border-gray-700' 
-                : 'bg-white text-gray-900 border-gray-200'
+                ? 'bg-gray-900/90 text-white border-gray-700' 
+                : 'bg-white/90 text-gray-900 border-gray-200'
             }`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -1286,9 +1905,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     When <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    type="datetime-local"
-                    value={newActionReport.when.toISOString().slice(0, 16)}
-                    onChange={(e) => handleInputChange('when', new Date(e.target.value))}
+                    type="text"
+                    placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
+                    value={newActionReport.when}
+                    onChange={(e) => handleInputChange('when', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
@@ -1318,63 +1938,93 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
+                {/* Hidden: Who */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Who <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Personnel involved..."
+                      value={newActionReport.who}
+                      onChange={(e) => handleInputChange('who', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
                   }`}>
-                    Who <span className="text-red-500">*</span>
+                    Gender
                   </label>
-                  <Input
-                    type="text"
-                    placeholder="Personnel involved..."
-                    value={newActionReport.who}
-                    onChange={(e) => handleInputChange('who', e.target.value)}
+                  <select
+                    value={newActionReport.gender}
+                    onChange={(e) => handleInputChange('gender', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
                         : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                     }`}
-                    required
-                  />
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Why
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Reason for the action..."
-                    value={newActionReport.why}
-                    onChange={(e) => handleInputChange('why', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  />
-                </div>
+                {/* Hidden: Why */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Why
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Reason for the action..."
+                      value={newActionReport.why}
+                      onChange={(e) => handleInputChange('why', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                )}
                 
-                <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    How
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Method or procedure used..."
-                    value={newActionReport.how}
-                    onChange={(e) => handleInputChange('how', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  />
-                </div>
+                {/* Hidden: How */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      How
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Method or procedure used..."
+                      value={newActionReport.how}
+                      onChange={(e) => handleInputChange('how', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
@@ -1382,7 +2032,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   }`}>
                     Action Taken <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <Input
+                    type="text"
+                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={newActionReport.actionTaken}
                     onChange={(e) => handleInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
@@ -1391,15 +2043,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                     required
-                  >
-                    <option value="">Select Action</option>
-                    <option value="Under investigation">Under investigation</option>
-                    <option value="Resolved">Resolved</option>
-                    <option value="Pending">Pending</option>
-                    <option value="In progress">In progress</option>
-                  </select>
+                  />
                 </div>
                 
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Source
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
+                    value={newActionReport.source}
+                    onChange={(e) => handleInputChange('source', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                  />
+                </div>
+
                 <div className="space-y-2 md:col-span-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1418,6 +2083,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     }`}
                   />
                 </div>
+
+
               </div>
               
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -1450,11 +2117,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Edit Action Report Modal */}
         {showEditModal && editingItem && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
               isDarkMode 
-                ? 'bg-gray-900 text-white border-gray-700' 
-                : 'bg-white text-gray-900 border-gray-200'
+                ? 'bg-gray-900/90 text-white border-gray-700' 
+                : 'bg-white/90 text-gray-900 border-gray-200'
             }`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -1579,9 +2246,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     When <span className="text-red-500">*</span>
                   </label>
                   <Input
-                    type="datetime-local"
-                    value={editingItem.when.toISOString ? editingItem.when.toISOString().slice(0, 16) : new Date(editingItem.when).toISOString().slice(0, 16)}
-                    onChange={(e) => handleEditInputChange('when', new Date(e.target.value))}
+                    type="text"
+                    placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
+                    value={editingItem.when}
+                    onChange={(e) => handleEditInputChange('when', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
@@ -1611,63 +2279,113 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
+                {/* Hidden: Who */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Who <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Personnel involved..."
+                      value={editingItem.who}
+                      onChange={(e) => handleEditInputChange('who', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
                   }`}>
-                    Who <span className="text-red-500">*</span>
+                    Gender
                   </label>
-                  <Input
-                    type="text"
-                    placeholder="Personnel involved..."
-                    value={editingItem.who}
-                    onChange={(e) => handleEditInputChange('who', e.target.value)}
+                  <select
+                    value={editingItem.gender || ""}
+                    onChange={(e) => handleEditInputChange('gender', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
                         : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                     }`}
-                    required
+                  >
+                    <option value="">Select Gender</option>
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                  </select>
+                </div>
+                
+                {/* Hidden: Why */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Why
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Reason for the action..."
+                      value={editingItem.why}
+                      onChange={(e) => handleEditInputChange('why', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                )}
+
+                {/* Source */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Source
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
+                    value={editingItem.source || ""}
+                    onChange={(e) => handleEditInputChange('source', e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Why
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Reason for the action..."
-                    value={editingItem.why}
-                    onChange={(e) => handleEditInputChange('why', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    How
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Method or procedure used..."
-                    value={editingItem.how}
-                    onChange={(e) => handleEditInputChange('how', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  />
-                </div>
+                {/* Hidden: How */}
+                {false && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      How
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Method or procedure used..."
+                      value={editingItem.how}
+                      onChange={(e) => handleEditInputChange('how', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
@@ -1675,7 +2393,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   }`}>
                     Action Taken <span className="text-red-500">*</span>
                   </label>
-                  <select
+                  <Input
+                    type="text"
+                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={editingItem.actionTaken}
                     onChange={(e) => handleEditInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
@@ -1684,13 +2404,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
                     }`}
                     required
-                  >
-                    <option value="">Select Action</option>
-                    <option value="Under investigation">Under investigation</option>
-                    <option value="Resolved">Resolved</option>
-                    <option value="Pending">Pending</option>
-                    <option value="In progress">In progress</option>
-                  </select>
+                  />
                 </div>
                 
                 <div className="space-y-2 md:col-span-2">
@@ -1711,6 +2425,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     }`}
                   />
                 </div>
+
+
               </div>
               
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -1741,11 +2457,281 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         )}
 
+        {/* View Details Modal */}
+        {showViewModal && viewingItem && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
+              isDarkMode 
+                ? 'bg-gray-900/90 text-white border-gray-700' 
+                : 'bg-white/90 text-gray-900 border-gray-200'
+            }`}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${
+                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                  }`}>
+                    <Eye className={`h-6 w-6 ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Action Report Details</h3>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>View complete action report information</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={handleCloseViewModal}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-lg border ${
+                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>Basic Information</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Department:</span>
+                        <p className={`text-sm ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.department?.toUpperCase() || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Municipality:</span>
+                        <p className={`text-sm ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.municipality}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>District:</span>
+                        <p className={`text-sm ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.district}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Date & Time:</span>
+                        <p className={`text-sm ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{formatDate(viewingItem.when)}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Information */}
+                <div className="space-y-4">
+                  <div className={`p-4 rounded-lg border ${
+                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>Status & Priority</h4>
+                    <div className="space-y-3">
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Action Taken:</span>
+                        <div className="mt-1">
+                          <Badge className={`${
+                            viewingItem.actionTaken === "Resolved" 
+                              ? isDarkMode 
+                                ? "bg-green-900/30 text-green-400" 
+                                : "bg-green-100 text-green-800"
+                              : isDarkMode 
+                                ? "bg-orange-900/30 text-orange-400" 
+                                : "bg-orange-100 text-orange-800"
+                          }`}>
+                            {viewingItem.actionTaken}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Status:</span>
+                        <div className="mt-1">
+                          <Badge className={`${
+                            viewingItem.status === "resolved" 
+                              ? isDarkMode 
+                                ? "bg-green-900/30 text-green-400" 
+                                : "bg-green-100 text-green-800"
+                              : isDarkMode 
+                                ? "bg-orange-900/30 text-orange-400" 
+                                : "bg-orange-100 text-orange-800"
+                          }`}>
+                            {viewingItem.status || 'pending'}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Priority:</span>
+                        <div className="mt-1">
+                          <Badge className={`${
+                            viewingItem.priority === "high" 
+                              ? isDarkMode 
+                                ? "bg-red-900/30 text-red-400" 
+                                : "bg-red-100 text-red-800"
+                              : viewingItem.priority === "medium"
+                              ? isDarkMode 
+                                ? "bg-yellow-900/30 text-yellow-400" 
+                                : "bg-yellow-100 text-yellow-800"
+                              : isDarkMode 
+                                ? "bg-green-900/30 text-green-400" 
+                                : "bg-green-100 text-green-800"
+                          }`}>
+                            {viewingItem.priority || 'medium'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Detailed Information */}
+              <div className="space-y-6">
+                <div className={`p-4 rounded-lg border ${
+                  isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h4 className={`font-semibold mb-4 ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                  }`}>Incident Details</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>What Happened:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.what}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Location:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.where}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Personnel Involved:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.who}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Gender:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.gender ? viewingItem.gender.charAt(0).toUpperCase() + viewingItem.gender.slice(1) : 'N/A'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                        }`}>Reason:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.why || 'N/A'}</p>
+                      </div>
+                      <div>
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Method:</span>
+                        <p className={`text-sm mt-1 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>{viewingItem.how || 'N/A'}</p>
+                      </div>
+                    <div>
+                      <span className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Source:</span>
+                      <p className={`text-sm mt-1 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>{viewingItem.source || 'N/A'}</p>
+                    </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Additional Information */}
+                {viewingItem.otherInfo && (
+                  <div className={`p-4 rounded-lg border ${
+                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>Additional Information</h4>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                    }`}>{viewingItem.otherInfo}</p>
+                  </div>
+                )}
+              </div>
+              
+              <div className="flex gap-3 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  onClick={handleCloseViewModal} 
+                  variant="outline"
+                  className={`${
+                    isDarkMode 
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Close
+                </Button>
+                <Button 
+                  onClick={() => {
+                    handleCloseViewModal();
+                    handleAction(viewingItem.id, "edit");
+                  }}
+                  className={`${
+                    isDarkMode 
+                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                      : 'bg-blue-600 hover:bg-blue-700 text-white'
+                  }`}
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Report
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full ${
-              isDarkMode ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full backdrop-blur-sm border ${
+              isDarkMode ? 'bg-gray-800/90 text-white border-gray-700' : 'bg-white/90 text-gray-900 border-gray-200'
             }`}>
               <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
