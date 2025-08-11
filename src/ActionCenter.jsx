@@ -525,12 +525,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       // hide who as requested
       // item.who,
       item.actionTaken,
+      item.source || 'N/A',
       item.otherInfo
     ]);
     
     // Add table
     doc.autoTable({
-      head: [['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken', 'Other Information']],
+      head: [['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken', 'Source', 'Other Information']],
       body: tableData,
       startY: 125,
       styles: {
@@ -640,6 +641,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       who: "",
       why: "",
       how: "",
+      source: "",
       actionTaken: "",
       otherInfo: ""
     });
@@ -1472,6 +1474,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>Action Taken</th>
+                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>Source</th>
                           <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>Other Information</th>
@@ -1754,6 +1759,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 }`}>
                                   {item.actionTaken}
                                 </Badge>
+                              </td>
+                              <td className="p-4">
+                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                }`} title={item.source}>
+                                  {item.source || 'N/A'}
+                                </span>
                               </td>
                               <td className="p-4">
                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
