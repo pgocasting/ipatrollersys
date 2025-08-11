@@ -1036,7 +1036,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
                         <p className="text-blue-200 text-xs">All activities</p>
                       </div>
@@ -1118,7 +1118,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
                         <p className="text-blue-200 text-xs">All activities</p>
                       </div>
@@ -1212,7 +1212,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
-                        <p className="text-blue-100 text-xs font-medium">Total</p>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
                         <p className="text-blue-200 text-xs">All activities</p>
                       </div>

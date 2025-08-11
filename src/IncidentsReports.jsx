@@ -1331,16 +1331,68 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       i.status === "resolved" || 
       i.status === "RESOLVED"
     ).length,
-    pending: filteredIncidents.filter(i => 
-      i.status === "Pending" || 
-      i.status === "pending" || 
-      i.status === "PENDING"
+    actionTaken: filteredIncidents.filter(i => 
+      i.actionType && i.actionType.trim() !== ""
     ).length,
     underInvestigation: filteredIncidents.filter(i => 
       i.status === "Under Investigation" || 
       i.status === "under investigation" || 
       i.status === "UNDER INVESTIGATION" ||
       i.status === "Under investigation"
+    ).length,
+    drugs: filteredIncidents.filter(i => 
+      i.incidentType === "Drug-related"
+    ).length,
+    others: filteredIncidents.filter(i => 
+      i.incidentType !== "Drug-related" && 
+      i.incidentType !== "Theft" && 
+      i.incidentType !== "Assault" && 
+      i.incidentType !== "Traffic Violation" && 
+      i.incidentType !== "Vandalism" && 
+      i.incidentType !== "Fraud" && 
+      i.incidentType !== "Domestic Violence" && 
+      i.incidentType !== "Public Disturbance" && 
+      i.incidentType !== "Property Damage" && 
+      i.incidentType !== "Missing Person" && 
+      i.incidentType !== "Suspicious Activity" && 
+      i.incidentType !== "Environmental Violation" && 
+      i.incidentType !== "Animal Control" && 
+      i.incidentType !== "Fire Safety" && 
+      i.incidentType !== "Emergency Response" && 
+      i.incidentType !== "Other"
+    ).length,
+    accidents: filteredIncidents.filter(i => 
+      i.incidentType === "Traffic Accident" || 
+      i.incidentType === "Work Accident" || 
+      i.incidentType === "Accident" ||
+      i.description?.toLowerCase().includes("accident") ||
+      i.description?.toLowerCase().includes("crash") ||
+      i.description?.toLowerCase().includes("collision")
+    ).length,
+    trafficAccidents: filteredIncidents.filter(i => 
+      i.incidentType === "Traffic Accident" || 
+      i.incidentType === "Traffic Violation" ||
+      i.description?.toLowerCase().includes("traffic") && (
+        i.description?.toLowerCase().includes("accident") ||
+        i.description?.toLowerCase().includes("crash") ||
+        i.description?.toLowerCase().includes("collision")
+      )
+    ).length,
+    workAccidents: filteredIncidents.filter(i => 
+      i.incidentType === "Work Accident" ||
+      i.description?.toLowerCase().includes("work") && (
+        i.description?.toLowerCase().includes("accident") ||
+        i.description?.toLowerCase().includes("injury") ||
+        i.description?.toLowerCase().includes("fall")
+      )
+    ).length,
+    otherAccidents: filteredIncidents.filter(i => 
+      (i.incidentType === "Accident" || 
+       i.description?.toLowerCase().includes("accident")) &&
+      !(i.incidentType === "Traffic Accident" || 
+        i.incidentType === "Work Accident" ||
+        i.description?.toLowerCase().includes("traffic") ||
+        i.description?.toLowerCase().includes("work"))
     ).length,
   };
 
@@ -3084,16 +3136,74 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       incident.status === 'resolved' || 
       incident.status === 'RESOLVED'
     ).length;
-    const pendingIncidents = filteredData.filter(incident => 
-      incident.status === 'Pending' || 
-      incident.status === 'pending' || 
-      incident.status === 'PENDING'
+    const actionTakenIncidents = filteredData.filter(incident => 
+      incident.actionType && incident.actionType.trim() !== ""
     ).length;
     const underInvestigation = filteredData.filter(incident => 
       incident.status === 'Under Investigation' || 
       incident.status === 'under investigation' || 
       incident.status === 'UNDER INVESTIGATION' ||
       incident.status === 'Under investigation'
+    ).length;
+    
+    const drugsIncidents = filteredData.filter(incident => 
+      incident.incidentType === 'Drug-related'
+    ).length;
+    
+    const othersIncidents = filteredData.filter(incident => 
+      incident.incidentType !== 'Drug-related' && 
+      incident.incidentType !== 'Theft' && 
+      incident.incidentType !== 'Assault' && 
+      incident.incidentType !== 'Traffic Violation' && 
+      incident.incidentType !== 'Vandalism' && 
+      incident.incidentType !== 'Fraud' && 
+      incident.incidentType !== 'Domestic Violence' && 
+      incident.incidentType !== 'Public Disturbance' && 
+      incident.incidentType !== 'Property Damage' && 
+      incident.incidentType !== 'Missing Person' && 
+      incident.incidentType !== 'Suspicious Activity' && 
+      incident.incidentType !== 'Environmental Violation' && 
+      incident.incidentType !== 'Animal Control' && 
+      incident.incidentType !== 'Fire Safety' && 
+      incident.incidentType !== 'Emergency Response' && 
+      incident.incidentType !== 'Other'
+    ).length;
+    
+    const accidentsIncidents = filteredData.filter(incident => 
+      incident.incidentType === 'Traffic Accident' || 
+      incident.incidentType === 'Work Accident' || 
+      incident.incidentType === 'Accident' ||
+      incident.description?.toLowerCase().includes('accident') ||
+      incident.description?.toLowerCase().includes('crash') ||
+      incident.description?.toLowerCase().includes('collision')
+    ).length;
+    
+    const trafficAccidents = filteredData.filter(incident => 
+      incident.incidentType === 'Traffic Accident' || 
+      incident.incidentType === 'Traffic Violation' ||
+      incident.description?.toLowerCase().includes('traffic') && (
+        incident.description?.toLowerCase().includes('accident') ||
+        incident.description?.toLowerCase().includes('crash') ||
+        incident.description?.toLowerCase().includes('collision')
+      )
+    ).length;
+    
+    const workAccidents = filteredData.filter(incident => 
+      incident.incidentType === 'Work Accident' ||
+      incident.description?.toLowerCase().includes('work') && (
+        incident.description?.toLowerCase().includes('accident') ||
+        incident.description?.toLowerCase().includes('injury') ||
+        incident.description?.toLowerCase().includes('fall')
+      )
+    ).length;
+    
+    const otherAccidents = filteredData.filter(incident => 
+      (incident.incidentType === 'Accident' || 
+       incident.description?.toLowerCase().includes('accident')) &&
+      !(incident.incidentType === 'Traffic Accident' || 
+        incident.incidentType === 'Work Accident' ||
+        incident.description?.toLowerCase().includes('traffic') ||
+        incident.description?.toLowerCase().includes('work'))
     ).length;
     
     // Incident type analysis
@@ -3249,8 +3359,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     return {
       totalIncidents,
       resolvedIncidents,
-      pendingIncidents,
+      actionTakenIncidents,
       underInvestigation,
+      drugsIncidents,
+      othersIncidents,
+      accidentsIncidents,
+      trafficAccidents,
+      workAccidents,
+      otherAccidents,
       mostCommonType,
       mostActiveDistrict,
       highestMonth,
@@ -3345,30 +3461,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </Button>
 
             <Button
-                              onClick={showPdfEditInterface}
+              onClick={showPdfEditInterface}
               className="bg-blue-600 hover:bg-blue-700 text-white"
               title="Export to PDF"
             >
               <Printer className="w-5 h-5" />
             </Button>
-            <Button
-              onClick={async () => {
-                if (window.confirm('Are you sure you want to clear all incidents? This action cannot be undone.')) {
-                  try {
-                    await clearAllIncidents();
-                    alert('All incidents cleared successfully!');
-                  } catch (error) {
-                    console.error('Error clearing incidents:', error);
-                    alert('Error clearing incidents. Please try again.');
-                  }
-                }
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white"
-              title="Clear All Data"
-              disabled={loading}
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
+            
+
             <input
               id="incidents-file-input"
               name="incidents-file-input"
@@ -3415,7 +3515,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </div>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
             isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
           }`}>
@@ -3444,53 +3544,83 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div>
                   <p className={`text-sm font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Resolved</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.resolved}</p>
-                </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                }`}>
-                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Under Investigation</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.underInvestigation}</p>
-                </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
-                  <Search className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Pending</p>
-                  <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.pending}</p>
+                  }`}>Action Taken</p>
+                  <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.actionTaken}</p>
                 </div>
                 <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                   isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-100'
                 }`}>
-                  <Clock className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                  <CheckCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+          }`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Drugs</p>
+                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.drugs}</p>
+                </div>
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  isDarkMode ? 'bg-red-900/30' : 'bg-red-100'
+                }`}>
+                  <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+          }`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Others</p>
+                  <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{stats.others}</p>
+                </div>
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  isDarkMode ? 'bg-gray-700/30' : 'bg-gray-200'
+                }`}>
+                  <MoreHorizontal className="h-6 w-6 text-gray-600 dark:text-gray-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+          }`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Accidents</p>
+                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.accidents}</p>
+                  <div className="mt-2 space-y-1">
+                    <div className="flex justify-between text-xs">
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Traffic:</span>
+                      <span className="font-medium text-orange-600 dark:text-orange-400">{stats.trafficAccidents}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other:</span>
+                      <span className="font-medium text-orange-600 dark:text-orange-400">{stats.otherAccidents}</span>
+                    </div>
+                  </div>
+                </div>
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'
+                }`}>
+                  <Car className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
@@ -4730,7 +4860,7 @@ Check browser console for detailed debug information.`);
                           isDarkMode ? 'text-white' : 'text-gray-900'
                         }`}>📊 Data Overview {selectedMonth !== "all" && `(${selectedMonth})`}</h3>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                         <div className={`p-4 rounded-lg ${enhancedClasses.hoverLift} ${
                           isDarkMode ? 'bg-blue-800/30' : 'bg-blue-100'
                         }`}>
@@ -4750,22 +4880,68 @@ Check browser console for detailed debug information.`);
                           }`}>{selectedMonth === "all" ? "All records in database" : `Records for ${selectedMonth}`}</p>
                         </div>
                         <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-green-800/30' : 'bg-green-100'
+                          isDarkMode ? 'bg-red-800/30' : 'bg-red-100'
                         }`}>
                           <div className="flex items-center gap-3 mb-2">
                             <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-green-600/30' : 'bg-green-200'
+                              isDarkMode ? 'bg-red-600/30' : 'bg-red-200'
                             }`}>
-                              <CheckCircle className="w-4 h-4 text-green-600 dark:text-green-400" />
+                              <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
                             </div>
                             <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-green-300' : 'text-green-600'
-                            }`}>Resolved</p>
+                              isDarkMode ? 'text-red-300' : 'text-red-600'
+                            }`}>Drugs</p>
                           </div>
-                          <p className="text-2xl font-bold text-green-600 dark:text-green-400">{insights.resolvedIncidents}</p>
+                          <p className="text-2xl font-bold text-red-600 dark:text-red-400">{insights.drugsIncidents}</p>
                           <p className={`text-xs ${
                             isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Cases completed</p>
+                          }`}>Drug-related incidents</p>
+                        </div>
+                        <div className={`p-4 rounded-lg ${
+                          isDarkMode ? 'bg-gray-800/30' : 'bg-gray-100'
+                        }`}>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-2 rounded-full ${
+                              isDarkMode ? 'bg-gray-600/30' : 'bg-gray-200'
+                            }`}>
+                              <MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                            </div>
+                            <p className={`text-sm font-medium ${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                            }`}>Others</p>
+                          </div>
+                          <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">{insights.othersIncidents}</p>
+                          <p className={`text-xs ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Other incident types</p>
+                        </div>
+                        <div className={`p-4 rounded-lg ${
+                          isDarkMode ? 'bg-orange-800/30' : 'bg-orange-100'
+                        }`}>
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className={`p-2 rounded-full ${
+                              isDarkMode ? 'bg-orange-600/30' : 'bg-orange-200'
+                            }`}>
+                              <Car className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <p className={`text-sm font-medium ${
+                              isDarkMode ? 'text-orange-300' : 'text-orange-600'
+                            }`}>Accidents</p>
+                          </div>
+                          <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{insights.accidentsIncidents}</p>
+                          <div className="mt-2 space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Traffic:</span>
+                              <span className="font-medium text-orange-600 dark:text-orange-400">{insights.trafficAccidents}</span>
+                            </div>
+                            <div className="flex justify-between text-xs">
+                              <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other:</span>
+                              <span className="font-medium text-orange-600 dark:text-orange-400">{insights.otherAccidents}</span>
+                            </div>
+                          </div>
+                          <p className={`text-xs mt-2 ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Accident breakdown</p>
                         </div>
                         <div className={`p-4 rounded-lg ${
                           isDarkMode ? 'bg-yellow-800/30' : 'bg-yellow-100'
@@ -4774,34 +4950,16 @@ Check browser console for detailed debug information.`);
                             <div className={`p-2 rounded-full ${
                               isDarkMode ? 'bg-yellow-600/30' : 'bg-yellow-200'
                             }`}>
-                              <Clock className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
+                              <CheckCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                             </div>
                             <p className={`text-sm font-medium ${
                               isDarkMode ? 'text-yellow-300' : 'text-yellow-600'
-                            }`}>Pending</p>
+                            }`}>Action Taken</p>
                           </div>
-                          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{insights.pendingIncidents}</p>
+                          <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{insights.actionTakenIncidents}</p>
                           <p className={`text-xs ${
                             isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Awaiting response</p>
-                        </div>
-                        <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-purple-800/30' : 'bg-purple-100'
-                        }`}>
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-purple-600/30' : 'bg-purple-200'
-                            }`}>
-                              <Search className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-                            </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-purple-300' : 'text-purple-600'
-                            }`}>Under Investigation</p>
-                          </div>
-                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">{insights.underInvestigation}</p>
-                          <p className={`text-xs ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Currently being investigated</p>
+                          }`}>Actions completed</p>
                         </div>
                       </div>
                     </div>

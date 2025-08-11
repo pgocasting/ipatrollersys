@@ -3,7 +3,7 @@ import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
 import { useTheme } from "./ThemeContext";
-import { usePatrolData } from "./PatrolDataContext";
+import { useData } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import {
   Chart as ChartJS,
@@ -52,7 +52,13 @@ ChartJS.register(
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const { isDarkMode } = useTheme();
-  const { patrolData } = usePatrolData();
+  const { 
+    patrolData, 
+    actionReports, 
+    incidents, 
+    summaryStats, 
+    loading: dataLoading 
+  } = useData();
   const { logout } = useFirebase();
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -66,8 +72,19 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-      // Get incidents data (empty for now)
-    const incidentsData = [];
+  // Helper function to format time ago
+  const getTimeAgo = (date) => {
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    if (diffInSeconds < 60) return `${diffInSeconds} sec ago`;
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} min ago`;
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hour ago`;
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} day ago`;
+    return date.toLocaleDateString();
+  };
+
+
 
   // Sample data for charts
   const monthlyData = {
@@ -162,18 +179,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Calculate active and inactive municipalities using real patrol data
   const activeMunicipalitiesList = patrolData.filter(row => {
-    const avgPatrols = row.data.reduce((a, b) => a + b, 0) / row.data.length;
+    if (!row.data || !Array.isArray(row.data)) return false;
+    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
     return avgPatrols >= 5;
   });
   const inactiveMunicipalitiesList = patrolData.filter(row => {
-    const avgPatrols = row.data.reduce((a, b) => a + b, 0) / row.data.length;
+    if (!row.data || !Array.isArray(row.data)) return false;
+    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
     return avgPatrols <= 4;
   });
   
-  const activeMunicipalities = activeMunicipalitiesList.length;
-  const inactiveMunicipalities = inactiveMunicipalitiesList.length;
   const totalMunicipalities = patrolData.length;
-  const percentagePerMunicipality = totalMunicipalities > 0 ? Math.round((activeMunicipalities / totalMunicipalities) * 100) : 0;
+  const percentagePerMunicipality = totalMunicipalities > 0 ? Math.round((summaryStats.activeMunicipalities / totalMunicipalities) * 100) : 0;
 
   const chartOptions = {
     responsive: true,
@@ -223,8 +240,49 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
       {/* Dashboard Content */}
       <section className="flex-1 p-6 space-y-6">
+        {/* Loading State and Refresh */}
+        <div className={`mb-4 p-4 rounded-lg ${
+          isDarkMode ? 'bg-blue-900/20 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {dataLoading ? (
+                <>
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-blue-300' : 'text-blue-700'
+                  }`}>
+                    Loading dashboard data...
+                  </span>
+                </>
+              ) : (
+                <>
+                  <div className="h-6 w-6 rounded-full bg-green-100 flex items-center justify-center">
+                    <div className="h-2 w-2 rounded-full bg-green-600"></div>
+                  </div>
+                  <span className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-green-300' : 'text-green-700'
+                  }`}>
+                    Dashboard data loaded successfully
+                  </span>
+                </>
+              )}
+            </div>
+            <button
+              onClick={() => window.location.reload()}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-all duration-300 ${
+                isDarkMode 
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+              disabled={dataLoading}
+            >
+              Refresh
+            </button>
+          </div>
+        </div>
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
 
           <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
             isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
@@ -235,7 +293,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <p className={`text-sm font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
                   }`}>Total Patrols</p>
-                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{patrolData.reduce((total, row) => total + row.data.reduce((sum, val) => sum + val, 0), 0).toLocaleString()}</p>
+                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{summaryStats.totalPatrols.toLocaleString()}</p>
                 </div>
                                  <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                    isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'
@@ -258,7 +316,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <p className={`text-sm font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
                   }`}>Active Municipalities</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{activeMunicipalities}</p>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">{summaryStats.activeMunicipalities}</p>
                 </div>
                                  <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                    isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
@@ -281,7 +339,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <p className={`text-sm font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
                   }`}>Inactive Municipalities</p>
-                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">{inactiveMunicipalities}</p>
+                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">{summaryStats.inactiveMunicipalities}</p>
                 </div>
                                  <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                    isDarkMode ? 'bg-red-900/30' : 'bg-red-100'
@@ -301,17 +359,42 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <p className={`text-sm font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
                   }`}>Total Incidents</p>
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{incidentsData.length}</p>
+                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{summaryStats.totalIncidents}</p>
                   <p className={`text-xs transition-colors duration-300 mt-1 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
                   }`}>
-                    {incidentsData.filter(i => i.status === 'Resolved').length} resolved
+                    {summaryStats.resolvedIncidents} resolved
                   </p>
                 </div>
                                  <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
                    isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
                  }`}>
                    <AlertTriangle className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+          }`}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Total Actions</p>
+                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{summaryStats.totalActions}</p>
+                  <p className={`text-xs transition-colors duration-300 mt-1 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    {summaryStats.pendingActions} pending
+                  </p>
+                </div>
+                                 <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                   isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                 }`}>
+                   <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                  </div>
               </div>
             </CardContent>
@@ -364,80 +447,81 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardHeader>
             <CardContent className="p-6 pt-0">
               <div className="space-y-4">
-                <div className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-300 ${
-                  isDarkMode 
-                    ? 'bg-blue-900/20 border-blue-800' 
-                    : 'bg-blue-50 border-blue-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                                         <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                       isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                     }`}>
-                       <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                     </div>
-                    <div>
-                      <p className={`font-medium transition-colors duration-300 ${
-                        isDarkMode ? 'text-white' : 'text-gray-900'
-                      }`}>New patrol completed</p>
-                      <p className={`text-sm transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>District 1 - Municipality A</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>2 min ago</span>
-                </div>
+                {summaryStats.recentActivity.length > 0 ? (
+                  summaryStats.recentActivity.map((activity, index) => {
+                    const getActivityIcon = (iconName) => {
+                      switch (iconName) {
+                        case 'MapPin':
+                          return <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+                        case 'FileText':
+                          return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />;
+                        case 'AlertTriangle':
+                          return <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
+                        default:
+                          return <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+                      }
+                    };
 
-                <div className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-300 ${
-                  isDarkMode 
-                    ? 'bg-green-900/20 border-green-800' 
-                    : 'bg-green-50 border-green-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                                         <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                       isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                     }`}>
-                       <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />
-                     </div>
-                    <div>
-                      <p className={`font-medium transition-colors duration-300 ${
-                        isDarkMode ? 'text-white' : 'text-gray-900'
-                      }`}>Report submitted</p>
-                      <p className={`text-sm transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>District 2 - Municipality B</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>15 min ago</span>
-                </div>
+                    const getActivityColor = (type) => {
+                      switch (type) {
+                        case 'patrol':
+                          return {
+                            bg: isDarkMode ? 'bg-blue-900/20 border-blue-800' : 'bg-blue-50 border-blue-200',
+                            icon: 'bg-blue-900/30'
+                          };
+                        case 'action':
+                          return {
+                            bg: isDarkMode ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-200',
+                            icon: 'bg-green-900/30'
+                          };
+                        case 'incident':
+                          return {
+                            bg: isDarkMode ? 'bg-yellow-900/20 border-yellow-800' : 'bg-yellow-50 border-yellow-200',
+                            icon: 'bg-yellow-900/30'
+                          };
+                        default:
+                          return {
+                            bg: isDarkMode ? 'bg-gray-900/20 border-gray-800' : 'bg-gray-50 border-gray-200',
+                            icon: 'bg-gray-900/30'
+                          };
+                      }
+                    };
 
-                <div className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-300 ${
-                  isDarkMode 
-                    ? 'bg-yellow-900/20 border-yellow-800' 
-                    : 'bg-yellow-50 border-yellow-200'
-                }`}>
-                  <div className="flex items-center gap-3">
-                                         <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                       isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-100'
-                     }`}>
-                       <User className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                     </div>
-                    <div>
-                      <p className={`font-medium transition-colors duration-300 ${
-                        isDarkMode ? 'text-white' : 'text-gray-900'
-                      }`}>User login</p>
-                      <p className={`text-sm transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-500'
-                      }`}>Admin user</p>
-                    </div>
-                  </div>
-                  <span className={`text-xs transition-colors duration-300 ${
+                    const colors = getActivityColor(activity.type);
+                    const timeAgo = activity.timestamp?.toDate ? 
+                      getTimeAgo(activity.timestamp.toDate()) : 
+                      getTimeAgo(new Date(activity.timestamp));
+
+                    return (
+                      <div key={index} className={`flex items-center justify-between p-4 rounded-lg border transition-all duration-300 ${colors.bg}`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 ${colors.icon}`}>
+                            {getActivityIcon(activity.icon)}
+                          </div>
+                          <div>
+                            <p className={`font-medium transition-colors duration-300 ${
+                              isDarkMode ? 'text-white' : 'text-gray-900'
+                            }`}>{activity.title}</p>
+                            <p className={`text-sm transition-colors duration-300 ${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-500'
+                            }`}>{activity.description}</p>
+                          </div>
+                        </div>
+                        <span className={`text-xs transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`}>{timeAgo}</span>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className={`text-center py-8 transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>1 hour ago</span>
-                </div>
+                  }`}>
+                    <Activity className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium">No Recent Activity</p>
+                    <p className="text-sm">Start using the system to see recent activity here.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -453,8 +537,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardHeader>
             <CardContent className="p-6 pt-0">
               <div className="space-y-4">
-                {incidentsData.length > 0 ? (
-                  incidentsData.slice(0, 5).map((incident, index) => {
+                {incidents.length > 0 ? (
+                  incidents.slice(0, 5).map((incident, index) => {
                     // Get status color based on incident status
                     const getStatusColor = (status) => {
                       switch (status) {
@@ -554,7 +638,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   }`}>Active Municipalities</h3>
                   <p className={`text-sm transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{activeMunicipalities} municipalities with ≥5 average patrols per day</p>
+                  }`}>{summaryStats.activeMunicipalities} municipalities with ≥5 average patrols per day</p>
                 </div>
               </div>
                              <button
@@ -632,7 +716,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   }`}>Inactive Municipalities</h3>
                   <p className={`text-sm transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
+                  }`}>{summaryStats.inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
                 </div>
               </div>
                              <button

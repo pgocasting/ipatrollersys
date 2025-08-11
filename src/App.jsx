@@ -8,6 +8,7 @@ import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
 import { ThemeProvider } from "./ThemeContext";
 import { PatrolDataProvider } from "./PatrolDataContext";
+import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import DebugComponent from "./DebugComponent";
 import "./firebase"; // Initialize Firebase
@@ -77,9 +78,11 @@ export default function App() {
     <DebugComponent>
       <ThemeProvider>
         <PatrolDataProvider>
-          <div className="App">
-            {user ? renderPage() : <Login onLogin={() => {}} />}
-          </div>
+          <DataProvider>
+            <div className="App">
+              {user ? renderPage() : <Login onLogin={() => {}} />}
+            </div>
+          </DataProvider>
         </PatrolDataProvider>
       </ThemeProvider>
     </DebugComponent>
