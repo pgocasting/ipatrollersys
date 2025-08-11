@@ -133,9 +133,9 @@ import {
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { isDarkMode } = useTheme();
   const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedMonth, setSelectedMonth] = useState('all');
+  const [selectedYear, setSelectedYear] = useState('all');
+  const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("municipality");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -221,7 +221,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const districts = [
-    { id: "", name: "All Districts" },
+    { id: "all", name: "All Districts" },
     { id: "1ST DISTRICT", name: "1ST DISTRICT" },
     { id: "2ND DISTRICT", name: "2ND DISTRICT" },
     { id: "3RD DISTRICT", name: "3RD DISTRICT" }
@@ -284,9 +284,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return null;
     };
     const d = toDate(item.when);
-    const matchesMonthYear = d ? (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) : false;
+    const matchesMonthYear = selectedMonth === 'all' || selectedYear === 'all' || 
+      (d ? (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) : false);
 
-    const matchesDistrict = !selectedDistrict || item.district === selectedDistrict;
+    const matchesDistrict = selectedDistrict === 'all' || !selectedDistrict || item.district === selectedDistrict;
     const matchesDepartment = item.department === activeTab;
     const matchesMunicipality = activeTab === "pnp" ?
       (activeMunicipality === "all" || item.municipality === activeMunicipality) : true;
@@ -331,7 +332,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
 
   // Calculate totals (normalized to match table display)
-  const totalActions = sortedItems.length;
+  const totalActions = sortedItems.filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
   const isResolved = (item) => normalize(item.status) === 'resolved' || normalize(item.actionTaken) === 'resolved';
   const isPending = (item) => !isResolved(item);
@@ -927,13 +928,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   }`}>Month</label>
                   <select
                     value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
                     className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-700 text-white' 
                         : 'border-gray-200 bg-white text-gray-900'
                     }`}
                   >
+                    <option value="all">All Months</option>
                     {months.map((month, index) => (
                       <option key={index} value={index}>{month}</option>
                     ))}
@@ -946,13 +948,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   }`}>Year</label>
                   <select
                     value={selectedYear}
-                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
                     className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-700 text-white' 
                         : 'border-gray-200 bg-white text-gray-900'
                     }`}
                   >
+                    <option value="all">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
                       <option key={year} value={year}>{year}</option>
                     ))}
@@ -972,6 +975,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         : 'border-gray-200 bg-white text-gray-900'
                     }`}
                   >
+                    <option value="all">All Districts</option>
                     {districts.map((district) => (
                       <option key={district.id} value={district.id}>{district.name}</option>
                     ))}
@@ -1032,13 +1036,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               {/* PNP Tab - Drug Related Stats */}
               {activeTab === "pnp" && (
                 <>
+                  {/* Total Card */}
+                  <div className="bg-gray-600 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{actionItems.length}</p>
+                        <p className="text-gray-200 text-xs">All reports</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Actions Card */}
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
-                        <p className="text-blue-200 text-xs">All activities</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
                         <Activity className="h-4 w-4" />
@@ -1114,13 +1132,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               {/* Bantay Dagat Tab - Fishing Related Stats */}
               {activeTab === "agriculture" && (
                 <>
+                  {/* Total Card */}
+                  <div className="bg-gray-600 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{actionItems.length}</p>
+                        <p className="text-gray-200 text-xs">All reports</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Actions Card */}
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
-                        <p className="text-blue-200 text-xs">All activities</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
                         <Activity className="h-4 w-4" />
@@ -1208,13 +1240,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               {/* PG-ENRO Tab - Environmental Stats */}
               {activeTab === "pgenro" && (
                 <>
+                  {/* Total Card */}
+                  <div className="bg-gray-600 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-gray-100 text-xs font-medium">Total</p>
+                        <p className="text-lg font-bold">{actionItems.length}</p>
+                        <p className="text-gray-200 text-xs">All reports</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Actions Card */}
                   <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
-                        <p className="text-blue-200 text-xs">All activities</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
                         <Activity className="h-4 w-4" />

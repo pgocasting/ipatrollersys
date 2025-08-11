@@ -62,6 +62,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const { logout } = useFirebase();
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
+  const [showTotalPatrolsModal, setShowTotalPatrolsModal] = useState(false);
+  const [showTotalIncidentsModal, setShowTotalIncidentsModal] = useState(false);
+  const [showTotalActionsModal, setShowTotalActionsModal] = useState(false);
 
   const handleLogout = async () => {
     try {
@@ -284,9 +287,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card 
+            className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
+              isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+            }`}
+            onClick={() => setShowTotalPatrolsModal(true)}
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -350,9 +356,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card 
+            className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
+              isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+            }`}
+            onClick={() => setShowTotalIncidentsModal(true)}
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -375,9 +384,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card 
+            className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
+              isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+            }`}
+            onClick={() => setShowTotalActionsModal(true)}
+          >
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
@@ -766,6 +778,308 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                    <p className="text-lg font-medium">No Inactive Municipalities</p>
                    <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
                  </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Total Patrols Modal */}
+      {showTotalPatrolsModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden ${
+            isDarkMode ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-6 border-b ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'
+                }`}>
+                  <MapPin className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Total Patrols Breakdown</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>{summaryStats.totalPatrols.toLocaleString()} total patrols across all municipalities</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTotalPatrolsModal(false)}
+                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {patrolData.length > 0 ? (
+                <div className="space-y-4">
+                  {patrolData.map((municipality, index) => {
+                    const totalPatrols = municipality.data ? municipality.data.reduce((sum, val) => sum + (val || 0), 0) : 0;
+                    const avgPatrols = municipality.data && municipality.data.length > 0 ? totalPatrols / municipality.data.length : 0;
+                    
+                    return (
+                      <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
+                        isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
+                      }`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className={`font-semibold transition-colors duration-300 ${
+                            isDarkMode ? 'text-white' : 'text-gray-900'
+                          }`}>{municipality.municipality || 'Unknown Municipality'}</h4>
+                          <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                            isDarkMode ? 'bg-orange-900/30 text-orange-400' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            {municipality.district || 'Unknown District'}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <div className={`text-sm transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span className="font-semibold text-orange-600 dark:text-orange-400">{totalPatrols}</span> total patrols
+                          </div>
+                          <div className={`text-sm transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span className="font-semibold text-orange-600 dark:text-orange-400">{avgPatrols.toFixed(1)}</span> avg per day
+                          </div>
+                          <div className={`text-sm transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span className="font-semibold text-orange-600 dark:text-orange-400">{municipality.data?.length || 0}</span> days tracked
+                          </div>
+                        </div>
+                        {municipality.data && municipality.data.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                            <div className={`text-xs font-medium mb-2 transition-colors duration-300 ${
+                              isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                            }`}>Daily Breakdown:</div>
+                            <div className="grid grid-cols-7 md:grid-cols-10 gap-1">
+                              {municipality.data.slice(0, 30).map((patrols, dayIndex) => (
+                                <div key={dayIndex} className={`text-center p-1 rounded text-xs ${
+                                  patrols > 0 
+                                    ? isDarkMode ? 'bg-orange-900/30 text-orange-300' : 'bg-orange-100 text-orange-700'
+                                    : isDarkMode ? 'bg-gray-800 text-gray-500' : 'bg-gray-200 text-gray-400'
+                                }`}>
+                                  {patrols || 0}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={`text-center py-8 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <MapPin className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No Patrol Data</p>
+                  <p className="text-sm">No patrol data has been recorded yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Total Incidents Modal */}
+      {showTotalIncidentsModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden ${
+            isDarkMode ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-6 border-b ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
+                }`}>
+                  <AlertTriangle className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Total Incidents Breakdown</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>{summaryStats.totalIncidents} total incidents reported</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTotalIncidentsModal(false)}
+                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {incidents.length > 0 ? (
+                <div className="space-y-4">
+                  {incidents.map((incident, index) => (
+                    <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
+                      isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`font-semibold transition-colors duration-300 ${
+                          isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>{incident.incidentType || 'Unknown Type'}</h4>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          incident.status === 'Resolved' || incident.actionType
+                            ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                            : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {incident.status === 'Resolved' || incident.actionType ? 'Resolved' : 'Pending'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Location:</span> {incident.location || 'Unknown'}
+                        </div>
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Date:</span> {incident.date?.toDate ? incident.date.toDate().toLocaleDateString() : new Date(incident.date).toLocaleDateString()}
+                        </div>
+                        {incident.description && (
+                          <div className={`md:col-span-2 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span className="font-medium">Description:</span> {incident.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`text-center py-8 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No Incidents Found</p>
+                  <p className="text-sm">No incidents have been reported yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Total Actions Modal */}
+      {showTotalActionsModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden ${
+            isDarkMode ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            {/* Header */}
+            <div className={`flex items-center justify-between p-6 border-b ${
+              isDarkMode ? 'border-gray-700' : 'border-gray-200'
+            }`}>
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
+                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
+                }`}>
+                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
+                    isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Total Actions Breakdown</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>{summaryStats.totalActions} total actions taken</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowTotalActionsModal(false)}
+                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {actionReports.length > 0 ? (
+                <div className="space-y-4">
+                  {actionReports.map((report, index) => (
+                    <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
+                      isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
+                    }`}>
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className={`font-semibold transition-colors duration-300 ${
+                          isDarkMode ? 'text-white' : 'text-gray-900'
+                        }`}>{report.what || 'Action Report'}</h4>
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          report.status === 'Resolved' || report.actionTaken === 'Resolved'
+                            ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
+                            : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {report.status === 'Resolved' || report.actionTaken === 'Resolved' ? 'Resolved' : 'Pending'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Location:</span> {report.where || 'Unknown'}
+                        </div>
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Date:</span> {report.when?.toDate ? report.when.toDate().toLocaleDateString() : new Date(report.when).toLocaleDateString()}
+                        </div>
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Action Taken:</span> {report.actionTaken || 'Not specified'}
+                        </div>
+                        <div className={`transition-colors duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          <span className="font-medium">Priority:</span> {report.priority || 'Not specified'}
+                        </div>
+                        {report.otherInfo && (
+                          <div className={`md:col-span-2 transition-colors duration-300 ${
+                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                          }`}>
+                            <span className="font-medium">Additional Info:</span> {report.otherInfo}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className={`text-center py-8 transition-colors duration-300 ${
+                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                }`}>
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No Action Reports</p>
+                  <p className="text-sm">No action reports have been submitted yet.</p>
+                </div>
               )}
             </div>
           </div>
