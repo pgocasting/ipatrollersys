@@ -479,30 +479,63 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const querySnapshot = await getDocs(incidentsRef);
       const incidentsData = [];
       const seenIds = new Set();
+      const duplicateIds = new Set();
+      const documentsToDelete = [];
       
+      // First pass: identify duplicates and collect documents to delete
       querySnapshot.forEach((doc) => {
         const incidentData = {
           id: doc.id,
           ...doc.data()
         };
         
-        // Skip if we've already seen this ID
         if (seenIds.has(incidentData.id)) {
-          console.warn('⚠️ Skipping duplicate incident ID:', incidentData.id, 'This may indicate a data integrity issue in your Firestore collection.');
-          console.warn('💡 Consider checking your Firestore console for duplicate documents with ID:', incidentData.id);
-          return;
+          duplicateIds.add(incidentData.id);
+          documentsToDelete.push(doc.ref);
+          console.warn('⚠️ Found duplicate incident ID:', incidentData.id, '- will be automatically cleaned up');
+        } else {
+          seenIds.add(incidentData.id);
         }
-        
-        seenIds.add(incidentData.id);
-        
-        // Clean the data when loading from Firestore
-        const cleanedIncident = cleanIncidentData(incidentData);
-        incidentsData.push(cleanedIncident);
       });
+      
+      // Second pass: collect clean data (excluding duplicates)
+      querySnapshot.forEach((doc) => {
+        const incidentData = {
+          id: doc.id,
+          ...doc.data()
+        };
+        
+        // Only include non-duplicate incidents
+        if (!duplicateIds.has(incidentData.id) || !seenIds.has(incidentData.id)) {
+          // Clean the data when loading from Firestore
+          const cleanedIncident = cleanIncidentData(incidentData);
+          incidentsData.push(cleanedIncident);
+        }
+      });
+      
+      // Automatically clean up duplicates if any were found
+      if (documentsToDelete.length > 0) {
+        console.log(`🧹 Auto-cleaning ${documentsToDelete.length} duplicate incidents...`);
+        try {
+          const batch = writeBatch(db);
+          documentsToDelete.forEach(docRef => {
+            batch.delete(docRef);
+          });
+          await batch.commit();
+          console.log(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
+        } catch (cleanupError) {
+          console.error('❌ Error during automatic duplicate cleanup:', cleanupError);
+          console.warn('💡 Duplicates were detected but could not be automatically removed. Use manual cleanup options.');
+        }
+      }
       
       setIncidents(incidentsData);
       setFirestoreStatus('connected');
       console.log('✅ Loaded incidents from Firestore:', incidentsData.length);
+      
+      if (duplicateIds.size > 0) {
+        console.log(`ℹ️ Found and cleaned up ${duplicateIds.size} duplicate incident IDs:`, Array.from(duplicateIds));
+      }
     } catch (error) {
       console.error('❌ Error loading incidents:', error);
       setFirestoreStatus('error');
@@ -788,6 +821,62 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     } catch (error) {
       console.error('❌ Error identifying duplicate incidents:', error);
       return [];
+    }
+  };
+
+  // Function to manually clean up duplicates
+  const manualCleanupDuplicates = async () => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      
+      const incidentMap = new Map();
+      const documentsToDelete = [];
+      
+      // Identify duplicates and collect documents to delete
+      querySnapshot.forEach((doc) => {
+        const incidentData = {
+          id: doc.id,
+          ...doc.data()
+        };
+        
+        if (incidentMap.has(incidentData.id)) {
+          documentsToDelete.push(doc.ref);
+        } else {
+          incidentMap.set(incidentData.id, incidentData);
+        }
+      });
+      
+      if (documentsToDelete.length > 0) {
+        console.log(`🧹 Manually cleaning up ${documentsToDelete.length} duplicate incidents...`);
+        
+        const batch = writeBatch(db);
+        documentsToDelete.forEach(docRef => {
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        console.log(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
+        
+        // Reload incidents after cleanup
+        await loadIncidents();
+        
+        alert(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
+      } else {
+        console.log('✅ No duplicates found to clean up');
+        alert('✅ No duplicates found to clean up');
+      }
+      
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error during manual duplicate cleanup:', error);
+      setFirestoreStatus('error');
+      alert('❌ Error during duplicate cleanup: ' + error.message);
+    } finally {
+      setCleanupLoading(false);
     }
   };
 
@@ -3648,7 +3737,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     </button>
                     <button
                       onClick={() => {
-                        cleanupDuplicateIncidents();
+                        manualCleanupDuplicates();
                         setShowCleanupDropdown(false);
                       }}
                       disabled={cleanupLoading}
