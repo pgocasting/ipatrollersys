@@ -436,6 +436,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
   const [showCleanupDropdown, setShowCleanupDropdown] = useState(false);
   const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [connectionError, setConnectionError] = useState(null);
   
   const [newIncident, setNewIncident] = useState({
     incidentType: "",
@@ -466,6 +468,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     try {
       setLoading(true);
       setFirestoreStatus('connecting');
+      setConnectionError(null);
+      
+      // Check if we're online before attempting to connect
+      if (!navigator.onLine) {
+        throw new Error('No internet connection');
+      }
       
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
@@ -497,6 +505,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     } catch (error) {
       console.error('❌ Error loading incidents:', error);
       setFirestoreStatus('error');
+      
+      // Handle different types of errors
+      if (error.message === 'No internet connection') {
+        setConnectionError('No internet connection. Please check your network and try again.');
+      } else if (error.code === 'unavailable' || error.code === 'failed-precondition') {
+        setConnectionError('Database connection failed. Please check your internet connection.');
+      } else if (error.code === 'permission-denied') {
+        setConnectionError('Access denied. Please check your permissions.');
+      } else {
+        setConnectionError('Error loading incidents. Please try again later.');
+      }
     } finally {
       setLoading(false);
     }
@@ -748,6 +767,29 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showCleanupDropdown]);
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setConnectionError(null);
+      console.log('🌐 Internet connection restored');
+    };
+
+    const handleOffline = () => {
+      setIsOnline(false);
+      setConnectionError('No internet connection');
+      console.log('❌ Internet connection lost');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   // Clean existing data when incidents are loaded
   useEffect(() => {
@@ -3648,6 +3690,73 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 {firestoreStatus === 'saving' ? 'Saving to database...' : 
                  firestoreStatus === 'connecting' ? 'Loading from database...' : 
                  'Processing...'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Connection Error Display */}
+        {connectionError && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            isDarkMode ? 'bg-red-900/20 border border-red-600/30' : 'bg-red-50 border border-red-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                isDarkMode ? 'bg-red-600/30' : 'bg-red-100'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 ${
+                  isDarkMode ? 'text-red-400' : 'text-red-600'
+                }`} />
+              </div>
+              <div className="flex-1">
+                <span className={`text-sm font-medium transition-colors duration-300 ${
+                  isDarkMode ? 'text-red-300' : 'text-red-700'
+                }`}>
+                  {connectionError}
+                </span>
+                {!isOnline && (
+                  <div className="mt-1">
+                    <span className={`text-xs transition-colors duration-300 ${
+                      isDarkMode ? 'text-red-400' : 'text-red-600'
+                    }`}>
+                      📡 You are currently offline
+                    </span>
+                  </div>
+                )}
+              </div>
+              <Button
+                onClick={loadIncidents}
+                disabled={loading}
+                size="sm"
+                variant="outline"
+                className={`h-8 px-3 text-xs ${
+                  isDarkMode ? 'border-red-600 text-red-400 hover:bg-red-600/20' : 'border-red-500 text-red-600 hover:bg-red-50'
+                }`}
+              >
+                <RefreshCw className="w-3 h-3 mr-1" />
+                Retry
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Connection Status Indicator */}
+        {!isOnline && !connectionError && (
+          <div className={`mb-4 p-4 rounded-lg ${
+            isDarkMode ? 'bg-yellow-900/20 border border-yellow-600/30' : 'bg-yellow-50 border border-yellow-200'
+          }`}>
+            <div className="flex items-center gap-3">
+              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
+                isDarkMode ? 'bg-yellow-600/30' : 'bg-yellow-100'
+              }`}>
+                <AlertTriangle className={`w-4 h-4 ${
+                  isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
+                }`} />
+              </div>
+              <span className={`text-sm font-medium transition-colors duration-300 ${
+                isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
+              }`}>
+                📡 You are currently offline. Some features may not work properly.
               </span>
             </div>
           </div>
