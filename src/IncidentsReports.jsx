@@ -488,7 +488,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         
         // Skip if we've already seen this ID
         if (seenIds.has(incidentData.id)) {
-          console.warn('⚠️ Skipping duplicate incident ID:', incidentData.id);
+          console.warn('⚠️ Skipping duplicate incident ID:', incidentData.id, 'This may indicate a data integrity issue in your Firestore collection.');
+          console.warn('💡 Consider checking your Firestore console for duplicate documents with ID:', incidentData.id);
           return;
         }
         
@@ -746,6 +747,47 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       alert('❌ Error clearing all incidents');
     } finally {
       setCleanupLoading(false);
+    }
+  };
+
+  // Function to identify and log duplicate incidents for debugging
+  const identifyDuplicateIncidents = async () => {
+    try {
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      
+      const incidentMap = new Map();
+      const duplicates = [];
+      
+      querySnapshot.forEach((doc) => {
+        const incidentData = {
+          id: doc.id,
+          ...doc.data()
+        };
+        
+        if (incidentMap.has(incidentData.id)) {
+          duplicates.push({
+            id: incidentData.id,
+            existingDoc: incidentMap.get(incidentData.id),
+            duplicateDoc: incidentData
+          });
+        } else {
+          incidentMap.set(incidentData.id, incidentData);
+        }
+      });
+      
+      if (duplicates.length > 0) {
+        console.warn('🔍 Found duplicate incidents:', duplicates);
+        console.warn('💡 Total duplicates found:', duplicates.length);
+        console.warn('💡 Consider using the cleanup options to resolve these issues');
+      } else {
+        console.log('✅ No duplicate incidents found');
+      }
+      
+      return duplicates;
+    } catch (error) {
+      console.error('❌ Error identifying duplicate incidents:', error);
+      return [];
     }
   };
 
@@ -3590,6 +3632,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     : 'bg-white border-gray-200'
                 }`}>
                   <div className="py-1">
+                    <button
+                      onClick={() => {
+                        identifyDuplicateIncidents();
+                        setShowCleanupDropdown(false);
+                      }}
+                      disabled={cleanupLoading}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
+                        isDarkMode 
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      🔍 Identify Duplicates
+                    </button>
                     <button
                       onClick={() => {
                         cleanupDuplicateIncidents();

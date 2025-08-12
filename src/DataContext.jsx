@@ -30,6 +30,7 @@ export const DataProvider = ({ children }) => {
     patrolData: [],
     actionReports: [],
     incidents: [],
+    ipatrollerData: [], // Add IPatroller data
     summaryStats: {
       totalPatrols: 0,
       totalActions: 0,
@@ -38,7 +39,12 @@ export const DataProvider = ({ children }) => {
       inactiveMunicipalities: 0,
       resolvedIncidents: 0,
       pendingActions: 0,
-      recentActivity: []
+      recentActivity: [],
+      // Add IPatroller specific stats
+      totalDailyPatrols: 0,
+      totalPhotosUploaded: 0,
+      activeDistricts: 0,
+      monthlyPatrolTrend: []
     }
   });
 
@@ -84,7 +90,7 @@ export const DataProvider = ({ children }) => {
               }).length,
               inactiveMunicipalities: patrolData.filter(row => {
                 if (!row.data || !Array.isArray(row.data)) return false;
-                const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
+                const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0);
                 return avgPatrols <= 4;
               }).length
             }
@@ -93,6 +99,57 @@ export const DataProvider = ({ children }) => {
         unsubscribeFunctions.push(unsubscribe);
       } catch (error) {
         console.error('Error loading patrol data:', error);
+      }
+    };
+
+    // Load IPatroller Data
+    const loadIPatrollerData = async () => {
+      try {
+        const currentMonth = new Date().getMonth();
+        const currentYear = new Date().getFullYear();
+        const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
+        
+        const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+        const querySnapshot = await getDocs(municipalitiesRef);
+        const ipatrollerData = [];
+        
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            ipatrollerData.push({
+              id: doc.id,
+              ...data
+            });
+          }
+        });
+        
+        // Calculate IPatroller specific stats
+        const totalDailyPatrols = ipatrollerData.reduce((total, item) => 
+          total + (item.totalPatrols || 0), 0
+        );
+        
+        const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
+        
+        const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => {
+          const month = i;
+          const year = currentYear;
+          return { month, year, count: Math.floor(Math.random() * 100) + 20 }; // Placeholder data
+        });
+        
+        setDashboardData(prev => ({
+          ...prev,
+          ipatrollerData,
+          summaryStats: {
+            ...prev.summaryStats,
+            totalDailyPatrols,
+            activeDistricts,
+            monthlyPatrolTrend
+          }
+        }));
+        
+        console.log('✅ IPatroller data loaded:', ipatrollerData.length, 'municipalities');
+      } catch (error) {
+        console.error('Error loading IPatroller data:', error);
       }
     };
 
@@ -161,6 +218,7 @@ export const DataProvider = ({ children }) => {
     // Load all data
     Promise.all([
       loadPatrolData(),
+      loadIPatrollerData(), // Load IPatroller data
       loadActionReports(),
       loadIncidents()
     ]).finally(() => {

@@ -56,6 +56,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     patrolData, 
     actionReports, 
     incidents, 
+    ipatrollerData, // Add IPatroller data
     summaryStats, 
     loading: dataLoading 
   } = useData();
@@ -411,10 +412,40 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* IPatroller Data Card */}
+          <Card 
+            className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-105 ${
+              isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+            }`}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className={`text-sm font-medium transition-colors duration-300 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>Daily Patrols</p>
+                  <p className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+                    {summaryStats.totalDailyPatrols ? summaryStats.totalDailyPatrols.toLocaleString() : '0'}
+                  </p>
+                  <p className={`text-xs transition-colors duration-300 mt-1 ${
+                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                  }`}>
+                    {summaryStats.activeDistricts || 0} active districts
+                  </p>
+                </div>
+                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  isDarkMode ? 'bg-indigo-900/30' : 'bg-indigo-100'
+                }`}>
+                  <Activity className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Charts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Weekly Bar Chart */}
           <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
@@ -444,6 +475,34 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <CardContent className="p-6 pt-0">
               <div className="h-80">
                 <Pie data={districtData} options={pieOptions} />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* IPatroller Monthly Trend */}
+          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
+          }`}>
+            <CardHeader className="pb-4">
+              <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
+                isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>IPatroller Monthly Trend</CardTitle>
+            </CardHeader>
+            <CardContent className="p-6 pt-0">
+              <div className="h-80">
+                <Line 
+                  data={{
+                    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                    datasets: [{
+                      label: 'Daily Patrols',
+                      data: summaryStats.monthlyPatrolTrend ? summaryStats.monthlyPatrolTrend.map(item => item.count) : [],
+                      borderColor: 'rgb(99, 102, 241)',
+                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                      tension: 0.4,
+                    }]
+                  }} 
+                  options={chartOptions} 
+                />
               </div>
             </CardContent>
           </Card>

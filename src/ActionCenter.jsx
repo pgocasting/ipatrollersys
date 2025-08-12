@@ -1534,7 +1534,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 </>
                               )}
                               <td className="p-4">
-                                <Badge className={`${
+                                <Badge className={`rounded-none ${
                                   item.actionTaken === "Resolved" 
                                     ? isDarkMode 
                                       ? "bg-green-900/30 text-green-400" 
