@@ -51,7 +51,8 @@ import {
   Target,
   Zap,
   Sun,
-  Moon
+  Moon,
+  Camera
 } from "lucide-react";
 
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
@@ -79,7 +80,40 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [clearLoading, setClearLoading] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [showSummaryReport, setShowSummaryReport] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [selectedItemForPhotos, setSelectedItemForPhotos] = useState(null);
+  const [beforePhoto, setBeforePhoto] = useState(null);
+  const [afterPhoto, setAfterPhoto] = useState(null);
+  const [beforePhotoFile, setBeforePhotoFile] = useState(null);
+  const [afterPhotoFile, setAfterPhotoFile] = useState(null);
+  const [showViewReportModal, setShowViewReportModal] = useState(false);
+  const [selectedItemForView, setSelectedItemForView] = useState(null);
+  const [selectedDate, setSelectedDate] = useState('');
+  const [actionTaken, setActionTaken] = useState(''); // Store action taken text
+  const [uploadedPhotos, setUploadedPhotos] = useState({}); // Store photos by date
   const fileInputRef = useRef(null);
+  const beforePhotoInputRef = useRef(null);
+  const afterPhotoInputRef = useRef(null);
+
+  // Helper function to generate random colors for placeholder images
+  const getRandomColor = () => {
+    const colors = ['4F46E5', '10B981', 'F59E0B', 'EF4444', '8B5CF6', '06B6D4', 'EC4899', '14B8A6', 'F97316', '6366F1'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  // Handle photo management from view report modal
+  const handleManagePhotosFromView = (item) => {
+    setShowViewReportModal(false);
+    setSelectedItemForPhotos(item);
+    setShowPhotoModal(true);
+    // Set current date as default
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+    // Reset photos when opening modal
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+    setBeforePhotoFile(null);
+    setAfterPhotoFile(null);
+  };
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -366,6 +400,190 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0) return "Inactive";
     if (value >= 5) return "Active";
     return "Low";
+  };
+
+  // Daily Reports Tab Handlers
+  const handleViewReport = (item) => {
+    setSelectedItemForView(item);
+    setShowViewReportModal(true);
+    // Set the current month/year for photo display
+    const currentDate = new Date();
+    setSelectedDate(`${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-01`);
+    // TODO: Load actual photos from database here
+    // For now, we'll use placeholder photos
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+  };
+
+  const handleExportReport = (item) => {
+    try {
+      // Create report data
+      const reportData = {
+        municipality: item.municipality,
+        district: item.district,
+        month: selectedMonth,
+        year: selectedYear,
+        totalPatrols: item.totalPatrols,
+        activeDays: item.activeDays,
+        inactiveDays: item.inactiveDays,
+        activePercentage: item.activePercentage,
+        reportDate: new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      };
+
+      // Convert to CSV format
+      const csvContent = [
+        ['Daily Patrol Report'],
+        [''],
+        ['Municipality:', reportData.municipality],
+        ['District:', reportData.district],
+        ['Month:', reportData.month],
+        ['Year:', reportData.year],
+        [''],
+        ['Patrol Statistics'],
+        ['Total Patrols:', reportData.totalPatrols],
+        ['Active Days:', reportData.activeDays],
+        ['Inactive Days:', reportData.inactiveDays],
+        ['Active Percentage:', reportData.activePercentage + '%'],
+        [''],
+        ['Report Generated:', reportData.reportDate]
+      ].map(row => row.join(',')).join('\n');
+
+      // Create and download CSV file
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `patrol_report_${item.municipality}_${selectedMonth}_${selectedYear}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Show success message
+      alert(`Report exported successfully for ${item.municipality}!`);
+    } catch (error) {
+      console.error('Error exporting report:', error);
+      alert('Error exporting report. Please try again.');
+    }
+  };
+
+  const handleOpenPhotoModal = (item) => {
+    setSelectedItemForPhotos(item);
+    setShowPhotoModal(true);
+    // Set current date as default
+    setSelectedDate(new Date().toISOString().split('T')[0]);
+    // Reset photos when opening modal
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+    setBeforePhotoFile(null);
+    setAfterPhotoFile(null);
+    setActionTaken(''); // Reset action taken text
+    
+    // Show helpful message
+    console.log(`Opening photo upload modal for ${item.municipality} - ${item.district}`);
+  };
+
+  const handleClosePhotoModal = () => {
+    // Check if there are unsaved changes
+    if (beforePhoto || afterPhoto || beforePhotoFile || afterPhotoFile || actionTaken) {
+      const hasChanges = beforePhoto || afterPhoto || beforePhotoFile || afterPhotoFile || actionTaken;
+      if (hasChanges) {
+        const confirmClose = confirm('⚠️ You have unsaved changes. Are you sure you want to close without saving?');
+        if (!confirmClose) return;
+      }
+    }
+    
+    setShowPhotoModal(false);
+    setSelectedItemForPhotos(null);
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+    setBeforePhotoFile(null);
+    setAfterPhotoFile(null);
+    setActionTaken('');
+  };
+
+  const handleBeforePhotoChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        setBeforePhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setBeforePhoto(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert('Please select an image file');
+      }
+    }
+  };
+
+  const handleAfterPhotoChange = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      if (file.type.startsWith('image/')) {
+        setAfterPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setAfterPhoto(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        alert('Please select an image file');
+      }
+    }
+  };
+
+  const handleUploadBeforePhoto = (item) => {
+    beforePhotoInputRef.current?.click();
+  };
+
+  const handleUploadAfterPhoto = (item) => {
+    afterPhotoInputRef.current?.click();
+  };
+
+    const handleSavePhotos = async () => {
+    if (!selectedItemForPhotos) return;
+
+    try {
+      // TODO: Implement actual photo upload to Firebase Storage
+      console.log('Saving photos for:', selectedItemForPhotos.municipality);
+      console.log('Selected date:', selectedDate);
+      console.log('Before photo:', beforePhotoFile);
+      console.log('After photo:', afterPhotoFile);
+
+      // Store photos in local state for now (replace with Firebase later)
+      const photoKey = `${selectedItemForPhotos.municipality}-${selectedDate}`;
+      setUploadedPhotos(prev => ({
+        ...prev,
+        [photoKey]: {
+          beforePhoto: beforePhoto,
+          afterPhoto: afterPhoto,
+          beforePhotoFile: beforePhotoFile,
+          afterPhotoFile: afterPhotoFile,
+          actionTaken: actionTaken, // Store action taken text
+          uploadDate: new Date().toISOString(),
+          municipality: selectedItemForPhotos.municipality,
+          district: selectedItemForPhotos.district,
+          selectedDate: selectedDate // Store the selected date
+        }
+      }));
+
+      // Show success message with more details
+      const successMessage = `✅ Photos saved successfully!\n\n📍 Location: ${selectedItemForPhotos.municipality} - ${selectedItemForPhotos.district}\n📅 Date: ${selectedDate}\n📸 Before Photo: ${beforePhoto ? '✅ Uploaded' : '❌ Not uploaded'}\n📸 After Photo: ${afterPhoto ? '✅ Uploaded' : '❌ Not uploaded'}\n📝 Action Taken: ${actionTaken ? '✅ Recorded' : '❌ Not recorded'}`;
+      
+      alert(successMessage);
+      handleClosePhotoModal();
+    } catch (error) {
+      console.error('Error saving photos:', error);
+      alert('Error saving photos. Please try again.');
+    }
   };
 
   const filteredData = patrolData
@@ -1399,6 +1617,21 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 <BarChart3 className="w-4 h-4" />
                 Status
               </button>
+              <button
+                onClick={() => setActiveTab("dailyReports")}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                  activeTab === "dailyReports"
+                    ? isDarkMode 
+                      ? "bg-gray-600 text-blue-400 shadow-sm"
+                      : "bg-white text-blue-600 shadow-sm"
+                    : isDarkMode
+                      ? "text-gray-400 hover:text-gray-200"
+                      : "text-gray-600 hover:text-gray-900"
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                Daily Reports
+              </button>
             </div>
           </CardHeader>
           <CardContent>
@@ -1440,7 +1673,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           <span className="text-xs">{date.day}</span>
                         </th>
                       ))
-                    ) : (
+                    ) : activeTab === "status" ? (
                       // Status Tab - Show only summary columns
                       <>
                         <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
@@ -1464,6 +1697,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           % Active
                         </th>
                       </>
+                    ) : (
+                      // Daily Reports Tab - Show report columns
+                      <>
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-all duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Months
+                        </th>
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-all duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Total Patrols
+                        </th>
+
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-all duration-300 ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                        }`}>
+                          Actions
+                        </th>
+
+                      </>
                     )}
                   </tr>
                 </thead>
@@ -1478,7 +1732,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       }`}>
                         <td
                                                      colSpan={
-                             activeTab === "daily" ? selectedDates.length + 2 : 6
+                             activeTab === "daily" ? selectedDates.length + 2 : 
+                                                           activeTab === "status" ? 6 : 5
                            }
                           className="px-6 py-3"
                         >
@@ -1585,7 +1840,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   </div>
                                 </td>
                               ))
-                            ) : (
+                            ) : activeTab === "status" ? (
                               // Status Tab - Show only summary columns
                               <>
                                 <td className="px-6 py-4 text-center">
@@ -1610,6 +1865,40 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     {item.activePercentage}%
                                   </span>
                                 </td>
+                              </>
+                            ) : (
+                              // Daily Reports Tab - Show report columns
+                              <>
+                                                    <td className="px-6 py-4 text-center">
+                      <span className={`text-sm transition-colors duration-300 ${
+                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                      }`}>
+                        {new Date(selectedYear, selectedMonth).toLocaleDateString('en-US', {
+                          month: 'long'
+                        })}
+                      </span>
+                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                      <span className={`text-lg font-semibold transition-colors duration-300 ${
+                        isDarkMode ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {item.totalPatrols}
+                      </span>
+                    </td>
+                                                    <td className="px-6 py-4 text-center">
+                      <div className="flex items-center justify-center">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 px-3 text-xs"
+                          onClick={() => handleViewReport(item)}
+                        >
+                          <Eye className="w-3 h-3 mr-1" />
+                          View
+                        </Button>
+                      </div>
+                    </td>
+                                
                               </>
                             )}
                           </tr>
@@ -1916,6 +2205,517 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   })}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo Modal */}
+      {showPhotoModal && selectedItemForPhotos && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div
+            className={`backdrop-blur-md rounded-xl p-6 w-full max-w-2xl mx-4 shadow-2xl border transition-all duration-300 ${
+              isDarkMode 
+                ? "bg-gray-900/95 border-gray-700/50" 
+                : "bg-white/95 border-gray-200/50"
+            }`}
+          >
+                                  <div className="flex items-center justify-between mb-6">
+                        <h3
+                          className={`text-xl font-bold transition-colors duration-300 ${
+                            isDarkMode ? "text-white" : "text-gray-900"
+                          }`}
+                        >
+                          Photos for {selectedItemForPhotos.municipality} - {selectedItemForPhotos.district}
+                        </h3>
+                        <button
+                          onClick={handleClosePhotoModal}
+                          className={`p-1 rounded-full transition-colors duration-300 ${
+                            isDarkMode
+                              ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700/80"
+                              : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/80"
+                          }`}
+                        >
+                          <XCircle className="w-5 h-5" />
+                        </button>
+                      </div>
+
+                      {/* Date Selection */}
+                      <div className="mb-6">
+                        <label
+                          htmlFor="photo-date"
+                          className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Select Date for Photos
+                        </label>
+                        <input
+                          type="date"
+                          id="photo-date"
+                          value={selectedDate}
+                          onChange={(e) => setSelectedDate(e.target.value)}
+                          className={`w-full px-3 py-2 border rounded-md text-sm transition-all duration-300 ${
+                            isDarkMode
+                              ? "bg-gray-800 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500"
+                              : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
+                          } focus:outline-none focus:ring-2 focus:ring-opacity-50`}
+                        />
+                      </div>
+
+                      {/* Action Taken */}
+                      <div className="mb-6">
+                        <label
+                          htmlFor="action-taken"
+                          className={`block text-sm font-medium mb-2 transition-colors duration-300 ${
+                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}
+                        >
+                          Action Taken
+                        </label>
+                        <textarea
+                          id="action-taken"
+                          value={actionTaken}
+                          onChange={(e) => setActionTaken(e.target.value)}
+                          placeholder="Describe the action taken for this patrol..."
+                          rows={3}
+                          className={`w-full px-3 py-2 border rounded-md text-sm transition-all duration-300 resize-none ${
+                            isDarkMode
+                              ? "bg-gray-800 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500 placeholder-gray-500"
+                              : "bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500 placeholder-gray-400"
+                          } focus:outline-none focus:ring-2 focus:ring-opacity-50`}
+                        />
+                      </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Before Photo Section */}
+              <div className="space-y-4">
+                <h4 className={`text-lg font-semibold transition-colors duration-300 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}>
+                  Before Photo
+                </h4>
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors duration-300 ${
+                  isDarkMode 
+                    ? "border-gray-600 bg-gray-800/50" 
+                    : "border-gray-300 bg-gray-50"
+                }`}>
+                  {beforePhoto ? (
+                    <div className="space-y-3">
+                      <img 
+                        src={beforePhoto} 
+                        alt="Before" 
+                        className="w-full h-32 object-cover rounded-lg mx-auto"
+                      />
+                                                      <Button
+                                  onClick={() => {
+                                    const confirmRemove = confirm('🗑️ Are you sure you want to remove the before photo?');
+                                    if (confirmRemove) {
+                                      setBeforePhoto(null);
+                                      setBeforePhotoFile(null);
+                                    }
+                                  }}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Remove
+                                </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Camera className={`w-12 h-12 mx-auto mb-3 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-400"
+                      }`} />
+                      <p className={`text-sm transition-colors duration-300 ${
+                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}>
+                        No before photo uploaded yet
+                      </p>
+                      <Button
+                        onClick={() => handleUploadBeforePhoto(selectedItemForPhotos)}
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload Before Photo
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {/* After Photo Section */}
+              <div className="space-y-4">
+                <h4 className={`text-lg font-semibold transition-colors duration-300 ${
+                  isDarkMode ? "text-white" : "text-gray-900"
+                }`}>
+                  After Photo
+                </h4>
+                <div className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors duration-300 ${
+                  isDarkMode 
+                    ? "border-gray-600 bg-gray-800/50" 
+                    : "border-gray-300 bg-gray-50"
+                }`}>
+                  {afterPhoto ? (
+                    <div className="space-y-3">
+                      <img 
+                        src={afterPhoto} 
+                        alt="After" 
+                        className="w-full h-32 object-cover rounded-lg mx-auto"
+                      />
+                                                      <Button
+                                  onClick={() => {
+                                    const confirmRemove = confirm('🗑️ Are you sure you want to remove the after photo?');
+                                    if (confirmRemove) {
+                                      setAfterPhoto(null);
+                                      setAfterPhotoFile(null);
+                                    }
+                                  }}
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Remove
+                                </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <Camera className={`w-12 h-12 mx-auto mb-3 ${
+                        isDarkMode ? "text-gray-400" : "text-gray-400"
+                      }`} />
+                      <p className={`text-sm transition-colors duration-300 ${
+                        isDarkMode ? "text-gray-300" : "text-gray-600"
+                      }`}>
+                        No after photo uploaded yet
+                      </p>
+                      <Button
+                        onClick={() => handleUploadAfterPhoto(selectedItemForPhotos)}
+                        variant="outline"
+                        size="sm"
+                        className="mt-3"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        Upload After Photo
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={handleClosePhotoModal}
+                variant="outline"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={handleSavePhotos}
+                variant="default"
+                disabled={!beforePhoto && !afterPhoto}
+              >
+                <Save className="w-4 h-4 mr-2" />
+                Save Photos
+              </Button>
+            </div>
+
+            {/* Hidden file inputs */}
+            <input
+              type="file"
+              ref={beforePhotoInputRef}
+              onChange={handleBeforePhotoChange}
+              accept="image/*"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={afterPhotoInputRef}
+              onChange={handleAfterPhotoChange}
+              accept="image/*"
+              className="hidden"
+            />
+          </div>
+        </div>
+      )}
+
+      {/* View Report Modal - Shows Photos */}
+      {showViewReportModal && selectedItemForView && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+          <div
+            className={`backdrop-blur-md rounded-xl p-6 w-full max-w-4xl mx-4 shadow-2xl border transition-all duration-300 ${
+              isDarkMode 
+                ? "bg-gray-900/95 border-gray-700/50" 
+                : "bg-white/95 border-gray-200/50"
+            }`}
+          >
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3
+                  className={`text-2xl font-bold transition-colors duration-300 ${
+                    isDarkMode ? "text-white" : "text-gray-900"
+                  }`}
+                >
+                  Daily Report: {selectedItemForView.municipality}
+                </h3>
+                <p className={`text-sm transition-colors duration-300 ${
+                  isDarkMode ? "text-gray-400" : "text-gray-600"
+                }`}>
+                  {selectedItemForView.district} • {new Date(selectedYear, selectedMonth).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    year: 'numeric' 
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={() => setShowViewReportModal(false)}
+                className={`p-1 rounded-full transition-colors duration-300 ${
+                  isDarkMode 
+                    ? "text-gray-400 hover:text-gray-300 hover:bg-gray-700/80" 
+                    : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/80"
+                }`}
+              >
+                <XCircle className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Report Summary */}
+            <div className={`p-4 rounded-lg border mb-6 ${
+              isDarkMode 
+                ? "bg-gray-800/50 border-gray-700" 
+                : "bg-gray-50 border-gray-200"
+            }`}>
+              <h4 className={`font-semibold mb-3 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                Patrol Summary
+              </h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Total Patrols:</span>
+                  <div className={`font-bold text-lg ${
+                    isDarkMode ? "text-blue-400" : "text-blue-600"
+                  }`}>
+                    {selectedItemForView.totalPatrols}
+                  </div>
+                </div>
+                <div>
+                  <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Active Days:</span>
+                  <div className={`font-bold text-lg ${
+                    isDarkMode ? "text-green-400" : "text-green-600"
+                  }`}>
+                    {selectedItemForView.activeDays}
+                  </div>
+                </div>
+                <div>
+                  <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Inactive Days:</span>
+                  <div className={`font-bold text-lg ${
+                    isDarkMode ? "text-red-400" : "text-red-600"
+                  }`}>
+                    {selectedItemForView.inactiveDays}
+                  </div>
+                </div>
+                <div>
+                  <span className={isDarkMode ? "text-gray-400" : "text-gray-600"}>Active %:</span>
+                  <div className={`font-bold text-lg ${
+                    isDarkMode ? "text-purple-400" : "text-purple-600"
+                  }`}>
+                    {selectedItemForView.activePercentage}%
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Photos Section */}
+            <div className="space-y-6">
+              <h4 className={`text-lg font-semibold transition-colors duration-300 ${
+                isDarkMode ? "text-white" : "text-gray-900"
+              }`}>
+                Daily Photos
+              </h4>
+              
+              {/* Scrollable Photos Container */}
+              <div className={`border rounded-lg p-4 max-h-96 overflow-y-auto ${
+                isDarkMode 
+                  ? "border-gray-700 bg-gray-800/30" 
+                  : "border-gray-200 bg-gray-50"
+              }`}>
+                {/* Sample Photo Entries - Replace with actual data from database */}
+                <div className="space-y-6">
+                  {/* Generate entries for August 1-31, 2025 */}
+                  {Array.from({ length: 31 }, (_, index) => {
+                    const day = index + 1;
+                    const date = new Date(2025, 7, day); // Month is 0-indexed, so 7 = August
+                    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                    const isToday = day === 15; // August 15 as example "today"
+                    
+                                         // Check if photos are uploaded for this specific date
+                     const currentDateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                     const photoKey = `${selectedItemForView?.municipality}-${currentDateString}`;
+                     const hasPhotos = uploadedPhotos[photoKey]?.beforePhoto || uploadedPhotos[photoKey]?.afterPhoto;
+
+                    return (
+                      <div key={day} className={`p-6 rounded-lg border transition-all duration-300 ${
+                        isDarkMode 
+                          ? "border-gray-600 bg-gray-800/50 hover:bg-gray-800/70" 
+                          : "border-gray-200 bg-white hover:bg-gray-50"
+                      }`}>
+                        <div className="mb-2">
+                          <h6 className={`font-medium text-sm transition-colors duration-300 ${
+                            isDarkMode ? "text-gray-300" : "text-gray-700"
+                          }`}>
+                            📅 August {day}, 2025
+                            {isToday && <span className="ml-2 text-xs bg-blue-500 text-white px-2 py-1 rounded-full">Today</span>}
+                          </h6>
+                        </div>
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <span className={`text-xs font-medium transition-colors duration-300 ${
+                              isDarkMode ? "text-gray-400" : "text-gray-600"
+                            }`}>
+                              Before Photo
+                            </span>
+                                                         <div className={`border rounded-lg p-2 text-center ${
+                               isDarkMode 
+                                 ? "border-gray-600 bg-gray-700/50" 
+                                 : "border-gray-200 bg-gray-100"
+                             }`}>
+                               {(() => {
+                                 // Create date string in YYYY-MM-DD format for the current day
+                                 const currentDateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                 
+                                 // Look for photos with this specific date
+                                 const photoKey = `${selectedItemForView?.municipality}-${currentDateString}`;
+                                 const photoData = uploadedPhotos[photoKey];
+                                 
+                                 if (photoData?.beforePhoto) {
+                                   return (
+                                     <img 
+                                       src={photoData.beforePhoto}
+                                       alt="Before" 
+                                       className="w-full h-40 object-cover rounded"
+                                     />
+                                   );
+                                 } else if (day <= 20) {
+                                   return (
+                                     <img 
+                                       src={`https://via.placeholder.com/300x250/${getRandomColor()}/FFFFFF?text=Before`}
+                                       alt="Before" 
+                                       className="w-full h-40 object-cover rounded"
+                                     />
+                                   );
+                                 } else {
+                                   return (
+                                     <div className="flex items-center justify-center h-40">
+                                       <Camera className={`w-12 h-12 ${
+                                         isDarkMode ? "text-gray-500" : "text-gray-400"
+                                       }`} />
+                                     </div>
+                                   );
+                                 }
+                               })()}
+                             </div>
+                           </div>
+                           <div className="space-y-1">
+                             <span className={`text-xs font-medium transition-colors duration-300 ${
+                               isDarkMode ? "text-gray-400" : "text-gray-600"
+                             }`}>
+                               After Photo
+                             </span>
+                                                         <div className={`border rounded-lg p-2 text-center ${
+                               isDarkMode 
+                                 ? "border-gray-600 bg-gray-700/50" 
+                                 : "border-gray-200 bg-gray-100"
+                             }`}>
+                               {(() => {
+                                 // Create date string in YYYY-MM-DD format for the current day
+                                 const currentDateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                                 
+                                 // Look for photos with this specific date
+                                 const photoKey = `${selectedItemForView?.municipality}-${currentDateString}`;
+                                 const photoData = uploadedPhotos[photoKey];
+                                 
+                                 if (photoData?.afterPhoto) {
+                                   return (
+                                     <img 
+                                       src={photoData.afterPhoto}
+                                       alt="After" 
+                                       className="w-full h-40 object-cover rounded"
+                                     />
+                                   );
+                                 } else if (day <= 15) {
+                                   return (
+                                     <img 
+                                       src={`https://via.placeholder.com/300x250/${getRandomColor()}/FFFFFF?text=After`}
+                                       alt="After" 
+                                       className="w-full h-40 object-cover rounded"
+                                     />
+                                   );
+                                 } else {
+                                   return (
+                                     <div className="flex items-center justify-center h-40">
+                                       <Camera className={`w-12 h-12 ${
+                                         isDarkMode ? "text-gray-500" : "text-gray-400"
+                                       }`} />
+                                     </div>
+                                   );
+                                 }
+                               })()}
+                             </div>
+                           </div>
+                         </div>
+
+                         {/* Action Taken Section */}
+                         {(() => {
+                           const currentDateString = `${selectedYear}-${String(selectedMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                           const photoKey = `${selectedItemForView?.municipality}-${currentDateString}`;
+                           const photoData = uploadedPhotos[photoKey];
+                           
+                           if (photoData?.actionTaken) {
+                             return (
+                               <div className="mt-3">
+                                 <span className={`text-xs font-medium transition-colors duration-300 ${
+                                   isDarkMode ? "text-gray-400" : "text-gray-600"
+                                 }`}>
+                                   📝 Action Taken:
+                                 </span>
+                                 <div className={`mt-1 p-2 rounded border text-xs transition-colors duration-300 ${
+                                   isDarkMode 
+                                     ? "border-gray-600 bg-gray-700/50 text-gray-200" 
+                                     : "border-gray-200 bg-gray-100 text-gray-700"
+                                 }`}>
+                                   {photoData.actionTaken}
+                                 </div>
+                               </div>
+                             );
+                           }
+                           return null;
+                         })()}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                onClick={() => setShowViewReportModal(false)}
+                variant="outline"
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => handleManagePhotosFromView(selectedItemForView)}
+                variant="default"
+              >
+                <Camera className="w-4 h-4 mr-2" />
+                Manage Photos
+              </Button>
             </div>
           </div>
         </div>

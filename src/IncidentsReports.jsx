@@ -434,6 +434,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
 
 
+  const [showCleanupDropdown, setShowCleanupDropdown] = useState(false);
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  
   const [newIncident, setNewIncident] = useState({
     incidentType: "",
     location: "",
@@ -649,10 +652,102 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     }
   };
 
+  const clearCurrentMonthIncidents = async () => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+      
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      let removedCount = 0;
+      
+      querySnapshot.forEach((doc) => {
+        const incidentData = doc.data();
+        const incidentDate = new Date(incidentData.date);
+        
+        if (incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
+          batch.delete(doc.ref);
+          removedCount++;
+        }
+      });
+      
+      if (removedCount > 0) {
+        await batch.commit();
+        console.log(`✅ Removed ${removedCount} incidents from current month (${currentMonth + 1}/${currentYear})`);
+        await loadIncidents();
+        alert(`✅ Successfully removed ${removedCount} incidents from current month`);
+      } else {
+        console.log('✅ No incidents found for current month');
+        alert('✅ No incidents found for current month');
+      }
+      
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error clearing current month incidents:', error);
+      setFirestoreStatus('error');
+      alert('❌ Error clearing current month incidents');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const clearAllIncidentsData = async () => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+      
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      let removedCount = 0;
+      
+      querySnapshot.forEach((doc) => {
+        batch.delete(doc.ref);
+        removedCount++;
+      });
+      
+      if (removedCount > 0) {
+        await batch.commit();
+        console.log(`✅ Removed all ${removedCount} incidents from Firestore`);
+        setIncidents([]);
+        alert(`✅ Successfully removed all ${removedCount} incidents`);
+      } else {
+        console.log('✅ No incidents found to remove');
+        alert('✅ No incidents found to remove');
+      }
+      
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error clearing all incidents:', error);
+      setFirestoreStatus('error');
+      alert('❌ Error clearing all incidents');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
   // Load incidents on component mount
   useEffect(() => {
     loadIncidents();
   }, []);
+
+  // Close cleanup dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showCleanupDropdown && !event.target.closest('.relative')) {
+        setShowCleanupDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showCleanupDropdown]);
 
   // Clean existing data when incidents are loaded
   useEffect(() => {
@@ -3435,14 +3530,72 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             >
               <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
             </Button>
-            <Button
-              onClick={cleanupDuplicateIncidents}
-              disabled={loading}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-              title="Clean Duplicates"
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
+            <div className="relative">
+              <Button
+                onClick={() => setShowCleanupDropdown(!showCleanupDropdown)}
+                disabled={loading || cleanupLoading}
+                className="bg-orange-600 hover:bg-orange-700 text-white"
+                title="Cleanup Options"
+              >
+                <Trash2 className="w-5 h-5" />
+              </Button>
+              
+              {/* Cleanup Dropdown Menu */}
+              {showCleanupDropdown && (
+                <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${
+                  isDarkMode 
+                    ? 'bg-gray-800 border-gray-600' 
+                    : 'bg-white border-gray-200'
+                }`}>
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        cleanupDuplicateIncidents();
+                        setShowCleanupDropdown(false);
+                      }}
+                      disabled={cleanupLoading}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
+                        isDarkMode 
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      🧹 Clean Duplicates
+                    </button>
+                    <button
+                      onClick={() => {
+                        clearCurrentMonthIncidents();
+                        setShowCleanupDropdown(false);
+                      }}
+                      disabled={cleanupLoading}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
+                        isDarkMode 
+                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
+                          : 'text-gray-700 hover:bg-gray-100'
+                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      📅 Clear Current Month
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
+                          clearAllIncidentsData();
+                          setShowCleanupDropdown(false);
+                        }
+                      }}
+                      disabled={cleanupLoading}
+                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
+                        isDarkMode 
+                          ? 'text-red-400 hover:bg-gray-700 hover:text-red-300' 
+                          : 'text-red-600 hover:bg-gray-100 hover:text-red-700'
+                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      🗑️ Clear All Data
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <Button
               onClick={() => setShowAddModal(true)}
               className="bg-green-600 hover:bg-green-700 text-white"
