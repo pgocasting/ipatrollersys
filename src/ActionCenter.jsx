@@ -8,6 +8,8 @@ import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { writeBatch, doc } from "firebase/firestore";
+import { db } from "./firebase";
 import { 
   Activity,
   AlertTriangle,
@@ -230,6 +232,66 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     { id: "2ND DISTRICT", name: "2ND DISTRICT" },
     { id: "3RD DISTRICT", name: "3RD DISTRICT" }
   ];
+
+  // Handle cleaning duplicates
+  const handleCleanDuplicates = async () => {
+    try {
+      setLoading(true);
+      
+      // Find duplicates based on key fields
+      const duplicates = [];
+      const seen = new Set();
+      const originalItems = new Map(); // Keep track of original items
+      
+      actionItems.forEach((item, index) => {
+        // Create a unique key based on municipality, district, what, when, where
+        const key = `${item.municipality}-${item.district}-${item.what}-${item.when}-${item.where}`;
+        
+        if (seen.has(key)) {
+          // This is a duplicate - add to duplicates array
+          duplicates.push({ ...item, index });
+        } else {
+          // This is the first occurrence (original) - keep it
+          seen.add(key);
+          originalItems.set(key, item);
+        }
+      });
+      
+      if (duplicates.length === 0) {
+        alert('No duplicates found in the data.');
+        return;
+      }
+      
+      // Confirm deletion
+      const confirmed = window.confirm(
+        `Found ${duplicates.length} duplicate entries. The original entries will be kept. Do you want to remove the duplicates? This action cannot be undone.`
+      );
+      
+      if (confirmed) {
+        // Remove duplicates from Firestore
+        const batch = writeBatch(db);
+        
+        duplicates.forEach(duplicate => {
+          const docRef = doc(db, 'actionReports', duplicate.id);
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        
+        // Update local state - keep only original items
+        setActionItems(prevItems => 
+          prevItems.filter(item => !duplicates.some(dup => dup.id === item.id))
+        );
+        
+        alert(`Successfully removed ${duplicates.length} duplicate entries. Original entries have been preserved.`);
+      }
+    } catch (error) {
+      console.error('Error cleaning duplicates:', error);
+      alert('Error cleaning duplicates. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getSeverityColor = (severity) => {
     switch (severity) {
@@ -481,6 +543,63 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const totalIllegalFishing = sortedItems.reduce((sum, item) => sum + (item.illegalFishing || 0), 0);
   const totalFishCaught = sortedItems.reduce((sum, item) => sum + (item.fishCaught || 0), 0);
   const totalBoatsInspected = sortedItems.reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
+  
+  // Agriculture/Bantay Dagat specific illegal categories
+  const { agricultureIllegalCategoryCounts, totalAgricultureIllegals } = (() => {
+    const counts = {};
+    let total = 0;
+    
+    // Only process items when agriculture tab is active
+    if (activeTab === "agriculture") {
+      sortedItems.forEach(item => {
+        const text = [item.what, item.why, item.how, item.otherInfo]
+          .map(v => normalize(v))
+          .join(' ');
+        
+        // Check predefined illegal categories first
+        let matched = false;
+        for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
+          if (keys.some(kw => text.includes(kw))) {
+            counts[cat] = (counts[cat] || 0) + 1;
+            matched = true;
+          }
+        }
+        
+        // Dynamically detect new categories from the agriculture data
+        if (!matched && text.length > 0) {
+          // Extract potential category from the main description
+          const mainText = item.what || item.why || '';
+          if (mainText && mainText.trim().length > 0) {
+            // Create a category name from the main text (first few words, capitalized)
+            const words = mainText.trim().split(' ').slice(0, 3);
+            const categoryName = words.map(word => 
+              word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+            ).join(' ');
+            
+            // Filter out unwanted categories
+            const unwantedTerms = [
+              'alleged', 'illegal', 'illegals', 'user', 'pusher', 'selling', 'using', 'drugs',
+              'alleged illegal', 'illegal user', 'illegal pusher', 'illegal selling', 'illegal using',
+              'alleged illegals', 'illegals user', 'illegals pusher', 'illegals selling', 'illegals using'
+            ];
+            
+            const isUnwanted = unwantedTerms.some(term => 
+              categoryName.toLowerCase().includes(term.toLowerCase())
+            );
+            
+            if (categoryName.length > 0 && !isUnwanted) {
+              counts[categoryName] = (counts[categoryName] || 0) + 1;
+              matched = true;
+            }
+          }
+        }
+        
+        if (matched) total += 1; // count each item once in total
+      });
+    }
+    
+    return { agricultureIllegalCategoryCounts: counts, totalAgricultureIllegals: total };
+  })();
   
   // PG-ENRO specific calculations
   const totalEnvironmentalViolations = sortedItems.reduce((sum, item) => sum + (item.environmentalViolations || 0), 0);
@@ -780,6 +899,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
+
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className={`w-full h-screen flex flex-col transition-all duration-300 ${
@@ -951,40 +1072,57 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
-          {/* Filters & Search */}
-          <div className="flex-shrink-0 mb-3">
-            <div className={`rounded-lg shadow-sm border p-3 transition-all duration-300 ${
+          {/* Filters & Search - Ultra Compact Design */}
+          <div className="flex-shrink-0 mb-2">
+            <div className={`rounded-lg shadow-sm border p-2 transition-all duration-300 ${
               isDarkMode 
                 ? 'bg-gray-800 border-gray-700' 
                 : 'bg-white border-gray-200'
             }`}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className={`p-2 rounded-lg ${
-                  isDarkMode ? 'bg-blue-900/40' : 'bg-blue-100/80'
-                }`}>
-                  <Filter className={`h-4 w-4 ${
-                    isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                  }`} />
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-lg ${
+                    isDarkMode ? 'bg-blue-900/40' : 'bg-blue-100/80'
+                  }`}>
+                    <Filter className={`h-3.5 w-3.5 ${
+                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className={`text-sm font-semibold transition-colors duration-300 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>Filters & Search</h3>
+                    <p className={`text-xs transition-colors duration-300 ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>Refine your data view</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className={`text-base font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                  }`}>Filters & Search</h3>
-                  <p className={`text-xs transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Refine your data view</p>
-                </div>
+                
+                <Button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDistrict("");
+                    setSelectedMonth(new Date().getMonth());
+                    setSelectedYear(new Date().getFullYear());
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs py-1 px-2 h-7"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Clear All Filters
+                </Button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-                <div className="space-y-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
+                <div className="space-y-0.5">
                   <label className={`text-xs font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>Month</label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-700 text-white' 
                         : 'border-gray-200 bg-white text-gray-900'
@@ -997,14 +1135,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <label className={`text-xs font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>Year</label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-700 text-white' 
                         : 'border-gray-200 bg-white text-gray-900'
@@ -1017,14 +1155,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <label className={`text-xs font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>District</label>
                   <select
                     value={selectedDistrict}
                     onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className={`w-full p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                       isDarkMode 
                         ? 'border-gray-600 bg-gray-700 text-white' 
                         : 'border-gray-200 bg-white text-gray-900'
@@ -1037,7 +1175,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
-                <div className="space-y-1">
+                <div className="space-y-0.5">
                   <label className={`text-xs font-medium transition-colors duration-300 ${
                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
                   }`}>Search</label>
@@ -1048,7 +1186,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       placeholder="Search actions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className={`pl-8 p-2 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
+                      className={`pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
                         isDarkMode 
                           ? 'border-gray-600 bg-gray-700 text-white' 
                           : 'border-gray-200 bg-white text-gray-900'
@@ -1064,23 +1202,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </div>
                 </div>
-              </div>
-              
-              <div className="flex justify-end mt-3">
-                <Button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedDistrict("");
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs"
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Clear All Filters
-                </Button>
               </div>
             </div>
           </div>
@@ -1155,6 +1276,59 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </>
               )}
 
+              {/* Agriculture Tab - Bantay Dagat Stats */}
+              {activeTab === "agriculture" && (
+                <>
+                  {/* Total Entries Card */}
+                  <div className="bg-green-600 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-green-100 text-xs font-medium">Total Entries</p>
+                        <p className="text-lg font-bold">{sortedItems.length}</p>
+                        <p className="text-green-200 text-xs">All agriculture records</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Illegals Card */}
+                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-red-100 text-xs font-medium mb-1">Illegals</p>
+                        <p className="text-lg font-bold mb-1">{totalAgricultureIllegals}</p>
+                        <p className="text-red-200 text-xs leading-tight">
+                          {Object.entries(agricultureIllegalCategoryCounts)
+                            .slice(0, 3) // Show only first 3 categories to fit better
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ')}
+                          {Object.entries(agricultureIllegalCategoryCounts).length > 3 && '...'}
+                        </p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Action Taken Card */}
+                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
 
@@ -1186,13 +1360,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       }`}>Detailed view of all activities</p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className={`text-sm ${
-                    isDarkMode 
-                      ? 'bg-blue-900/40 text-blue-400' 
-                      : 'bg-blue-100/80 text-blue-800'
-                  }`}>
-                    {sortedItems.length} items
-                  </Badge>
+                  <div className="flex items-center gap-3">
+                    <Button
+                      onClick={handleCleanDuplicates}
+                      variant="outline"
+                      size="sm"
+                      className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
+                    >
+                      <Trash2 className="h-3 w-3 mr-1" />
+                      Clean Duplicates
+                    </Button>
+                    <Badge variant="secondary" className={`text-sm ${
+                      isDarkMode 
+                        ? 'bg-blue-900/40 text-blue-400' 
+                        : 'bg-blue-100/80 text-blue-800'
+                    }`}>
+                      {sortedItems.length} items
+                    </Badge>
+                  </div>
                 </div>
               </div>
               
@@ -1283,9 +1468,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>Action Taken</th>
-                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>Source</th>
+                          {/* Hide Source column for Agriculture tab */}
+                          {activeTab !== "agriculture" && (
+                            <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
+                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                            }`}>Source</th>
+                          )}
                           <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>Other Information</th>
@@ -1569,13 +1757,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   {item.actionTaken}
                                 </Badge>
                               </td>
-                              <td className="p-4">
-                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`} title={item.source}>
-                                  {item.source || 'N/A'}
-                                </span>
-                              </td>
+                              {/* Hide Source column data for Agriculture tab */}
+                              {activeTab !== "agriculture" && (
+                                <td className="p-4">
+                                  <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                  }`} title={item.source}>
+                                    {item.source || 'N/A'}
+                                  </span>
+                                </td>
+                              )}
                               <td className="p-4">
                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
                                   isDarkMode ? 'text-gray-300' : 'text-gray-700'

@@ -384,22 +384,22 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         : "bg-gray-100 text-gray-800";
     if (value === 0)
       return isDarkMode 
-        ? "bg-red-900/30 text-red-400" 
-        : "bg-red-100 text-red-800";
+        ? "bg-red-600 text-white" 
+        : "bg-red-600 text-white";
     if (value >= 5)
       return isDarkMode 
-        ? "bg-green-900/30 text-green-400" 
-        : "bg-green-100 text-green-800";
+        ? "bg-green-600 text-white" 
+        : "bg-green-600 text-white";
     return isDarkMode 
-      ? "bg-yellow-900/30 text-yellow-400" 
-      : "bg-yellow-100 text-yellow-800";
+      ? "bg-red-600 text-white" 
+      : "bg-red-600 text-white";
   };
 
   const getStatusText = (value) => {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     if (value >= 5) return "Active";
-    return "Low";
+    return "Inactive";
   };
 
   // Daily Reports Tab Handlers
