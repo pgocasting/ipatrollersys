@@ -26,6 +26,7 @@ export const useFirebase = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log('🔄 Auth state changed:', user ? `User: ${user.email}` : 'No user (logged out)');
       setUser(user);
       setLoading(false);
     });

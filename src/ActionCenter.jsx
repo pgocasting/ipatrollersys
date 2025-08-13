@@ -140,6 +140,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [sortBy, setSortBy] = useState("municipality");
   const [sortOrder, setSortOrder] = useState("asc");
   const [actionItems, setActionItems] = useState([]);
+  const [allActionReports, setAllActionReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("pnp");
   const [activeMunicipality, setActiveMunicipality] = useState("all");
@@ -173,6 +174,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       try {
         const result = await getActionReports();
         if (result.success) {
+          // Store all reports
+          setAllActionReports(result.data);
           // Filter by active tab if needed
           const filteredReports = result.data.filter(report => 
             activeTab === "all" || report.department === activeTab
@@ -181,6 +184,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         } else {
           console.error('Error loading action reports:', result.error);
           setActionItems([]);
+          setAllActionReports([]);
         }
       } catch (error) {
         console.error('Error loading action reports:', error);
@@ -350,22 +354,37 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const ILLEGAL_KEYWORDS = [
     'illegal',
     'gambling', 'sugal', 'pagsusugal', 'pasugal',
-    'sakla', 'saklaan',
-    'tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong',
+    'sakla', 'saklaan', 'sakla game', 'sakla gambling',
+    'tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong', 'cockfighting',
     'jueteng',
     'cara y cruz', 'cara y-cruz',
     'color game', 'fruit game',
     'video karera', 'videokarera', 'vk',
-    'patulo', 'pa-tulo', 'pa tulo'
+    'patulo', 'pa-tulo', 'pa tulo', 'patulo game', 'patulo gambling',
+    'drugs', 'drug use', 'drug selling', 'drug pushing', 'marijuana', 'shabu', 'cocaine',
+    'illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing',
+    'illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction',
+    'illegal mining', 'illegal quarrying', 'illegal extraction',
+    'illegal construction', 'building without permit', 'illegal structure',
+    'illegal vending', 'illegal selling', 'illegal business', 'no permit',
+    'traffic violation', 'reckless driving', 'illegal parking', 'no license', 'no registration',
+    'prostitution', 'illegal bar', 'bar girls'
   ].map(k => k.toLowerCase());
 
   const ILLEGAL_CATEGORIES = {
-    'Sakla': ['sakla', 'saklaan'],
-    'Gambling': ['gambling', 'sugal', 'pagsusugal', 'pasugal', 'jueteng', 'cara y cruz', 'cara y-cruz', 'color game', 'fruit game', 'video karera', 'videokarera', 'vk'],
-    'Tupada': ['tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong'],
-    'Bingo': ['bingo'],
-    'Gro Bar': ['gro bar', 'g.r.o', 'g.r.o.', 'gro', 'bar operation', 'bar girls'],
-    'Patulo': ['patulo', 'pa-tulo', 'pa tulo']
+    'Sakla': ['sakla', 'saklaan', 'sakla game', 'sakla gambling'],
+    'Gambling': ['gambling', 'sugal', 'pagsusugal', 'pasugal', 'jueteng', 'cara y cruz', 'cara y-cruz', 'color game', 'fruit game', 'video karera', 'videokarera', 'vk', 'illegal gambling'],
+    'Tupada': ['tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong', 'cockfighting', 'illegal cockfighting'],
+    'Bingo': ['bingo', 'illegal bingo', 'bingo operation'],
+    'Gro Bar': ['gro bar', 'g.r.o', 'g.r.o.', 'gro', 'bar operation', 'bar girls', 'illegal bar', 'prostitution'],
+    'Patulo': ['patulo', 'pa-tulo', 'pa tulo', 'patulo game', 'patulo gambling'],
+    'Drugs': ['drugs', 'drug use', 'drug selling', 'drug pushing', 'illegal drugs', 'marijuana', 'shabu', 'cocaine'],
+    'Illegal Fishing': ['illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing'],
+    'Illegal Logging': ['illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction'],
+    'Illegal Mining': ['illegal mining', 'illegal quarrying', 'illegal extraction'],
+    'Illegal Construction': ['illegal construction', 'building without permit', 'illegal structure'],
+    'Illegal Vending': ['illegal vending', 'illegal selling', 'illegal business', 'no permit'],
+    'Traffic Violations': ['traffic violation', 'reckless driving', 'illegal parking', 'no license', 'no registration']
   };
 
   const isIllegal = (item) => {
@@ -375,23 +394,57 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return ILLEGAL_KEYWORDS.some(kw => text.includes(kw));
   };
 
-  // Count categories and total unique illegal items (based on categories only)
+  // Count categories and total unique illegal items (dynamically detected from table data)
   const { illegalCategoryCounts, totalIllegals } = (() => {
-    const counts = Object.fromEntries(Object.keys(ILLEGAL_CATEGORIES).map(k => [k, 0]));
+    const counts = {};
     let total = 0;
+    
     sortedItems.forEach(item => {
       const text = [item.what, item.why, item.how, item.otherInfo]
         .map(v => normalize(v))
         .join(' ');
+      
+      // Check predefined illegal categories first
       let matched = false;
       for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
         if (keys.some(kw => text.includes(kw))) {
-          counts[cat] += 1;
+          counts[cat] = (counts[cat] || 0) + 1;
           matched = true;
         }
       }
+      
+      // Dynamically detect new categories from the data
+      if (!matched && text.length > 0) {
+        // Extract potential category from the main description
+        const mainText = item.what || item.why || '';
+        if (mainText && mainText.trim().length > 0) {
+          // Create a category name from the main text (first few words, capitalized)
+          const words = mainText.trim().split(' ').slice(0, 3);
+          const categoryName = words.map(word => 
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          ).join(' ');
+          
+          // Filter out unwanted categories
+          const unwantedTerms = [
+            'alleged', 'illegal', 'illegals', 'user', 'pusher', 'selling', 'using', 'drugs',
+            'alleged illegal', 'illegal user', 'illegal pusher', 'illegal selling', 'illegal using',
+            'alleged illegals', 'illegals user', 'illegals pusher', 'illegals selling', 'illegals using'
+          ];
+          
+          const isUnwanted = unwantedTerms.some(term => 
+            categoryName.toLowerCase().includes(term.toLowerCase())
+          );
+          
+          if (categoryName.length > 0 && !isUnwanted) {
+            counts[categoryName] = (counts[categoryName] || 0) + 1;
+            matched = true;
+          }
+        }
+      }
+      
       if (matched) total += 1; // count each item once in total
     });
+    
     return { illegalCategoryCounts: counts, totalIllegals: total };
   })();
 
@@ -1043,8 +1096,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-100 text-xs font-medium">Total</p>
-                        <p className="text-lg font-bold">{actionItems.length}</p>
-                        <p className="text-gray-200 text-xs">All reports</p>
+                        <p className="text-lg font-bold">{sortedItems.length}</p>
+                        <p className="text-gray-200 text-xs">All table records</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
                         <Database className="h-4 w-4" />
@@ -1082,55 +1135,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                   {/* Illegals Total Card */}
                   <div className="bg-fuchsia-500 rounded-lg p-3 text-white shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-fuchsia-100 text-xs font-medium">Illegals</p>
-                        <p className="text-lg font-bold">{totalIllegals}</p>
-                        <p className="text-fuchsia-200 text-xs">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-fuchsia-100 text-xs font-medium mb-1">Illegals</p>
+                        <p className="text-lg font-bold mb-1">{totalIllegals}</p>
+                        <p className="text-fuchsia-200 text-xs leading-tight">
                           {Object.entries(illegalCategoryCounts)
-                            .filter(([, v]) => v > 0)
+                            .slice(0, 3) // Show only first 3 categories to fit better
                             .map(([k, v]) => `${k}: ${v}`)
-                            .join(' • ') || 'No categories detected'}
+                            .join(' • ')}
+                          {Object.entries(illegalCategoryCounts).length > 3 && '...'}
                         </p>
                       </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
+                      <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
                         <AlertTriangle className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </div>
-
-                  
-
-                  {/* Pending Card (from Action Taken) */}
-                  <div className="bg-yellow-500 rounded-lg p-3 text-white shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-yellow-100 text-xs font-medium">Pending</p>
-                        <p className="text-lg font-bold">{actionTakenCounts['Pending'] || 0}</p>
-                        <p className="text-yellow-200 text-xs">Awaiting action</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <Clock className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Resolved Card (from Action Taken) */}
-                  <div className="bg-green-500 rounded-lg p-3 text-white shadow-lg">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-green-100 text-xs font-medium">Resolved</p>
-                        <p className="text-lg font-bold">{actionTakenCounts['Resolved'] || 0}</p>
-                        <p className="text-green-200 text-xs">Completed</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <CheckCircle className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
                 </>
               )}
-
 
             </div>
           </div>

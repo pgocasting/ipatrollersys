@@ -20,11 +20,35 @@ export default function App() {
     const validPages = ['dashboard', 'ipatroller', 'reports', 'incidents', 'actioncenter', 'settings'];
     return validPages.includes(path) ? path : 'dashboard';
   });
-  const { user, loading } = useFirebase();
+  const { user, loading, logout } = useFirebase();
 
-  const handleLogout = () => {
-    setCurrentPage('dashboard');
-    window.history.pushState({}, '', '/dashboard');
+  const handleLogout = async () => {
+    try {
+      console.log('🚪 Logout initiated...');
+      console.log('👤 Current user before logout:', user?.email);
+      
+      // First, call Firebase logout to clear authentication
+      await logout();
+      console.log('✅ Firebase logout completed');
+      
+      // Add a small delay to ensure Firebase auth state change is processed
+      await new Promise(resolve => setTimeout(resolve, 100));
+      console.log('⏳ Delay completed');
+      
+      // Clear any stored data or state if needed
+      localStorage.removeItem('theme'); // Keep theme preference
+      console.log('🧹 Local storage cleared');
+      
+      // Reset to dashboard page (this will be overridden by the user state change)
+      setCurrentPage('dashboard');
+      console.log('📄 Page reset to dashboard');
+      
+      console.log('🎯 Logout completed - waiting for auth state change...');
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+      // Even if Firebase logout fails, still try to redirect
+      setCurrentPage('dashboard');
+    }
   };
 
   const handleNavigate = (page) => {

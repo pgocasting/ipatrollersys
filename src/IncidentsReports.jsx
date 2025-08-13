@@ -4019,7 +4019,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       <span className="font-medium text-orange-600 dark:text-orange-400">{stats.trafficAccidents}</span>
                     </div>
                     <div className="flex justify-between text-xs">
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other:</span>
+                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other</span>
                       <span className="font-medium text-orange-600 dark:text-orange-400">{stats.otherAccidents}</span>
                     </div>
                   </div>
