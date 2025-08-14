@@ -848,23 +848,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
       // Clean photos data before saving to Firestore (include base64 image data)
       const cleanPhotos = newActionReport.photos ? newActionReport.photos
-        .filter(photo => photo && photo.id) // Remove any null/undefined photos
-        .map(photo => ({
-          id: photo.id,
-          fileName: photo.fileName || 'Unknown Photo', // Ensure fileName is never undefined
-          fileSize: photo.fileSize || 0, // Ensure fileSize is never undefined
-          fileType: photo.fileType || 'image/*', // Ensure fileType is never undefined
-          lastModified: photo.lastModified || Date.now(), // Ensure lastModified is never undefined
-          // Store the base64 image data in Firestore
-          imageData: photo.imageData || null, // Ensure imageData is never undefined
-          uploadDate: photo.uploadDate || new Date().toISOString() // Ensure uploadDate is never undefined
-        }))
-        .filter(photo => photo.imageData) // Only keep photos with actual image data
+        .map(validateAndCleanPhoto) // Use the validation function
+        .filter(photo => photo !== null) // Remove any invalid photos
         : [];
 
       const reportToSave = {
         ...newActionReport,
         photos: cleanPhotos,
+        status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
+        priority: "medium",
+        patrolCount: 0,
+        incidentCount: 0,
+        icon: "AlertCircle",
         timestamp: Date.now(),
         id: `action-${Date.now()}`
       };
@@ -928,18 +923,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     try {
       // Clean photos data before saving to Firestore (include base64 image data)
       const cleanPhotos = editingItem.photos ? editingItem.photos
-        .filter(photo => photo && photo.id) // Remove any null/undefined photos
-        .map(photo => ({
-          id: photo.id,
-          fileName: photo.fileName || photo.name || 'Unknown Photo', // Ensure fileName is never undefined
-          fileSize: photo.fileSize || 0, // Ensure fileSize is never undefined
-          fileType: photo.fileType || 'image/*', // Ensure fileType is never undefined
-          lastModified: photo.lastModified || Date.now(), // Ensure lastModified is never undefined
-          // Store the base64 image data in Firestore
-          imageData: photo.imageData || null, // Ensure imageData is never undefined
-          uploadDate: photo.uploadDate || new Date().toISOString() // Ensure uploadDate is never undefined
-        }))
-        .filter(photo => photo.imageData || photo.url) // Only keep photos with actual image data or legacy URLs
+        .map(validateAndCleanPhoto) // Use the validation function
+        .filter(photo => photo !== null) // Remove any invalid photos
         : [];
 
       const updatedReport = {
@@ -1032,6 +1017,31 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       
       return updated;
     });
+  };
+
+  // Function to validate and clean photo objects
+  const validateAndCleanPhoto = (photo) => {
+    if (!photo || typeof photo !== 'object') {
+      return null;
+    }
+
+    // Ensure all required fields have valid values
+    const cleanPhoto = {
+      id: photo.id || `photo-${Date.now()}-${Math.random()}`,
+      fileName: photo.fileName || photo.name || 'Unknown Photo',
+      fileSize: photo.fileSize || 0,
+      fileType: photo.fileType || 'image/*',
+      lastModified: photo.lastModified || Date.now(),
+      imageData: photo.imageData || null,
+      uploadDate: photo.uploadDate || new Date().toISOString()
+    };
+
+    // Only return photos that have actual image data or are legacy photos
+    if (cleanPhoto.imageData || photo.url) {
+      return cleanPhoto;
+    }
+
+    return null;
   };
 
   // Function to migrate Firebase Storage URLs to base64 data
