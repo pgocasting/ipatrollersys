@@ -9,8 +9,7 @@ import { Badge } from "./components/ui/badge";
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { writeBatch, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { db } from "./firebase";
 import { 
   Activity,
   AlertTriangle,
@@ -759,36 +758,46 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   // Photo handling functions
-  const handlePhotoUpload = (event, setActionReport) => {
+  const handlePhotoUpload = (event, setReport) => {
     const files = Array.from(event.target.files);
-    const validFiles = files.filter(file => 
-      file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024 // 5MB limit
-    );
+    const validFiles = files.filter(file => file.type.startsWith('image/'));
     
-    if (validFiles.length !== files.length) {
-      alert('Some files were skipped. Only image files under 5MB are allowed.');
+    if (validFiles.length === 0) {
+      alert('Please select valid image files only.');
+      return;
     }
-    
-    const newPhotos = validFiles.map(file => ({
-      id: Date.now() + Math.random(),
-      // Store file metadata
-      fileName: file.name,
-      fileSize: file.size,
-      fileType: file.type,
-      lastModified: file.lastModified,
-      // Create preview URL for display
-      preview: URL.createObjectURL(file),
-      // Store the actual file object for upload to Firebase Storage
-      _file: file,
-      // Will be populated after upload
-      downloadURL: null,
-      uploadStatus: 'pending' // pending, uploading, completed, failed
-    }));
-    
-    setActionReport(prevReport => ({
-      ...prevReport,
-      photos: [...(prevReport.photos || []), ...newPhotos]
-    }));
+
+    if (validFiles.length > 10) {
+      alert('Maximum 10 images allowed.');
+      return;
+    }
+
+    // Convert images to base64 and store in state
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const base64String = e.target.result;
+        
+        const newPhoto = {
+          id: Date.now() + Math.random(),
+          fileName: file.name,
+          fileSize: file.size,
+          fileType: file.type,
+          lastModified: file.lastModified,
+          // Store the base64 image data
+          imageData: base64String,
+          // Create preview URL for display
+          preview: URL.createObjectURL(file),
+          uploadDate: new Date().toISOString()
+        };
+
+        setReport(prevReport => ({
+          ...prevReport,
+          photos: [...(prevReport.photos || []), newPhoto]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handlePhotoRemove = (photoId, setActionReport) => {
@@ -802,70 +811,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         photos: (prevReport.photos || []).filter(p => p.id !== photoId)
       };
     });
-  };
-
-  // Upload photos to Firebase Storage
-  const uploadPhotosToStorage = async (photos) => {
-    const photosToUpload = photos.filter(photo => photo._file && photo.uploadStatus === 'pending');
-    
-    if (photosToUpload.length === 0) {
-      return photos; // No new photos to upload
-    }
-    
-    console.log(`📸 Starting upload of ${photosToUpload.length} photos to Firebase Storage...`);
-    
-    const uploadPromises = photosToUpload.map(async (photo) => {
-      try {
-        // Update status to uploading
-        photo.uploadStatus = 'uploading';
-        
-        // Create a unique filename with timestamp and original name
-        const timestamp = Date.now();
-        const randomId = Math.random().toString(36).substring(2, 15);
-        const fileName = `${timestamp}_${randomId}_${photo.fileName}`;
-        const storageRef = ref(storage, `action-reports/${fileName}`);
-        
-        console.log(`📤 Uploading: ${photo.fileName} to ${storageRef.fullPath}`);
-        
-        // Upload the file
-        const snapshot = await uploadBytes(storageRef, photo._file);
-        
-        // Get the download URL
-        const downloadURL = await getDownloadURL(snapshot.ref);
-        
-        // Update photo object
-        photo.downloadURL = downloadURL;
-        photo.uploadStatus = 'completed';
-        photo.storagePath = storageRef.fullPath;
-        
-        console.log(`✅ Upload successful: ${photo.fileName} -> ${downloadURL}`);
-        
-        return photo;
-      } catch (error) {
-        console.error(`❌ Error uploading photo ${photo.fileName}:`, error);
-        photo.uploadStatus = 'failed';
-        photo.error = error.message;
-        return photo;
-      }
-    });
-    
-    // Wait for all uploads to complete
-    const uploadedPhotos = await Promise.all(uploadPromises);
-    
-    // Check results
-    const successfulUploads = uploadedPhotos.filter(photo => photo.uploadStatus === 'completed');
-    const failedUploads = uploadedPhotos.filter(photo => photo.uploadStatus === 'failed');
-    
-    console.log(`📊 Upload Summary: ${successfulUploads.length} successful, ${failedUploads.length} failed`);
-    
-    if (failedUploads.length > 0) {
-      console.warn('❌ Failed uploads:', failedUploads.map(p => ({ name: p.fileName, error: p.error })));
-      // Show user-friendly error message
-      const failedNames = failedUploads.map(p => p.fileName).join(', ');
-      alert(`Some photos failed to upload: ${failedNames}\n\nPlease try again or contact support if the problem persists.`);
-    }
-    
-    return uploadedPhotos;
   };
 
   const handleAddActionReport = () => {
@@ -901,28 +846,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Source field is not shown for Agriculture
       }
 
-      // Upload photos to Firebase Storage first
-      let uploadedPhotos = [];
-      if (newActionReport.photos && newActionReport.photos.length > 0) {
-        try {
-          uploadedPhotos = await uploadPhotosToStorage(newActionReport.photos);
-        } catch (error) {
-          console.error('Error uploading photos:', error);
-          alert('Error uploading photos. Please try again.');
-          return;
-        }
-      }
-
-      // Clean photos data before saving to Firestore (include download URLs)
-      const cleanPhotos = uploadedPhotos.map(photo => ({
+      // Clean photos data before saving to Firestore (include base64 image data)
+      const cleanPhotos = newActionReport.photos?.map(photo => ({
         id: photo.id,
         fileName: photo.fileName,
         fileSize: photo.fileSize,
         fileType: photo.fileType,
         lastModified: photo.lastModified,
-        downloadURL: photo.downloadURL,
-        uploadStatus: photo.uploadStatus,
-        // Remove _file property and preview as they're not needed in Firestore
+        // Store the base64 image data in Firestore
+        imageData: photo.imageData,
+        uploadDate: photo.uploadDate
       })) || [];
 
       const newReport = {
@@ -988,29 +921,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   const handleEditActionReport = async () => {
     try {
-      // Upload any new photos to Firebase Storage first
-      let uploadedPhotos = [];
-      if (editingItem.photos && editingItem.photos.length > 0) {
-        try {
-          uploadedPhotos = await uploadPhotosToStorage(editingItem.photos);
-        } catch (error) {
-          console.error('Error uploading photos:', error);
-          alert('Error uploading photos. Please try again.');
-          return;
-        }
-      }
-
-      // Clean photos data before saving to Firestore (include download URLs)
-      const cleanPhotos = uploadedPhotos.map(photo => ({
+      // Clean photos data before saving to Firestore (include base64 image data)
+      const cleanPhotos = editingItem.photos ? editingItem.photos.map(photo => ({
         id: photo.id,
         fileName: photo.fileName || photo.name, // Handle both new and existing photos
         fileSize: photo.fileSize,
         fileType: photo.fileType,
         lastModified: photo.lastModified,
-        downloadURL: photo.downloadURL,
-        uploadStatus: photo.uploadStatus,
-        // Remove _file property and preview as they're not needed in Firestore
-      })) || [];
+        // Store the base64 image data in Firestore
+        imageData: photo.imageData,
+        uploadDate: photo.uploadDate || new Date().toISOString()
+      })) : [];
 
       const updatedReport = {
         ...editingItem,
@@ -2424,42 +2345,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         {newActionReport.photos.map((photo) => (
                           <div key={photo.id} className="relative group">
                             <img
-                              src={photo.downloadURL || photo.preview || photo.url || photo}
+                              src={photo.imageData || photo.preview}
                               alt={photo.fileName || photo.name}
                               className="w-full h-24 object-cover rounded-lg border"
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
-                              {photo.uploadStatus === 'uploading' ? (
-                                <div className="text-white text-center">
-                                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mx-auto mb-2"></div>
-                                  <p className="text-xs">Uploading...</p>
-                                </div>
-                              ) : (
-                                <Button
-                                  onClick={() => handlePhotoRemove(photo.id, setNewActionReport)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              )}
+                              <Button
+                                onClick={() => handlePhotoRemove(photo.id, setNewActionReport)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
                             </div>
                             <div className="absolute bottom-1 left-1 right-1">
                               <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
                                 {photo.fileName || photo.name}
                               </p>
-                              {/* Upload Status Indicator */}
-                              {photo.uploadStatus === 'completed' && (
-                                <div className="absolute top-1 right-1">
-                                  <div className="w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                                </div>
-                              )}
-                              {photo.uploadStatus === 'failed' && (
-                                <div className="absolute top-1 right-1">
-                                  <div className="w-3 h-3 bg-red-500 rounded-full border-2 border-white"></div>
-                                </div>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -2865,7 +2768,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           {editingItem.photos.map((photo, index) => (
                             <div key={index} className="relative group">
                               <img
-                                src={photo.downloadURL || photo.preview || photo.url || photo}
+                                src={photo.imageData || photo.preview || photo.url || photo}
                                 alt={`Photo ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg border"
                               />
@@ -2881,45 +2784,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </div>
                               <div className="absolute bottom-1 left-1 right-1">
                                 <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
-                                  {photo.uploadStatus === 'completed' ? 'Uploaded' : 
-                                   photo.uploadStatus === 'uploading' ? 'Uploading...' : 
-                                   photo.uploadStatus === 'failed' ? 'Failed' : 
-                                   photo.preview ? 'New Upload' : 'Existing Photo'}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* New Photo Preview Grid */}
-                    {editingItem.photos && editingItem.photos.some(p => p.preview) && (
-                      <div className="space-y-3">
-                        <h5 className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>New Photos to Add</h5>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                          {editingItem.photos.filter(p => p.preview).map((photo) => (
-                            <div key={photo.id} className="relative group">
-                              <img
-                                src={photo.preview}
-                                alt={photo.fileName || photo.name}
-                                className="w-full h-24 object-cover rounded-lg border"
-                              />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
-                                <Button
-                                  onClick={() => handlePhotoRemove(photo.id, setEditingItem)}
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                              <div className="absolute bottom-1 left-1 right-1">
-                                <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
-                                  {photo.fileName || photo.name}
+                                  {photo.imageData ? 'Stored in Database' : photo.preview ? 'New Upload' : 'Existing Photo'}
                                 </p>
                               </div>
                             </div>
@@ -3065,12 +2930,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         {viewingItem.photos.map((photo, index) => (
                           <div key={index} className="relative group">
                             <img
-                              src={photo.downloadURL || photo.preview || photo.url || photo}
+                              src={photo.imageData || photo.preview || photo.url || photo}
                               alt={`Photo ${index + 1}`}
                               className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
                               onClick={() => {
                                 // Open photo in full screen or modal
-                                window.open(photo.downloadURL || photo.preview || photo.url || photo, '_blank');
+                                window.open(photo.imageData || photo.preview || photo.url || photo, '_blank');
                               }}
                             />
                             <div className="absolute top-2 right-2">
