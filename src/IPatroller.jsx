@@ -1453,14 +1453,41 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
         }`}>
           <CardHeader>
-            <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
-              Filters & Search
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
+                isDarkMode ? 'text-white' : 'text-gray-900'
+              }`}>
+                Filters & Search
+              </CardTitle>
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setSelectedMonth(new Date().getMonth());
+                    setSelectedYear(new Date().getFullYear());
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  Current Month
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDistrict("ALL");
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  Clear Filters
+                </Button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <Label htmlFor="search" className={`transition-colors duration-300 ${
                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
@@ -1546,29 +1573,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   <option value="3RD DISTRICT">3RD DISTRICT</option>
                 </select>
               </div>
-              <div className="flex items-end gap-2">
-                <Button
-                  onClick={() => {
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Calendar className="w-4 h-4 mr-2" />
-                  Current Month
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedDistrict("ALL");
-                  }}
-                  variant="outline"
-                  className="flex-1"
-                >
-                  Clear Filters
-                </Button>
-              </div>
+
             </div>
           </CardContent>
         </Card>
@@ -1676,22 +1681,22 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     ) : activeTab === "status" ? (
                       // Status Tab - Show only summary columns
                       <>
-                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 w-24 ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           Total
                         </th>
-                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 w-24 ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           Active
                         </th>
-                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 w-24 ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           Inactive
                         </th>
-                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 ${
+                        <th className={`px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 w-24 ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
                         }`}>
                           % Active
@@ -1843,24 +1848,24 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             ) : activeTab === "status" ? (
                               // Status Tab - Show only summary columns
                               <>
-                                <td className="px-6 py-4 text-center">
+                                <td className="px-6 py-4 text-center w-24">
                                   <span className={`text-lg font-semibold transition-colors duration-300 ${
                                     isDarkMode ? 'text-white' : 'text-gray-900'
                                   }`}>
                                     {item.totalPatrols}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-center">
+                                <td className="px-6 py-4 text-center w-24">
                                   <span className="text-lg font-semibold text-green-600 dark:text-green-400">
                                     {item.activeDays}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-center">
+                                <td className="px-6 py-4 text-center w-24">
                                   <span className="text-lg font-semibold text-red-600 dark:text-red-400">
                                     {item.inactiveDays}
                                   </span>
                                 </td>
-                                <td className="px-6 py-4 text-center">
+                                <td className="px-6 py-4 text-center w-24">
                                   <span className="text-lg font-semibold text-purple-600 dark:text-purple-400">
                                     {item.activePercentage}%
                                   </span>

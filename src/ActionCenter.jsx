@@ -166,7 +166,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     how: "",
     source: "",
     actionTaken: "",
-    otherInfo: ""
+    otherInfo: "",
+    photos: []
   });
 
   useEffect(() => {
@@ -756,15 +757,97 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return date; // Fallback
   };
 
+  // Photo handling functions
+  const handlePhotoUpload = (event, setActionReport) => {
+    const files = Array.from(event.target.files);
+    const validFiles = files.filter(file => 
+      file.type.startsWith('image/') && file.size <= 5 * 1024 * 1024 // 5MB limit
+    );
+    
+    if (validFiles.length !== files.length) {
+      alert('Some files were skipped. Only image files under 5MB are allowed.');
+    }
+    
+    const newPhotos = validFiles.map(file => ({
+      id: Date.now() + Math.random(),
+      // Store file metadata instead of the actual File object
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      lastModified: file.lastModified,
+      // Create preview URL for display
+      preview: URL.createObjectURL(file),
+      // Store the actual file object separately for potential upload to storage
+      _file: file // This will be removed before saving to Firestore
+    }));
+    
+    setActionReport(prevReport => ({
+      ...prevReport,
+      photos: [...(prevReport.photos || []), ...newPhotos]
+    }));
+  };
+
+  const handlePhotoRemove = (photoId, setActionReport) => {
+    setActionReport(prevReport => {
+      const photoToRemove = prevReport.photos?.find(p => p.id === photoId);
+      if (photoToRemove && photoToRemove.preview) {
+        URL.revokeObjectURL(photoToRemove.preview);
+      }
+      return {
+        ...prevReport,
+        photos: (prevReport.photos || []).filter(p => p.id !== photoId)
+      };
+    });
+  };
+
   const handleAddActionReport = () => {
     setShowAddModal(true);
   };
 
   const handleSubmitActionReport = async () => {
     try {
+      // Validate required fields based on department
+      if (!newActionReport.department) {
+        alert("Please select a department.");
+        return;
+      }
+      
+      if (!newActionReport.municipality || !newActionReport.district || 
+          !newActionReport.what || !newActionReport.when || 
+          !newActionReport.where || !newActionReport.actionTaken) {
+        alert("Please fill in all required fields.");
+        return;
+      }
+      
+      // Additional validation for PNP department
+      if (newActionReport.department === "pnp") {
+        if (!newActionReport.who) {
+          alert("Please fill in the 'Who' field for PNP reports.");
+          return;
+        }
+      }
+      
+      // Additional validation for Agriculture department
+      if (newActionReport.department === "agriculture") {
+        // For Agriculture, only basic fields are required
+        // Source field is not shown for Agriculture
+      }
+
+      // Clean photos data before saving to Firestore (remove File objects)
+      const cleanPhotos = newActionReport.photos?.map(photo => ({
+        id: photo.id,
+        fileName: photo.fileName,
+        fileSize: photo.fileSize,
+        fileType: photo.fileType,
+        lastModified: photo.lastModified,
+        preview: photo.preview
+        // Remove _file property as it contains the File object
+      })) || [];
+
       const newReport = {
         id: `action-${Date.now()}`,
         ...newActionReport,
+        photos: cleanPhotos, // Use cleaned photos
         status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
         priority: "medium",
         patrolCount: 0,
@@ -789,7 +872,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           how: "",
           source: "",
           actionTaken: "",
-          otherInfo: ""
+          otherInfo: "",
+          photos: []
         });
         alert("Action report added successfully!");
       } else {
@@ -811,19 +895,33 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       when: "",
       where: "",
       who: "",
+      gender: "",
       why: "",
       how: "",
       source: "",
       actionTaken: "",
-      otherInfo: ""
+      otherInfo: "",
+      photos: []
     });
   };
 
   const handleEditActionReport = async () => {
     try {
+      // Clean photos data before saving to Firestore (remove File objects)
+      const cleanPhotos = editingItem.photos ? editingItem.photos.map(photo => ({
+        id: photo.id,
+        fileName: photo.fileName || photo.name, // Handle both new and existing photos
+        fileSize: photo.fileSize,
+        fileType: photo.fileType,
+        lastModified: photo.lastModified,
+        preview: photo.preview
+        // Remove _file property as it contains the File object
+      })) : [];
+
       const updatedReport = {
         ...editingItem,
-        status: editingItem.actionTaken === "Resolved" ? "resolved" : "pending"
+        photos: cleanPhotos,
+        status: editingItem.actionTaken === "resolved" ? "resolved" : "pending"
       };
 
       const result = await updateActionReport(editingItem.id, updatedReport);
@@ -848,6 +946,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const handleCancelEdit = () => {
     setShowEditModal(false);
     setEditingItem(null);
+    // Clean up any photo previews to prevent memory leaks
+    if (editingItem && editingItem.photos) {
+      editingItem.photos.forEach(photo => {
+        if (photo.preview) {
+          URL.revokeObjectURL(photo.preview);
+        }
+      });
+    }
   };
 
   const handleCloseViewModal = () => {
@@ -903,169 +1009,188 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className={`w-full h-screen flex flex-col transition-all duration-300 ${
-        isDarkMode 
-          ? 'bg-gray-900' 
-          : 'bg-gray-50'
-      }`}>
-        {/* Compact Header */}
-        <div className={`flex-shrink-0 px-6 py-4 border-b transition-all duration-300 ${
-          isDarkMode 
-            ? 'bg-gray-800 border-gray-700' 
-            : 'bg-white border-gray-200'
-        }`}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 dark:bg-blue-900/40 rounded-lg">
-                <Activity className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h1 className={`text-3xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
-                  Action Center
-                </h1>
-                <p className={`text-sm transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
-                  Centralized monitoring and management dashboard
-                </p>
-              </div>
+      <section className="flex-1 p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className={`text-3xl font-bold transition-colors duration-300 ${
+              isDarkMode ? 'text-white' : 'text-gray-900'
+            }`}>
+              Action Center Management
+            </h1>
+            <p className={`text-lg transition-colors duration-300 ${
+              isDarkMode ? 'text-gray-400' : 'text-gray-600'
+            }`}>
+              {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} • Incident Response & Action Tracking
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`w-2 h-2 rounded-full ${
+                loading ? 'bg-yellow-500' : 'bg-green-500'
+              }`}></div>
+              <span className={`text-sm font-medium ${
+                loading ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'
+              }`}>
+                {loading ? 'Processing...' : 'System operational'}
+              </span>
             </div>
-            <div className="flex gap-2">
-              <Button 
-                onClick={handleAddActionReport}
-                variant="outline" 
-                size="sm"
-                className="text-xs"
-              >
-                <Plus className="h-3 w-3 mr-1" />
-                Add Report
-              </Button>
-              <Button 
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => setLoading(false), 500);
-                }} 
-                variant="outline" 
-                size="sm"
-                disabled={loading}
-                className="text-xs"
-              >
-                <RefreshCw className={`h-3 w-3 mr-1 ${loading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-              <Button onClick={exportToPDF} variant="outline" size="sm" className="text-xs">
-                <Download className="h-3 w-3 mr-1" />
-                Export
-              </Button>
-              <Button onClick={handlePrint} variant="outline" size="sm" className="text-xs">
-                <Printer className="h-3 w-3 mr-1" />
-                Print
-              </Button>
-            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={handleAddActionReport}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+              title="Add Action Report"
+            >
+              <Plus className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={() => {
+                setLoading(true);
+                setTimeout(() => setLoading(false), 500);
+              }}
+              disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white"
+              title="Refresh Data"
+            >
+              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              onClick={exportToPDF}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              title="Export PDF"
+            >
+              <Download className="w-5 h-5" />
+            </Button>
+            <Button
+              onClick={handlePrint}
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              title="Print Report"
+            >
+              <Printer className="w-5 h-5" />
+            </Button>
           </div>
         </div>
 
-        {/* Compact Department Navigation */}
-        <div className="flex-shrink-0 px-6 py-2">
-          <div className={`rounded-lg shadow-sm border overflow-hidden transition-all duration-300 ${
-            isDarkMode 
-              ? 'bg-gray-800 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            <div className="grid grid-cols-3 gap-1 p-1">
-              <button
-                onClick={() => {
-                  setActiveTab("pnp");
-                  setActiveMunicipality("all");
-                }}
-                className={`relative group p-2 rounded-lg transition-all duration-300 ${
-                  activeTab === "pnp"
-                    ? "bg-blue-500 text-white shadow-lg"
-                    : isDarkMode 
-                      ? "bg-gray-700 hover:bg-blue-900/20 text-gray-300"
-                      : "bg-white hover:bg-blue-50 text-gray-700"
-                }`}
-              >
-                <div className="flex flex-col items-center text-center space-y-1">
-                  <div className={`p-1 rounded-full ${
+        {/* Department Navigation Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "pnp"
+                ? isDarkMode 
+                  ? 'bg-blue-900/80 border-blue-600' 
+                  : 'bg-blue-50 border-blue-300'
+                : isDarkMode 
+                  ? 'bg-gray-800/80 border-gray-700 hover:bg-blue-900/20' 
+                  : 'bg-white border-gray-200 hover:bg-blue-50'
+            }`}
+            onClick={() => {
+              setActiveTab("pnp");
+              setActiveMunicipality("all");
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${
+                  activeTab === "pnp" 
+                    ? 'bg-blue-600 text-white' 
+                    : isDarkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  <Shield className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
                     activeTab === "pnp" 
-                      ? "bg-white/20" 
-                      : isDarkMode ? "bg-blue-900/40" : "bg-blue-100/80"
-                  }`}>
-                    <Shield className={`h-3 w-3 ${
-                      activeTab === "pnp" ? "text-white" : isDarkMode ? "text-blue-400" : "text-blue-600"
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-xs">PNP</h3>
-                    <p className="text-xs opacity-80">Police Operations</p>
-                  </div>
+                      ? 'text-blue-600 dark:text-blue-400' 
+                      : isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>PNP</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    activeTab === "pnp" 
+                      ? 'text-blue-500 dark:text-blue-300' 
+                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>Police Operations</p>
                 </div>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setActiveTab("agriculture");
-                  setActiveMunicipality("all");
-                }}
-                className={`relative group p-2 rounded-lg transition-all duration-300 ${
-                  activeTab === "agriculture"
-                    ? "bg-green-500 text-white shadow-lg"
-                    : isDarkMode 
-                      ? "bg-gray-700 hover:bg-green-900/20 text-gray-300"
-                      : "bg-white hover:bg-green-50 text-gray-700"
-                }`}
-              >
-                <div className="flex flex-col items-center text-center space-y-1">
-                  <div className={`p-1 rounded-full ${
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "agriculture"
+                ? isDarkMode 
+                  ? 'bg-green-900/80 border-green-600' 
+                  : 'bg-green-50 border-green-300'
+                : isDarkMode 
+                  ? 'bg-gray-800/80 border-gray-700 hover:bg-green-900/20' 
+                  : 'bg-white border-gray-200 hover:bg-green-50'
+            }`}
+            onClick={() => {
+              setActiveTab("agriculture");
+              setActiveMunicipality("all");
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${
+                  activeTab === "agriculture" 
+                    ? 'bg-green-600 text-white' 
+                    : isDarkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-600'
+                }`}>
+                  <Target className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
                     activeTab === "agriculture" 
-                      ? "bg-white/20" 
-                      : isDarkMode ? "bg-green-900/40" : "bg-green-100/80"
-                  }`}>
-                    <TrendingUp className={`h-3 w-3 ${
-                      activeTab === "agriculture" ? "text-white" : isDarkMode ? "text-green-400" : "text-green-600"
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-xs">Agriculture</h3>
-                    <p className="text-xs opacity-80">Bantay Dagat</p>
-                  </div>
+                      ? 'text-green-600 dark:text-green-400' 
+                      : isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>Agriculture</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    activeTab === "agriculture" 
+                      ? 'text-green-500 dark:text-green-300' 
+                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>Bantay Dagat</p>
                 </div>
-              </button>
-              
-              <button
-                onClick={() => {
-                  setActiveTab("pgenro");
-                  setActiveMunicipality("all");
-                }}
-                className={`relative group p-2 rounded-lg transition-all duration-300 ${
-                  activeTab === "pgenro"
-                    ? "bg-purple-500 text-white shadow-lg"
-                    : isDarkMode 
-                      ? "bg-gray-700 hover:bg-purple-900/20 text-gray-300"
-                      : "bg-white hover:bg-purple-50 text-gray-700"
-                }`}
-              >
-                <div className="flex flex-col items-center text-center space-y-1">
-                  <div className={`p-1 rounded-full ${
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "pgenro"
+                ? isDarkMode 
+                  ? 'bg-purple-900/80 border-purple-600' 
+                  : 'bg-purple-50 border-purple-300'
+                : isDarkMode 
+                  ? 'bg-gray-800/80 border-gray-700 hover:bg-purple-900/20' 
+                  : 'bg-white border-gray-200 hover:bg-purple-50'
+            }`}
+            onClick={() => {
+              setActiveTab("pgenro");
+              setActiveMunicipality("all");
+            }}
+          >
+            <CardContent className="p-6">
+              <div className="flex items-center gap-4">
+                <div className={`p-3 rounded-lg ${
+                  activeTab === "pgenro" 
+                    ? 'bg-purple-600 text-white' 
+                    : isDarkMode ? 'bg-purple-900/40 text-purple-400' : 'bg-purple-100 text-purple-600'
+                }`}>
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
                     activeTab === "pgenro" 
-                      ? "bg-white/20" 
-                      : isDarkMode ? "bg-purple-900/40" : "bg-purple-100/80"
-                  }`}>
-                    <AlertCircle className={`h-3 w-3 ${
-                      activeTab === "pgenro" ? "text-white" : isDarkMode ? "text-purple-400" : "text-purple-600"
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-xs">PG-Enro</h3>
-                    <p className="text-xs opacity-80">Environment</p>
-                  </div>
+                      ? 'text-purple-600 dark:text-purple-400' 
+                      : isDarkMode ? 'text-white' : 'text-gray-900'
+                  }`}>PG-Enro</h3>
+                  <p className={`text-sm transition-colors duration-300 ${
+                    activeTab === "pgenro" 
+                      ? 'text-purple-500 dark:text-purple-300' 
+                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                  }`}>Environment</p>
                 </div>
-              </button>
-            </div>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
 
@@ -1208,12 +1333,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
           {/* Summary Cards */}
           <div className="flex-shrink-0 mb-3">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* PNP Tab - Drug Related Stats */}
               {activeTab === "pnp" && (
                 <>
                   {/* Total Card */}
-                  <div className="bg-gray-600 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-gray-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-100 text-xs font-medium">Total</p>
@@ -1227,7 +1352,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   {/* Actions Card */}
-                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
@@ -1241,7 +1366,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   {/* Drugs Card */}
-                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-red-100 text-xs font-medium">Drugs</p>
@@ -1255,7 +1380,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   {/* Illegals Total Card */}
-                  <div className="bg-fuchsia-500 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-fuchsia-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-fuchsia-100 text-xs font-medium mb-1">Illegals</p>
@@ -1280,7 +1405,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               {activeTab === "agriculture" && (
                 <>
                   {/* Total Entries Card */}
-                  <div className="bg-green-600 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-green-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-green-100 text-xs font-medium">Total Entries</p>
@@ -1294,7 +1419,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   {/* Illegals Card */}
-                  <div className="bg-red-500 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-red-100 text-xs font-medium mb-1">Illegals</p>
@@ -1314,7 +1439,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   {/* Action Taken Card */}
-                  <div className="bg-blue-500 rounded-lg p-3 text-white shadow-lg">
+                  <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
@@ -1474,9 +1599,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               isDarkMode ? 'text-gray-300' : 'text-gray-700'
                             }`}>Source</th>
                           )}
-                          <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>Other Information</th>
+                                                     {/* Other Information column hidden */}
+                           {/* <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
+                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                           }`}>Other Information</th> */}
                           <th className={`text-left p-4 font-semibold w-24 transition-colors duration-300 ${
                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>Actions</th>
@@ -1767,13 +1893,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   </span>
                                 </td>
                               )}
-                              <td className="p-4">
-                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`} title={item.otherInfo}>
-                                  {item.otherInfo}
-                                </span>
-                              </td>
+                                                             {/* Other Information column data hidden */}
+                               {/* <td className="p-4">
+                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
+                                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
+                                 }`} title={item.otherInfo}>
+                                   {item.otherInfo}
+                                 </span>
+                               </td> */}
                               <td className="p-4">
                                 <div className="flex items-center gap-2">
                                   <Button
@@ -1890,6 +2017,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
+                {/* Municipality - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1913,6 +2041,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
+                {/* District - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1936,6 +2065,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </select>
                 </div>
                 
+                {/* What - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1956,6 +2086,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
+                {/* When - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1976,6 +2107,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
+                {/* Where - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -1996,8 +2128,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
-                {/* Hidden: Who */}
-                {false && (
+                {/* Who - Only visible for PNP */}
+                {newActionReport.department === "pnp" && (
                   <div className="space-y-2">
                     <label className={`text-sm font-semibold ${
                       isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -2019,29 +2151,32 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Gender
-                  </label>
-                  <select
-                    value={newActionReport.gender}
-                    onChange={(e) => handleInputChange('gender', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  >
-                    <option value="">Select Gender</option>
-                    <option value="male">Male</option>
-                    <option value="female">Female</option>
-                  </select>
-                </div>
+                {/* Gender - Only visible for PNP */}
+                {newActionReport.department === "pnp" && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Gender
+                    </label>
+                    <select
+                      value={newActionReport.gender}
+                      onChange={(e) => handleInputChange('gender', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    >
+                      <option value="">Select Gender</option>
+                      <option value="male">Male</option>
+                      <option value="female">Female</option>
+                    </select>
+                  </div>
+                )}
                 
-                {/* Hidden: Why */}
-                {false && (
+                {/* Why - Only visible for PNP */}
+                {newActionReport.department === "pnp" && (
                   <div className="space-y-2">
                     <label className={`text-sm font-semibold ${
                       isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -2062,8 +2197,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 )}
                 
-                {/* Hidden: How */}
-                {false && (
+                {/* How - Only visible for PNP */}
+                {newActionReport.department === "pnp" && (
                   <div className="space-y-2">
                     <label className={`text-sm font-semibold ${
                       isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -2084,6 +2219,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 )}
                 
+                {/* Action Taken - Always visible */}
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -2104,25 +2240,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 
-                <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Source
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
-                    value={newActionReport.source}
-                    onChange={(e) => handleInputChange('source', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
-                  />
-                </div>
+                {/* Source - Only visible for PNP */}
+                {newActionReport.department === "pnp" && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Source
+                    </label>
+                    <Input
+                      type="text"
+                      placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
+                      value={newActionReport.source}
+                      onChange={(e) => handleInputChange('source', e.target.value)}
+                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                        isDarkMode 
+                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                      }`}
+                    />
+                  </div>
+                )}
 
+                {/* Other Information - Always visible */}
                 <div className="space-y-2 md:col-span-2">
                   <label className={`text-sm font-semibold ${
                     isDarkMode ? 'text-gray-200' : 'text-gray-700'
@@ -2142,6 +2282,135 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
 
+                {/* Photo Upload Section */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Photos <span className="text-xs text-gray-500">(Optional - Max 5MB per image)</span>
+                  </label>
+                  <div className="space-y-3">
+                    {/* Photo Upload Input */}
+                    <div className={`p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 hover:border-blue-500 bg-gray-800/50' 
+                        : 'border-gray-300 hover:border-blue-500 bg-gray-50'
+                    }`}>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handlePhotoUpload(e, setNewActionReport)}
+                        className="hidden"
+                        id="photo-upload"
+                      />
+                      <label 
+                        htmlFor="photo-upload"
+                        className="flex flex-col items-center justify-center cursor-pointer"
+                      >
+                        <Camera className={`h-8 w-8 mb-2 ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`} />
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          Click to upload photos or drag and drop
+                        </span>
+                        <span className={`text-xs ${
+                          isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                        }`}>
+                          PNG, JPG, GIF up to 5MB
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Photo Preview Grid */}
+                    {newActionReport.photos && newActionReport.photos.length > 0 && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                        {newActionReport.photos.map((photo) => (
+                          <div key={photo.id} className="relative group">
+                            <img
+                              src={photo.preview}
+                              alt={photo.fileName || photo.name}
+                              className="w-full h-24 object-cover rounded-lg border"
+                            />
+                            <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
+                              <Button
+                                onClick={() => handlePhotoRemove(photo.id, setNewActionReport)}
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+                            <div className="absolute bottom-1 left-1 right-1">
+                              <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
+                                {photo.fileName || photo.name}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Status & Priority Section */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Status & Priority
+                  </label>
+                  <div className="space-y-3">
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <label className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        Status
+                      </label>
+                      <select
+                        value={newActionReport.status || 'pending'}
+                        onChange={(e) => handleInputChange('status', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+                    
+                    {/* Priority */}
+                    <div className="space-y-2">
+                      <label className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        Priority
+                      </label>
+                      <select
+                        value={newActionReport.priority || 'medium'}
+                        onChange={(e) => handleInputChange('priority', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
               </div>
               
@@ -2484,6 +2753,175 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
 
+                {/* Status & Priority Section */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Status & Priority
+                  </label>
+                  <div className="space-y-3">
+                    {/* Status */}
+                    <div className="space-y-2">
+                      <label className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        Status
+                      </label>
+                      <select
+                        value={editingItem.status || 'pending'}
+                        onChange={(e) => handleEditInputChange('status', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in-progress">In Progress</option>
+                        <option value="resolved">Resolved</option>
+                        <option value="closed">Closed</option>
+                      </select>
+                    </div>
+                    
+                    {/* Priority */}
+                    <div className="space-y-2">
+                      <label className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>
+                        Priority
+                      </label>
+                      <select
+                        value={editingItem.priority || 'medium'}
+                        onChange={(e) => handleEditInputChange('priority', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                        <option value="urgent">Urgent</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photo Upload Section */}
+                <div className="space-y-2 md:col-span-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    Photos <span className="text-xs text-gray-500">(Optional - Max 5MB per image)</span>
+                  </label>
+                  <div className="space-y-3">
+                    {/* Photo Upload Input */}
+                    <div className={`p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 hover:border-blue-500 bg-gray-800/50' 
+                        : 'border-gray-300 hover:border-blue-500 bg-gray-50'
+                    }`}>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        onChange={(e) => handlePhotoUpload(e, setEditingItem)}
+                        className="hidden"
+                        id="edit-photo-upload"
+                      />
+                      <label 
+                        htmlFor="edit-photo-upload"
+                        className="flex flex-col items-center justify-center cursor-pointer"
+                      >
+                        <Camera className={`h-8 w-8 mb-2 ${
+                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
+                        }`} />
+                        <span className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>
+                          Click to upload photos or drag and drop
+                        </span>
+                        <span className={`text-xs ${
+                          isDarkMode ? 'text-gray-500' : 'text-gray-400'
+                        }`}>
+                          PNG, JPG, GIF up to 5MB
+                        </span>
+                      </label>
+                    </div>
+
+                    {/* Existing Photos Display */}
+                    {editingItem.photos && editingItem.photos.length > 0 && (
+                      <div className="space-y-3">
+                        <h5 className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>Existing Photos ({editingItem.photos.length})</h5>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {editingItem.photos.map((photo, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={photo.preview || photo.url || photo}
+                                alt={`Photo ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
+                                <Button
+                                  onClick={() => handlePhotoRemove(index, setEditingItem)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <div className="absolute bottom-1 left-1 right-1">
+                                <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
+                                  {photo.preview ? 'New Upload' : 'Existing Photo'}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* New Photo Preview Grid */}
+                    {editingItem.photos && editingItem.photos.some(p => p.preview) && (
+                      <div className="space-y-3">
+                        <h5 className={`text-sm font-medium ${
+                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
+                        }`}>New Photos to Add</h5>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                          {editingItem.photos.filter(p => p.preview).map((photo) => (
+                            <div key={photo.id} className="relative group">
+                              <img
+                                src={photo.preview}
+                                alt={photo.fileName || photo.name}
+                                className="w-full h-24 object-cover rounded-lg border"
+                              />
+                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
+                                <Button
+                                  onClick={() => handlePhotoRemove(photo.id, setEditingItem)}
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 bg-red-600 hover:bg-red-700 text-white"
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                              <div className="absolute bottom-1 left-1 right-1">
+                                <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
+                                  {photo.fileName || photo.name}
+                                </p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
 
               </div>
               
@@ -2595,76 +3033,40 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
 
-                {/* Status Information */}
-                <div className="space-y-4">
-                  <div className={`p-4 rounded-lg border ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <h4 className={`font-semibold mb-3 ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>Status & Priority</h4>
-                    <div className="space-y-3">
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Action Taken:</span>
-                        <div className="mt-1">
-                          <Badge className={`${
-                            viewingItem.actionTaken === "Resolved" 
-                              ? isDarkMode 
-                                ? "bg-green-900/30 text-green-400" 
-                                : "bg-green-100 text-green-800"
-                              : isDarkMode 
-                                ? "bg-orange-900/30 text-orange-400" 
-                                : "bg-orange-100 text-orange-800"
-                          }`}>
-                            {viewingItem.actionTaken}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Status:</span>
-                        <div className="mt-1">
-                          <Badge className={`${
-                            viewingItem.status === "resolved" 
-                              ? isDarkMode 
-                                ? "bg-green-900/30 text-green-400" 
-                                : "bg-green-100 text-green-800"
-                              : isDarkMode 
-                                ? "bg-orange-900/30 text-orange-400" 
-                                : "bg-orange-100 text-orange-800"
-                          }`}>
-                            {viewingItem.status || 'pending'}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Priority:</span>
-                        <div className="mt-1">
-                          <Badge className={`${
-                            viewingItem.priority === "high" 
-                              ? isDarkMode 
-                                ? "bg-red-900/30 text-red-400" 
-                                : "bg-red-100 text-red-800"
-                              : viewingItem.priority === "medium"
-                              ? isDarkMode 
-                                ? "bg-yellow-900/30 text-yellow-400" 
-                                : "bg-yellow-100 text-yellow-800"
-                              : isDarkMode 
-                                ? "bg-green-900/30 text-green-400" 
-                                : "bg-green-100 text-green-800"
-                          }`}>
-                            {viewingItem.priority || 'medium'}
-                          </Badge>
-                        </div>
+                {/* Photos Section */}
+                {viewingItem.photos && viewingItem.photos.length > 0 && (
+                  <div className="space-y-4">
+                    <div className={`p-4 rounded-lg border ${
+                      isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                    }`}>
+                      <h4 className={`font-semibold mb-3 ${
+                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>Photos ({viewingItem.photos.length})</h4>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        {viewingItem.photos.map((photo, index) => (
+                          <div key={index} className="relative group">
+                            <img
+                              src={photo.preview || photo.url || photo}
+                              alt={`Photo ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200"
+                              onClick={() => {
+                                // Open photo in full screen or modal
+                                window.open(photo.preview || photo.url || photo, '_blank');
+                              }}
+                            />
+                            <div className="absolute top-2 right-2">
+                              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
+                              }`}>
+                                {index + 1}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Detailed Information */}
@@ -2752,6 +3154,108 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     }`}>{viewingItem.otherInfo}</p>
                   </div>
                 )}
+
+                {/* Status & Priority Section */}
+                <div className={`p-4 rounded-lg border md:col-span-2 ${
+                  isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                }`}>
+                  <h4 className={`font-semibold mb-3 ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                  }`}>Status & Priority</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <span className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Action Taken:</span>
+                      <div className="mt-1">
+                        <Badge className={`${
+                          viewingItem.actionTaken === "Resolved" 
+                            ? isDarkMode 
+                              ? "bg-green-900/30 text-green-400" 
+                              : "bg-green-100 text-green-800"
+                            : isDarkMode 
+                              ? "bg-orange-900/30 text-orange-400" 
+                              : "bg-orange-100 text-orange-800"
+                        }`}>
+                          {viewingItem.actionTaken}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Status:</span>
+                      <div className="mt-1">
+                        <Badge className={`${
+                          viewingItem.status === "resolved" 
+                            ? isDarkMode 
+                              ? "bg-green-900/30 text-green-400" 
+                              : "bg-green-100 text-green-800"
+                            : isDarkMode 
+                              ? "bg-orange-900/30 text-orange-400" 
+                              : "bg-orange-100 text-orange-800"
+                        }`}>
+                          {viewingItem.status || 'pending'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <span className={`text-sm font-medium ${
+                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                      }`}>Priority:</span>
+                      <div className="mt-1">
+                        <Badge className={`${
+                          viewingItem.priority === "high" 
+                            ? isDarkMode 
+                              ? "bg-red-900/30 text-red-400" 
+                              : "bg-red-100 text-red-800"
+                            : viewingItem.priority === "medium"
+                            ? isDarkMode 
+                              ? "bg-yellow-900/30 text-yellow-400" 
+                              : "bg-yellow-100 text-yellow-800"
+                            : isDarkMode 
+                              ? "bg-green-900/30 text-green-400" 
+                              : "bg-green-100 text-green-800"
+                        }`}>
+                          {viewingItem.priority || 'medium'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Photos Section */}
+                {viewingItem.photos && viewingItem.photos.length > 0 && (
+                  <div className={`p-4 rounded-lg border md:col-span-2 ${
+                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                  }`}>
+                    <h4 className={`font-semibold mb-3 ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                    }`}>Photos ({viewingItem.photos.length})</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                      {viewingItem.photos.map((photo, index) => (
+                        <div key={index} className="relative group">
+                          <img
+                            src={photo.preview || photo.url || photo}
+                            alt={`Photo ${index + 1}`}
+                            className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200"
+                            onClick={() => {
+                              // Open photo in full screen or modal
+                              window.open(photo.preview || photo.url || photo, '_blank');
+                            }}
+                          />
+                          <div className="absolute top-2 right-2">
+                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
+                            }`}>
+                              {index + 1}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div className="flex gap-3 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
@@ -2811,7 +3315,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-      </div>
+      </section>
     </Layout>
   );
 } 

@@ -326,6 +326,11 @@ export const useFirebase = () => {
   // Action Reports functions
   const saveActionReport = useCallback(async (actionReport) => {
     try {
+      // Check if Firestore is available
+      if (!db) {
+        throw new Error('Firestore database is not available');
+      }
+      
       const docRef = doc(db, 'actionReports', actionReport.id);
       await setDoc(docRef, {
         ...actionReport,
@@ -335,12 +340,18 @@ export const useFirebase = () => {
       });
       return { success: true };
     } catch (error) {
+      console.error('❌ Error saving action report:', error);
       return { success: false, error: error.message };
     }
   }, [user]);
 
   const getActionReports = useCallback(async () => {
     try {
+      // Check if Firestore is available
+      if (!db) {
+        throw new Error('Firestore database is not available');
+      }
+      
       const q = query(collection(db, 'actionReports'));
       const querySnapshot = await getDocs(q);
       const reports = [];
@@ -357,6 +368,7 @@ export const useFirebase = () => {
       
       return { success: true, data: reports };
     } catch (error) {
+      console.error('❌ Error getting action reports:', error);
       return { success: false, error: error.message };
     }
   }, []);
