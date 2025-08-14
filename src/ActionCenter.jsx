@@ -847,31 +847,36 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       }
 
       // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = newActionReport.photos?.map(photo => ({
-        id: photo.id,
-        fileName: photo.fileName,
-        fileSize: photo.fileSize,
-        fileType: photo.fileType,
-        lastModified: photo.lastModified,
-        // Store the base64 image data in Firestore
-        imageData: photo.imageData,
-        uploadDate: photo.uploadDate
-      })) || [];
+      const cleanPhotos = newActionReport.photos ? newActionReport.photos
+        .filter(photo => photo && photo.id) // Remove any null/undefined photos
+        .map(photo => ({
+          id: photo.id,
+          fileName: photo.fileName || 'Unknown Photo', // Ensure fileName is never undefined
+          fileSize: photo.fileSize || 0, // Ensure fileSize is never undefined
+          fileType: photo.fileType || 'image/*', // Ensure fileType is never undefined
+          lastModified: photo.lastModified || Date.now(), // Ensure lastModified is never undefined
+          // Store the base64 image data in Firestore
+          imageData: photo.imageData || null, // Ensure imageData is never undefined
+          uploadDate: photo.uploadDate || new Date().toISOString() // Ensure uploadDate is never undefined
+        }))
+        .filter(photo => photo.imageData) // Only keep photos with actual image data
+        : [];
 
-      const newReport = {
-        id: `action-${Date.now()}`,
+      const reportToSave = {
         ...newActionReport,
-        photos: cleanPhotos, // Use cleaned photos
-        status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
-        priority: "medium",
-        patrolCount: 0,
-        incidentCount: 0,
-        icon: "AlertCircle"
+        photos: cleanPhotos,
+        timestamp: Date.now(),
+        id: `action-${Date.now()}`
       };
 
-      const result = await saveActionReport(newReport);
+      // Remove any undefined values from the entire report
+      const cleanReport = Object.fromEntries(
+        Object.entries(reportToSave).filter(([_, value]) => value !== undefined)
+      );
+
+      const result = await saveActionReport(cleanReport);
       if (result.success) {
-        setActionItems(prevItems => [...prevItems, newReport]);
+        setActionItems(prevItems => [...prevItems, reportToSave]);
         // Keep the add modal open to allow adding multiple reports
         setNewActionReport({
           department: "",
@@ -922,16 +927,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const handleEditActionReport = async () => {
     try {
       // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = editingItem.photos ? editingItem.photos.map(photo => ({
-        id: photo.id,
-        fileName: photo.fileName || photo.name, // Handle both new and existing photos
-        fileSize: photo.fileSize,
-        fileType: photo.fileType,
-        lastModified: photo.lastModified,
-        // Store the base64 image data in Firestore
-        imageData: photo.imageData,
-        uploadDate: photo.uploadDate || new Date().toISOString()
-      })) : [];
+      const cleanPhotos = editingItem.photos ? editingItem.photos
+        .filter(photo => photo && photo.id) // Remove any null/undefined photos
+        .map(photo => ({
+          id: photo.id,
+          fileName: photo.fileName || photo.name || 'Unknown Photo', // Ensure fileName is never undefined
+          fileSize: photo.fileSize || 0, // Ensure fileSize is never undefined
+          fileType: photo.fileType || 'image/*', // Ensure fileType is never undefined
+          lastModified: photo.lastModified || Date.now(), // Ensure lastModified is never undefined
+          // Store the base64 image data in Firestore
+          imageData: photo.imageData || null, // Ensure imageData is never undefined
+          uploadDate: photo.uploadDate || new Date().toISOString() // Ensure uploadDate is never undefined
+        }))
+        .filter(photo => photo.imageData || photo.url) // Only keep photos with actual image data or legacy URLs
+        : [];
 
       const updatedReport = {
         ...editingItem,
@@ -939,11 +948,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         status: editingItem.actionTaken === "resolved" ? "resolved" : "pending"
       };
 
-      const result = await updateActionReport(editingItem.id, updatedReport);
+      // Remove any undefined values from the entire report
+      const cleanReport = Object.fromEntries(
+        Object.entries(updatedReport).filter(([_, value]) => value !== undefined)
+      );
+
+      const result = await updateActionReport(editingItem.id, cleanReport);
       if (result.success) {
         setActionItems(prevItems => 
           prevItems.map(item => 
-            item.id === editingItem.id ? updatedReport : item
+            item.id === editingItem.id ? cleanReport : item
           )
         );
         setShowEditModal(false);
@@ -1020,7 +1034,66 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
+  // Function to migrate Firebase Storage URLs to base64 data
+  const migratePhotoToBase64 = async (photo) => {
+    // If photo already has base64 data, return as is
+    if (photo.imageData) {
+      return photo;
+    }
 
+    // If photo has a Firebase Storage URL, try to convert it
+    if (photo.url && photo.url.includes('firebasestorage.googleapis.com')) {
+      try {
+        // For now, we'll create a placeholder since we can't fetch from Firebase Storage
+        // In a real migration, you would need to download the image and convert to base64
+        return {
+          ...photo,
+          imageData: null, // Will be null for old Firebase Storage URLs
+          isLegacy: true,
+          error: 'Legacy Firebase Storage URL - needs manual migration'
+        };
+      } catch (error) {
+        console.error('Error migrating photo:', error);
+        return {
+          ...photo,
+          imageData: null,
+          isLegacy: true,
+          error: 'Migration failed'
+        };
+      }
+    }
+
+    // If photo is just a string URL, treat it as legacy
+    if (typeof photo === 'string') {
+      return {
+        id: Date.now() + Math.random(),
+        fileName: 'Legacy Photo',
+        fileSize: 0,
+        fileType: 'image/*',
+        imageData: null,
+        isLegacy: true,
+        error: 'Legacy photo format - needs manual migration'
+      };
+    }
+
+    return photo;
+  };
+
+  // Function to get the best available image source
+  const getImageSource = (photo) => {
+    // Priority: base64 data > preview > legacy URL > placeholder
+    if (photo.imageData) {
+      return photo.imageData;
+    }
+    if (photo.preview) {
+      return photo.preview;
+    }
+    if (photo.url && !photo.url.includes('firebasestorage.googleapis.com')) {
+      return photo.url;
+    }
+    // Return a placeholder for legacy Firebase Storage URLs
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
+  };
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
@@ -2345,7 +2418,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         {newActionReport.photos.map((photo) => (
                           <div key={photo.id} className="relative group">
                             <img
-                              src={photo.imageData || photo.preview}
+                              src={getImageSource(photo)}
                               alt={photo.fileName || photo.name}
                               className="w-full h-24 object-cover rounded-lg border"
                             />
@@ -2768,7 +2841,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           {editingItem.photos.map((photo, index) => (
                             <div key={index} className="relative group">
                               <img
-                                src={photo.imageData || photo.preview || photo.url || photo}
+                                src={getImageSource(photo)}
                                 alt={`Photo ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg border"
                               />
@@ -2784,9 +2857,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </div>
                               <div className="absolute bottom-1 left-1 right-1">
                                 <p className="text-xs text-white bg-black/70 px-1 py-0.5 rounded truncate">
-                                  {photo.imageData ? 'Stored in Database' : photo.preview ? 'New Upload' : 'Existing Photo'}
+                                  {photo.imageData ? 'Stored in Database' : photo.isLegacy ? 'Legacy Photo' : photo.preview ? 'New Upload' : 'Existing Photo'}
                                 </p>
                               </div>
+                              {/* Show legacy photo indicator */}
+                              {photo.isLegacy && (
+                                <div className="absolute top-2 left-2">
+                                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white">
+                                    Legacy
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -2918,24 +2999,41 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className={`p-5 rounded-xl border shadow-sm ${
                       isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
                     }`}>
-                      <div className="flex items-center gap-2 mb-4">
-                        <div className={`w-2 h-2 rounded-full ${
-                          isDarkMode ? 'bg-pink-400' : 'bg-pink-600'
-                        }`}></div>
-                        <h4 className={`font-semibold text-lg ${
-                          isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                        }`}>Photos ({viewingItem.photos.length})</h4>
+                      <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            isDarkMode ? 'bg-pink-400' : 'bg-pink-600'
+                          }`}></div>
+                          <h4 className={`font-semibold text-lg ${
+                            isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                          }`}>Photos ({viewingItem.photos.length})</h4>
+                        </div>
+                        {/* Migration button for legacy photos */}
+                        {viewingItem.photos.some(photo => photo.isLegacy) && (
+                          <Button
+                            onClick={() => alert('To migrate legacy photos, please re-upload them in the edit mode. Legacy Firebase Storage URLs cannot be automatically converted due to CORS restrictions.')}
+                            variant="outline"
+                            size="sm"
+                            className="text-yellow-600 border-yellow-600 hover:bg-yellow-50"
+                          >
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Migrate Legacy Photos
+                          </Button>
+                        )}
                       </div>
                       <div className="grid grid-cols-2 gap-3">
                         {viewingItem.photos.map((photo, index) => (
                           <div key={index} className="relative group">
                             <img
-                              src={photo.imageData || photo.preview || photo.url || photo}
+                              src={getImageSource(photo)}
                               alt={`Photo ${index + 1}`}
                               className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
                               onClick={() => {
                                 // Open photo in full screen or modal
-                                window.open(photo.imageData || photo.preview || photo.url || photo, '_blank');
+                                const imageSource = getImageSource(photo);
+                                if (imageSource && !imageSource.includes('data:image/svg+xml')) {
+                                  window.open(imageSource, '_blank');
+                                }
                               }}
                             />
                             <div className="absolute top-2 right-2">
@@ -2945,6 +3043,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 {index + 1}
                               </div>
                             </div>
+                            {/* Show legacy photo indicator */}
+                            {photo.isLegacy && (
+                              <div className="absolute top-2 left-2">
+                                <div className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white">
+                                  Legacy
+                                </div>
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>
