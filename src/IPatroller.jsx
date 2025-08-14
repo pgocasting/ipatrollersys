@@ -1919,9 +1919,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       {/* Clear Data Modal */}
       {showClearModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div
-            className={`backdrop-blur-md rounded-xl p-6 w-96 max-w-md mx-4 shadow-2xl border transition-all duration-300 ${
+            className={`rounded-xl p-6 w-96 max-w-md mx-4 shadow-2xl border transition-all duration-300 ${
               isDarkMode 
                 ? "bg-gray-900/95 border-gray-700/50" 
                 : "bg-white/95 border-gray-200/50"
@@ -2021,9 +2021,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       {/* Summary Report Modal */}
       {showSummaryReport && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div
-            className={`backdrop-blur-md rounded-xl p-6 w-[800px] max-w-[90vw] mx-4 shadow-2xl border transition-all duration-300 ${
+            className={`rounded-xl p-6 w-[800px] max-w-[90vw] mx-4 shadow-2xl border transition-all duration-300 ${
               isDarkMode 
                 ? "bg-gray-900/95 border-gray-700/50" 
                 : "bg-white/95 border-gray-200/50"
@@ -2217,9 +2217,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       {/* Photo Modal */}
       {showPhotoModal && selectedItemForPhotos && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div
-            className={`backdrop-blur-md rounded-xl p-6 w-full max-w-2xl mx-4 shadow-2xl border transition-all duration-300 ${
+            className={`rounded-xl p-6 w-full max-w-2xl mx-4 shadow-2xl border transition-all duration-300 ${
               isDarkMode 
                 ? "bg-gray-900/95 border-gray-700/50" 
                 : "bg-white/95 border-gray-200/50"
@@ -2450,9 +2450,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       {/* View Report Modal - Shows Photos */}
       {showViewReportModal && selectedItemForView && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
           <div
-            className={`backdrop-blur-md rounded-xl p-6 w-full max-w-4xl mx-4 shadow-2xl border transition-all duration-300 ${
+            className={`rounded-xl p-6 w-full max-w-4xl mx-4 shadow-2xl border transition-all duration-300 ${
               isDarkMode 
                 ? "bg-gray-900/95 border-gray-700/50" 
                 : "bg-white/95 border-gray-200/50"

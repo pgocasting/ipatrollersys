@@ -1959,14 +1959,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
-        {/* Add Action Report Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
-              isDarkMode 
-                ? 'bg-gray-900/90 text-white border-gray-700' 
-                : 'bg-white/90 text-gray-900 border-gray-200'
-            }`}>
+                                     {/* Add Action Report Modal */}
+           {showAddModal && (
+             <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+               <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+                 isDarkMode 
+                   ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-900/50' 
+                   : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
+               }`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-3 rounded-xl ${
@@ -2356,61 +2356,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
 
-                {/* Status & Priority Section */}
-                <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Status & Priority
-                  </label>
-                  <div className="space-y-3">
-                    {/* Status */}
-                    <div className="space-y-2">
-                      <label className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>
-                        Status
-                      </label>
-                      <select
-                        value={newActionReport.status || 'pending'}
-                        onChange={(e) => handleInputChange('status', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
-                    </div>
-                    
-                    {/* Priority */}
-                    <div className="space-y-2">
-                      <label className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>
-                        Priority
-                      </label>
-                      <select
-                        value={newActionReport.priority || 'medium'}
-                        onChange={(e) => handleInputChange('priority', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+
 
               </div>
               
@@ -2442,14 +2388,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         )}
 
-        {/* Edit Action Report Modal */}
-        {showEditModal && editingItem && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
-              isDarkMode 
-                ? 'bg-gray-900/90 text-white border-gray-700' 
-                : 'bg-white/90 text-gray-900 border-gray-200'
-            }`}>
+                                     {/* Edit Action Report Modal */}
+           {showEditModal && editingItem && (
+             <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+               <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
+                 isDarkMode 
+                   ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-700' 
+                   : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
+               }`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className={`p-3 rounded-xl ${
@@ -2753,61 +2699,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
 
-                {/* Status & Priority Section */}
-                <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
-                    Status & Priority
-                  </label>
-                  <div className="space-y-3">
-                    {/* Status */}
-                    <div className="space-y-2">
-                      <label className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>
-                        Status
-                      </label>
-                      <select
-                        value={editingItem.status || 'pending'}
-                        onChange={(e) => handleEditInputChange('status', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="in-progress">In Progress</option>
-                        <option value="resolved">Resolved</option>
-                        <option value="closed">Closed</option>
-                      </select>
-                    </div>
-                    
-                    {/* Priority */}
-                    <div className="space-y-2">
-                      <label className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>
-                        Priority
-                      </label>
-                      <select
-                        value={editingItem.priority || 'medium'}
-                        onChange={(e) => handleEditInputChange('priority', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
-                      >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
+
 
                 {/* Photo Upload Section */}
                 <div className="space-y-2 md:col-span-2">
@@ -2955,11 +2847,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* View Details Modal */}
         {showViewModal && viewingItem && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border backdrop-blur-sm ${
+          <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border ${
               isDarkMode 
-                ? 'bg-gray-900/90 text-white border-gray-700' 
-                : 'bg-white/90 text-gray-900 border-gray-200'
+                ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-900/50' 
+                : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
             }`}>
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
@@ -2971,10 +2863,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     }`} />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">Action Report Details</h3>
+                    <h3 className="text-2xl font-bold">Action Report Details</h3>
                     <p className={`text-sm ${
                       isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>View complete action report information</p>
+                    }`}>Complete incident and action information</p>
                   </div>
                 </div>
                 <Button
@@ -2987,68 +2879,80 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                {/* Basic Information */}
-                <div className="space-y-4">
-                  <div className={`p-4 rounded-lg border ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+              {/* Main Content Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                {/* Left Column - Basic Info & Photos */}
+                <div className="lg:col-span-1 space-y-4">
+                  {/* Basic Information Card */}
+                  <div className={`p-5 rounded-xl border shadow-sm ${
+                    isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
                   }`}>
-                    <h4 className={`font-semibold mb-3 ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>Basic Information</h4>
-                    <div className="space-y-3">
-                      <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className={`w-2 h-2 rounded-full ${
+                        isDarkMode ? 'bg-blue-400' : 'bg-blue-600'
+                      }`}></div>
+                      <h4 className={`font-semibold text-lg ${
+                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>Basic Information</h4>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className={`text-sm font-medium ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Department:</span>
-                        <p className={`text-sm ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.department?.toUpperCase() || 'N/A'}</p>
+                        }`}>Department</span>
+                        <Badge className={`${
+                          isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'
+                        }`}>
+                          {viewingItem.department?.toUpperCase() || 'N/A'}
+                        </Badge>
                       </div>
-                      <div>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className={`text-sm font-medium ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Municipality:</span>
-                        <p className={`text-sm ${
+                        }`}>Municipality</span>
+                        <span className={`text-sm font-semibold ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.municipality}</p>
+                        }`}>{viewingItem.municipality}</span>
                       </div>
-                      <div>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
                         <span className={`text-sm font-medium ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>District:</span>
-                        <p className={`text-sm ${
+                        }`}>District</span>
+                        <span className={`text-sm font-semibold ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.district}</p>
+                        }`}>{viewingItem.district}</span>
                       </div>
-                      <div>
+                      <div className="flex justify-between items-center py-2">
                         <span className={`text-sm font-medium ${
                           isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Date & Time:</span>
-                        <p className={`text-sm ${
+                        }`}>Date & Time</span>
+                        <span className={`text-sm font-semibold ${
                           isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{formatDate(viewingItem.when)}</p>
+                        }`}>{formatDate(viewingItem.when)}</span>
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Photos Section */}
-                {viewingItem.photos && viewingItem.photos.length > 0 && (
-                  <div className="space-y-4">
-                    <div className={`p-4 rounded-lg border ${
-                      isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                  {/* Photos Section */}
+                  {viewingItem.photos && viewingItem.photos.length > 0 && (
+                    <div className={`p-5 rounded-xl border shadow-sm ${
+                      isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
                     }`}>
-                      <h4 className={`font-semibold mb-3 ${
-                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                      }`}>Photos ({viewingItem.photos.length})</h4>
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className={`w-2 h-2 rounded-full ${
+                          isDarkMode ? 'bg-pink-400' : 'bg-pink-600'
+                        }`}></div>
+                        <h4 className={`font-semibold text-lg ${
+                          isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                        }`}>Photos ({viewingItem.photos.length})</h4>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
                         {viewingItem.photos.map((photo, index) => (
                           <div key={index} className="relative group">
                             <img
                               src={photo.preview || photo.url || photo}
                               alt={`Photo ${index + 1}`}
-                              className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200"
+                              className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
                               onClick={() => {
                                 // Open photo in full screen or modal
                                 window.open(photo.preview || photo.url || photo, '_blank');
@@ -3065,198 +2969,101 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         ))}
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Detailed Information */}
-              <div className="space-y-6">
-                <div className={`p-4 rounded-lg border ${
-                  isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <h4 className={`font-semibold mb-4 ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                  }`}>Incident Details</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>What Happened:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.what}</p>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Location:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.where}</p>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Personnel Involved:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.who}</p>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Gender:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.gender ? viewingItem.gender.charAt(0).toUpperCase() + viewingItem.gender.slice(1) : 'N/A'}</p>
-                      </div>
-                    </div>
-                    <div className="space-y-4">
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Reason:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.why || 'N/A'}</p>
-                      </div>
-                      <div>
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Method:</span>
-                        <p className={`text-sm mt-1 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.how || 'N/A'}</p>
-                      </div>
-                    <div>
-                      <span className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Source:</span>
-                      <p className={`text-sm mt-1 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>{viewingItem.source || 'N/A'}</p>
-                    </div>
-                    </div>
-                  </div>
+                  )}
                 </div>
 
-                {/* Additional Information */}
-                {viewingItem.otherInfo && (
-                  <div className={`p-4 rounded-lg border ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
+                {/* Right Column - Incident Details */}
+                <div className="lg:col-span-2 space-y-4">
+                  {/* Incident Details Card */}
+                  <div className={`p-5 rounded-xl border shadow-sm ${
+                    isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
                   }`}>
-                    <h4 className={`font-semibold mb-3 ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>Additional Information</h4>
-                    <p className={`text-sm ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>{viewingItem.otherInfo}</p>
-                  </div>
-                )}
-
-                {/* Status & Priority Section */}
-                <div className={`p-4 rounded-lg border md:col-span-2 ${
-                  isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-                }`}>
-                  <h4 className={`font-semibold mb-3 ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                  }`}>Status & Priority</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <span className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Action Taken:</span>
-                      <div className="mt-1">
-                        <Badge className={`${
-                          viewingItem.actionTaken === "Resolved" 
-                            ? isDarkMode 
-                              ? "bg-green-900/30 text-green-400" 
-                              : "bg-green-100 text-green-800"
-                            : isDarkMode 
-                              ? "bg-orange-900/30 text-orange-400" 
-                              : "bg-orange-100 text-orange-800"
-                        }`}>
-                          {viewingItem.actionTaken}
-                        </Badge>
-                      </div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <div className={`w-2 h-2 rounded-full ${
+                        isDarkMode ? 'bg-purple-400' : 'bg-purple-600'
+                      }`}></div>
+                      <h4 className={`font-semibold text-lg ${
+                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                      }`}>Incident Details</h4>
                     </div>
-                    <div>
-                      <span className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Status:</span>
-                      <div className="mt-1">
-                        <Badge className={`${
-                          viewingItem.status === "resolved" 
-                            ? isDarkMode 
-                              ? "bg-green-900/30 text-green-400" 
-                              : "bg-green-100 text-green-800"
-                            : isDarkMode 
-                              ? "bg-orange-900/30 text-orange-400" 
-                              : "bg-orange-100 text-orange-800"
-                        }`}>
-                          {viewingItem.status || 'pending'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div>
-                      <span className={`text-sm font-medium ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Priority:</span>
-                      <div className="mt-1">
-                        <Badge className={`${
-                          viewingItem.priority === "high" 
-                            ? isDarkMode 
-                              ? "bg-red-900/30 text-red-400" 
-                              : "bg-red-100 text-red-800"
-                            : viewingItem.priority === "medium"
-                            ? isDarkMode 
-                              ? "bg-yellow-900/30 text-yellow-400" 
-                              : "bg-yellow-100 text-yellow-800"
-                            : isDarkMode 
-                              ? "bg-green-900/30 text-green-400" 
-                              : "bg-green-100 text-green-800"
-                        }`}>
-                          {viewingItem.priority || 'medium'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Photos Section */}
-                {viewingItem.photos && viewingItem.photos.length > 0 && (
-                  <div className={`p-4 rounded-lg border md:col-span-2 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-200'
-                  }`}>
-                    <h4 className={`font-semibold mb-3 ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>Photos ({viewingItem.photos.length})</h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                      {viewingItem.photos.map((photo, index) => (
-                        <div key={index} className="relative group">
-                          <img
-                            src={photo.preview || photo.url || photo}
-                            alt={`Photo ${index + 1}`}
-                            className="w-full h-32 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200"
-                            onClick={() => {
-                              // Open photo in full screen or modal
-                              window.open(photo.preview || photo.url || photo, '_blank');
-                            }}
-                          />
-                          <div className="absolute top-2 right-2">
-                            <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
-                            }`}>
-                              {index + 1}
-                            </div>
-                          </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>What Happened</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.what}</p>
                         </div>
-                      ))}
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Location</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.where}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Personnel Involved</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.who || 'N/A'}</p>
+                        </div>
+                      </div>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Gender</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.gender ? viewingItem.gender.charAt(0).toUpperCase() + viewingItem.gender.slice(1) : 'N/A'}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Reason</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.why || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-2">
+                          <span className={`text-sm font-medium ${
+                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                          }`}>Source</span>
+                          <p className={`text-sm p-3 rounded-lg ${
+                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                          }`}>{viewingItem.source || 'N/A'}</p>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                )}
+
+                  {/* Additional Information Card */}
+                  {viewingItem.otherInfo && (
+                    <div className={`p-5 rounded-xl border shadow-sm ${
+                      isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className={`w-2 h-2 rounded-full ${
+                          isDarkMode ? 'bg-orange-400' : 'bg-orange-600'
+                        }`}></div>
+                        <h4 className={`font-semibold text-lg ${
+                          isDarkMode ? 'text-gray-200' : 'text-gray-800'
+                        }`}>Additional Information</h4>
+                      </div>
+                      <p className={`text-sm p-4 rounded-lg ${
+                        isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                      }`}>{viewingItem.otherInfo}</p>
+                    </div>
+                  )}
+                </div>
               </div>
+
+
               
               <div className="flex gap-3 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
                 <Button 
@@ -3291,8 +3098,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full backdrop-blur-sm border ${
+          <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
+            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full border ${
               isDarkMode ? 'bg-gray-800/90 text-white border-gray-700' : 'bg-white/90 text-gray-900 border-gray-200'
             }`}>
               <div className="flex items-center gap-3 mb-3 sm:mb-4">

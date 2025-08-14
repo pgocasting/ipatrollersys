@@ -1142,7 +1142,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
 
        {/* Add User Modal */}
        {showAddUserModal && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
            <div className={`w-full max-w-md p-6 rounded-lg shadow-xl ${
              isDarkMode ? 'bg-gray-800' : 'bg-white'
            }`}>
@@ -1311,7 +1311,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
 
          {/* Delete User Confirmation Modal */}
          {showDeleteUserModal && userToDelete && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+           <div className="fixed inset-0 z-50 flex items-center justify-center bg-transparent">
              <div className={`w-full max-w-md p-6 rounded-lg shadow-xl ${
                isDarkMode ? 'bg-gray-800' : 'bg-white'
              }`}>
