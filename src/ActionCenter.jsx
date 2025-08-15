@@ -124,7 +124,7 @@ import {
  *     how: string,
  *     actionTaken: string,
  *     otherInfo: string,
- *     status: "active" | "completed",
+ *     status: "pending" | "resolved",
  *     priority: "high" | "medium" | "low",
  *     patrolCount: number,
  *     incidentCount: number,
@@ -308,8 +308,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "completed": return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
-      case "active": return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
+      case "resolved": return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
+      case "pending": return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400";
       case "urgent": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
@@ -401,18 +401,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
 
   // Calculate totals (normalized to match table display)
-  const totalActions = sortedItems.filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
+  const totalActions = (sortedItems || []).filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
-  const isCompleted = (item) => normalize(item.status) === 'completed' || normalize(item.actionTaken) === 'completed';
-  const isActive = (item) => !isCompleted(item);
-  const activeActions = sortedItems.filter(isActive).length;
-  const completedActions = sortedItems.filter(isCompleted).length;
-  const highPriorityActions = sortedItems.filter(item => item.priority === "high").length;
-  const totalPatrols = sortedItems.reduce((sum, item) => sum + (item.patrolCount || 0), 0);
-  const totalIncidents = sortedItems.reduce((sum, item) => sum + (item.incidentCount || 0), 0);
+  const isResolved = (item) => normalize(item.status) === 'resolved' || normalize(item.actionTaken) === 'resolved';
+  const isPending = (item) => !isResolved(item);
+  const pendingActions = (sortedItems || []).filter(isPending).length;
+  const resolvedActions = (sortedItems || []).filter(isResolved).length;
+  const highPriorityActions = (sortedItems || []).filter(item => item.priority === "high").length;
+  const totalPatrols = (sortedItems || []).reduce((sum, item) => sum + (item.patrolCount || 0), 0);
+  const totalIncidents = (sortedItems || []).reduce((sum, item) => sum + (item.incidentCount || 0), 0);
   // Gender-based counting (cards use these)
-  const totalDrugsMale = sortedItems.filter(item => normalize(item.gender) === 'male').length;
-  const totalDrugsFemale = sortedItems.filter(item => normalize(item.gender) === 'female').length;
+  const totalDrugsMale = (sortedItems || []).filter(item => normalize(item.gender) === 'male').length;
+  const totalDrugsFemale = (sortedItems || []).filter(item => normalize(item.gender) === 'female').length;
   const totalDrugs = totalDrugsMale + totalDrugsFemale;
 
   // "Illegals" counters (detect via text fields)
@@ -463,6 +463,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { illegalCategoryCounts, totalIllegals } = (() => {
     const counts = {};
     let total = 0;
+    
+    if (!sortedItems || !Array.isArray(sortedItems)) {
+      return { illegalCategoryCounts: counts, totalIllegals: total };
+    }
     
     sortedItems.forEach(item => {
       const text = [item.what, item.why, item.how, item.otherInfo]
@@ -515,8 +519,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   // Action Taken category counts
   const ACTION_TAKEN_ALIASES = {
-          'Completed': ['completed', 'complete', 'closed', 'done', 'finished'],
-      'Active': ['active', 'in progress', 'ongoing', 'under investigation', 'for action'],
+    'Resolved': ['resolved', 'complete', 'completed', 'closed', 'done'],
+    'Pending': ['pending', 'awaiting action', 'to do', 'todo', 'for action', 'for review'],
     'Under Investigation': ['under investigation', 'investigation', 'investigating', 'ongoing', 'ongoing investigation'],
     'Referred': ['referred', 'endorsed', 'forwarded'],
     'Arrested': ['arrested', 'apprehended']
@@ -534,6 +538,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   const actionTakenCounts = (() => {
     const counts = {};
+    if (!sortedItems || !Array.isArray(sortedItems)) {
+      return counts;
+    }
     sortedItems.forEach(item => {
       const label = getActionTakenLabel(item.actionTaken);
       counts[label] = (counts[label] || 0) + 1;
@@ -542,10 +549,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   })();
   
   // Bantay Dagat specific calculations
-  const totalFishingViolations = sortedItems.reduce((sum, item) => sum + (item.fishingViolations || 0), 0);
-  const totalIllegalFishing = sortedItems.reduce((sum, item) => sum + (item.illegalFishing || 0), 0);
-  const totalFishCaught = sortedItems.reduce((sum, item) => sum + (item.fishCaught || 0), 0);
-  const totalBoatsInspected = sortedItems.reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
+  const totalFishingViolations = (sortedItems || []).reduce((sum, item) => sum + (item.fishingViolations || 0), 0);
+  const totalIllegalFishing = (sortedItems || []).reduce((sum, item) => sum + (item.illegalFishing || 0), 0);
+  const totalFishCaught = (sortedItems || []).reduce((sum, item) => sum + (item.fishCaught || 0), 0);
+  const totalBoatsInspected = (sortedItems || []).reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
   
   // Agriculture/Bantay Dagat specific illegal categories
   const { agricultureIllegalCategoryCounts, totalAgricultureIllegals } = (() => {
@@ -553,7 +560,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     let total = 0;
     
     // Only process items when agriculture tab is active
-    if (activeTab === "agriculture") {
+    if (activeTab === "agriculture" && sortedItems && Array.isArray(sortedItems)) {
       sortedItems.forEach(item => {
         const text = [item.what, item.why, item.how, item.otherInfo]
           .map(v => normalize(v))
@@ -605,10 +612,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   })();
   
   // PG-ENRO specific calculations
-  const totalEnvironmentalViolations = sortedItems.reduce((sum, item) => sum + (item.environmentalViolations || 0), 0);
-  const totalWasteManagement = sortedItems.reduce((sum, item) => sum + (item.wasteManagement || 0), 0);
-  const totalTreePlanting = sortedItems.reduce((sum, item) => sum + (item.treePlanting || 0), 0);
-  const totalCleanupOperations = sortedItems.reduce((sum, item) => sum + (item.cleanupOperations || 0), 0);
+  const totalEnvironmentalViolations = (sortedItems || []).reduce((sum, item) => sum + (item.environmentalViolations || 0), 0);
+  const totalWasteManagement = (sortedItems || []).reduce((sum, item) => sum + (item.wasteManagement || 0), 0);
+  const totalTreePlanting = (sortedItems || []).reduce((sum, item) => sum + (item.treePlanting || 0), 0);
+  const totalCleanupOperations = (sortedItems || []).reduce((sum, item) => sum + (item.cleanupOperations || 0), 0);
 
   const handleSort = (column) => {
     if (sortBy === column) {
@@ -620,7 +627,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const handleAction = (actionId, action) => {
-    const item = actionItems.find(item => item.id === actionId);
+    const item = (actionItems || []).find(item => item.id === actionId);
     
     switch (action) {
       case "view":
@@ -645,7 +652,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       try {
         const result = await deleteActionReport(selectedItem.id);
         if (result.success) {
-          setActionItems(prevItems => prevItems.filter(item => item.id !== selectedItem.id));
+          setActionItems(prevItems => (prevItems || []).filter(item => item.id !== selectedItem.id));
           setShowDeleteModal(false);
           setSelectedItem(null);
           alert(`Successfully deleted: ${selectedItem.what}`);
@@ -675,23 +682,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     // Add report details
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Month: ${months[selectedMonth]}`, 14, 35);
+    doc.text(`Month: ${months[selectedMonth] || 'Unknown'}`, 14, 35);
     doc.text(`Year: ${selectedYear}`, 14, 42);
     doc.text(`District: ${selectedDistrict || "All Districts"}`, 14, 49);
-    doc.text(`Department: ${activeTab.toUpperCase()}`, 14, 56);
+    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, 14, 56);
     doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, 14, 63);
     
     // Add summary statistics
     doc.text(`Total Actions: ${totalActions}`, 14, 75);
     doc.text(`Total Drugs: ${totalDrugs} (Male: ${totalDrugsMale}, Female: ${totalDrugsFemale})`, 14, 82);
-            doc.text(`Active Actions: ${activeActions}`, 14, 89);
-        doc.text(`Completed Actions: ${completedActions}`, 14, 96);
+    doc.text(`Pending Actions: ${pendingActions}`, 14, 89);
+    doc.text(`Resolved Actions: ${resolvedActions}`, 14, 96);
     doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 103);
     doc.text(`Total Patrols: ${totalPatrols}`, 14, 110);
     doc.text(`Total Incidents: ${totalIncidents}`, 14, 117);
     
     // Prepare table data (hide Why/How in export)
-    const tableData = sortedItems.map(item => [
+    const tableData = (sortedItems || []).map(item => [
       item.municipality,
       item.district,
       item.what,
@@ -725,7 +732,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
     
     // Save the PDF
-    doc.save(`action-center-report-${months[selectedMonth].toLowerCase()}-${selectedYear}.pdf`);
+    doc.save(`action-center-report-${(months[selectedMonth] || 'unknown').toLowerCase()}-${selectedYear}.pdf`);
   };
 
   const handlePrint = () => {
@@ -756,7 +763,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         minute: '2-digit'
       });
     }
-    return date; // Fallback
+    // Ensure we always return a string, not an object
+    if (date && typeof date === 'object') {
+      return 'Invalid Date';
+    }
+    return date ? String(date) : 'No Date';
   };
 
   // Function to recursively clean objects and arrays, removing undefined values
@@ -899,10 +910,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const handlePhotoUpload = (event, setReport) => {
-    const files = Array.from(event.target.files);
-    const validFiles = files.filter(file => file.type.startsWith('image/'));
+    if (!event || !event.target) {
+      console.error('Invalid event object');
+      return;
+    }
     
-    if (validFiles.length === 0) {
+    if (!setReport || typeof setReport !== 'function') {
+      console.error('setReport is not a function');
+      return;
+    }
+    
+    const files = Array.from(event.target?.files || []);
+    if (!Array.isArray(files)) {
+      console.error('Files is not an array');
+      return;
+    }
+    
+    const validFiles = files.filter(file => file && file.type && file.type.startsWith('image/'));
+    
+    if (!validFiles || !Array.isArray(validFiles) || validFiles.length === 0) {
       alert('Please select valid image files only.');
       return;
     }
@@ -913,35 +939,64 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
 
     // Convert images to base64 and store in state
-    validFiles.forEach(file => {
+    if (validFiles && Array.isArray(validFiles)) {
+      validFiles.forEach(file => {
+        if (!file || typeof file !== 'object' || !(file instanceof File)) return; // Skip undefined, invalid, or non-File objects
+      
       const reader = new FileReader();
+      if (!reader) {
+        console.error('Failed to create FileReader');
+        return;
+      }
+      
       reader.onload = (e) => {
-        const base64String = e.target.result;
+        if (!e || !e.target) {
+          console.error('Invalid event object in reader.onload');
+          return;
+        }
+        
+        const base64String = e.target?.result;
+        if (!base64String || typeof base64String !== 'string') return; // Skip if no result or not a string
         
         const newPhoto = {
           id: Date.now() + Math.random(),
-          fileName: file.name,
-          fileSize: file.size,
-          fileType: file.type,
-          lastModified: file.lastModified,
+          fileName: (file.name && typeof file.name === 'string') ? file.name : 'Unknown',
+          fileSize: (file.size && typeof file.size === 'number') ? file.size : 0,
+          fileType: (file.type && typeof file.type === 'string') ? file.type : 'image/*',
+          lastModified: (file.lastModified && typeof file.lastModified === 'number') ? file.lastModified : Date.now(),
           // Store only the base64 image data - no blob URLs
           imageData: base64String,
           uploadDate: new Date().toISOString()
         };
 
         setReport(prevReport => ({
-          ...prevReport,
-          photos: [...(prevReport.photos || []), newPhoto]
+          ...(prevReport || {}),
+          photos: [...(prevReport?.photos || []), newPhoto]
         }));
       };
-      reader.readAsDataURL(file);
-    });
+      
+      try {
+        if (file && file instanceof File) {
+          reader.readAsDataURL(file);
+        } else {
+          console.error('Invalid file object');
+        }
+              } catch (error) {
+          console.error('Error reading file as data URL:', error);
+        }
+      });
+    }
   };
 
   const handlePhotoRemove = (photoId, setActionReport) => {
+    if (!setActionReport || typeof setActionReport !== 'function') {
+      console.error('setActionReport is not a function');
+      return;
+    }
+    
     setActionReport(prevReport => ({
-      ...prevReport,
-      photos: (prevReport.photos || []).filter(p => p.id !== photoId)
+      ...(prevReport || {}),
+      photos: (prevReport?.photos || []).filter(p => p && p.id !== photoId)
     }));
   };
 
@@ -987,7 +1042,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const reportToSave = {
         ...newActionReport,
         photos: cleanPhotos,
-        status: newActionReport.actionTaken === "Completed" ? "completed" : "active",
+        status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
         priority: "medium",
         patrolCount: 0,
         incidentCount: 0,
@@ -1003,7 +1058,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
       const result = await saveActionReport(cleanReport);
       if (result.success) {
-        setActionItems(prevItems => [...prevItems, reportToSave]);
+        setActionItems(prevItems => [...(prevItems || []), reportToSave]);
         // Keep the add modal open to allow adding multiple reports
         setNewActionReport({
           department: "",
@@ -1062,7 +1117,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const updatedReport = {
         ...editingItem,
         photos: cleanPhotos,
-        status: editingItem.actionTaken === "completed" ? "completed" : "active"
+        status: editingItem.actionTaken === "resolved" ? "resolved" : "pending"
       };
 
       // Remove any undefined values from the entire report
@@ -1082,7 +1137,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const result = await updateActionReport(editingItem.id, cleanReport);
       if (result.success) {
         setActionItems(prevItems => 
-          prevItems.map(item => 
+          (prevItems || []).map(item => 
             item.id === editingItem.id ? cleanReport : item
           )
         );
@@ -1102,9 +1157,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     setShowEditModal(false);
     setEditingItem(null);
     // Clean up any photo previews to prevent memory leaks
-    if (editingItem && editingItem.photos) {
+    if (editingItem && editingItem.photos && Array.isArray(editingItem.photos)) {
       editingItem.photos.forEach(photo => {
-        if (photo.preview) {
+        if (photo && photo.preview) {
           URL.revokeObjectURL(photo.preview);
         }
       });
@@ -1126,7 +1181,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
-        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict || {})) {
           if (municipalities.includes(value)) {
             updated.district = district;
             break;
@@ -1148,7 +1203,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
-        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict || {})) {
           if (municipalities.includes(value)) {
             updated.district = district;
             break;
@@ -1164,14 +1219,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const handleRemovePhoto = async (reportId, photoIndex) => {
     try {
       // Find the action report
-      const reportIndex = actionItems.findIndex(item => item.id === reportId);
+      const reportIndex = (actionItems || []).findIndex(item => item.id === reportId);
       if (reportIndex === -1) {
         alert('Report not found.');
         return;
       }
 
-      const report = actionItems[reportIndex];
-      const updatedPhotos = report.photos.filter((_, index) => index !== photoIndex);
+      const report = (actionItems || [])[reportIndex];
+      const updatedPhotos = (report.photos || []).filter((_, index) => index !== photoIndex);
       
       // Create updated report
       const updatedReport = {
@@ -1184,7 +1239,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       if (result.success) {
         // Update local state
         setActionItems(prevItems => 
-          prevItems.map(item => 
+          (prevItems || []).map(item => 
             item.id === reportId ? updatedReport : item
           )
         );
@@ -1539,7 +1594,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-gray-100 text-xs font-medium">Total</p>
-                        <p className="text-lg font-bold">{sortedItems.length}</p>
+                        <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
                         <p className="text-gray-200 text-xs">All table records</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
@@ -1583,11 +1638,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         <p className="text-fuchsia-100 text-xs font-medium mb-1">Illegals</p>
                         <p className="text-lg font-bold mb-1">{totalIllegals}</p>
                         <p className="text-fuchsia-200 text-xs leading-tight">
-                          {Object.entries(illegalCategoryCounts)
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts)
                             .slice(0, 3) // Show only first 3 categories to fit better
                             .map(([k, v]) => `${k}: ${v}`)
                             .join(' • ')}
-                          {Object.entries(illegalCategoryCounts).length > 3 && '...'}
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 3 && '...'}
                         </p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
@@ -1606,7 +1661,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="text-green-100 text-xs font-medium">Total Entries</p>
-                        <p className="text-lg font-bold">{sortedItems.length}</p>
+                        <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
                         <p className="text-green-200 text-xs">All agriculture records</p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full">
@@ -1622,11 +1677,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         <p className="text-red-100 text-xs font-medium mb-1">Illegals</p>
                         <p className="text-lg font-bold mb-1">{totalAgricultureIllegals}</p>
                         <p className="text-red-200 text-xs leading-tight">
-                          {Object.entries(agricultureIllegalCategoryCounts)
+                          {agricultureIllegalCategoryCounts && Object.entries(agricultureIllegalCategoryCounts)
                             .slice(0, 3) // Show only first 3 categories to fit better
                             .map(([k, v]) => `${k}: ${v}`)
                             .join(' • ')}
-                          {Object.entries(agricultureIllegalCategoryCounts).length > 3 && '...'}
+                          {agricultureIllegalCategoryCounts && Object.entries(agricultureIllegalCategoryCounts).length > 3 && '...'}
                         </p>
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
@@ -1697,7 +1752,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         ? 'bg-blue-900/40 text-blue-400' 
                         : 'bg-blue-100/80 text-blue-800'
                     }`}>
-                      {sortedItems.length} items
+                                             {sortedItems ? sortedItems.length : 0} items
                     </Badge>
                   </div>
                 </div>
@@ -1806,7 +1861,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortedItems.map((item) => {
+                        {(sortedItems || []).map((item) => {
+                          // Safety check - ensure item is valid
+                          if (!item || typeof item !== 'object') {
+                            return null;
+                          }
+                          
                           // Handle icon rendering properly
                           const getIconComponent = (iconName) => {
                             switch (iconName) {
@@ -1993,9 +2053,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             }
                           };
                           
-                          const IconComponent = getIconComponent(item.icon);
+                          const IconComponent = getIconComponent(item.icon || 'AlertCircle');
                           return (
-                            <tr key={item.id} className={`border-b transition-colors duration-200 ${
+                            <tr key={item.id || `item-${Math.random()}`} className={`border-b transition-colors duration-200 ${
                               isDarkMode 
                                 ? 'border-gray-700 hover:bg-gray-700/30' 
                                 : 'border-gray-200 hover:bg-gray-50'
@@ -2027,7 +2087,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
                                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
                                 }`} title={item.what}>
-                                  {item.what}
+                                  {typeof item.what === 'string' ? item.what : 'N/A'}
                                 </span>
                               </td>
                               <td className="p-4">
@@ -2040,7 +2100,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               <td className="p-4">
                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
                                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`}>{item.where}</span>
+                                }`}>{typeof item.where === 'string' ? item.where : 'N/A'}</span>
                               </td>
                               {false && (
                                 <td className="p-4">
@@ -2069,7 +2129,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                               <td className="p-4">
                                 <Badge className={`rounded-none ${
-                                  item.actionTaken === "Completed" 
+                                  item.actionTaken === "Resolved" 
                                     ? isDarkMode 
                                       ? "bg-green-900/30 text-green-400" 
                                       : "bg-green-100 text-green-800"
@@ -2077,7 +2137,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                       ? "bg-orange-900/30 text-orange-400" 
                                       : "bg-orange-100 text-orange-800"
                                 }`}>
-                                  {item.actionTaken}
+                                  {typeof item.actionTaken === 'string' ? item.actionTaken : 'N/A'}
                                 </Badge>
                               </td>
                               {/* Hide Source column data for Agriculture tab */}
@@ -2086,7 +2146,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
                                     isDarkMode ? 'text-gray-300' : 'text-gray-700'
                                   }`} title={item.source}>
-                                    {item.source || 'N/A'}
+                                    {typeof item.source === 'string' ? item.source : 'N/A'}
                                   </span>
                                 </td>
                               )}
@@ -2103,7 +2163,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleAction(item.id, "view")}
+                                    onClick={() => handleAction(item.id || 'unknown', "view")}
                                     title="View Details"
                                     className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400"
                                   >
@@ -2112,7 +2172,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleAction(item.id, "edit")}
+                                    onClick={() => handleAction(item.id || 'unknown', "edit")}
                                     title="Edit"
                                     className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400"
                                   >
@@ -2121,7 +2181,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleAction(item.id, "delete")}
+                                    onClick={() => handleAction(item.id || 'unknown', "delete")}
                                     title="Delete"
                                     className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400"
                                   >
@@ -2135,7 +2195,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </tbody>
                     </table>
                     
-                    {sortedItems.length === 0 && (
+                    {(!sortedItems || sortedItems.length === 0) && (
                       <div className="text-center py-12">
                         <div className={`p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center ${
                           isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
@@ -2425,7 +2485,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </label>
                   <Input
                     type="text"
-                    placeholder="Enter action taken (e.g., Under investigation, Completed, Active)"
+                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={newActionReport.actionTaken}
                     onChange={(e) => handleInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
@@ -2866,7 +2926,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </label>
                   <Input
                     type="text"
-                    placeholder="Enter action taken (e.g., Under investigation, Completed, Active)"
+                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={editingItem.actionTaken}
                     onChange={(e) => handleEditInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${

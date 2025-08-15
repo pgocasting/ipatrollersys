@@ -37,8 +37,6 @@ export const DataProvider = ({ children }) => {
       totalIncidents: 0,
       activeMunicipalities: 0,
       inactiveMunicipalities: 0,
-              totalIncidents: 0,
-        totalActions: 0,
       recentActivity: [],
       // Add IPatroller specific stats
       totalDailyPatrols: 0,
@@ -171,8 +169,7 @@ export const DataProvider = ({ children }) => {
             actionReports,
             summaryStats: {
               ...prev.summaryStats,
-              totalActions: actionReports.length,
-                        totalActions: actionReports.length
+              totalActions: actionReports.length
             }
           }));
         });
@@ -200,7 +197,6 @@ export const DataProvider = ({ children }) => {
             incidents,
             summaryStats: {
               ...prev.summaryStats,
-              totalIncidents: incidents.length,
               totalIncidents: incidents.length
             }
           }));
