@@ -1141,7 +1141,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   };
 
   return (
-    <Layout onLogout={onLogout} onNavigate={currentPage}>
+          <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="flex-1 p-6 space-y-6 print-content">
         {/* Header */}
         <div className="flex items-center justify-between">

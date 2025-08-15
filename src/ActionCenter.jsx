@@ -48,6 +48,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Minus,
+  Plus,
   Maximize2,
   Minimize2,
   RotateCcw,
@@ -100,7 +101,6 @@ import {
   Star,
   Heart,
   Briefcase,
-  Plus,
   FileText
 } from "lucide-react";
 
@@ -155,6 +155,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [editingItem, setEditingItem] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageModalData, setImageModalData] = useState({ imageSource: '', fileName: '' });
+  const [showAddIllegalTypeModal, setShowAddIllegalTypeModal] = useState(false);
+  const [newIllegalType, setNewIllegalType] = useState("");
+  const [customIllegalTypes, setCustomIllegalTypes] = useState({
+    pnp: [],
+    agriculture: [],
+    "pg-enro": []
+  });
+  const [successMessage, setSuccessMessage] = useState("");
   const [newActionReport, setNewActionReport] = useState({
     department: "",
     municipality: "",
@@ -169,36 +177,52 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     source: "",
     actionTaken: "",
     otherInfo: "",
-    photos: []
+    photos: [],
+    illegalType: "",
+    otherIllegalType: ""
   });
 
-  useEffect(() => {
-    // Load action items from Firestore
-    const loadActionReports = async () => {
-      setLoading(true);
-      try {
-        const result = await getActionReports();
-        if (result.success) {
-          // Store all reports
-          setAllActionReports(result.data);
-          // Filter by active tab if needed
-          const filteredReports = result.data.filter(report => 
-            activeTab === "all" || report.department === activeTab
-          );
-          setActionItems(filteredReports);
-        } else {
-          console.error('Error loading action reports:', result.error);
-          setActionItems([]);
-          setAllActionReports([]);
-        }
-      } catch (error) {
-        console.error('Error loading action reports:', error);
+  // Load action items from Firestore
+  const loadActionReports = async () => {
+    setLoading(true);
+    try {
+      const result = await getActionReports();
+      if (result.success) {
+        // Store all reports
+        setAllActionReports(result.data);
+        // Filter by active tab if needed
+        console.log('Loading action reports:', {
+          totalReports: result.data.length,
+          activeTab: activeTab,
+          departments: result.data.map(r => r.department),
+          pgEnroReports: result.data.filter(r => r.department === 'pg-enro')
+        });
+        
+        const filteredReports = result.data.filter(report => 
+          activeTab === "all" || report.department === activeTab
+        );
+        
+        console.log('Filtered reports:', {
+          activeTab: activeTab,
+          filteredCount: filteredReports.length,
+          filteredDepartments: filteredReports.map(r => r.department)
+        });
+        
+        setActionItems(filteredReports);
+      } else {
+        console.error('Error loading action reports:', result.error);
         setActionItems([]);
-      } finally {
-        setLoading(false);
+        setAllActionReports([]);
       }
-    };
+    } catch (error) {
+      console.error('Error loading action reports:', error);
+      setActionItems([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     loadActionReports();
   }, [activeTab, getActionReports]);
 
@@ -235,6 +259,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     { id: "2ND DISTRICT", name: "2ND DISTRICT" },
     { id: "3RD DISTRICT", name: "3RD DISTRICT" }
   ];
+
+  // Handle adding new illegal types
+  const handleAddIllegalType = () => {
+    if (newIllegalType.trim()) {
+      const currentDepartment = newActionReport.department || editingItem?.department;
+      if (currentDepartment) {
+        setCustomIllegalTypes(prev => ({
+          ...prev,
+          [currentDepartment]: [...(prev[currentDepartment] || []), newIllegalType.trim()]
+        }));
+        setSuccessMessage(`New illegal type "${newIllegalType}" added to ${currentDepartment} successfully!`);
+        setNewIllegalType("");
+        setShowAddIllegalTypeModal(false);
+        
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccessMessage(""), 3000);
+      }
+    } else {
+      alert("Please enter a valid illegal type.");
+    }
+  };
 
   // Handle cleaning duplicates
   const handleCleanDuplicates = async () => {
@@ -1022,6 +1067,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Source field is not shown for Agriculture
       }
 
+      // Additional validation for all departments - Illegal Type is required
+      if (newActionReport.department) {
+        if (!newActionReport.illegalType) {
+          alert("Please select the Type of Illegals for your report.");
+          return;
+        }
+        if (newActionReport.illegalType === "other" && !newActionReport.otherIllegalType) {
+          alert("Please specify the other type of illegals.");
+          return;
+        }
+      }
+
       // Clean photos data before saving to Firestore (include base64 image data)
       const cleanPhotos = newActionReport.photos ? newActionReport.photos
         .map(validateAndCleanPhoto) // Use the validation function
@@ -1040,15 +1097,33 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         id: `action-${Date.now()}`
       };
 
+      console.log('Report to save:', reportToSave);
+
       // Remove any undefined values from the entire report
       const cleanReport = Object.fromEntries(
         Object.entries(reportToSave).filter(([_, value]) => value !== undefined)
       );
 
+      console.log('Submitting action report:', {
+        department: cleanReport.department,
+        what: cleanReport.what,
+        illegalType: cleanReport.illegalType,
+        otherIllegalType: cleanReport.otherIllegalType
+      });
+      
       const result = await saveActionReport(cleanReport);
       if (result.success) {
+        console.log('Action report saved successfully:', result);
+              // Reload the data to ensure it appears in the correct tab
+      try {
+        await loadActionReports();
+        console.log('Data reloaded successfully after submission');
+      } catch (error) {
+        console.error('Error reloading data after submission:', error);
+        // Fallback: manually add the new report to the current list
         setActionItems(prevItems => [...(prevItems || []), reportToSave]);
-        // Keep the add modal open to allow adding multiple reports
+      }
+      // Keep the add modal open to allow adding multiple reports
         setNewActionReport({
           department: "",
           municipality: "",
@@ -1063,10 +1138,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           source: "",
           actionTaken: "",
           otherInfo: "",
-          photos: []
+          photos: [],
+          illegalType: "",
+          otherIllegalType: ""
         });
         alert("Action report added successfully!");
       } else {
+        console.error('Error saving action report:', result.error);
         alert(`Error saving action report: ${result.error}`);
       }
     } catch (error) {
@@ -1091,7 +1169,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       source: "",
       actionTaken: "",
       otherInfo: "",
-      photos: []
+      photos: [],
+      illegalType: "",
+      otherIllegalType: ""
     });
   };
 
@@ -1311,6 +1391,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
+        {/* Success Message */}
+        {successMessage && (
+          <div className={`p-4 rounded-lg border transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-green-900/20 border-green-600 text-green-400' 
+              : 'bg-green-50 border-green-300 text-green-700'
+          }`}>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="font-medium">{successMessage}</span>
+            </div>
+          </div>
+        )}
+
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Card 
@@ -1395,7 +1489,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           
           <Card 
             className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pgenro"
+              activeTab === "pg-enro"
                 ? isDarkMode 
                   ? 'bg-purple-900/80 border-purple-600' 
                   : 'bg-purple-50 border-purple-300'
@@ -1404,14 +1498,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   : 'bg-white border-gray-200 hover:bg-purple-50'
             }`}
             onClick={() => {
-              setActiveTab("pgenro");
+              setActiveTab("pg-enro");
               setActiveMunicipality("all");
             }}
           >
             <CardContent className="p-6">
               <div className="flex items-center gap-4">
                 <div className={`p-3 rounded-lg ${
-                  activeTab === "pgenro" 
+                  activeTab === "pg-enro" 
                     ? 'bg-purple-600 text-white' 
                     : isDarkMode ? 'bg-purple-900/40 text-purple-400' : 'bg-purple-100 text-purple-600'
                 }`}>
@@ -1419,12 +1513,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 <div>
                   <h3 className={`font-bold text-lg transition-colors duration-300 ${
-                    activeTab === "pgenro" 
+                    activeTab === "pg-enro" 
                       ? 'text-purple-600 dark:text-purple-400' 
                       : isDarkMode ? 'text-white' : 'text-gray-900'
                   }`}>PG-Enro</h3>
                   <p className={`text-sm transition-colors duration-300 ${
-                    activeTab === "pgenro" 
+                    activeTab === "pg-enro" 
                       ? 'text-purple-500 dark:text-purple-300' 
                       : isDarkMode ? 'text-gray-400' : 'text-gray-600'
                   }`}>Environment</p>
@@ -2331,6 +2425,114 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     required
                   />
                 </div>
+
+                {/* Type of Illegals - Visible for all departments */}
+                {newActionReport.department && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Type of Illegals <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={newActionReport.illegalType || ""}
+                        onChange={(e) => handleInputChange('illegalType', e.target.value)}
+                        className={`flex-1 p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        required
+                      >
+                        <option value="">Select Type of Illegals</option>
+                        
+                        {/* PNP Illegal Types */}
+                        {newActionReport.department === "pnp" && (
+                          <>
+                            <option value="illegal-possession">Illegal Possession</option>
+                            <option value="illegal-trafficking">Illegal Trafficking</option>
+                            <option value="illegal-gambling">Illegal Gambling</option>
+                            <option value="illegal-prostitution">Illegal Prostitution</option>
+                            <option value="illegal-cybercrime">Illegal Cybercrime</option>
+                            <option value="illegal-vehicles">Illegal Vehicles</option>
+                            <option value="illegal-weapons">Illegal Weapons</option>
+                            <option value="illegal-drugs">Illegal Drugs</option>
+                            <option value="illegal-alcohol">Illegal Alcohol</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* Agriculture / Bantay Dagat Illegal Types */}
+                        {newActionReport.department === "agriculture" && (
+                          <>
+                            <option value="illegal-fishing">Illegal Fishing</option>
+                            <option value="illegal-fishing-gear">Illegal Fishing Gear</option>
+                            <option value="illegal-fish-size">Illegal Fish Size</option>
+                            <option value="illegal-fishing-season">Illegal Fishing Season</option>
+                            <option value="illegal-fishing-zone">Illegal Fishing Zone</option>
+                            <option value="illegal-fish-species">Illegal Fish Species</option>
+                            <option value="illegal-fish-transport">Illegal Fish Transport</option>
+                            <option value="illegal-fish-sale">Illegal Fish Sale</option>
+                            <option value="illegal-fish-processing">Illegal Fish Processing</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* PG-ENRO / AGRICULTURE Illegal Types */}
+                        {newActionReport.department === "pg-enro" && (
+                          <>
+                            <option value="illegal-fishing">Illegal Fishing</option>
+                            <option value="illegal-logging">Illegal Logging</option>
+                            <option value="illegal-mining">Illegal Mining</option>
+                            <option value="illegal-quarrying">Illegal Quarrying</option>
+                            <option value="illegal-dumping">Illegal Dumping</option>
+                            <option value="illegal-construction">Illegal Construction</option>
+                            <option value="illegal-encroachment">Illegal Encroachment</option>
+                            <option value="illegal-harvesting">Illegal Harvesting</option>
+                            <option value="illegal-waste">Illegal Waste Disposal</option>
+                            <option value="illegal-pollution">Illegal Pollution</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* Custom Illegal Types */}
+                        {newActionReport.department && customIllegalTypes[newActionReport.department]?.map((customType, index) => (
+                          <option key={`custom-${index}`} value={`custom-${customType}`}>
+                            {customType} (Custom)
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        onClick={() => setShowAddIllegalTypeModal(true)}
+                        variant="outline"
+                        className={`p-3 border-2 border-dashed transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400' 
+                            : 'border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600'
+                        }`}
+                        title="Add New Type of Illegals"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {newActionReport.illegalType === "other" && (
+                      <Input
+                        type="text"
+                        placeholder="Specify other type of illegals..."
+                        value={newActionReport.otherIllegalType || ""}
+                        onChange={(e) => handleInputChange('otherIllegalType', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        required
+                      />
+                    )}
+                  </div>
+                )}
                 
                 {/* When - Always visible */}
                 <div className="space-y-2">
@@ -2635,6 +2837,90 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         )}
 
+        {/* Add New Illegal Type Modal */}
+        {showAddIllegalTypeModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+            <div className={`p-6 rounded-xl shadow-2xl max-w-md w-full border ${
+              isDarkMode 
+                ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-700' 
+                : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
+            }`}>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${
+                    isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
+                  }`}>
+                    <Plus className={`h-6 w-6 ${
+                      isDarkMode ? 'text-green-400' : 'text-green-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Add New Illegal Type</h3>
+                    <p className={`text-sm ${
+                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                    }`}>Add a new type of illegals to the system</p>
+                  </div>
+                </div>
+                <Button
+                  onClick={() => setShowAddIllegalTypeModal(false)}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              
+              <div className="space-y-4 mb-6">
+                <div className="space-y-2">
+                  <label className={`text-sm font-semibold ${
+                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                  }`}>
+                    New Illegal Type <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Enter new type of illegals..."
+                    value={newIllegalType}
+                    onChange={(e) => setNewIllegalType(e.target.value)}
+                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                      isDarkMode 
+                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                    }`}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
+                <Button 
+                  onClick={() => setShowAddIllegalTypeModal(false)} 
+                  variant="outline"
+                  className={`${
+                    isDarkMode 
+                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
+                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleAddIllegalType}
+                  className={`${
+                    isDarkMode 
+                      ? 'bg-green-600 hover:bg-green-700 text-white' 
+                      : 'bg-green-600 hover:bg-green-700 text-white'
+                  }`}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Type
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
                                      {/* Edit Action Report Modal */}
            {showEditModal && editingItem && (
              <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
@@ -2758,6 +3044,114 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     required
                   />
                 </div>
+
+                {/* Type of Illegals - Visible for all departments */}
+                {editingItem.department && (
+                  <div className="space-y-2">
+                    <label className={`text-sm font-semibold ${
+                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
+                    }`}>
+                      Type of Illegals <span className="text-red-500">*</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <select
+                        value={editingItem.illegalType || ""}
+                        onChange={(e) => handleEditInputChange('illegalType', e.target.value)}
+                        className={`flex-1 p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        required
+                      >
+                        <option value="">Select Type of Illegals</option>
+                        
+                        {/* PNP Illegal Types */}
+                        {editingItem.department === "pnp" && (
+                          <>
+                            <option value="illegal-possession">Illegal Possession</option>
+                            <option value="illegal-trafficking">Illegal Trafficking</option>
+                            <option value="illegal-gambling">Illegal Gambling</option>
+                            <option value="illegal-prostitution">Illegal Prostitution</option>
+                            <option value="illegal-cybercrime">Illegal Cybercrime</option>
+                            <option value="illegal-vehicles">Illegal Vehicles</option>
+                            <option value="illegal-weapons">Illegal Weapons</option>
+                            <option value="illegal-drugs">Illegal Drugs</option>
+                            <option value="illegal-alcohol">Illegal Alcohol</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* Agriculture / Bantay Dagat Illegal Types */}
+                        {editingItem.department === "agriculture" && (
+                          <>
+                            <option value="illegal-fishing">Illegal Fishing</option>
+                            <option value="illegal-fishing-gear">Illegal Fishing Gear</option>
+                            <option value="illegal-fish-size">Illegal Fish Size</option>
+                            <option value="illegal-fishing-season">Illegal Fishing Season</option>
+                            <option value="illegal-fishing-zone">Illegal Fishing Zone</option>
+                            <option value="illegal-fish-species">Illegal Fish Species</option>
+                            <option value="illegal-fish-transport">Illegal Fish Transport</option>
+                            <option value="illegal-fish-sale">Illegal Fish Sale</option>
+                            <option value="illegal-fish-processing">Illegal Fish Processing</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* PG-ENRO / AGRICULTURE Illegal Types */}
+                        {editingItem.department === "pg-enro" && (
+                          <>
+                            <option value="illegal-fishing">Illegal Fishing</option>
+                            <option value="illegal-logging">Illegal Logging</option>
+                            <option value="illegal-mining">Illegal Mining</option>
+                            <option value="illegal-quarrying">Illegal Quarrying</option>
+                            <option value="illegal-dumping">Illegal Dumping</option>
+                            <option value="illegal-construction">Illegal Construction</option>
+                            <option value="illegal-encroachment">Illegal Encroachment</option>
+                            <option value="illegal-harvesting">Illegal Harvesting</option>
+                            <option value="illegal-waste">Illegal Waste Disposal</option>
+                            <option value="illegal-pollution">Illegal Pollution</option>
+                            <option value="other">Other</option>
+                          </>
+                        )}
+                        
+                        {/* Custom Illegal Types */}
+                        {editingItem.department && customIllegalTypes[editingItem.department]?.map((customType, index) => (
+                          <option key={`custom-edit-${index}`} value={`custom-${customType}`}>
+                            {customType} (Custom)
+                          </option>
+                        ))}
+                      </select>
+                      <Button
+                        type="button"
+                        onClick={() => setShowAddIllegalTypeModal(true)}
+                        variant="outline"
+                        className={`p-3 border-2 border-dashed transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400' 
+                            : 'border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600'
+                        }`}
+                        title="Add New Type of Illegals"
+                      >
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    {editingItem.illegalType === "other" && (
+                      <Input
+                        type="text"
+                        placeholder="Specify other type of illegals..."
+                        value={editingItem.otherIllegalType || ""}
+                        onChange={(e) => handleEditInputChange('otherIllegalType', e.target.value)}
+                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
+                          isDarkMode 
+                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
+                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+                        }`}
+                        required
+                      />
+                    )}
+                  </div>
+                )}
                 
                 <div className="space-y-2">
                   <label className={`text-sm font-semibold ${
@@ -3278,6 +3672,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
                           }`}>{viewingItem.what}</p>
                         </div>
+                        {/* Type of Illegals - Visible for all departments */}
+                        {viewingItem.department && (
+                          <div className="space-y-2">
+                            <span className={`text-sm font-medium ${
+                              isDarkMode ? 'text-gray-400' : 'text-gray-600'
+                            }`}>Type of Illegals</span>
+                            <p className={`text-sm p-3 rounded-lg ${
+                              isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {viewingItem.illegalType === "other" 
+                                ? viewingItem.otherIllegalType || 'N/A'
+                                : viewingItem.illegalType 
+                                  ? viewingItem.illegalType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+                                  : 'N/A'
+                              }
+                            </p>
+                          </div>
+                        )}
                         <div className="space-y-2">
                           <span className={`text-sm font-medium ${
                             isDarkMode ? 'text-gray-400' : 'text-gray-600'
