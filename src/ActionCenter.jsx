@@ -153,6 +153,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showViewModal, setShowViewModal] = useState(false);
   const [viewingItem, setViewingItem] = useState(null);
   const [editingItem, setEditingItem] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [imageModalData, setImageModalData] = useState({ imageSource: '', fileName: '' });
   const [newActionReport, setNewActionReport] = useState({
     department: "",
     municipality: "",
@@ -757,7 +759,145 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return date; // Fallback
   };
 
-  // Photo handling functions
+  // Function to recursively clean objects and arrays, removing undefined values
+  const deepCleanObject = (obj) => {
+    if (obj === undefined || obj === null) {
+      return null;
+    }
+
+    if (Array.isArray(obj)) {
+      const cleanedArray = obj
+        .map(item => deepCleanObject(item))
+        .filter(item => item !== null);
+      return cleanedArray;
+    }
+
+    if (typeof obj === 'object') {
+      const cleanedObj = {};
+      Object.entries(obj).forEach(([key, value]) => {
+        const cleanedValue = deepCleanObject(value);
+        if (cleanedValue !== null) {
+          cleanedObj[key] = cleanedValue;
+        }
+      });
+      return cleanedObj;
+    }
+
+    return obj;
+  };
+
+  // Function to validate and clean photo objects
+  const validateAndCleanPhoto = (photo) => {
+    if (!photo || typeof photo !== 'object') {
+      return null;
+    }
+
+    // Check for required fields and provide defaults
+    const cleanPhoto = {
+      id: photo.id || `photo-${Date.now()}-${Math.random()}`,
+      fileName: photo.fileName || photo.name || 'Unknown Photo',
+      fileSize: photo.fileSize || 0,
+      fileType: photo.fileType || 'image/*',
+      lastModified: photo.lastModified || Date.now(),
+      imageData: photo.imageData || null,
+      uploadDate: photo.uploadDate || new Date().toISOString()
+    };
+
+    // Validate each field individually
+    Object.entries(cleanPhoto).forEach(([key, value]) => {
+      if (value === undefined) {
+        cleanPhoto[key] = null; // Set to null instead of undefined
+      }
+    });
+
+    // Only return photos that have actual image data or are legacy photos
+    if (cleanPhoto.imageData || photo.url) {
+      return cleanPhoto;
+    }
+
+    return null;
+  };
+
+  // Function to migrate Firebase Storage URLs to base64 data
+  const migratePhotoToBase64 = async (photo) => {
+    // If photo already has base64 data, return as is
+    if (photo.imageData) {
+      return photo;
+    }
+
+    // If photo has a Firebase Storage URL, try to convert it
+    if (photo.url && photo.url.includes('firebasestorage.googleapis.com')) {
+      try {
+        // For now, we'll create a placeholder since we can't fetch from Firebase Storage
+        // In a real migration, you would need to download the image and convert to base64
+        return {
+          ...photo,
+          imageData: null, // Will be null for old Firebase Storage URLs
+          isLegacy: true,
+          error: 'Legacy Firebase Storage URL - needs manual migration'
+        };
+      } catch (error) {
+        console.error('Error migrating photo:', error);
+        return {
+          ...photo,
+          imageData: null,
+          isLegacy: true,
+          error: 'Migration failed'
+        };
+      }
+    }
+
+    // If photo is just a string URL, treat it as legacy
+    if (typeof photo === 'string') {
+      return {
+        id: Date.now() + Math.random(),
+        fileName: 'Legacy Photo',
+        fileSize: 0,
+        fileType: 'image/*',
+        imageData: null,
+        isLegacy: true,
+        error: 'Legacy photo format - needs manual migration'
+      };
+    }
+
+    return photo;
+  };
+
+  // Function to get the best available image source
+  const getImageSource = (photo) => {
+    // Priority: base64 data > legacy URL > placeholder
+    if (photo.imageData && typeof photo.imageData === 'string' && photo.imageData.startsWith('data:image')) {
+      return photo.imageData;
+    }
+    
+    if (photo.url && typeof photo.url === 'string' && !photo.url.includes('firebasestorage.googleapis.com')) {
+      return photo.url;
+    }
+    
+    // Check if photo is a string (legacy format)
+    if (typeof photo === 'string' && photo.startsWith('data:image')) {
+      return photo;
+    }
+    
+    // Return a placeholder for legacy Firebase Storage URLs or invalid photos
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
+  };
+
+  // Function to handle photo loading errors
+  const handlePhotoError = (event, photo) => {
+    // Set a fallback image
+    event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmYwMDAwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3IgTG9hZGluZyBQaG90bzwvdGV4dD48L3N2Zz4=';
+    
+    // Add error styling
+    event.target.classList.add('border-red-500');
+  };
+
+  // Function to show image modal for data URLs
+  const openImageModal = (imageSource, fileName) => {
+    setImageModalData({ imageSource, fileName });
+    setShowImageModal(true);
+  };
+
   const handlePhotoUpload = (event, setReport) => {
     const files = Array.from(event.target.files);
     const validFiles = files.filter(file => file.type.startsWith('image/'));
@@ -784,10 +924,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           fileSize: file.size,
           fileType: file.type,
           lastModified: file.lastModified,
-          // Store the base64 image data
+          // Store only the base64 image data - no blob URLs
           imageData: base64String,
-          // Create preview URL for display
-          preview: URL.createObjectURL(file),
           uploadDate: new Date().toISOString()
         };
 
@@ -801,16 +939,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const handlePhotoRemove = (photoId, setActionReport) => {
-    setActionReport(prevReport => {
-      const photoToRemove = prevReport.photos?.find(p => p.id === photoId);
-      if (photoToRemove && photoToRemove.preview) {
-        URL.revokeObjectURL(photoToRemove.preview);
-      }
-      return {
-        ...prevReport,
-        photos: (prevReport.photos || []).filter(p => p.id !== photoId)
-      };
-    });
+    setActionReport(prevReport => ({
+      ...prevReport,
+      photos: (prevReport.photos || []).filter(p => p.id !== photoId)
+    }));
   };
 
   const handleAddActionReport = () => {
@@ -934,9 +1066,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       };
 
       // Remove any undefined values from the entire report
-      const cleanReport = Object.fromEntries(
-        Object.entries(updatedReport).filter(([_, value]) => value !== undefined)
+      const cleanReport = deepCleanObject(updatedReport);
+
+      // Final validation - check for any remaining undefined values
+      const hasUndefinedValues = Object.values(cleanReport).some(value => 
+        value === undefined || 
+        (Array.isArray(value) && value.some(item => item === undefined)) ||
+        (typeof value === 'object' && value !== null && Object.values(value).some(v => v === undefined))
       );
+
+      if (hasUndefinedValues) {
+        throw new Error('Data validation failed: undefined values still present');
+      }
 
       const result = await updateActionReport(editingItem.id, cleanReport);
       if (result.success) {
@@ -1019,90 +1160,48 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
-  // Function to validate and clean photo objects
-  const validateAndCleanPhoto = (photo) => {
-    if (!photo || typeof photo !== 'object') {
-      return null;
-    }
-
-    // Ensure all required fields have valid values
-    const cleanPhoto = {
-      id: photo.id || `photo-${Date.now()}-${Math.random()}`,
-      fileName: photo.fileName || photo.name || 'Unknown Photo',
-      fileSize: photo.fileSize || 0,
-      fileType: photo.fileType || 'image/*',
-      lastModified: photo.lastModified || Date.now(),
-      imageData: photo.imageData || null,
-      uploadDate: photo.uploadDate || new Date().toISOString()
-    };
-
-    // Only return photos that have actual image data or are legacy photos
-    if (cleanPhoto.imageData || photo.url) {
-      return cleanPhoto;
-    }
-
-    return null;
-  };
-
-  // Function to migrate Firebase Storage URLs to base64 data
-  const migratePhotoToBase64 = async (photo) => {
-    // If photo already has base64 data, return as is
-    if (photo.imageData) {
-      return photo;
-    }
-
-    // If photo has a Firebase Storage URL, try to convert it
-    if (photo.url && photo.url.includes('firebasestorage.googleapis.com')) {
-      try {
-        // For now, we'll create a placeholder since we can't fetch from Firebase Storage
-        // In a real migration, you would need to download the image and convert to base64
-        return {
-          ...photo,
-          imageData: null, // Will be null for old Firebase Storage URLs
-          isLegacy: true,
-          error: 'Legacy Firebase Storage URL - needs manual migration'
-        };
-      } catch (error) {
-        console.error('Error migrating photo:', error);
-        return {
-          ...photo,
-          imageData: null,
-          isLegacy: true,
-          error: 'Migration failed'
-        };
+  // Function to remove photos from an action report
+  const handleRemovePhoto = async (reportId, photoIndex) => {
+    try {
+      // Find the action report
+      const reportIndex = actionItems.findIndex(item => item.id === reportId);
+      if (reportIndex === -1) {
+        alert('Report not found.');
+        return;
       }
-    }
 
-    // If photo is just a string URL, treat it as legacy
-    if (typeof photo === 'string') {
-      return {
-        id: Date.now() + Math.random(),
-        fileName: 'Legacy Photo',
-        fileSize: 0,
-        fileType: 'image/*',
-        imageData: null,
-        isLegacy: true,
-        error: 'Legacy photo format - needs manual migration'
+      const report = actionItems[reportIndex];
+      const updatedPhotos = report.photos.filter((_, index) => index !== photoIndex);
+      
+      // Create updated report
+      const updatedReport = {
+        ...report,
+        photos: updatedPhotos
       };
-    }
 
-    return photo;
-  };
-
-  // Function to get the best available image source
-  const getImageSource = (photo) => {
-    // Priority: base64 data > preview > legacy URL > placeholder
-    if (photo.imageData) {
-      return photo.imageData;
+      // Update in Firestore
+      const result = await updateActionReport(reportId, updatedReport);
+      if (result.success) {
+        // Update local state
+        setActionItems(prevItems => 
+          prevItems.map(item => 
+            item.id === reportId ? updatedReport : item
+          )
+        );
+        
+        // Update viewingItem if it's the same report
+        if (viewingItem && viewingItem.id === reportId) {
+          setViewingItem(updatedReport);
+        }
+        
+        alert('Photo removed successfully!');
+      } else {
+        alert(`Error removing photo: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Error removing photo:', error);
+      alert('Error removing photo. Please try again.');
     }
-    if (photo.preview) {
-      return photo.preview;
-    }
-    if (photo.url && !photo.url.includes('firebasestorage.googleapis.com')) {
-      return photo.url;
-    }
-    // Return a placeholder for legacy Firebase Storage URLs
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
   };
 
   return (
@@ -2431,6 +2530,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               src={getImageSource(photo)}
                               alt={photo.fileName || photo.name}
                               className="w-full h-24 object-cover rounded-lg border"
+                              onError={handlePhotoError}
                             />
                             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
                               <Button
@@ -2854,6 +2954,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 src={getImageSource(photo)}
                                 alt={`Photo ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg border"
+                                onError={handlePhotoError}
                               />
                               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 rounded-lg flex items-center justify-center">
                                 <Button
@@ -3031,39 +3132,75 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           </Button>
                         )}
                       </div>
+                      
+
                       <div className="grid grid-cols-2 gap-3">
-                        {viewingItem.photos.map((photo, index) => (
-                          <div key={index} className="relative group">
-                            <img
-                              src={getImageSource(photo)}
-                              alt={`Photo ${index + 1}`}
-                              className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
-                              onClick={() => {
-                                // Open photo in full screen or modal
-                                const imageSource = getImageSource(photo);
-                                if (imageSource && !imageSource.includes('data:image/svg+xml')) {
-                                  window.open(imageSource, '_blank');
-                                }
-                              }}
-                            />
-                            <div className="absolute top-2 right-2">
-                              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
-                              }`}>
-                                {index + 1}
-                              </div>
-                            </div>
-                            {/* Show legacy photo indicator */}
-                            {photo.isLegacy && (
-                              <div className="absolute top-2 left-2">
-                                <div className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white">
-                                  Legacy
+                        {viewingItem.photos.map((photo, index) => {
+                          const imageSource = getImageSource(photo);
+                          
+                          return (
+                            <div key={index} className="relative group">
+                              <img
+                                src={imageSource}
+                                alt={`Photo ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
+                                onError={(event) => handlePhotoError(event, photo)}
+                                onClick={() => {
+                                  // Handle photo click based on source type
+                                  if (imageSource && !imageSource.includes('data:image/svg+xml')) {
+                                    // For regular URLs, open in new tab
+                                    if (imageSource.startsWith('http')) {
+                                      window.open(imageSource, '_blank');
+                                    } else {
+                                      // For data URLs, show in modal or download
+                                      openImageModal(imageSource, photo.fileName || photo.name || `Photo ${index + 1}`);
+                                    }
+                                  } else {
+                                    alert('This photo cannot be opened. It may be a legacy photo that needs migration.');
+                                  }
+                                }}
+                              />
+                              <div className="absolute top-2 right-2">
+                                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                  isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
+                                }`}>
+                                  {index + 1}
                                 </div>
                               </div>
-                            )}
-                          </div>
-                        ))}
+                              {/* Remove photo button */}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (confirm(`Are you sure you want to remove photo ${index + 1}?`)) {
+                                    handleRemovePhoto(viewingItem.id, index);
+                                  }
+                                }}
+                                className="absolute top-2 left-2 bg-red-600 hover:bg-red-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold transition-colors duration-200"
+                                title="Remove photo"
+                              >
+                                ×
+                              </button>
+                              {/* Show legacy photo indicator */}
+                              {photo.isLegacy && (
+                                <div className="absolute top-2 left-12">
+                                  <div className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-600 text-white">
+                                    Legacy
+                                  </div>
+                                </div>
+                              )}
+                              {/* Show photo info on hover */}
+                              <div className="absolute bottom-1 left-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                <div className="bg-black/70 text-white text-xs p-1 rounded">
+                                  {photo.fileName || photo.name || `Photo ${index + 1}`}
+                                  {photo.isLegacy && ' (Legacy)'}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
+                      
+
                     </div>
                   )}
                 </div>
@@ -3187,6 +3324,46 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Report
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Image Modal */}
+        {showImageModal && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className={`relative max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl ${
+              isDarkMode ? 'bg-gray-900' : 'bg-white'
+            }`}>
+              {/* Close button */}
+              <Button
+                onClick={() => setShowImageModal(false)}
+                variant="ghost"
+                size="sm"
+                className="absolute top-4 right-4 h-10 w-10 p-0 z-10 bg-black/50 hover:bg-black/70 text-white"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+              
+              {/* Image */}
+              <div className="flex items-center justify-center p-4">
+                <img
+                  src={imageModalData.imageSource}
+                  alt={imageModalData.fileName}
+                  className="max-w-full max-h-full object-contain rounded-lg"
+                  onError={handlePhotoError}
+                />
+              </div>
+              
+              {/* Image info */}
+              <div className={`absolute bottom-0 left-0 right-0 p-4 ${
+                isDarkMode ? 'bg-gray-900/90' : 'bg-white/90'
+              }`}>
+                <p className={`text-center font-medium ${
+                  isDarkMode ? 'text-white' : 'text-gray-900'
+                }`}>
+                  {imageModalData.fileName}
+                </p>
               </div>
             </div>
           </div>
