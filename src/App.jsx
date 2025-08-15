@@ -12,6 +12,7 @@ import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import DebugComponent from "./DebugComponent";
 import "./firebase"; // Initialize Firebase
+import "./mobile.css"; // Mobile responsive styles
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState(() => {
