@@ -37,8 +37,8 @@ export const DataProvider = ({ children }) => {
       totalIncidents: 0,
       activeMunicipalities: 0,
       inactiveMunicipalities: 0,
-      resolvedIncidents: 0,
-      pendingActions: 0,
+              totalIncidents: 0,
+        totalActions: 0,
       recentActivity: [],
       // Add IPatroller specific stats
       totalDailyPatrols: 0,
@@ -172,9 +172,7 @@ export const DataProvider = ({ children }) => {
             summaryStats: {
               ...prev.summaryStats,
               totalActions: actionReports.length,
-              pendingActions: actionReports.filter(report => 
-                report.status === 'Pending' || report.actionTaken === 'Pending'
-              ).length
+                        totalActions: actionReports.length
             }
           }));
         });
@@ -203,9 +201,7 @@ export const DataProvider = ({ children }) => {
             summaryStats: {
               ...prev.summaryStats,
               totalIncidents: incidents.length,
-              resolvedIncidents: incidents.filter(incident => 
-                incident.status === 'Resolved' || incident.actionType
-              ).length
+              totalIncidents: incidents.length
             }
           }));
         });

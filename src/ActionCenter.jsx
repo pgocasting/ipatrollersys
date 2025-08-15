@@ -124,7 +124,7 @@ import {
  *     how: string,
  *     actionTaken: string,
  *     otherInfo: string,
- *     status: "pending" | "resolved",
+ *     status: "active" | "completed",
  *     priority: "high" | "medium" | "low",
  *     patrolCount: number,
  *     incidentCount: number,
@@ -308,8 +308,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "resolved": return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
-      case "pending": return "bg-orange-100 text-orange-800 dark:bg-orange-900/20 dark:text-orange-400";
+      case "completed": return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
+      case "active": return "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400";
       case "urgent": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
@@ -403,10 +403,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   // Calculate totals (normalized to match table display)
   const totalActions = sortedItems.filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
-  const isResolved = (item) => normalize(item.status) === 'resolved' || normalize(item.actionTaken) === 'resolved';
-  const isPending = (item) => !isResolved(item);
-  const pendingActions = sortedItems.filter(isPending).length;
-  const resolvedActions = sortedItems.filter(isResolved).length;
+  const isCompleted = (item) => normalize(item.status) === 'completed' || normalize(item.actionTaken) === 'completed';
+  const isActive = (item) => !isCompleted(item);
+  const activeActions = sortedItems.filter(isActive).length;
+  const completedActions = sortedItems.filter(isCompleted).length;
   const highPriorityActions = sortedItems.filter(item => item.priority === "high").length;
   const totalPatrols = sortedItems.reduce((sum, item) => sum + (item.patrolCount || 0), 0);
   const totalIncidents = sortedItems.reduce((sum, item) => sum + (item.incidentCount || 0), 0);
@@ -515,8 +515,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   // Action Taken category counts
   const ACTION_TAKEN_ALIASES = {
-    'Resolved': ['resolved', 'complete', 'completed', 'closed', 'done'],
-    'Pending': ['pending', 'awaiting action', 'to do', 'todo', 'for action', 'for review'],
+          'Completed': ['completed', 'complete', 'closed', 'done', 'finished'],
+      'Active': ['active', 'in progress', 'ongoing', 'under investigation', 'for action'],
     'Under Investigation': ['under investigation', 'investigation', 'investigating', 'ongoing', 'ongoing investigation'],
     'Referred': ['referred', 'endorsed', 'forwarded'],
     'Arrested': ['arrested', 'apprehended']
@@ -684,8 +684,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     // Add summary statistics
     doc.text(`Total Actions: ${totalActions}`, 14, 75);
     doc.text(`Total Drugs: ${totalDrugs} (Male: ${totalDrugsMale}, Female: ${totalDrugsFemale})`, 14, 82);
-    doc.text(`Pending Actions: ${pendingActions}`, 14, 89);
-    doc.text(`Resolved Actions: ${resolvedActions}`, 14, 96);
+            doc.text(`Active Actions: ${activeActions}`, 14, 89);
+        doc.text(`Completed Actions: ${completedActions}`, 14, 96);
     doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 103);
     doc.text(`Total Patrols: ${totalPatrols}`, 14, 110);
     doc.text(`Total Incidents: ${totalIncidents}`, 14, 117);
@@ -987,7 +987,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const reportToSave = {
         ...newActionReport,
         photos: cleanPhotos,
-        status: newActionReport.actionTaken === "Resolved" ? "resolved" : "pending",
+        status: newActionReport.actionTaken === "Completed" ? "completed" : "active",
         priority: "medium",
         patrolCount: 0,
         incidentCount: 0,
@@ -1062,7 +1062,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const updatedReport = {
         ...editingItem,
         photos: cleanPhotos,
-        status: editingItem.actionTaken === "resolved" ? "resolved" : "pending"
+        status: editingItem.actionTaken === "completed" ? "completed" : "active"
       };
 
       // Remove any undefined values from the entire report
@@ -2069,7 +2069,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                               <td className="p-4">
                                 <Badge className={`rounded-none ${
-                                  item.actionTaken === "Resolved" 
+                                  item.actionTaken === "Completed" 
                                     ? isDarkMode 
                                       ? "bg-green-900/30 text-green-400" 
                                       : "bg-green-100 text-green-800"
@@ -2425,7 +2425,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </label>
                   <Input
                     type="text"
-                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
+                    placeholder="Enter action taken (e.g., Under investigation, Completed, Active)"
                     value={newActionReport.actionTaken}
                     onChange={(e) => handleInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${
@@ -2866,7 +2866,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </label>
                   <Input
                     type="text"
-                    placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
+                    placeholder="Enter action taken (e.g., Under investigation, Completed, Active)"
                     value={editingItem.actionTaken}
                     onChange={(e) => handleEditInputChange('actionTaken', e.target.value)}
                     className={`w-full p-3 rounded-lg border transition-all duration-200 ${

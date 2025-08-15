@@ -447,7 +447,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     date: "",
     time: "",
     description: "",
-    status: "Pending",
+    status: "Active",
     officer: "",
     witnesses: "",
     evidence: "",
@@ -1016,7 +1016,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       date: "",
       time: "",
       description: "",
-      status: "Pending",
+      status: "Active",
       officer: "",
       witnesses: "",
       evidence: "",
@@ -1206,7 +1206,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               date: values[headers.indexOf('WHEN')] || '',
               time: values[headers.indexOf('Time')] || values[headers.indexOf('TIME')] || '',
               description: description,
-              status: values[headers.indexOf('Status')] || values[headers.indexOf('STATUS')] || 'Pending',
+              status: values[headers.indexOf('Status')] || values[headers.indexOf('STATUS')] || 'Active',
               officer: values[headers.indexOf('WHO')] || values[headers.indexOf('Officer')] || values[headers.indexOf('OFFICER')] || '',
               witnesses: values[headers.indexOf('Witnesses')] || values[headers.indexOf('WITNESSES')] || '',
               evidence: values[headers.indexOf('Evidence')] || values[headers.indexOf('EVIDENCE')] || '',
@@ -1314,7 +1314,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 date: dateValue || '',
                 time: values[headers.indexOf('Time')] || values[headers.indexOf('TIME')] || '',
                 description: description,
-                status: values[headers.indexOf('Status')] || values[headers.indexOf('STATUS')] || 'Pending',
+                status: values[headers.indexOf('Status')] || values[headers.indexOf('STATUS')] || 'Active',
                 officer: values[headers.indexOf('WHO')] || values[headers.indexOf('Officer')] || values[headers.indexOf('OFFICER')] || '',
                 witnesses: values[headers.indexOf('Witnesses')] || values[headers.indexOf('WITNESSES')] || '',
                 evidence: values[headers.indexOf('Evidence')] || values[headers.indexOf('EVIDENCE')] || '',
@@ -1526,7 +1526,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     cleaned.location = cleaned.location || '';
     cleaned.description = cleaned.description || '';
     cleaned.officer = cleaned.officer || '';
-    cleaned.status = cleaned.status || 'Pending';
+            cleaned.status = cleaned.status || 'Active';
     
     return cleaned;
   };
@@ -1581,12 +1581,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
   const getStatusColor = (status) => {
     switch (status) {
-      case "Resolved":
+      case "Completed":
         return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400";
       case "Under Investigation":
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
-      case "Pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400";
+      case "Active":
+        return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400";
       default:
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
     }
@@ -1594,10 +1594,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
   const stats = {
     total: filteredIncidents.length,
-    resolved: filteredIncidents.filter(i => 
-      i.status === "Resolved" || 
-      i.status === "resolved" || 
-      i.status === "RESOLVED"
+    completed: filteredIncidents.filter(i => 
+      i.status === "Completed" || 
+      i.status === "completed" || 
+      i.status === "COMPLETED"
     ).length,
     actionTaken: filteredIncidents.filter(i => 
       i.actionType && i.actionType.trim() !== ""
@@ -3399,10 +3399,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     };
 
     const totalIncidents = filteredData.length;
-    const resolvedIncidents = filteredData.filter(incident => 
-      incident.status === 'Resolved' || 
-      incident.status === 'resolved' || 
-      incident.status === 'RESOLVED'
+    const completedIncidents = filteredData.filter(incident => 
+      incident.status === 'Completed' || 
+      incident.status === 'completed' || 
+      incident.status === 'COMPLETED'
     ).length;
     const actionTakenIncidents = filteredData.filter(incident => 
       incident.actionType && incident.actionType.trim() !== ""
@@ -3622,11 +3622,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       monthlyCounts[a] > monthlyCounts[b] ? a : b, 'None');
     
     // Resolution rate
-    const resolutionRate = totalIncidents > 0 ? ((resolvedIncidents / totalIncidents) * 100).toFixed(1) : 0;
+    const completionRate = totalIncidents > 0 ? ((completedIncidents / totalIncidents) * 100).toFixed(1) : 0;
     
     return {
       totalIncidents,
-      resolvedIncidents,
+              completedIncidents,
       actionTakenIncidents,
       underInvestigation,
       drugsIncidents,
@@ -4100,9 +4100,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   }`}
                 >
                   <option value="all">All Status</option>
-                  <option value="Pending">Pending</option>
-                  <option value="Under Investigation">Under Investigation</option>
-                  <option value="Resolved">Resolved</option>
+                                  <option value="Active">Active</option>
+                <option value="Under Investigation">Under Investigation</option>
+                <option value="Completed">Completed</option>
                 </select>
               </div>
 

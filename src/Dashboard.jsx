@@ -723,7 +723,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   incidents.slice(0, 5).map((incident, index) => {
                     const getStatusColor = (status) => {
                       switch (status) {
-                        case "Resolved":
+                        case "Completed":
                           return {
                             bg: isDarkMode ? 'bg-green-900/20 border-green-800/30' : 'bg-green-50 border-green-200',
                             icon: 'bg-green-900/30',
@@ -737,12 +737,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                             iconColor: 'text-blue-600 dark:text-blue-400',
                             svg: <Search className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                           };
-                        default: // Pending
+                        default: // Active
                           return {
-                            bg: isDarkMode ? 'bg-yellow-900/20 border-yellow-800/30' : 'bg-yellow-50 border-yellow-200',
-                            icon: 'bg-yellow-900/30',
-                            iconColor: 'text-yellow-600 dark:text-yellow-400',
-                            svg: <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                            bg: isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-200',
+                            icon: 'bg-blue-900/30',
+                            iconColor: 'text-blue-600 dark:text-blue-400',
+                            svg: <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                           };
                       }
                     };
@@ -772,7 +772,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           <div className={`text-xs font-medium mt-1 px-2 py-1 rounded-full transition-colors duration-300 ${
                             statusColors.bg.replace('bg-', 'bg-').replace('/20', '/30').replace('/30', '/40')
                           }`}>
-                            {incident.status || 'Pending'}
+                            {incident.status || 'Active'}
                           </div>
                         </div>
                       </div>
@@ -1010,11 +1010,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           isDarkMode ? 'text-white' : 'text-gray-900'
                         }`}>{incident.incidentType || 'Unknown Type'}</h4>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          incident.status === 'Resolved' || incident.actionType
+                          incident.status === 'Completed' || incident.actionType
                             ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
                             : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {incident.status === 'Resolved' || incident.actionType ? 'Resolved' : 'Pending'}
+                          {incident.status === 'Completed' || incident.actionType ? 'Completed' : 'Active'}
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
@@ -1101,11 +1101,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           isDarkMode ? 'text-white' : 'text-gray-900'
                         }`}>{report.what || 'Action Report'}</h4>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          report.status === 'Resolved' || report.actionTaken === 'Resolved'
+                          report.status === 'Completed' || report.actionTaken === 'Completed'
                             ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
                             : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
                         }`}>
-                          {report.status === 'Resolved' || report.actionTaken === 'Resolved' ? 'Resolved' : 'Pending'}
+                          {report.status === 'Completed' || report.actionTaken === 'Completed' ? 'Completed' : 'Active'}
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
