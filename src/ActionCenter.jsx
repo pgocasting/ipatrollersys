@@ -554,7 +554,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const totalFishCaught = (sortedItems || []).reduce((sum, item) => sum + (item.fishCaught || 0), 0);
   const totalBoatsInspected = (sortedItems || []).reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
   
-  // Agriculture/Bantay Dagat specific illegal categories
+  // Agriculture/Bantay Dagat specific illegal categories - ONLY based on table data
   const { agricultureIllegalCategoryCounts, totalAgricultureIllegals } = (() => {
     const counts = {};
     let total = 0;
@@ -566,17 +566,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           .map(v => normalize(v))
           .join(' ');
         
-        // Check predefined illegal categories first
-        let matched = false;
-        for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
-          if (keys.some(kw => text.includes(kw))) {
-            counts[cat] = (counts[cat] || 0) + 1;
-            matched = true;
-          }
-        }
-        
-        // Dynamically detect new categories from the agriculture data
-        if (!matched && text.length > 0) {
+        // Only create categories from actual table data, no predefined categories
+        if (text.length > 0) {
           // Extract potential category from the main description
           const mainText = item.what || item.why || '';
           if (mainText && mainText.trim().length > 0) {
@@ -599,12 +590,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             
             if (categoryName.length > 0 && !isUnwanted) {
               counts[categoryName] = (counts[categoryName] || 0) + 1;
-              matched = true;
+              total += 1; // count each item once in total
             }
           }
         }
-        
-        if (matched) total += 1; // count each item once in total
       });
     }
     
