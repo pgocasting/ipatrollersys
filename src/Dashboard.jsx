@@ -654,28 +654,66 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-     // Calculate weekly activity from IPatroller data
+     // State for time period selection
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
+
+  // Calculate activity data based on selected time period
+  const getActivityData = (period) => {
+    switch (period) {
+      case 'monthly':
+        // Monthly data for the last 12 months
+        const monthlyTotals = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        const monthNames = [
+          'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+          'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+        ];
+        
+        ipatrollerData.forEach(row => {
+          row.data.forEach((patrols, monthIndex) => {
+            if (monthIndex < 12) {
+              monthlyTotals[monthIndex] += patrols;
+            }
+          });
+        });
+        
+        return {
+          labels: monthNames,
+          datasets: [{
+            label: 'Last 12 Months',
+            data: monthlyTotals,
+            backgroundColor: [
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(16, 185, 129, 0.8)',
+              'rgba(245, 158, 11, 0.8)',
+              'rgba(239, 68, 68, 0.8)',
+              'rgba(139, 92, 246, 0.8)',
+              'rgba(236, 72, 153, 0.8)',
+              'rgba(34, 197, 94, 0.8)',
+              'rgba(168, 85, 247, 0.8)',
+              'rgba(236, 72, 153, 0.8)',
+              'rgba(34, 197, 94, 0.8)',
+              'rgba(59, 130, 246, 0.8)',
+              'rgba(16, 185, 129, 0.8)',
+            ],
+          }],
+        };
+
+      case 'weekly':
+      default:
+        // Weekly data (existing logic)
    const weeklyTotals = [0, 0, 0, 0, 0, 0, 0]; // Mon, Tue, Wed, Thu, Fri, Sat, Sun
    
    ipatrollerData.forEach(row => {
      row.data.forEach((patrols, dayIndex) => {
-       if (dayIndex < 7) { // Ensure we only count the first 7 days (week)
+            if (dayIndex < 7) {
          weeklyTotals[dayIndex] += patrols;
        }
      });
    });
 
-   // Debug: Log the weekly totals to verify data
-   console.log('Weekly Activity Data:', {
-     ipatrollerDataLength: ipatrollerData.length,
-     weeklyTotals,
-     sampleMunicipality: ipatrollerData[0] ? ipatrollerData[0].municipality : 'No IPatroller data'
-   });
-
-   const weeklyData = {
+        return {
      labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-     datasets: [
-       {
+          datasets: [{
          label: 'This Week',
          data: weeklyTotals,
          backgroundColor: [
@@ -687,9 +725,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
            'rgba(236, 72, 153, 0.8)',
            'rgba(34, 197, 94, 0.8)',
          ],
-       },
-     ],
-   };
+          }],
+        };
+    }
+  };
+
+  // Get current activity data based on selected time period
+  const currentActivityData = getActivityData(selectedTimePeriod);
+
+  // Debug: Log the activity data to verify
+  console.log('Activity Data:', {
+    selectedTimePeriod,
+    ipatrollerDataLength: ipatrollerData.length,
+    currentActivityData,
+    sampleMunicipality: ipatrollerData[0] ? ipatrollerData[0].municipality : 'No IPatroller data'
+  });
 
      // Calculate district distribution from IPatroller data
    const districtTotals = {};
@@ -1058,19 +1108,47 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         {/* Charts Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           
-          {/* Weekly Activity Chart */}
+          {/* Activity Chart with Time Period Selector */}
           <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardHeader className="pb-3 md:pb-4">
+              <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 md:gap-3">
                 <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center bg-blue-100">
                   <BarChart3 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                 </div>
-                <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Weekly Activity</CardTitle>
+                  <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">
+                    {selectedTimePeriod === 'monthly' ? 'Monthly Activity' : 'Weekly Activity'}
+                  </CardTitle>
+                </div>
+                
+                {/* Time Period Selector */}
+                <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+                  <button
+                    onClick={() => setSelectedTimePeriod('weekly')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                      selectedTimePeriod === 'weekly'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Weekly
+                  </button>
+                  <button
+                    onClick={() => setSelectedTimePeriod('monthly')}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                      selectedTimePeriod === 'monthly'
+                        ? 'bg-white text-blue-600 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
               <div className="h-60 md:h-80">
-                <Bar data={weeklyData} options={chartOptions} />
+                <Bar data={currentActivityData} options={chartOptions} />
               </div>
             </CardContent>
           </Card>
