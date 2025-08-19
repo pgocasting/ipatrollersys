@@ -5,8 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { writeBatch, doc } from "firebase/firestore";
 import { db } from "./firebase";
 import { 
@@ -22,7 +22,6 @@ import {
   Trash2,
   Filter,
   MapPin,
-  Printer,
   RefreshCw,
   Search,
   Settings,
@@ -178,6 +177,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     illegalType: "",
     otherIllegalType: ""
   });
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [pdfDescription, setPdfDescription] = useState("");
     // Load action items from Firestore
     const loadActionReports = async () => {
       setLoading(true);
@@ -717,65 +718,206 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     setSelectedItem(null);
   };
   const exportToPDF = () => {
-    const doc = new jsPDF();
-    // Add title
-    doc.setFontSize(20);
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+    
+    // Set page dimensions
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 40;
+    const contentWidth = pageWidth - (2 * margin);
+    
+    // Add page border
+    doc.rect(margin, margin, contentWidth, pageHeight - (2 * margin));
+    
+    // Add header
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('Action Center Report', 14, 22);
-    // Add report details
+    doc.text('Action Center Report', pageWidth / 2, 80, { align: 'center' });
+    
+    // Add description if provided
+    if (pdfDescription && pdfDescription.trim()) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'italic');
+      const descriptionLines = doc.splitTextToSize(pdfDescription.trim(), contentWidth - 40);
+      let descriptionY = 105;
+      descriptionLines.forEach((line, index) => {
+        doc.text(line, pageWidth / 2, descriptionY + (index * 15), { align: 'center' });
+      });
+      var finalDescriptionY = descriptionY + (descriptionLines.length * 15) + 10;
+    }
+    
+    // Add report details section
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Month: ${months[selectedMonth] || 'Unknown'}`, 14, 35);
-    doc.text(`Year: ${selectedYear}`, 14, 42);
-    doc.text(`District: ${selectedDistrict || "All Districts"}`, 14, 49);
-    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, 14, 56);
-    doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, 14, 63);
+    
+    const detailsY = pdfDescription && pdfDescription.trim() ? (finalDescriptionY + 20) : 120;
+    const lineHeight = 20;
+    
+    // Report details in two columns
+    doc.text(`Month: ${months[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
+    doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
+    
+    doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
+    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, pageWidth / 2 + 20, detailsY + lineHeight);
+    
+    doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, margin + 20, detailsY + (2 * lineHeight));
+    
     // Add summary statistics
-    doc.text(`Total Actions: ${totalActions}`, 14, 75);
-    doc.text(`Total Drugs: ${totalDrugs} (Male: ${totalDrugsMale}, Female: ${totalDrugsFemale})`, 14, 82);
-    doc.text(`Pending Actions: ${pendingActions}`, 14, 89);
-    doc.text(`Resolved Actions: ${resolvedActions}`, 14, 96);
-    doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 103);
-    doc.text(`Total Patrols: ${totalPatrols}`, 14, 110);
-    doc.text(`Total Incidents: ${totalIncidents}`, 14, 117);
-    // Prepare table data (hide Why/How in export)
-    const tableData = (sortedItems || []).map(item => [
-      item.municipality,
-      item.district,
-      item.what,
-      formatDate(item.when),
-      item.where,
-      // hide who as requested
-      // item.who,
-      item.actionTaken,
-      item.source || 'N/A',
-      item.otherInfo
-    ]);
-    // Add table
-    doc.autoTable({
-      head: [['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken', 'Source', 'Other Information']],
+    const statsY = detailsY + (4 * lineHeight);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Summary Statistics', margin + 20, statsY);
+    
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    // Statistics in a grid layout
+    const statsData = [
+      { label: 'Total Actions', value: totalActions },
+      { label: 'Pending Actions', value: pendingActions },
+      { label: 'Resolved Actions', value: resolvedActions },
+      { label: 'High Priority Actions', value: highPriorityActions }
+    ];
+    
+    if (activeTab === "pnp") {
+      statsData.push(
+        { label: 'Total Drugs', value: totalDrugs },
+        { label: 'Male Drugs', value: totalDrugsMale },
+        { label: 'Female Drugs', value: totalDrugsFemale },
+        { label: 'Total Illegals', value: totalIllegals }
+      );
+    } else if (activeTab === "agriculture") {
+      statsData.push(
+        { label: 'Total Illegals', value: totalAgricultureIllegals },
+        { label: 'Fishing Violations', value: totalFishingViolations },
+        { label: 'Illegal Fishing', value: totalIllegalFishing }
+      );
+    } else if (activeTab === "pg-enro") {
+      statsData.push(
+        { label: 'Environmental Violations', value: totalEnvironmentalViolations },
+        { label: 'Waste Management', value: totalWasteManagement },
+        { label: 'Tree Planting', value: totalTreePlanting }
+      );
+    }
+    
+    // Display statistics in a grid
+    const statsPerRow = 2;
+    let currentRow = 0;
+    let currentCol = 0;
+    
+    statsData.forEach((stat, index) => {
+      const x = margin + 20 + (currentCol * (contentWidth / statsPerRow));
+      const y = statsY + 30 + (currentRow * 25);
+      
+      doc.text(`${stat.label}: ${stat.value}`, x, y);
+      
+      currentCol++;
+      if (currentCol >= statsPerRow) {
+        currentCol = 0;
+        currentRow++;
+      }
+    });
+    
+    // Prepare table data based on active tab
+    let tableHeaders = ['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken'];
+    let tableData = [];
+    
+    if (activeTab === "pnp") {
+      tableHeaders.push('Source', 'Other Information');
+      tableData = (sortedItems || []).map(item => [
+        item.municipality || 'N/A',
+        item.district || 'N/A',
+        item.what || 'N/A',
+        formatDate(item.when),
+        item.where || 'N/A',
+        item.actionTaken || 'N/A',
+        item.source || 'N/A',
+        item.otherInfo || 'N/A'
+      ]);
+    } else if (activeTab === "agriculture") {
+      tableHeaders.push('Illegal Type', 'Other Information');
+      tableData = (sortedItems || []).map(item => [
+        item.municipality || 'N/A',
+        item.district || 'N/A',
+        item.what || 'N/A',
+        formatDate(item.when),
+        item.where || 'N/A',
+        item.actionTaken || 'N/A',
+        item.illegalType || 'N/A',
+        item.otherInfo || 'N/A'
+      ]);
+    } else if (activeTab === "pg-enro") {
+      tableHeaders.push('Source', 'Other Information');
+      tableData = (sortedItems || []).map(item => [
+        item.municipality || 'N/A',
+        item.district || 'N/A',
+        item.what || 'N/A',
+        formatDate(item.when),
+        item.where || 'N/A',
+        item.actionTaken || 'N/A',
+        item.source || 'N/A',
+        item.otherInfo || 'N/A'
+      ]);
+    }
+    
+    // Calculate table start position
+    const tableStartY = statsY + (Math.ceil(statsData.length / statsPerRow) * 25) + 60;
+    
+    // Add table title
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Action Items Details', margin + 20, tableStartY - 20);
+    
+    // Add table with auto table
+    autoTable(doc, {
+      head: [tableHeaders],
       body: tableData,
-      startY: 125,
+      startY: tableStartY,
       styles: {
         fontSize: 8,
-        cellPadding: 2
+        cellPadding: 4,
+        font: 'helvetica'
       },
       headStyles: {
         fillColor: [59, 130, 246],
         textColor: 255,
-        fontStyle: 'bold'
+        fontStyle: 'bold',
+        fontSize: 9,
+        cellPadding: 6
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252]
       },
-      margin: { top: 125 }
+      margin: { top: tableStartY, left: margin, right: margin },
+      tableWidth: 'auto',
+      columnStyles: {
+        0: { cellWidth: 'auto' }, // Municipality
+        1: { cellWidth: 'auto' }, // District
+        2: { cellWidth: 'auto' }, // What
+        3: { cellWidth: 'auto' }, // When
+        4: { cellWidth: 'auto' }, // Where
+        5: { cellWidth: 'auto' }, // Action Taken
+        6: { cellWidth: 'auto' }, // Source/Illegal Type
+        7: { cellWidth: 'auto' }  // Other Information
+      }
     });
+    
+    // Add footer
+    const footerY = pageHeight - 60;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY, { align: 'center' });
+    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
+    
     // Save the PDF
-    doc.save(`action-center-report-${(months[selectedMonth] || 'unknown').toLowerCase()}-${selectedYear}.pdf`);
+    const fileName = `action-center-${activeTab}-${months[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    doc.save(fileName);
   };
-  const handlePrint = () => {
-    window.print();
+
+  const openPreviewModal = () => {
+    setShowPreviewModal(true);
   };
+
   const formatDate = (date) => {
     // Handle Firestore Timestamp objects
     if (date && typeof date === 'object' && date.seconds) {
@@ -1309,21 +1451,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <span className="hidden sm:inline ml-2">Refresh</span>
               </Button>
             <Button
-              onClick={exportToPDF}
+              onClick={openPreviewModal}
               className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Export PDF"
+              title="Preview Report"
             >
-              <Download className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">PDF</span>
+              <Eye className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">Preview</span>
               </Button>
-            <Button
-              onClick={handlePrint}
-              className="bg-purple-600 hover:bg-purple-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Print Report"
-            >
-              <Printer className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Print</span>
-              </Button>
+
             </div>
           </div>
         {/* Success Message */}
@@ -1428,12 +1563,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="flex items-center gap-2">
                   <div className="p-1.5 rounded-lg bg-blue-100/80">
                     <Filter className="h-3.5 w-3.5 text-blue-600" />
-                </div>
-                <div>
+                  </div>
+                  <div>
                     <h3 className="text-sm font-semibold transition-colors duration-300 text-gray-800">Filters & Search</h3>
                     <p className="text-xs transition-colors duration-300 text-gray-600">Refine your data view</p>
+                  </div>
                 </div>
-              </div>
                 <Button
                   onClick={() => {
                     setSearchTerm("");
@@ -1489,16 +1624,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                <div className="space-y-1 md:space-y-0.5">
+                <div className="space-y-0.5">
                   <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Search</label>
                   <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-3 md:w-3 text-gray-400" />
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
                     <Input
                       type="text"
                       placeholder="Search actions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 p-2 md:p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs md:text-xs border-gray-200 bg-white text-gray-900"
+                      className="pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                     />
                     {searchTerm && (
                       <button
@@ -1510,7 +1645,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </div>
                 </div>
-              </div>
               </div>
             </div>
           {/* Summary Cards */}
@@ -1774,8 +1908,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 return Filter;
                               case "MapPin":
                                 return MapPin;
-                              case "Printer":
-                                return Printer;
+
                               case "RefreshCw":
                                 return RefreshCw;
                               case "Search":
@@ -3155,6 +3288,217 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
+        {/* Preview Modal */}
+        {showPreviewModal && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+            <div className="relative w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl bg-white">
+              {/* Header with Export PDF button */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-blue-100">
+                    <FileText className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Action Center Report Preview</h3>
+                    <p className="text-sm text-gray-600">
+                      {months[selectedMonth] || 'All Months'} {selectedYear || 'All Years'} • {activeTab?.toUpperCase()}
+                    </p>
+                  </div>
+                </div>
+                                 <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-2">
+                     <input
+                       type="text"
+                       placeholder="Add description (optional)"
+                       value={pdfDescription}
+                       onChange={(e) => setPdfDescription(e.target.value)}
+                       className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                     />
+                   </div>
+                   <Button
+                     onClick={exportToPDF}
+                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2"
+                     title="Export to PDF"
+                   >
+                     <Download className="w-4 h-4 mr-2" />
+                     Export PDF
+                   </Button>
+                  <Button
+                    onClick={() => setShowPreviewModal(false)}
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-10 p-0"
+                  >
+                    <X className="h-5 w-5" />
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Preview Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+                                 {/* Report Header */}
+                 <div className="text-center mb-8 p-6 bg-blue-50 rounded-xl border border-blue-200">
+                   <h1 className="text-3xl font-bold text-blue-900 mb-2">Action Center Report</h1>
+                   {pdfDescription && pdfDescription.trim() && (
+                     <p className="text-sm italic text-blue-700 mb-4 max-w-2xl mx-auto">
+                       {pdfDescription}
+                     </p>
+                   )}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <span className="font-semibold text-blue-700">Month:</span>
+                      <p className="text-blue-900">{months[selectedMonth] || 'All Months'}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-700">Year:</span>
+                      <p className="text-blue-900">{selectedYear || 'All Years'}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-700">District:</span>
+                      <p className="text-blue-900">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
+                    </div>
+                    <div>
+                      <span className="font-semibold text-blue-700">Department:</span>
+                      <p className="text-blue-900">{(activeTab || 'unknown').toUpperCase()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Summary Statistics */}
+                <div className="mb-8">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Summary Statistics</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600">Total Actions</p>
+                      <p className="text-2xl font-bold text-blue-600">{totalActions}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600">Pending Actions</p>
+                      <p className="text-2xl font-bold text-orange-600">{pendingActions}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600">Resolved Actions</p>
+                      <p className="text-2xl font-bold text-green-600">{resolvedActions}</p>
+                    </div>
+                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <p className="text-sm font-medium text-gray-600">High Priority</p>
+                      <p className="text-2xl font-bold text-red-600">{highPriorityActions}</p>
+                    </div>
+                    
+                    {/* Tab-specific statistics */}
+                    {activeTab === "pnp" && (
+                      <>
+                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
+                          <p className="text-sm font-medium text-red-600">Total Drugs</p>
+                          <p className="text-2xl font-bold text-red-600">{totalDrugs}</p>
+                        </div>
+                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
+                          <p className="text-sm font-medium text-purple-600">Total Illegals</p>
+                          <p className="text-2xl font-bold text-purple-600">{totalIllegals}</p>
+                        </div>
+                      </>
+                    )}
+                    
+                    {activeTab === "agriculture" && (
+                      <>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-sm font-medium text-green-600">Total Illegals</p>
+                          <p className="text-2xl font-bold text-green-600">{totalAgricultureIllegals}</p>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
+                          <p className="text-2xl font-bold text-blue-600">{totalFishingViolations}</p>
+                        </div>
+                      </>
+                    )}
+                    
+                    {activeTab === "pg-enro" && (
+                      <>
+                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                          <p className="text-sm font-medium text-green-600">Environmental</p>
+                          <p className="text-2xl font-bold text-green-600">{totalEnvironmentalViolations}</p>
+                        </div>
+                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                          <p className="text-sm font-medium text-blue-600">Waste Management</p>
+                          <p className="text-2xl font-bold text-blue-600">{totalWasteManagement}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Items Table */}
+                <div className="mb-8">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Action Items Details</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border border-gray-200 rounded-lg">
+                      <thead className="bg-blue-600 text-white">
+                        <tr>
+                          <th className="p-3 text-left text-sm font-semibold">Municipality</th>
+                          <th className="p-3 text-left text-sm font-semibold">District</th>
+                          <th className="p-3 text-left text-sm font-semibold">What</th>
+                          <th className="p-3 text-left text-sm font-semibold">When</th>
+                          <th className="p-3 text-left text-sm font-semibold">Where</th>
+                          <th className="p-3 text-left text-sm font-semibold">Action Taken</th>
+                          {activeTab === "pnp" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
+                          {activeTab === "agriculture" && <th className="p-3 text-left text-sm font-semibold">Illegal Type</th>}
+                          {activeTab === "pg-enro" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
+                          <th className="p-3 text-left text-sm font-semibold">Other Info</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(sortedItems || []).slice(0, 20).map((item, index) => (
+                          <tr key={item.id || index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                            <td className="p-3 text-sm border-b border-gray-200">{item.municipality || 'N/A'}</td>
+                            <td className="p-3 text-sm border-b border-gray-200">{item.district || 'N/A'}</td>
+                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.what}>{item.what || 'N/A'}</td>
+                            <td className="p-3 text-sm border-b border-gray-200">{formatDate(item.when)}</td>
+                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.where}>{item.where || 'N/A'}</td>
+                            <td className="p-3 text-sm border-b border-gray-200">
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                item.actionTaken === "Resolved" 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.actionTaken || 'N/A'}
+                              </span>
+                            </td>
+                            {activeTab === "pnp" && (
+                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                            )}
+                            {activeTab === "agriculture" && (
+                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.illegalType}>{item.illegalType || 'N/A'}</td>
+                            )}
+                            {activeTab === "pg-enro" && (
+                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                            )}
+                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.otherInfo}>{item.otherInfo || 'N/A'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {sortedItems && sortedItems.length > 20 && (
+                      <p className="text-sm text-gray-600 mt-2 text-center">
+                        Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Generated on: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Department: {(activeTab || 'unknown').toUpperCase()} | Total Records: {sortedItems ? sortedItems.length : 0}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        </div>
       </section>
     </Layout>
   );
