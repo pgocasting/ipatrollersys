@@ -157,11 +157,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Helper function to get top performers data
   const getTopPerformers = () => {
-    // Use filtered data if available, otherwise fall back to current data
-    const dataToUse = filteredTopPerformersData.length > 0 ? filteredTopPerformersData : ipatrollerData;
+    // Only use filtered data for the selected month, no fallback
+    const dataToUse = filteredTopPerformersData;
     
     if (!dataToUse || dataToUse.length === 0) {
-      console.warn('No data available for top performers calculation');
+      console.warn('No data available for the selected month');
       return [];
     }
     
@@ -1602,12 +1602,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           <div className="rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                                <div className="flex items-center gap-3">
-                    <div className="h-12 w-12 rounded-full flex items-center justify-center bg-emerald-100">
-                      <Target className="h-7 w-7 text-emerald-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">Top Performers Dashboard</h3>
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full flex items-center justify-center bg-emerald-100">
+                  <Target className="h-7 w-7 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">Top Performers Dashboard</h3>
                       <p className="text-sm transition-colors duration-300 text-gray-600">
                         Top 12 performing municipalities based on patrol data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                       </p>
@@ -1637,16 +1637,32 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[75vh]">
-              {/* Filters Section */}
-              <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80 mb-6">
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-gray-600" />
-                      <span className="font-medium text-gray-700">Filter by Period:</span>
-                      {loadingTopPerformers && (
-                        <div className="flex items-center gap-2 ml-2">
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+              {loadingTopPerformers ? (
+                <div className="flex items-center justify-center h-64">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+                </div>
+              ) : filteredTopPerformersData.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-64 text-center">
+                  <div className="h-16 w-16 rounded-full flex items-center justify-center bg-gray-100 mb-4">
+                    <AlertCircle className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">No Data Available</h3>
+                  <p className="text-gray-600 max-w-md">
+                    There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Filters Section */}
+                  <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80 mb-6">
+                    <CardContent className="p-4">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-5 h-5 text-gray-600" />
+                          <span className="font-medium text-gray-700">Filter by Period:</span>
+                          {loadingTopPerformers && (
+                            <div className="flex items-center gap-2 ml-2">
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
                           <span className="text-xs text-emerald-600">Loading data...</span>
                         </div>
                       )}
