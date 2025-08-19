@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Separator } from "./components/ui/separator";
-import { ThemeToggle } from "./components/ui/theme-toggle";
-import { useTheme } from "./ThemeContext";
+
 import { useFirebase } from "./hooks/useFirebase";
 import { 
   Home, 
@@ -24,7 +23,6 @@ const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
 
 export default function Layout({ children, onNavigate, currentPage, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { isDarkMode } = useTheme();
   const { user } = useFirebase();
   
   // Close sidebar when screen size changes to desktop
@@ -78,11 +76,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   ];
 
   return (
-    <div className={`min-h-screen transition-all duration-300 max-w-full ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900' 
-        : 'bg-gradient-to-br from-blue-50 via-white to-purple-50'
-    }`}>
+    <div className="min-h-screen transition-all duration-300 max-w-full bg-gradient-to-br from-blue-50 via-white to-purple-50">
       {/* Mobile Sidebar Overlay */}
       {sidebarOpen && (
         <div 
@@ -96,17 +90,11 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         id="sidebar"
         className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-4 flex flex-col transition-all duration-300 overflow-y-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } ${
-          isDarkMode 
-            ? 'bg-gray-900/95 border-gray-700' 
-            : 'bg-white/95 border-gray-200'
-        }`}
+        } bg-white/95 border-gray-200`}
       >        
         {/* Sidebar Header */}
         <div className="flex items-center justify-between mb-8">
-          <div className={`text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2 transition-colors duration-300 ${
-            isDarkMode ? 'text-blue-300' : 'text-blue-700'
-          }`}>
+                      <div className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2 transition-colors duration-300 text-blue-700">
             <Shield className="h-8 w-8" />
             <span className="hidden md:inline">Dashboard</span>
             <span className="md:hidden">IPatroller</span>
@@ -136,9 +124,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
               className={`justify-start h-12 text-base font-medium transition-all duration-200 ${
                 currentPage === item.id 
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
-                  : isDarkMode
-                    ? 'text-gray-200 hover:text-blue-400 hover:bg-blue-900/20'
-                    : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                  : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
               }`}
             >
               <span className="mr-3">{item.icon}</span>
@@ -148,7 +134,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         </nav>
 
         {/* Settings at Bottom */}
-        <div className="mt-auto pt-4 border-t transition-colors duration-300 border-gray-200 dark:border-gray-700">
+        <div className="mt-auto pt-4 border-t transition-colors duration-300 border-gray-200">
           <Button
             onClick={() => { 
               setSidebarOpen(false); 
@@ -158,9 +144,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 ${
               currentPage === 'settings' 
                 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
-                : isDarkMode
-                  ? 'text-gray-200 hover:text-blue-400 hover:bg-blue-900/20'
-                  : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
+                : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
             }`}
           >
             <span className="mr-3"><Settings className="h-5 w-5" /></span>
@@ -170,11 +154,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       </aside>
 
       {/* Responsive Header */}
-      <header className={`fixed z-30 top-0 left-0 w-full md:left-56 md:w-[calc(100%-224px)] px-3 md:px-6 py-3 md:py-6 backdrop-blur-xl border-b flex items-center justify-between gap-3 md:gap-4 transition-all duration-300 ${
-        isDarkMode 
-          ? 'bg-gray-900/80 border-gray-700' 
-          : 'bg-white/80 border-gray-200'
-      }`}>
+      <header className="fixed z-30 top-0 left-0 w-full md:left-56 md:w-[calc(100%-224px)] px-3 md:px-6 py-3 md:py-6 backdrop-blur-xl border-b flex items-center justify-between gap-3 md:gap-4 transition-all duration-300 bg-white/80 border-gray-200">
         {/* Hamburger for mobile */}
         <Button
           id="hamburger"
@@ -188,17 +168,12 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         </Button>
 
         {/* Page Title */}
-        <h1 className={`text-lg md:text-2xl font-bold capitalize flex-1 truncate transition-colors duration-300 ${
-          isDarkMode ? 'text-white' : 'text-gray-900'
-        }`}>
+        <h1 className="text-lg md:text-2xl font-bold capitalize flex-1 truncate transition-colors duration-300 text-gray-900">
           {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
         </h1>
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 md:gap-3">
-          {/* Theme Toggle */}
-          <ThemeToggle />
-
           {/* User Profile */}
           <div className="relative">
             <Button
@@ -219,14 +194,14 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             </Button>
             
             {showProfile && (
-              <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-xl border z-50 p-4 transition-all duration-300">
+              <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-xl border z-50 p-4 transition-all duration-300 bg-white border-gray-200">
                 <div className="flex items-center gap-3 mb-3">
                   <span className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold">
                     {initials}
                   </span>
                   <div>
-                    <div className="font-semibold transition-colors duration-300">{userInfo.name}</div>
-                    <div className="text-sm transition-colors duration-300 text-gray-600 dark:text-gray-300">{userInfo.email}</div>
+                    <div className="font-semibold transition-colors duration-300 text-gray-900">{userInfo.name}</div>
+                    <div className="text-sm transition-colors duration-300 text-gray-600">{userInfo.email}</div>
                   </div>
                 </div>
                 <Separator className="my-3" />
@@ -243,7 +218,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       </header>
 
       {/* Main Content */}
-      <main className="flex-1 min-h-screen max-w-full transition-all duration-300" 
+      <main className="flex-1 min-h-screen max-w-full transition-all duration-300 bg-white" 
         style={{ 
           marginLeft: window.innerWidth >= 768 ? SIDEBAR_WIDTH : 0, 
           paddingTop: 72 

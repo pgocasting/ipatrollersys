@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
-import { useTheme } from "./ThemeContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
@@ -103,7 +102,6 @@ import {
   Briefcase,
   FileText
 } from "lucide-react";
-
 /**
  * Action Center Component
  * 
@@ -133,7 +131,6 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { isDarkMode } = useTheme();
   const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -181,56 +178,49 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     illegalType: "",
     otherIllegalType: ""
   });
-
-  // Load action items from Firestore
-  const loadActionReports = async () => {
-    setLoading(true);
-    try {
-      const result = await getActionReports();
-      if (result.success) {
+    // Load action items from Firestore
+    const loadActionReports = async () => {
+      setLoading(true);
+      try {
+        const result = await getActionReports();
+        if (result.success) {
         // Store all reports
         setAllActionReports(result.data);
-        // Filter by active tab if needed
+          // Filter by active tab if needed
         console.log('Loading action reports:', {
           totalReports: result.data.length,
           activeTab: activeTab,
           departments: result.data.map(r => r.department),
           pgEnroReports: result.data.filter(r => r.department === 'pg-enro')
         });
-        
-        const filteredReports = result.data.filter(report => 
-          activeTab === "all" || report.department === activeTab
-        );
-        
+          const filteredReports = result.data.filter(report => 
+            activeTab === "all" || report.department === activeTab
+          );
         console.log('Filtered reports:', {
           activeTab: activeTab,
           filteredCount: filteredReports.length,
           filteredDepartments: filteredReports.map(r => r.department)
         });
-        
-        setActionItems(filteredReports);
-      } else {
-        console.error('Error loading action reports:', result.error);
-        setActionItems([]);
+          setActionItems(filteredReports);
+        } else {
+          console.error('Error loading action reports:', result.error);
+          setActionItems([]);
         setAllActionReports([]);
+        }
+      } catch (error) {
+        console.error('Error loading action reports:', error);
+        setActionItems([]);
+      } finally {
+        setLoading(false);
       }
-    } catch (error) {
-      console.error('Error loading action reports:', error);
-      setActionItems([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
+    };
   useEffect(() => {
     loadActionReports();
   }, [activeTab, getActionReports]);
-
   const months = [
     "January", "February", "March", "April", "May", "June",
     "July", "August", "September", "October", "November", "December"
   ];
-
   // Municipalities by district mapping
   const municipalitiesByDistrict = {
     "1ST DISTRICT": [
@@ -252,14 +242,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       "Morong"
     ]
   };
-
   const districts = [
     { id: "all", name: "All Districts" },
     { id: "1ST DISTRICT", name: "1ST DISTRICT" },
     { id: "2ND DISTRICT", name: "2ND DISTRICT" },
     { id: "3RD DISTRICT", name: "3RD DISTRICT" }
   ];
-
   // Handle adding new illegal types
   const handleAddIllegalType = () => {
     if (newIllegalType.trim()) {
@@ -272,7 +260,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         setSuccessMessage(`New illegal type "${newIllegalType}" added to ${currentDepartment} successfully!`);
         setNewIllegalType("");
         setShowAddIllegalTypeModal(false);
-        
         // Clear success message after 3 seconds
         setTimeout(() => setSuccessMessage(""), 3000);
       }
@@ -280,21 +267,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert("Please enter a valid illegal type.");
     }
   };
-
   // Handle cleaning duplicates
   const handleCleanDuplicates = async () => {
     try {
       setLoading(true);
-      
       // Find duplicates based on key fields
       const duplicates = [];
       const seen = new Set();
       const originalItems = new Map(); // Keep track of original items
-      
       actionItems.forEach((item, index) => {
         // Create a unique key based on municipality, district, what, when, where
         const key = `${item.municipality}-${item.district}-${item.what}-${item.when}-${item.where}`;
-        
         if (seen.has(key)) {
           // This is a duplicate - add to duplicates array
           duplicates.push({ ...item, index });
@@ -304,33 +287,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           originalItems.set(key, item);
         }
       });
-      
       if (duplicates.length === 0) {
         alert('No duplicates found in the data.');
         return;
       }
-      
       // Confirm deletion
       const confirmed = window.confirm(
         `Found ${duplicates.length} duplicate entries. The original entries will be kept. Do you want to remove the duplicates? This action cannot be undone.`
       );
-      
       if (confirmed) {
         // Remove duplicates from Firestore
         const batch = writeBatch(db);
-        
         duplicates.forEach(duplicate => {
           const docRef = doc(db, 'actionReports', duplicate.id);
           batch.delete(docRef);
         });
-        
         await batch.commit();
-        
         // Update local state - keep only original items
         setActionItems(prevItems => 
           prevItems.filter(item => !duplicates.some(dup => dup.id === item.id))
         );
-        
         alert(`Successfully removed ${duplicates.length} duplicate entries. Original entries have been preserved.`);
       }
     } catch (error) {
@@ -340,7 +316,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(false);
     }
   };
-
   const getSeverityColor = (severity) => {
     switch (severity) {
       case "high": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
@@ -350,7 +325,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
-
   const getStatusColor = (status) => {
     switch (status) {
       case "resolved": return "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400";
@@ -359,7 +333,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
-
   const getPriorityColor = (priority) => {
     switch (priority) {
       case "high": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
@@ -368,7 +341,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       default: return "bg-gray-100 text-gray-800 dark:bg-gray-900/20 dark:text-gray-400";
     }
   };
-
   const filteredItems = actionItems.filter(item => {
     // Safe search matching across fields
     const st = String(searchTerm || "").trim().toLowerCase();
@@ -384,7 +356,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       includes(item.source) ||
       includes(item.actionTaken) ||
       includes(item.otherInfo);
-
     // Month/Year filter based on the 'when' field
     const toDate = (when) => {
       if (when && typeof when === 'object' && 'seconds' in when) {
@@ -400,18 +371,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const d = toDate(item.when);
     const matchesMonthYear = selectedMonth === 'all' || selectedYear === 'all' || 
       (d ? (d.getMonth() === selectedMonth && d.getFullYear() === selectedYear) : false);
-
     const matchesDistrict = selectedDistrict === 'all' || !selectedDistrict || item.district === selectedDistrict;
     const matchesDepartment = item.department === activeTab;
-    const matchesMunicipality = activeTab === "pnp" ?
+    const matchesMunicipality = activeTab === "pnp" ? 
       (activeMunicipality === "all" || item.municipality === activeMunicipality) : true;
-
     return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality;
   });
-
   const sortedItems = [...filteredItems].sort((a, b) => {
     let aValue, bValue;
-    
     switch (sortBy) {
       case "municipality":
         aValue = a.municipality;
@@ -437,14 +404,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         aValue = a.municipality;
         bValue = b.municipality;
     }
-
     if (sortOrder === "asc") {
       return aValue > bValue ? 1 : -1;
     } else {
       return aValue < bValue ? 1 : -1;
     }
   });
-
   // Calculate totals (normalized to match table display)
   const totalActions = (sortedItems || []).filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
@@ -459,10 +424,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const totalDrugsMale = (sortedItems || []).filter(item => normalize(item.gender) === 'male').length;
   const totalDrugsFemale = (sortedItems || []).filter(item => normalize(item.gender) === 'female').length;
   const totalDrugs = totalDrugsMale + totalDrugsFemale;
-
   // "Illegals" counters (detect via text fields)
   const ILLEGAL_KEYWORDS = [
     'illegal',
+    // Gambling and games
     'gambling', 'sugal', 'pagsusugal', 'pasugal',
     'sakla', 'saklaan', 'sakla game', 'sakla gambling',
     'tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong', 'cockfighting',
@@ -471,53 +436,69 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     'color game', 'fruit game',
     'video karera', 'videokarera', 'vk',
     'patulo', 'pa-tulo', 'pa tulo', 'patulo game', 'patulo gambling',
-    'drugs', 'drug use', 'drug selling', 'drug pushing', 'marijuana', 'shabu', 'cocaine',
-    'illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing',
-    'illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction',
+    'bingo', 'illegal bingo',
+    // Drugs
+    'drugs', 'drug use', 'drug selling', 'drug pushing', 'marijuana', 'shabu', 'cocaine', 'illegal drugs',
+    // Fishing/Forest/Mining/Construction/Vending
+    'illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing', 'fishing gear', 'fine mesh', 'hulbot', 'active gear',
+    'illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction', 'kaingin',
     'illegal mining', 'illegal quarrying', 'illegal extraction',
     'illegal construction', 'building without permit', 'illegal structure',
     'illegal vending', 'illegal selling', 'illegal business', 'no permit',
-    'traffic violation', 'reckless driving', 'illegal parking', 'no license', 'no registration',
-    'prostitution', 'illegal bar', 'bar girls'
+    // Traffic / vehicles
+    'traffic violation', 'reckless driving', 'illegal parking', 'no license', 'no registration', 'unregistered', 'carnapping', 'stolen vehicle',
+    // Morality / prostitution
+    'prostitution', 'illegal bar', 'bar girls', 'gro', 'g.r.o', 'g.r.o.',
+    // Weapons / possession / contraband
+    'loose firearm', 'unregistered firearm', 'illegal firearm', 'illegal weapon', 'illegal possession', 'contraband', 'smuggling', 'illegal smuggling',
+    // Cybercrime / fraud
+    'cybercrime', 'hacking', 'phishing', 'online scam', 'scam', 'estafa', 'fraud', 'swindling',
+    // Trafficking / recruitment
+    'human trafficking', 'trafficking', 'illegal trafficking', 'illegal recruitment',
+    // Alcohol / tobacco / counterfeit
+    'illegal alcohol', 'liquor ban', 'pirated', 'counterfeit'
   ].map(k => k.toLowerCase());
-
   const ILLEGAL_CATEGORIES = {
+    // Gambling
     'Sakla': ['sakla', 'saklaan', 'sakla game', 'sakla gambling'],
-    'Gambling': ['gambling', 'sugal', 'pagsusugal', 'pasugal', 'jueteng', 'cara y cruz', 'cara y-cruz', 'color game', 'fruit game', 'video karera', 'videokarera', 'vk', 'illegal gambling'],
+    'Gambling': ['gambling', 'sugal', 'pagsusugal', 'pasugal', 'jueteng', 'cara y cruz', 'cara y-cruz', 'color game', 'fruit game', 'video karera', 'videokarera', 'vk', 'illegal gambling', 'patulo', 'pa-tulo', 'pa tulo', 'patulo game', 'bingo', 'illegal bingo'],
     'Tupada': ['tupada', 'sabong', 'e-sabong', 'esabong', 'online sabong', 'cockfighting', 'illegal cockfighting'],
-    'Bingo': ['bingo', 'illegal bingo', 'bingo operation'],
-    'Gro Bar': ['gro bar', 'g.r.o', 'g.r.o.', 'gro', 'bar operation', 'bar girls', 'illegal bar', 'prostitution'],
-    'Patulo': ['patulo', 'pa-tulo', 'pa tulo', 'patulo game', 'patulo gambling'],
+    'Gro Bar / Prostitution': ['gro bar', 'g.r.o', 'g.r.o.', 'gro', 'bar operation', 'bar girls', 'illegal bar', 'prostitution'],
+    // Drugs
     'Drugs': ['drugs', 'drug use', 'drug selling', 'drug pushing', 'illegal drugs', 'marijuana', 'shabu', 'cocaine'],
-    'Illegal Fishing': ['illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing'],
-    'Illegal Logging': ['illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction'],
+    // PNP-focused
+    'Illegal Possession of Firearm': ['loose firearm', 'unregistered firearm', 'illegal firearm', 'illegal weapon', 'illegal possession'],
+    'Cybercrime / Fraud': ['cybercrime', 'hacking', 'phishing', 'online scam', 'scam', 'estafa', 'fraud', 'swindling'],
+    'Human Trafficking': ['human trafficking', 'trafficking', 'illegal trafficking'],
+    'Illegal Recruitment': ['illegal recruitment'],
+    'Smuggling / Contraband': ['smuggling', 'illegal smuggling', 'contraband', 'pirated', 'counterfeit'],
+    'Carnapping / Illegal Vehicles': ['carnapping', 'stolen vehicle', 'unregistered', 'no registration'],
+    // Environment / commerce
+    'Illegal Fishing': ['illegal fishing', 'dynamite fishing', 'cyanide fishing', 'poison fishing', 'fishing gear', 'fine mesh', 'hulbot', 'active gear'],
+    'Illegal Logging': ['illegal logging', 'illegal cutting', 'tree cutting', 'forest destruction', 'kaingin'],
     'Illegal Mining': ['illegal mining', 'illegal quarrying', 'illegal extraction'],
     'Illegal Construction': ['illegal construction', 'building without permit', 'illegal structure'],
-    'Illegal Vending': ['illegal vending', 'illegal selling', 'illegal business', 'no permit'],
-    'Traffic Violations': ['traffic violation', 'reckless driving', 'illegal parking', 'no license', 'no registration']
+    'Illegal Vending / No Permit': ['illegal vending', 'illegal selling', 'illegal business', 'no permit'],
+    // Traffic
+    'Traffic Violations': ['traffic violation', 'reckless driving', 'illegal parking', 'no license']
   };
-
   const isIllegal = (item) => {
-    const text = [item.what, item.why, item.how, item.otherInfo]
+    const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.illegalType, item.where, item.source]
       .map(v => normalize(v))
       .join(' ');
     return ILLEGAL_KEYWORDS.some(kw => text.includes(kw));
   };
-
   // Count categories and total unique illegal items (dynamically detected from table data)
   const { illegalCategoryCounts, totalIllegals } = (() => {
     const counts = {};
     let total = 0;
-    
     if (!sortedItems || !Array.isArray(sortedItems)) {
       return { illegalCategoryCounts: counts, totalIllegals: total };
     }
-    
     sortedItems.forEach(item => {
-      const text = [item.what, item.why, item.how, item.otherInfo]
+      const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.illegalType, item.where, item.source]
         .map(v => normalize(v))
         .join(' ');
-      
       // Check predefined illegal categories first
       let matched = false;
       for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
@@ -526,42 +507,32 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           matched = true;
         }
       }
-      
       // Dynamically detect new categories from the data
       if (!matched && text.length > 0) {
-        // Extract potential category from the main description
         const mainText = item.what || item.why || '';
         if (mainText && mainText.trim().length > 0) {
-          // Create a category name from the main text (first few words, capitalized)
           const words = mainText.trim().split(' ').slice(0, 3);
           const categoryName = words.map(word => 
             word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
           ).join(' ');
-          
-          // Filter out unwanted categories
           const unwantedTerms = [
             'alleged', 'illegal', 'illegals', 'user', 'pusher', 'selling', 'using', 'drugs',
             'alleged illegal', 'illegal user', 'illegal pusher', 'illegal selling', 'illegal using',
             'alleged illegals', 'illegals user', 'illegals pusher', 'illegals selling', 'illegals using'
           ];
-          
           const isUnwanted = unwantedTerms.some(term => 
             categoryName.toLowerCase().includes(term.toLowerCase())
           );
-          
           if (categoryName.length > 0 && !isUnwanted) {
             counts[categoryName] = (counts[categoryName] || 0) + 1;
             matched = true;
           }
         }
       }
-      
       if (matched) total += 1; // count each item once in total
     });
-    
     return { illegalCategoryCounts: counts, totalIllegals: total };
   })();
-
   // Action Taken category counts
   const ACTION_TAKEN_ALIASES = {
     'Resolved': ['resolved', 'complete', 'completed', 'closed', 'done'],
@@ -570,7 +541,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     'Referred': ['referred', 'endorsed', 'forwarded'],
     'Arrested': ['arrested', 'apprehended']
   };
-
   const getActionTakenLabel = (raw) => {
     const val = normalize(raw);
     if (!val) return 'Unspecified';
@@ -580,7 +550,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     // Fallback: capitalize first letter of provided text
     return raw.charAt(0).toUpperCase() + raw.slice(1);
   };
-
   const actionTakenCounts = (() => {
     const counts = {};
     if (!sortedItems || !Array.isArray(sortedItems)) {
@@ -592,14 +561,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
     return counts;
   })();
-  
   // Bantay Dagat specific calculations
   const totalFishingViolations = (sortedItems || []).reduce((sum, item) => sum + (item.fishingViolations || 0), 0);
   const totalIllegalFishing = (sortedItems || []).reduce((sum, item) => sum + (item.illegalFishing || 0), 0);
   const totalFishCaught = (sortedItems || []).reduce((sum, item) => sum + (item.fishCaught || 0), 0);
   const totalBoatsInspected = (sortedItems || []).reduce((sum, item) => sum + (item.boatsInspected || 0), 0);
-  
-  // Agriculture/Bantay Dagat specific illegal categories - ONLY based on table data
+  // Agriculture/Bantay Dagat specific illegal categories - AUTO DETECT from table data
   const { agricultureIllegalCategoryCounts, totalAgricultureIllegals } = (() => {
     const counts = {};
     let total = 0;
@@ -607,36 +574,87 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     // Only process items when agriculture tab is active
     if (activeTab === "agriculture" && sortedItems && Array.isArray(sortedItems)) {
       sortedItems.forEach(item => {
-        const text = [item.what, item.why, item.how, item.otherInfo]
+        // Combine all text fields for analysis
+        const allText = [item.what, item.why, item.how, item.otherInfo, item.actionTaken]
+          .filter(v => v && v.trim().length > 0)
           .map(v => normalize(v))
-          .join(' ');
+          .join(' ').toLowerCase();
         
-        // Only create categories from actual table data, no predefined categories
-        if (text.length > 0) {
-          // Extract potential category from the main description
-          const mainText = item.what || item.why || '';
-          if (mainText && mainText.trim().length > 0) {
-            // Create a category name from the main text (first few words, capitalized)
-            const words = mainText.trim().split(' ').slice(0, 3);
-            const categoryName = words.map(word => 
-              word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
-            ).join(' ');
-            
-            // Filter out unwanted categories
-            const unwantedTerms = [
-              'alleged', 'illegal', 'illegals', 'user', 'pusher', 'selling', 'using', 'drugs',
-              'alleged illegal', 'illegal user', 'illegal pusher', 'illegal selling', 'illegal using',
-              'alleged illegals', 'illegals user', 'illegals pusher', 'illegals selling', 'illegals using'
-            ];
-            
-            const isUnwanted = unwantedTerms.some(term => 
-              categoryName.toLowerCase().includes(term.toLowerCase())
-            );
-            
-            if (categoryName.length > 0 && !isUnwanted) {
-              counts[categoryName] = (counts[categoryName] || 0) + 1;
-              total += 1; // count each item once in total
+        if (allText.length > 0) {
+          let detectedCategory = null;
+          
+          // Auto-detect illegal fishing categories
+          if (allText.includes('fishing') || allText.includes('fish') || allText.includes('boat') || allText.includes('net')) {
+            if (allText.includes('gear') || allText.includes('equipment') || allText.includes('net') || allText.includes('hook')) {
+              detectedCategory = 'Illegal Fishing Gear';
+            } else if (allText.includes('size') || allText.includes('small') || allText.includes('juvenile')) {
+              detectedCategory = 'Illegal Fish Size';
+            } else if (allText.includes('season') || allText.includes('closed') || allText.includes('spawning')) {
+              detectedCategory = 'Illegal Fishing Season';
+            } else if (allText.includes('zone') || allText.includes('area') || allText.includes('protected')) {
+              detectedCategory = 'Illegal Fishing Zone';
+            } else if (allText.includes('species') || allText.includes('endangered') || allText.includes('protected')) {
+              detectedCategory = 'Illegal Fish Species';
+            } else if (allText.includes('transport') || allText.includes('carry') || allText.includes('move')) {
+              detectedCategory = 'Illegal Fish Transport';
+            } else if (allText.includes('sale') || allText.includes('sell') || allText.includes('market')) {
+              detectedCategory = 'Illegal Fish Sale';
+            } else if (allText.includes('process') || allText.includes('drying') || allText.includes('smoking')) {
+              detectedCategory = 'Illegal Fish Processing';
+            } else {
+              detectedCategory = 'Illegal Fishing';
             }
+          }
+          
+          // Auto-detect agriculture violations
+          else if (allText.includes('pesticide') || allText.includes('chemical') || allText.includes('fertilizer')) {
+            detectedCategory = 'Illegal Pesticide Use';
+          } else if (allText.includes('land') || allText.includes('farm') || allText.includes('agriculture')) {
+            if (allText.includes('clear') || allText.includes('burn') || allText.includes('slash')) {
+              detectedCategory = 'Illegal Land Clearing';
+            } else if (allText.includes('water') || allText.includes('irrigation') || allText.includes('drainage')) {
+              detectedCategory = 'Illegal Water Use';
+            } else {
+              detectedCategory = 'Agricultural Violation';
+            }
+          }
+          
+          // Auto-detect wildlife violations
+          else if (allText.includes('wildlife') || allText.includes('animal') || allText.includes('bird') || allText.includes('mammal')) {
+            detectedCategory = 'Wildlife Violation';
+          }
+          
+          // Auto-detect forest violations
+          else if (allText.includes('tree') || allText.includes('forest') || allText.includes('wood') || allText.includes('timber')) {
+            detectedCategory = 'Forest Violation';
+          }
+          
+          // Auto-detect water pollution
+          else if (allText.includes('pollution') || allText.includes('contamination') || allText.includes('waste') || allText.includes('dumping')) {
+            detectedCategory = 'Water Pollution';
+          }
+          
+          // If no specific category detected, create smart category from main text
+          if (!detectedCategory) {
+            const mainText = item.what || item.why || '';
+            if (mainText && mainText.trim().length > 0) {
+              // Extract key words and create meaningful category
+              const keyWords = mainText.trim().split(' ')
+                .filter(word => word.length > 3) // Filter out short words
+                .slice(0, 2); // Take first 2 meaningful words
+              
+              if (keyWords.length > 0) {
+                detectedCategory = keyWords.map(word => 
+                  word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+                ).join(' ') + ' Violation';
+              }
+            }
+          }
+          
+          // Add to counts if category was detected
+          if (detectedCategory) {
+            counts[detectedCategory] = (counts[detectedCategory] || 0) + 1;
+            total += 1;
           }
         }
       });
@@ -644,13 +662,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     
     return { agricultureIllegalCategoryCounts: counts, totalAgricultureIllegals: total };
   })();
-  
   // PG-ENRO specific calculations
   const totalEnvironmentalViolations = (sortedItems || []).reduce((sum, item) => sum + (item.environmentalViolations || 0), 0);
   const totalWasteManagement = (sortedItems || []).reduce((sum, item) => sum + (item.wasteManagement || 0), 0);
   const totalTreePlanting = (sortedItems || []).reduce((sum, item) => sum + (item.treePlanting || 0), 0);
   const totalCleanupOperations = (sortedItems || []).reduce((sum, item) => sum + (item.cleanupOperations || 0), 0);
-
   const handleSort = (column) => {
     if (sortBy === column) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -659,10 +675,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setSortOrder("asc");
     }
   };
-
   const handleAction = (actionId, action) => {
     const item = (actionItems || []).find(item => item.id === actionId);
-    
     switch (action) {
       case "view":
         setViewingItem(item);
@@ -680,7 +694,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         console.log(`Action ${action} performed on item ${actionId}`);
     }
   };
-
   const confirmDelete = async () => {
     if (selectedItem) {
       try {
@@ -699,20 +712,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       }
     }
   };
-
   const cancelDelete = () => {
     setShowDeleteModal(false);
     setSelectedItem(null);
   };
-
   const exportToPDF = () => {
     const doc = new jsPDF();
-    
     // Add title
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
     doc.text('Action Center Report', 14, 22);
-    
     // Add report details
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
@@ -721,7 +730,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     doc.text(`District: ${selectedDistrict || "All Districts"}`, 14, 49);
     doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, 14, 56);
     doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, 14, 63);
-    
     // Add summary statistics
     doc.text(`Total Actions: ${totalActions}`, 14, 75);
     doc.text(`Total Drugs: ${totalDrugs} (Male: ${totalDrugsMale}, Female: ${totalDrugsFemale})`, 14, 82);
@@ -730,7 +738,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     doc.text(`High Priority Actions: ${highPriorityActions}`, 14, 103);
     doc.text(`Total Patrols: ${totalPatrols}`, 14, 110);
     doc.text(`Total Incidents: ${totalIncidents}`, 14, 117);
-    
     // Prepare table data (hide Why/How in export)
     const tableData = (sortedItems || []).map(item => [
       item.municipality,
@@ -744,7 +751,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       item.source || 'N/A',
       item.otherInfo
     ]);
-    
     // Add table
     doc.autoTable({
       head: [['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken', 'Source', 'Other Information']],
@@ -764,15 +770,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       },
       margin: { top: 125 }
     });
-    
     // Save the PDF
     doc.save(`action-center-report-${(months[selectedMonth] || 'unknown').toLowerCase()}-${selectedYear}.pdf`);
   };
-
   const handlePrint = () => {
     window.print();
   };
-
   const formatDate = (date) => {
     // Handle Firestore Timestamp objects
     if (date && typeof date === 'object' && date.seconds) {
@@ -789,13 +792,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return date; // Return the string as is
     }
     if (date instanceof Date) {
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
     }
     // Ensure we always return a string, not an object
     if (date && typeof date === 'object') {
@@ -803,20 +806,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
     return date ? String(date) : 'No Date';
   };
-
   // Function to recursively clean objects and arrays, removing undefined values
   const deepCleanObject = (obj) => {
     if (obj === undefined || obj === null) {
       return null;
     }
-
     if (Array.isArray(obj)) {
       const cleanedArray = obj
         .map(item => deepCleanObject(item))
         .filter(item => item !== null);
       return cleanedArray;
     }
-
     if (typeof obj === 'object') {
       const cleanedObj = {};
       Object.entries(obj).forEach(([key, value]) => {
@@ -827,16 +827,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       });
       return cleanedObj;
     }
-
     return obj;
   };
-
   // Function to validate and clean photo objects
   const validateAndCleanPhoto = (photo) => {
     if (!photo || typeof photo !== 'object') {
       return null;
     }
-
     // Check for required fields and provide defaults
     const cleanPhoto = {
       id: photo.id || `photo-${Date.now()}-${Math.random()}`,
@@ -847,29 +844,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       imageData: photo.imageData || null,
       uploadDate: photo.uploadDate || new Date().toISOString()
     };
-
     // Validate each field individually
     Object.entries(cleanPhoto).forEach(([key, value]) => {
       if (value === undefined) {
         cleanPhoto[key] = null; // Set to null instead of undefined
       }
     });
-
     // Only return photos that have actual image data or are legacy photos
     if (cleanPhoto.imageData || photo.url) {
       return cleanPhoto;
     }
-
     return null;
   };
-
   // Function to migrate Firebase Storage URLs to base64 data
   const migratePhotoToBase64 = async (photo) => {
     // If photo already has base64 data, return as is
     if (photo.imageData) {
       return photo;
     }
-
     // If photo has a Firebase Storage URL, try to convert it
     if (photo.url && photo.url.includes('firebasestorage.googleapis.com')) {
       try {
@@ -891,7 +883,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         };
       }
     }
-
     // If photo is just a string URL, treat it as legacy
     if (typeof photo === 'string') {
       return {
@@ -904,94 +895,75 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         error: 'Legacy photo format - needs manual migration'
       };
     }
-
     return photo;
   };
-
   // Function to get the best available image source
   const getImageSource = (photo) => {
     // Priority: base64 data > legacy URL > placeholder
     if (photo.imageData && typeof photo.imageData === 'string' && photo.imageData.startsWith('data:image')) {
       return photo.imageData;
     }
-    
     if (photo.url && typeof photo.url === 'string' && !photo.url.includes('firebasestorage.googleapis.com')) {
       return photo.url;
     }
-    
     // Check if photo is a string (legacy format)
     if (typeof photo === 'string' && photo.startsWith('data:image')) {
       return photo;
     }
-    
     // Return a placeholder for legacy Firebase Storage URLs or invalid photos
     return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
   };
-
   // Function to handle photo loading errors
   const handlePhotoError = (event, photo) => {
     // Set a fallback image
     event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZmYwMDAwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjZmZmIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3IgTG9hZGluZyBQaG90bzwvdGV4dD48L3N2Zz4=';
-    
     // Add error styling
     event.target.classList.add('border-red-500');
   };
-
   // Function to show image modal for data URLs
   const openImageModal = (imageSource, fileName) => {
     setImageModalData({ imageSource, fileName });
     setShowImageModal(true);
   };
-
   const handlePhotoUpload = (event, setReport) => {
     if (!event || !event.target) {
       console.error('Invalid event object');
       return;
     }
-    
     if (!setReport || typeof setReport !== 'function') {
       console.error('setReport is not a function');
       return;
     }
-    
     const files = Array.from(event.target?.files || []);
     if (!Array.isArray(files)) {
       console.error('Files is not an array');
       return;
     }
-    
     const validFiles = files.filter(file => file && file.type && file.type.startsWith('image/'));
-    
     if (!validFiles || !Array.isArray(validFiles) || validFiles.length === 0) {
       alert('Please select valid image files only.');
       return;
     }
-
     if (validFiles.length > 10) {
       alert('Maximum 10 images allowed.');
       return;
     }
-
     // Convert images to base64 and store in state
     if (validFiles && Array.isArray(validFiles)) {
       validFiles.forEach(file => {
         if (!file || typeof file !== 'object' || !(file instanceof File)) return; // Skip undefined, invalid, or non-File objects
-      
       const reader = new FileReader();
       if (!reader) {
         console.error('Failed to create FileReader');
         return;
       }
-      
       reader.onload = (e) => {
         if (!e || !e.target) {
           console.error('Invalid event object in reader.onload');
           return;
         }
-        
         const base64String = e.target?.result;
         if (!base64String || typeof base64String !== 'string') return; // Skip if no result or not a string
-        
         const newPhoto = {
           id: Date.now() + Math.random(),
           fileName: (file.name && typeof file.name === 'string') ? file.name : 'Unknown',
@@ -1002,13 +974,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           imageData: base64String,
           uploadDate: new Date().toISOString()
         };
-
         setReport(prevReport => ({
           ...(prevReport || {}),
           photos: [...(prevReport?.photos || []), newPhoto]
         }));
       };
-      
       try {
         if (file && file instanceof File) {
           reader.readAsDataURL(file);
@@ -1021,23 +991,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       });
     }
   };
-
   const handlePhotoRemove = (photoId, setActionReport) => {
     if (!setActionReport || typeof setActionReport !== 'function') {
       console.error('setActionReport is not a function');
       return;
     }
-    
     setActionReport(prevReport => ({
       ...(prevReport || {}),
       photos: (prevReport?.photos || []).filter(p => p && p.id !== photoId)
     }));
   };
-
   const handleAddActionReport = () => {
     setShowAddModal(true);
   };
-
   const handleSubmitActionReport = async () => {
     try {
       // Validate required fields based on department
@@ -1045,14 +1011,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         alert("Please select a department.");
         return;
       }
-      
       if (!newActionReport.municipality || !newActionReport.district || 
           !newActionReport.what || !newActionReport.when || 
           !newActionReport.where || !newActionReport.actionTaken) {
         alert("Please fill in all required fields.");
         return;
       }
-      
       // Additional validation for PNP department
       if (newActionReport.department === "pnp") {
         if (!newActionReport.who) {
@@ -1060,13 +1024,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           return;
         }
       }
-      
       // Additional validation for Agriculture department
       if (newActionReport.department === "agriculture") {
         // For Agriculture, only basic fields are required
         // Source field is not shown for Agriculture
       }
-
       // Additional validation for all departments - Illegal Type is required
       if (newActionReport.department) {
         if (!newActionReport.illegalType) {
@@ -1078,13 +1040,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           return;
         }
       }
-
       // Clean photos data before saving to Firestore (include base64 image data)
       const cleanPhotos = newActionReport.photos ? newActionReport.photos
         .map(validateAndCleanPhoto) // Use the validation function
         .filter(photo => photo !== null) // Remove any invalid photos
         : [];
-
+      
       const reportToSave = {
         ...newActionReport,
         photos: cleanPhotos,
@@ -1096,21 +1057,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         timestamp: Date.now(),
         id: `action-${Date.now()}`
       };
-
       console.log('Report to save:', reportToSave);
-
       // Remove any undefined values from the entire report
       const cleanReport = Object.fromEntries(
         Object.entries(reportToSave).filter(([_, value]) => value !== undefined)
       );
-
       console.log('Submitting action report:', {
         department: cleanReport.department,
         what: cleanReport.what,
         illegalType: cleanReport.illegalType,
         otherIllegalType: cleanReport.otherIllegalType
       });
-      
       const result = await saveActionReport(cleanReport);
       if (result.success) {
         console.log('Action report saved successfully:', result);
@@ -1152,7 +1109,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert('Error saving action report. Please try again.');
     }
   };
-
   const handleCancelAdd = () => {
     setShowAddModal(false);
     setNewActionReport({
@@ -1174,7 +1130,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       otherIllegalType: ""
     });
   };
-
   const handleEditActionReport = async () => {
     try {
       // Clean photos data before saving to Firestore (include base64 image data)
@@ -1182,27 +1137,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         .map(validateAndCleanPhoto) // Use the validation function
         .filter(photo => photo !== null) // Remove any invalid photos
         : [];
-
+      
       const updatedReport = {
         ...editingItem,
         photos: cleanPhotos,
         status: editingItem.actionTaken === "resolved" ? "resolved" : "pending"
       };
-
       // Remove any undefined values from the entire report
       const cleanReport = deepCleanObject(updatedReport);
-
       // Final validation - check for any remaining undefined values
       const hasUndefinedValues = Object.values(cleanReport).some(value => 
         value === undefined || 
         (Array.isArray(value) && value.some(item => item === undefined)) ||
         (typeof value === 'object' && value !== null && Object.values(value).some(v => v === undefined))
       );
-
       if (hasUndefinedValues) {
         throw new Error('Data validation failed: undefined values still present');
       }
-
       const result = await updateActionReport(editingItem.id, cleanReport);
       if (result.success) {
         setActionItems(prevItems => 
@@ -1221,7 +1172,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert('Error updating action report. Please try again.');
     }
   };
-
   const handleCancelEdit = () => {
     setShowEditModal(false);
     setEditingItem(null);
@@ -1234,19 +1184,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       });
     }
   };
-
   const handleCloseViewModal = () => {
     setShowViewModal(false);
     setViewingItem(null);
   };
-
   const handleEditInputChange = (field, value) => {
     setEditingItem(prev => {
       const updated = {
         ...prev,
         [field]: value
       };
-      
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
@@ -1257,18 +1204,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
       }
-      
       return updated;
     });
   };
-
   const handleInputChange = (field, value) => {
     setNewActionReport(prev => {
       const updated = {
         ...prev,
         [field]: value
       };
-      
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
@@ -1279,11 +1223,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
       }
-      
       return updated;
     });
   };
-
   // Function to remove photos from an action report
   const handleRemovePhoto = async (reportId, photoIndex) => {
     try {
@@ -1293,16 +1235,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         alert('Report not found.');
         return;
       }
-
       const report = (actionItems || [])[reportIndex];
       const updatedPhotos = (report.photos || []).filter((_, index) => index !== photoIndex);
-      
       // Create updated report
       const updatedReport = {
         ...report,
         photos: updatedPhotos
       };
-
       // Update in Firestore
       const result = await updateActionReport(reportId, updatedReport);
       if (result.success) {
@@ -1312,12 +1251,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             item.id === reportId ? updatedReport : item
           )
         );
-        
         // Update viewingItem if it's the same report
         if (viewingItem && viewingItem.id === reportId) {
           setViewingItem(updatedReport);
         }
-        
         alert('Photo removed successfully!');
       } else {
         alert(`Error removing photo: ${result.error}`);
@@ -1327,237 +1264,176 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert('Error removing photo. Please try again.');
     }
   };
-
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <section className="flex-1 p-6 space-y-6">
+      <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className={`text-3xl font-bold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
               Action Center Management
-            </h1>
-            <p className={`text-lg transition-colors duration-300 ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-600'
-            }`}>
+                </h1>
+            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
               {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} • Incident Response & Action Tracking
             </p>
             <div className="flex items-center gap-2 mt-2">
               <div className={`w-2 h-2 rounded-full ${
-                loading ? 'bg-yellow-500' : 'bg-green-500'
+                loading ? 'bg-green-500' : 'bg-yellow-500'
               }`}></div>
-              <span className={`text-sm font-medium ${
-                loading ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'
+              <span className={`text-xs md:text-sm font-medium ${
+                loading ? 'text-yellow-600' : 'text-green-600'
               }`}>
                 {loading ? 'Processing...' : 'System operational'}
               </span>
+              </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Button
-              onClick={handleAddActionReport}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+          <div className="flex flex-wrap gap-2">
+              <Button 
+                onClick={handleAddActionReport}
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Add Action Report"
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() => {
-                setLoading(true);
-                setTimeout(() => setLoading(false), 500);
-              }}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              >
+              <Plus className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">Add Report</span>
+              </Button>
+              <Button 
+                onClick={() => {
+                  setLoading(true);
+                  setTimeout(() => setLoading(false), 500);
+                }} 
+                disabled={loading}
+              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Refresh Data"
-            >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+              >
+              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
+              <span className="hidden sm:inline ml-2">Refresh</span>
+              </Button>
             <Button
               onClick={exportToPDF}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Export PDF"
             >
-              <Download className="w-5 h-5" />
-            </Button>
+              <Download className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">PDF</span>
+              </Button>
             <Button
               onClick={handlePrint}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
+              className="bg-purple-600 hover:bg-purple-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Print Report"
             >
-              <Printer className="w-5 h-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Success Message */}
-        {successMessage && (
-          <div className={`p-4 rounded-lg border transition-all duration-300 ${
-            isDarkMode 
-              ? 'bg-green-900/20 border-green-600 text-green-400' 
-              : 'bg-green-50 border-green-300 text-green-700'
-          }`}>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="font-medium">{successMessage}</span>
+              <Printer className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">Print</span>
+              </Button>
             </div>
           </div>
-        )}
-
-        {/* Department Navigation Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pnp"
-                ? isDarkMode 
-                  ? 'bg-blue-900/80 border-blue-600' 
-                  : 'bg-blue-50 border-blue-300'
-                : isDarkMode 
-                  ? 'bg-gray-800/80 border-gray-700 hover:bg-blue-900/20' 
-                  : 'bg-white border-gray-200 hover:bg-blue-50'
-            }`}
-            onClick={() => {
-              setActiveTab("pnp");
-              setActiveMunicipality("all");
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${
-                  activeTab === "pnp" 
-                    ? 'bg-blue-600 text-white' 
-                    : isDarkMode ? 'bg-blue-900/40 text-blue-400' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  <Shield className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
-                    activeTab === "pnp" 
-                      ? 'text-blue-600 dark:text-blue-400' 
-                      : isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>PNP</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    activeTab === "pnp" 
-                      ? 'text-blue-500 dark:text-blue-300' 
-                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Police Operations</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "agriculture"
-                ? isDarkMode 
-                  ? 'bg-green-900/80 border-green-600' 
-                  : 'bg-green-50 border-green-300'
-                : isDarkMode 
-                  ? 'bg-gray-800/80 border-gray-700 hover:bg-green-900/20' 
-                  : 'bg-white border-gray-200 hover:bg-green-50'
-            }`}
-            onClick={() => {
-              setActiveTab("agriculture");
-              setActiveMunicipality("all");
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${
-                  activeTab === "agriculture" 
-                    ? 'bg-green-600 text-white' 
-                    : isDarkMode ? 'bg-green-900/40 text-green-400' : 'bg-green-100 text-green-600'
-                }`}>
-                  <Target className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
-                    activeTab === "agriculture" 
-                      ? 'text-green-600 dark:text-green-400' 
-                      : isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Agriculture</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    activeTab === "agriculture" 
-                      ? 'text-green-500 dark:text-green-300' 
-                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Bantay Dagat</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pg-enro"
-                ? isDarkMode 
-                  ? 'bg-purple-900/80 border-purple-600' 
-                  : 'bg-purple-50 border-purple-300'
-                : isDarkMode 
-                  ? 'bg-gray-800/80 border-gray-700 hover:bg-purple-900/20' 
-                  : 'bg-white border-gray-200 hover:bg-purple-50'
-            }`}
-            onClick={() => {
-              setActiveTab("pg-enro");
-              setActiveMunicipality("all");
-            }}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className={`p-3 rounded-lg ${
-                  activeTab === "pg-enro" 
-                    ? 'bg-purple-600 text-white' 
-                    : isDarkMode ? 'bg-purple-900/40 text-purple-400' : 'bg-purple-100 text-purple-600'
-                }`}>
-                  <Building2 className="h-6 w-6" />
-                </div>
-                <div>
-                  <h3 className={`font-bold text-lg transition-colors duration-300 ${
-                    activeTab === "pg-enro" 
-                      ? 'text-purple-600 dark:text-purple-400' 
-                      : isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>PG-Enro</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    activeTab === "pg-enro" 
-                      ? 'text-purple-500 dark:text-purple-300' 
-                      : isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Environment</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Success Message */}
+        {successMessage && (
+          <div className="p-3 md:p-4 rounded-lg border transition-all duration-300 bg-green-50 border-green-300 text-green-700">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <span className="font-medium text-sm md:text-base">{successMessage}</span>
         </div>
-
-
-
+          </div>
+        )}
+        {/* Department Navigation Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "pnp" ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-50'
+            }`}
+                onClick={() => {
+                  setActiveTab("pnp");
+                  setActiveMunicipality("all");
+                }}
+          >
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className={`p-2 md:p-3 rounded-lg ${
+                  activeTab === "pnp" ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
+                }`}>
+                  <Shield className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <div>
+                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                    activeTab === "pnp" ? 'text-blue-600' : 'text-gray-900'
+                  }`}>PNP</h3>
+                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                    activeTab === "pnp" ? 'text-blue-500' : 'text-gray-600'
+                  }`}>Police Operations</p>
+                  </div>
+                </div>
+            </CardContent>
+          </Card>
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
+            }`}
+                onClick={() => {
+                  setActiveTab("agriculture");
+                  setActiveMunicipality("all");
+                }}
+          >
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className={`p-2 md:p-3 rounded-lg ${
+                  activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
+                }`}>
+                  <Target className="h-5 w-5 md:h-6 md:w-6" />
+                  </div>
+                  <div>
+                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                    activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
+                  }`}>Agriculture</h3>
+                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                    activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
+                  }`}>Bantay Dagat</p>
+                  </div>
+                </div>
+            </CardContent>
+          </Card>
+          <Card 
+            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+              activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
+            }`}
+                onClick={() => {
+              setActiveTab("pg-enro");
+                  setActiveMunicipality("all");
+                }}
+          >
+            <CardContent className="p-4 md:p-6">
+              <div className="flex items-center gap-3 md:gap-4">
+                <div className={`p-2 md:p-3 rounded-lg ${
+                  activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
+                }`}>
+                  <Building2 className="h-5 w-5 md:h-6 md:w-5" />
+                  </div>
+                  <div>
+                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                    activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
+                  }`}>PG-Enro</h3>
+                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                    activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
+                  }`}>Environment</p>
+                  </div>
+                </div>
+            </CardContent>
+          </Card>
+            </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
           {/* Filters & Search - Ultra Compact Design */}
           <div className="flex-shrink-0 mb-2">
-            <div className={`rounded-lg shadow-sm border p-2 transition-all duration-300 ${
-              isDarkMode 
-                ? 'bg-gray-800 border-gray-700' 
-                : 'bg-white border-gray-200'
-            }`}>
+            <div className="rounded-lg shadow-sm border p-2 transition-all duration-300 bg-white border-gray-200">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <div className={`p-1.5 rounded-lg ${
-                    isDarkMode ? 'bg-blue-900/40' : 'bg-blue-100/80'
-                  }`}>
-                    <Filter className={`h-3.5 w-3.5 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className={`text-sm font-semibold transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                    }`}>Filters & Search</h3>
-                    <p className={`text-xs transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>Refine your data view</p>
-                  </div>
+                  <div className="p-1.5 rounded-lg bg-blue-100/80">
+                    <Filter className="h-3.5 w-3.5 text-blue-600" />
                 </div>
-                
+                <div>
+                    <h3 className="text-sm font-semibold transition-colors duration-300 text-gray-800">Filters & Search</h3>
+                    <p className="text-xs transition-colors duration-300 text-gray-600">Refine your data view</p>
+                </div>
+              </div>
                 <Button
                   onClick={() => {
                     setSearchTerm("");
@@ -1573,20 +1449,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   Clear All Filters
                 </Button>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
                 <div className="space-y-0.5">
-                  <label className={`text-xs font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Month</label>
+                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Month</label>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-200 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                   >
                     <option value="all">All Months</option>
                     {months.map((month, index) => (
@@ -1594,19 +1463,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                
                 <div className="space-y-0.5">
-                  <label className={`text-xs font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Year</label>
+                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Year</label>
                   <select
                     value={selectedYear}
                     onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-200 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                   >
                     <option value="all">All Years</option>
                     {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
@@ -1614,19 +1476,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                
                 <div className="space-y-0.5">
-                  <label className={`text-xs font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>District</label>
+                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">District</label>
                   <select
                     value={selectedDistrict}
                     onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className={`w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-700 text-white' 
-                        : 'border-gray-200 bg-white text-gray-900'
-                    }`}
+                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                   >
                     <option value="all">All Districts</option>
                     {districts.map((district) => (
@@ -1634,23 +1489,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                
-                <div className="space-y-0.5">
-                  <label className={`text-xs font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>Search</label>
+                <div className="space-y-1 md:space-y-0.5">
+                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Search</label>
                   <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 md:h-3 md:w-3 text-gray-400" />
                     <Input
                       type="text"
                       placeholder="Search actions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className={`pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-700 text-white' 
-                          : 'border-gray-200 bg-white text-gray-900'
-                      }`}
+                      className="pl-8 p-2 md:p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs md:text-xs border-gray-200 bg-white text-gray-900"
                     />
                     {searchTerm && (
                       <button
@@ -1663,63 +1511,59 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
               </div>
+              </div>
             </div>
-          </div>
-
           {/* Summary Cards */}
           <div className="flex-shrink-0 mb-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {/* PNP Tab - Drug Related Stats */}
               {activeTab === "pnp" && (
                 <>
                   {/* Total Card */}
-                  <div className="bg-gray-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
-                    <div className="flex items-center justify-between">
-                      <div>
+                  <div className="bg-gray-600 rounded-lg p-3 md:p-4 text-white shadow-lg min-h-[80px] md:min-h-[100px]">
+                <div className="flex items-center justify-between">
+                  <div>
                         <p className="text-gray-100 text-xs font-medium">Total</p>
-                        <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
+                        <p className="text-base md:text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
                         <p className="text-gray-200 text-xs">All table records</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <Database className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
-
+                      <div className="p-1 md:p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-3 w-3 md:h-4 md:w-4" />
+                  </div>
+                </div>
+              </div>
                   {/* Actions Card */}
-                  <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
-                    <div className="flex items-center justify-between">
-                      <div>
+                  <div className="bg-blue-500 rounded-lg p-3 md:p-4 text-white shadow-lg min-h-[80px] md:min-h-[100px]">
+                <div className="flex items-center justify-between">
+                  <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
-                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-base md:text-lg font-bold">{totalActions}</p>
                         <p className="text-blue-200 text-xs">Actions with status</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <Activity className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
-
+                      <div className="p-1 md:p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-3 w-3 md:h-4 md:w-4" />
+                  </div>
+                </div>
+              </div>
                   {/* Drugs Card */}
-                  <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
-                    <div className="flex items-center justify-between">
-                      <div>
+                  <div className="bg-red-500 rounded-lg p-3 md:p-4 text-white shadow-lg min-h-[80px] md:min-h-[100px]">
+                <div className="flex items-center justify-between">
+                  <div>
                         <p className="text-red-100 text-xs font-medium">Drugs</p>
-                        <p className="text-lg font-bold">{totalDrugs}</p>
+                        <p className="text-base md:text-lg font-bold">{totalDrugs}</p>
                         <p className="text-red-200 text-xs">Male: {totalDrugsMale} | Female: {totalDrugsFemale}</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <AlertTriangle className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
-
+                      <div className="p-1 md:p-1.5 bg-white/20 rounded-full">
+                        <AlertTriangle className="h-3 w-3 md:h-4 md:w-4" />
+                  </div>
+                </div>
+              </div>
                   {/* Illegals Total Card */}
-                  <div className="bg-fuchsia-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                  <div className="bg-fuchsia-500 rounded-lg p-3 md:p-4 text-white shadow-lg min-h-[80px] md:min-h-[100px]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
                         <p className="text-fuchsia-100 text-xs font-medium mb-1">Illegals</p>
-                        <p className="text-lg font-bold mb-1">{totalIllegals}</p>
+                        <p className="text-base md:text-lg font-bold mb-1">{totalIllegals}</p>
                         <p className="text-fuchsia-200 text-xs leading-tight">
                           {illegalCategoryCounts && Object.entries(illegalCategoryCounts)
                             .slice(0, 3) // Show only first 3 categories to fit better
@@ -1727,37 +1571,35 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             .join(' • ')}
                           {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 3 && '...'}
                         </p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
-                        <AlertTriangle className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
+                      <div className="p-1 md:p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
+                        <AlertTriangle className="h-3 w-3 md:h-4 md:w-4" />
+                  </div>
+                </div>
+              </div>
                 </>
               )}
-
               {/* Agriculture Tab - Bantay Dagat Stats */}
               {activeTab === "agriculture" && (
                 <>
                   {/* Total Entries Card */}
                   <div className="bg-green-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
-                    <div className="flex items-center justify-between">
-                      <div>
+                <div className="flex items-center justify-between">
+                  <div>
                         <p className="text-green-100 text-xs font-medium">Total Entries</p>
                         <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
                         <p className="text-green-200 text-xs">All agriculture records</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <Database className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
-
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
                   {/* Illegals Card */}
                   <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
                     <div className="flex items-start justify-between">
                       <div className="flex-1 min-w-0">
-                        <p className="text-red-100 text-xs font-medium mb-1">Illegals</p>
+                        <p className="text-red-100 text-xs font-medium mb-1">Illegals (Auto-Detected)</p>
                         <p className="text-lg font-bold mb-1">{totalAgricultureIllegals}</p>
                         <p className="text-red-200 text-xs leading-tight">
                           {agricultureIllegalCategoryCounts && Object.entries(agricultureIllegalCategoryCounts)
@@ -1766,58 +1608,53 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             .join(' • ')}
                           {agricultureIllegalCategoryCounts && Object.entries(agricultureIllegalCategoryCounts).length > 3 && '...'}
                         </p>
+                        {agricultureIllegalCategoryCounts && Object.entries(agricultureIllegalCategoryCounts).length > 0 && (
+                          <p className="text-red-200 text-xs mt-1">
+                            {Object.entries(agricultureIllegalCategoryCounts).length} categories detected
+                            {Object.entries(agricultureIllegalCategoryCounts).length > 3 && (
+                              <span className="ml-1 cursor-help" title={Object.entries(agricultureIllegalCategoryCounts)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join('\n')}>
+                                (Hover for details)
+                              </span>
+                            )}
+                          </p>
+                        )}
                       </div>
                       <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
                         <AlertTriangle className="h-4 w-4" />
                       </div>
                     </div>
                   </div>
-
                   {/* Action Taken Card */}
                   <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
-                    <div className="flex items-center justify-between">
-                      <div>
+                <div className="flex items-center justify-between">
+                  <div>
                         <p className="text-blue-100 text-xs font-medium">Action Taken</p>
                         <p className="text-lg font-bold">{totalActions}</p>
                         <p className="text-blue-200 text-xs">Actions with status</p>
-                      </div>
-                      <div className="p-1.5 bg-white/20 rounded-full">
-                        <Activity className="h-4 w-4" />
-                      </div>
-                    </div>
                   </div>
+                  <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                  </div>
+                </div>
+              </div>
                 </>
               )}
-
             </div>
           </div>
-
           {/* Action Items Table */}
           <div className="flex-1 min-h-0">
-            <div className={`rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 ${
-              isDarkMode 
-                ? 'bg-gray-800 border-gray-700' 
-                : 'bg-white border-gray-200'
-            }`}>
-              <div className={`p-4 border-b transition-all duration-300 ${
-                isDarkMode ? 'border-gray-700' : 'border-gray-200'
-              }`}>
+                          <div className="rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-gray-200">
+              <div className="p-4 border-b transition-all duration-300 border-gray-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${
-                      isDarkMode ? 'bg-green-900/40' : 'bg-green-100/80'
-                    }`}>
-                      <BarChart3 className={`h-5 w-5 ${
-                        isDarkMode ? 'text-green-400' : 'text-green-600'
-                      }`} />
+                    <div className="p-2 rounded-lg bg-green-100/80">
+                      <BarChart3 className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
-                      <h3 className={`text-lg font-semibold transition-colors duration-300 ${
-                        isDarkMode ? 'text-white' : 'text-gray-900'
-                      }`}>Action Items</h3>
-                      <p className={`text-sm transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Detailed view of all activities</p>
+                      <h3 className="text-lg font-semibold transition-colors duration-300 text-gray-900">Action Items</h3>
+                      <p className="text-sm transition-colors duration-300 text-gray-600">Detailed view of all activities</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -1830,44 +1667,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Trash2 className="h-3 w-3 mr-1" />
                       Clean Duplicates
                     </Button>
-                    <Badge variant="secondary" className={`text-sm ${
-                      isDarkMode 
-                        ? 'bg-blue-900/40 text-blue-400' 
-                        : 'bg-blue-100/80 text-blue-800'
-                    }`}>
+                    <Badge variant="secondary" className="text-sm bg-blue-100/80 text-blue-800">
                                              {sortedItems ? sortedItems.length : 0} items
-                    </Badge>
-                  </div>
+                  </Badge>
                 </div>
               </div>
-              
+              </div>
               <div className="flex-1 overflow-auto p-4">
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center gap-3">
-                      <RefreshCw className={`h-8 w-8 animate-spin ${
-                        isDarkMode ? 'text-blue-400' : 'text-blue-500'
-                      }`} />
-                      <span className={`text-base transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>Loading action items...</span>
+                      <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                      <span className="text-base transition-colors duration-300 text-gray-600">Loading action items...</span>
                     </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full table-fixed">
                       <thead>
-                        <tr className={`border-b transition-all duration-300 ${
-                          isDarkMode ? 'border-gray-700' : 'border-gray-200'
-                        }`}>
-                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
+                        <tr className="border-b transition-all duration-300 border-gray-200">
+                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("municipality")}
-                              className={`flex items-center gap-2 transition-colors ${
-                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
-                              }`}
+                              className="flex items-center gap-2 transition-colors hover:text-blue-600"
                             >
                               Municipality
                               {sortBy === "municipality" && (
@@ -1875,72 +1697,46 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               )}
                             </button>
                           </th>
-                          <th className={`text-left p-4 font-semibold w-28 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
+                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-28 transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("district")}
-                              className={`flex items-center gap-2 transition-colors ${
-                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
-                              }`}
+                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
                             >
                               District
                               {sortBy === "district" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
                               )}
                             </button>
                           </th>
-                          <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>What</th>
-                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>
+                          <th className="text-left p-2 md:p-4 font-semibold w-32 md:w-40 transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
+                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("when")}
-                              className={`flex items-center gap-2 transition-colors ${
-                                isDarkMode ? 'hover:text-blue-400' : 'hover:text-blue-600'
-                              }`}
+                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
                             >
                               When
                               {sortBy === "when" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
                               )}
                             </button>
                           </th>
-                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>Where</th>
+                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
                           {/* Temporarily hidden columns */}
                           {false && (
                             <>
-                              <th className={`text-left p-4 font-semibold w-28 transition-colors duration-300 ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                              }`}>Who</th>
-                              <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                              }`}>Why</th>
-                              <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                              }`}>How</th>
+                              <th className="text-left p-4 font-semibold w-28 transition-colors duration-300 text-gray-700">Who</th>
+                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Why</th>
+                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">How</th>
                             </>
                           )}
-                          <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>Action Taken</th>
+                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
                           {/* Hide Source column for Agriculture tab */}
                           {activeTab !== "agriculture" && (
-                            <th className={`text-left p-4 font-semibold w-32 transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>Source</th>
+                            <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
                           )}
                                                      {/* Other Information column hidden */}
-                           {/* <th className={`text-left p-4 font-semibold w-40 transition-colors duration-300 ${
-                             isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                           }`}>Other Information</th> */}
-                          <th className={`text-left p-4 font-semibold w-24 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                          }`}>Actions</th>
+                           {/* <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Other Information</th> */}
+                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-24 transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1949,7 +1745,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           if (!item || typeof item !== 'object') {
                             return null;
                           }
-                          
                           // Handle icon rendering properly
                           const getIconComponent = (iconName) => {
                             switch (iconName) {
@@ -2135,140 +1930,105 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 return AlertCircle; // Default fallback
                             }
                           };
-                          
                           const IconComponent = getIconComponent(item.icon || 'AlertCircle');
                           return (
-                            <tr key={item.id || `item-${Math.random()}`} className={`border-b transition-colors duration-200 ${
-                              isDarkMode 
-                                ? 'border-gray-700 hover:bg-gray-700/30' 
-                                : 'border-gray-200 hover:bg-gray-50'
-                            }`}>
-                              <td className="p-4">
-                                <div className="flex items-center gap-3">
-                                  <div className={`p-2 rounded-lg ${
-                                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                                  }`}>
-                                    <IconComponent className={`h-4 w-4 ${
-                                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                                    }`} />
+                            <tr key={item.id || `item-${Math.random()}`}>
+                              <td className="p-2 md:p-4">
+                                <div className="flex items-center gap-2 md:gap-3">
+                                  <div className="p-1.5 md:p-2 rounded-lg bg-blue-100">
+                                    <IconComponent className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
                                   </div>
-                                  <span className={`font-medium transition-colors duration-300 ${
-                                    isDarkMode ? 'text-white' : 'text-gray-900'
-                                  }`}>{item.municipality}</span>
+                                  <span className="font-medium transition-colors duration-300 text-xs md:text-sm text-gray-900">{item.municipality}</span>
                                 </div>
                               </td>
-                              <td className="p-4">
-                                <Badge variant="outline" className={`${
-                                  isDarkMode 
-                                    ? 'bg-gray-700 text-gray-300 border-gray-600' 
-                                    : 'bg-gray-100 text-gray-700 border-gray-300'
-                                }`}>
+                              <td className="p-2 md:p-4">
+                                <Badge variant="outline" className="text-xs md:text-sm bg-gray-100 text-gray-700 border-gray-300">
                                   {item.district}
                                 </Badge>
                               </td>
-                              <td className="p-4">
-                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`} title={item.what}>
+                              <td className="p-2 md:p-4">
+                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.what}>
                                   {typeof item.what === 'string' ? item.what : 'N/A'}
                                 </span>
                               </td>
-                              <td className="p-4">
-                                <span className={`text-sm transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                                }`}>
+                              <td className="p-2 md:p-4">
+                                <span className="text-xs md:text-sm transition-colors duration-300 text-gray-600">
                                   {formatDate(item.when)}
                                 </span>
                               </td>
-                              <td className="p-4">
-                                <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`}>{typeof item.where === 'string' ? item.where : 'N/A'}</span>
+                              <td className="p-2 md:p-4">
+                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700">{typeof item.where === 'string' ? item.where : 'N/A'}</span>
                               </td>
                               {false && (
-                                <td className="p-4">
-                                  <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                  }`}>{item.who}</span>
-                                </td>
+                              <td className="p-4">
+                                  <span className="text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700">{item.who}</span>
+                              </td>
                               )}
                               {false && (
                                 <>
-                                  <td className="p-4">
-                                    <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                    }`} title={item.why}>
-                                      {item.why}
-                                    </span>
-                                  </td>
-                                  <td className="p-4">
-                                    <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                    }`} title={item.how}>
-                                      {item.how}
-                                    </span>
-                                  </td>
+                              <td className="p-4">
+                                    <span className="text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.why}>
+                                  {item.why}
+                                </span>
+                              </td>
+                              <td className="p-4">
+                                    <span className="text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.how}>
+                                  {item.how}
+                                </span>
+                              </td>
                                 </>
                               )}
-                              <td className="p-4">
-                                <Badge className={`rounded-none ${
+                              <td className="p-2 md:p-4">
+                                <Badge className={`rounded-none text-xs md:text-sm ${
                                   item.actionTaken === "Resolved" 
-                                    ? isDarkMode 
-                                      ? "bg-green-900/30 text-green-400" 
-                                      : "bg-green-100 text-green-800"
-                                    : isDarkMode 
-                                      ? "bg-orange-900/30 text-orange-400" 
-                                      : "bg-orange-100 text-orange-800"
+                                    ? "bg-green-100 text-green-800"
+                                    : "bg-gray-100 text-gray-800"
                                 }`}>
                                   {typeof item.actionTaken === 'string' ? item.actionTaken : 'N/A'}
                                 </Badge>
                               </td>
                               {/* Hide Source column data for Agriculture tab */}
                               {activeTab !== "agriculture" && (
-                                <td className="p-4">
-                                  <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                  }`} title={item.source}>
+                                <td className="p-2 md:p-4">
+                                  <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.source}>
                                     {typeof item.source === 'string' ? item.source : 'N/A'}
-                                  </span>
-                                </td>
+                                </span>
+                              </td>
                               )}
                                                              {/* Other Information column data hidden */}
                                {/* <td className="p-4">
-                                 <span className={`text-sm break-words leading-relaxed transition-colors duration-300 ${
-                                   isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                 }`} title={item.otherInfo}>
+                                 <span className="text-sm break-words leading-relaxed transition-colors duration-300  text-gray-700"" title={item.otherInfo}>
                                    {item.otherInfo}
                                  </span>
                                </td> */}
-                              <td className="p-4">
-                                <div className="flex items-center gap-2">
+                              <td className="p-2 md:p-4">
+                                <div className="flex items-center gap-1 md:gap-2">
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "view")}
                                     title="View Details"
-                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400"
+                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 p-1 md:p-2"
                                   >
-                                    <Eye className="h-4 w-4" />
+                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "edit")}
                                     title="Edit"
-                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400"
+                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400 p-1 md:p-2"
                                   >
-                                    <Edit className="h-4 w-4" />
+                                    <Edit className="h-3 w-3 md:h-4 md:w-4" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "delete")}
                                     title="Delete"
-                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400"
+                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 p-1 md:p-2"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                                   </Button>
                                 </div>
                               </td>
@@ -2277,19 +2037,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         })}
                       </tbody>
                     </table>
-                    
                     {(!sortedItems || sortedItems.length === 0) && (
-                      <div className="text-center py-12">
-                        <div className={`p-4 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center ${
-                          isDarkMode ? 'bg-gray-700' : 'bg-gray-200'
-                        }`}>
-                          <AlertTriangle className={`h-8 w-8 ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                          }`} />
+                      <div className="text-center py-8 md:py-12">
+                        <div className="p-3 md:p-4 rounded-full w-12 h-12 md:w-16 md:h-16 mx-auto mb-3 md:mb-4 flex items-center justify-center bg-gray-200">
+                          <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-gray-500" />
                         </div>
-                        <p className={`text-base transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>No action items found matching your criteria.</p>
+                        <p className="text-sm md:text-base transition-colors duration-300 text-gray-600">No action items found matching your criteria.</p>
                       </div>
                     )}
                   </div>
@@ -2298,29 +2051,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         </div>
-
-                                     {/* Add Action Report Modal */}
-           {showAddModal && (
-             <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-               <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
-                 isDarkMode 
-                   ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-900/50' 
-                   : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
-               }`}>
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-xl ${
-                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                  }`}>
-                    <FileText className={`h-6 w-6 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`} />
+        {/* Add Action Report Modal */}
+        {showAddModal && (
+             <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-2 md:p-4">
+               <div className="p-4 md:p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20">
+              <div className="flex items-center justify-between mb-4 md:mb-6">
+                <div className="flex items-center gap-2 md:gap-3">
+                  <div className="p-2 md:p-3 rounded-xl bg-blue-100">
+                    <FileText className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold">Add New Action Report</h3>
-                    <p className={`text-sm ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>Create a new action report entry</p>
+                    <h3 className="text-lg md:text-xl font-bold">Add New Action Report</h3>
+                    <p className="text-xs md:text-sm text-gray-600">Create a new action report entry</p>
                   </div>
                 </div>
                 <Button
@@ -2332,22 +2074,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Department <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={newActionReport.department}
                     onChange={(e) => handleInputChange('department', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Department</option>
@@ -2356,22 +2091,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <option value="pg-enro">PG-Enro / Agriculture</option>
                   </select>
                 </div>
-                
                 {/* Municipality - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Municipality <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={newActionReport.municipality}
                     onChange={(e) => handleInputChange('municipality', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Municipality</option>
@@ -2380,22 +2108,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                
                 {/* District - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     District <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={newActionReport.district}
                     disabled
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-700 text-gray-400 cursor-not-allowed' 
-                        : 'border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
                     required
                   >
                     <option value="">{newActionReport.municipality ? 'Auto-detected' : 'Select Municipality First'}</option>
@@ -2404,12 +2125,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </select>
                 </div>
-                
                 {/* What - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     What <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2417,36 +2135,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Describe what happened..."
                     value={newActionReport.what}
                     onChange={(e) => handleInputChange('what', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-
                 {/* Type of Illegals - Visible for all departments */}
                 {newActionReport.department && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">
                       Type of Illegals <span className="text-red-500">*</span>
                     </label>
                     <div className="flex gap-2">
                       <select
                         value={newActionReport.illegalType || ""}
                         onChange={(e) => handleInputChange('illegalType', e.target.value)}
-                        className={`flex-1 p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
+                        className="flex-1 p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       >
                         <option value="">Select Type of Illegals</option>
-                        
                         {/* PNP Illegal Types */}
                         {newActionReport.department === "pnp" && (
                           <>
@@ -2462,7 +2168,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* Agriculture / Bantay Dagat Illegal Types */}
                         {newActionReport.department === "agriculture" && (
                           <>
@@ -2478,7 +2183,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* PG-ENRO / AGRICULTURE Illegal Types */}
                         {newActionReport.department === "pg-enro" && (
                           <>
@@ -2495,10 +2199,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* Custom Illegal Types */}
                         {newActionReport.department && customIllegalTypes[newActionReport.department]?.map((customType, index) => (
-                          <option key={`custom-${index}`} value={`custom-${customType}`}>
+                          <option key={index} value={customType}>
                             {customType} (Custom)
                           </option>
                         ))}
@@ -2507,11 +2210,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         type="button"
                         onClick={() => setShowAddIllegalTypeModal(true)}
                         variant="outline"
-                        className={`p-3 border-2 border-dashed transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400' 
-                            : 'border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600'
-                        }`}
+                        className="p-3 border-2 border-dashed transition-all duration-200 border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600"
                         title="Add New Type of Illegals"
                       >
                         <Plus className="h-4 w-4" />
@@ -2523,22 +2222,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         placeholder="Specify other type of illegals..."
                         value={newActionReport.otherIllegalType || ""}
                         onChange={(e) => handleInputChange('otherIllegalType', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
+                        className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     )}
                   </div>
                 )}
-                
                 {/* When - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     When <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2546,20 +2238,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={newActionReport.when}
                     onChange={(e) => handleInputChange('when', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 {/* Where - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Where <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2567,54 +2252,36 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Location of the incident..."
                     value={newActionReport.where}
                     onChange={(e) => handleInputChange('where', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 {/* Who - Only visible for PNP */}
                 {newActionReport.department === "pnp" && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      Who <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Personnel involved..."
-                      value={newActionReport.who}
-                      onChange={(e) => handleInputChange('who', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                      required
-                    />
-                  </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">
+                    Who <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Personnel involved..."
+                    value={newActionReport.who}
+                    onChange={(e) => handleInputChange('who', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
                 )}
-
                 {/* Gender - Only visible for PNP */}
                 {newActionReport.department === "pnp" && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">
                       Gender
                     </label>
                     <select
                       value={newActionReport.gender}
                       onChange={(e) => handleInputChange('gender', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">Select Gender</option>
                       <option value="male">Male</option>
@@ -2622,56 +2289,39 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </select>
                   </div>
                 )}
-                
                 {/* Why - Only visible for PNP */}
                 {newActionReport.department === "pnp" && (
                   <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      Why
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Reason for the action..."
-                      value={newActionReport.why}
-                      onChange={(e) => handleInputChange('why', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
+                    <label className="text-sm font-semibold text-gray-700">
+                    Why
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Reason for the action..."
+                    value={newActionReport.why}
+                    onChange={(e) => handleInputChange('why', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
                 )}
-                
                 {/* How - Only visible for PNP */}
                 {newActionReport.department === "pnp" && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      How
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Method or procedure used..."
-                      value={newActionReport.how}
-                      onChange={(e) => handleInputChange('how', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">
+                    How
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Method or procedure used..."
+                    value={newActionReport.how}
+                    onChange={(e) => handleInputChange('how', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
                 )}
-                
                 {/* Action Taken - Always visible */}
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Action Taken <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2679,21 +2329,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={newActionReport.actionTaken}
                     onChange={(e) => handleInputChange('actionTaken', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 {/* Source - Only visible for PNP */}
                 {newActionReport.department === "pnp" && (
                   <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
+                    <label className="text-sm font-semibold text-gray-700">
                       Source
                     </label>
                     <Input
@@ -2701,20 +2344,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
                       value={newActionReport.source}
                       onChange={(e) => handleInputChange('source', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
                 )}
-
                 {/* Other Information - Always visible */}
                 <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Other Information
                   </label>
                   <textarea
@@ -2722,28 +2358,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     value={newActionReport.otherInfo}
                     onChange={(e) => handleInputChange('otherInfo', e.target.value)}
                     rows={3}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 resize-none ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 resize-none border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-
                 {/* Photo Upload Section */}
                 <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Photos <span className="text-xs text-gray-500">(Optional - Max 5MB per image)</span>
                   </label>
                   <div className="space-y-3">
                     {/* Photo Upload Input */}
-                    <div className={`p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 hover:border-blue-500 bg-gray-800/50' 
-                        : 'border-gray-300 hover:border-blue-500 bg-gray-50'
-                    }`}>
+                    <div className="p-4 border-2 border-dashed rounded-lg transition-all duration-200 border-gray-300 hover:border-blue-500 bg-gray-50">
                       <input
                         type="file"
                         multiple
@@ -2756,22 +2381,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         htmlFor="photo-upload"
                         className="flex flex-col items-center justify-center cursor-pointer"
                       >
-                        <Camera className={`h-8 w-8 mb-2 ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`} />
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <Camera className="h-8 w-8 mb-2 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-600">
                           Click to upload photos or drag and drop
                         </span>
-                        <span className={`text-xs ${
-                          isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                        }`}>
+                        <span className="text-xs text-gray-400">
                           PNG, JPG, GIF up to 5MB
                         </span>
                       </label>
-                    </div>
-
+              </div>
                     {/* Photo Preview Grid */}
                     {newActionReport.photos && newActionReport.photos.length > 0 && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -2804,30 +2422,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </div>
                 </div>
-
-
-
               </div>
-              
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button 
                   onClick={handleCancelAdd} 
                   variant="outline"
-                  className={`${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleSubmitActionReport} 
-                  className={`${
-                    isDarkMode 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Save Report
@@ -2836,29 +2442,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-
         {/* Add New Illegal Type Modal */}
         {showAddIllegalTypeModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-md w-full border ${
-              isDarkMode 
-                ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-700' 
-                : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
-            }`}>
+            <div className="p-6 rounded-xl shadow-2xl max-w-md w-full border bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-xl ${
-                    isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                  }`}>
-                    <Plus className={`h-6 w-6 ${
-                      isDarkMode ? 'text-green-400' : 'text-green-600'
-                    }`} />
+                  <div className="p-3 rounded-xl bg-green-100">
+                    <Plus className="h-6 w-6 text-green-600" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold">Add New Illegal Type</h3>
-                    <p className={`text-sm ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>Add a new type of illegals to the system</p>
+                    <p className="text-sm text-gray-600">Add a new type of illegals to the system</p>
                   </div>
                 </div>
                 <Button
@@ -2870,12 +2465,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
               <div className="space-y-4 mb-6">
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     New Illegal Type <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -2883,35 +2475,22 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Enter new type of illegals..."
                     value={newIllegalType}
                     onChange={(e) => setNewIllegalType(e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
               </div>
-              
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button 
                   onClick={() => setShowAddIllegalTypeModal(false)} 
                   variant="outline"
-                  className={`${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleAddIllegalType}
-                  className={`${
-                    isDarkMode 
-                      ? 'bg-green-600 hover:bg-green-700 text-white' 
-                      : 'bg-green-600 hover:bg-green-700 text-white'
-                  }`}
+                  className="bg-green-600 hover:bg-green-700 text-white"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Type
@@ -2920,29 +2499,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-
-                                     {/* Edit Action Report Modal */}
-           {showEditModal && editingItem && (
+        {/* Edit Action Report Modal */}
+        {showEditModal && editingItem && (
              <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-               <div className={`p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border ${
-                 isDarkMode 
-                   ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-700' 
-                   : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
-               }`}>
+               <div className="p-6 rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-xl ${
-                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                  }`}>
-                    <Edit className={`h-6 w-6 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`} />
+                  <div className="p-3 rounded-xl bg-blue-100">
+                    <Edit className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
                     <h3 className="text-xl font-bold">Edit Action Report</h3>
-                    <p className={`text-sm ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>Update action report details</p>
+                    <p className="text-sm text-gray-600">Update action report details</p>
                   </div>
                 </div>
                 <Button
@@ -2954,22 +2522,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Department <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editingItem.department}
                     onChange={(e) => handleEditInputChange('department', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Department</option>
@@ -2978,21 +2539,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <option value="pg-enro">PG-Enro / Agriculture</option>
                   </select>
                 </div>
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Municipality <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editingItem.municipality}
                     onChange={(e) => handleEditInputChange('municipality', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   >
                     <option value="">Select Municipality</option>
@@ -3001,21 +2555,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     ))}
                   </select>
                 </div>
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     District <span className="text-red-500">*</span>
                   </label>
                   <select
                     value={editingItem.district}
                     disabled
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-700 text-gray-400 cursor-not-allowed' 
-                        : 'border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-gray-100 text-gray-600 cursor-not-allowed"
                     required
                   >
                     <option value="">{editingItem.municipality ? 'Auto-detected' : 'Select Municipality First'}</option>
@@ -3024,11 +2571,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </select>
                 </div>
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     What <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -3036,36 +2580,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Describe what happened..."
                     value={editingItem.what}
                     onChange={(e) => handleEditInputChange('what', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-
                 {/* Type of Illegals - Visible for all departments */}
                 {editingItem.department && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
+                <div className="space-y-2">
+                    <label className="text-sm font-semibold text-gray-700">
                       Type of Illegals <span className="text-red-500">*</span>
                     </label>
                     <div className="flex gap-2">
                       <select
                         value={editingItem.illegalType || ""}
                         onChange={(e) => handleEditInputChange('illegalType', e.target.value)}
-                        className={`flex-1 p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
+                        className="flex-1 p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       >
                         <option value="">Select Type of Illegals</option>
-                        
                         {/* PNP Illegal Types */}
                         {editingItem.department === "pnp" && (
                           <>
@@ -3081,7 +2613,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* Agriculture / Bantay Dagat Illegal Types */}
                         {editingItem.department === "agriculture" && (
                           <>
@@ -3097,7 +2628,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* PG-ENRO / AGRICULTURE Illegal Types */}
                         {editingItem.department === "pg-enro" && (
                           <>
@@ -3114,10 +2644,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             <option value="other">Other</option>
                           </>
                         )}
-                        
                         {/* Custom Illegal Types */}
                         {editingItem.department && customIllegalTypes[editingItem.department]?.map((customType, index) => (
-                          <option key={`custom-edit-${index}`} value={`custom-${customType}`}>
+                          <option key={index} value={customType}>
                             {customType} (Custom)
                           </option>
                         ))}
@@ -3126,11 +2655,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         type="button"
                         onClick={() => setShowAddIllegalTypeModal(true)}
                         variant="outline"
-                        className={`p-3 border-2 border-dashed transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 text-gray-300 hover:border-blue-500 hover:text-blue-400' 
-                            : 'border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600'
-                        }`}
+                        className="p-3 border-2 border-dashed transition-all duration-200 border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600"
                         title="Add New Type of Illegals"
                       >
                         <Plus className="h-4 w-4" />
@@ -3142,21 +2667,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         placeholder="Specify other type of illegals..."
                         value={editingItem.otherIllegalType || ""}
                         onChange={(e) => handleEditInputChange('otherIllegalType', e.target.value)}
-                        className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                          isDarkMode 
-                            ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                            : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                        }`}
+                        className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         required
                       />
                     )}
                   </div>
                 )}
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     When <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -3164,19 +2682,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={editingItem.when}
                     onChange={(e) => handleEditInputChange('when', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Where <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -3184,86 +2695,58 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Location of the incident..."
                     value={editingItem.where}
                     onChange={(e) => handleEditInputChange('where', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 {/* Hidden: Who */}
                 {false && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      Who <span className="text-red-500">*</span>
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Personnel involved..."
-                      value={editingItem.who}
-                      onChange={(e) => handleEditInputChange('who', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                      required
-                    />
-                  </div>
-                )}
-
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                    <label className="text-sm font-semibold text-gray-700">
+                    Who <span className="text-red-500">*</span>
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Personnel involved..."
+                    value={editingItem.who}
+                    onChange={(e) => handleEditInputChange('who', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    required
+                  />
+                </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">
                     Gender
                   </label>
                   <select
                     value={editingItem.gender || ""}
                     onChange={(e) => handleEditInputChange('gender', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   >
                     <option value="">Select Gender</option>
                     <option value="male">Male</option>
                     <option value="female">Female</option>
                   </select>
                 </div>
-                
                 {/* Hidden: Why */}
                 {false && (
                   <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      Why
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Reason for the action..."
-                      value={editingItem.why}
-                      onChange={(e) => handleEditInputChange('why', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
+                    <label className="text-sm font-semibold text-gray-700">
+                    Why
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Reason for the action..."
+                    value={editingItem.why}
+                    onChange={(e) => handleEditInputChange('why', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
                 )}
-
                 {/* Source */}
                 <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Source
                   </label>
                   <Input
@@ -3271,40 +2754,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Where did this report come from? (e.g., Hotline, Walk-in, Facebook, Patrol)"
                     value={editingItem.source || ""}
                     onChange={(e) => handleEditInputChange('source', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-                
                 {/* Hidden: How */}
                 {false && (
-                  <div className="space-y-2">
-                    <label className={`text-sm font-semibold ${
-                      isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                    }`}>
-                      How
-                    </label>
-                    <Input
-                      type="text"
-                      placeholder="Method or procedure used..."
-                      value={editingItem.how}
-                      onChange={(e) => handleEditInputChange('how', e.target.value)}
-                      className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                        isDarkMode 
-                          ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                          : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                      }`}
-                    />
-                  </div>
-                )}
-                
                 <div className="space-y-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                    <label className="text-sm font-semibold text-gray-700">
+                    How
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Method or procedure used..."
+                    value={editingItem.how}
+                    onChange={(e) => handleEditInputChange('how', e.target.value)}
+                      className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+                )}
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">
                     Action Taken <span className="text-red-500">*</span>
                   </label>
                   <Input
@@ -3312,19 +2781,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     placeholder="Enter action taken (e.g., Under investigation, Resolved, Pending)"
                     value={editingItem.actionTaken}
                     onChange={(e) => handleEditInputChange('actionTaken', e.target.value)}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     required
                   />
                 </div>
-                
                 <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Other Information
                   </label>
                   <textarea
@@ -3332,30 +2794,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     value={editingItem.otherInfo}
                     onChange={(e) => handleEditInputChange('otherInfo', e.target.value)}
                     rows={3}
-                    className={`w-full p-3 rounded-lg border transition-all duration-200 resize-none ${
-                      isDarkMode 
-                        ? 'border-gray-600 bg-gray-800 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500' 
-                        : 'border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
-                    }`}
+                    className="w-full p-3 rounded-lg border transition-all duration-200 resize-none border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
-
-
-
                 {/* Photo Upload Section */}
                 <div className="space-y-2 md:col-span-2">
-                  <label className={`text-sm font-semibold ${
-                    isDarkMode ? 'text-gray-200' : 'text-gray-700'
-                  }`}>
+                  <label className="text-sm font-semibold text-gray-700">
                     Photos <span className="text-xs text-gray-500">(Optional - Max 5MB per image)</span>
                   </label>
                   <div className="space-y-3">
                     {/* Photo Upload Input */}
-                    <div className={`p-4 border-2 border-dashed rounded-lg transition-all duration-200 ${
-                      isDarkMode 
-                        ? 'border-gray-600 hover:border-blue-500 bg-gray-800/50' 
-                        : 'border-gray-300 hover:border-blue-500 bg-gray-50'
-                    }`}>
+                    <div className="p-4 border-2 border-dashed rounded-lg transition-all duration-200 border-gray-300 hover:border-blue-500 bg-gray-50">
                       <input
                         type="file"
                         multiple
@@ -3368,34 +2817,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         htmlFor="edit-photo-upload"
                         className="flex flex-col items-center justify-center cursor-pointer"
                       >
-                        <Camera className={`h-8 w-8 mb-2 ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`} />
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <Camera className="h-8 w-8 mb-2 text-gray-500" />
+                        <span className="text-sm font-medium text-gray-600">
                           Click to upload photos or drag and drop
                         </span>
-                        <span className={`text-xs ${
-                          isDarkMode ? 'text-gray-500' : 'text-gray-400'
-                        }`}>
+                        <span className="text-xs text-gray-400">
                           PNG, JPG, GIF up to 5MB
                         </span>
                       </label>
-                    </div>
-
+              </div>
                     {/* Existing Photos Display */}
                     {editingItem.photos && editingItem.photos.length > 0 && (
                       <div className="space-y-3">
-                        <h5 className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>Existing Photos ({editingItem.photos.length})</h5>
+                          <h5 className="text-sm font-medium text-gray-600">Existing Photos ({editingItem.photos.length})</h5>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
                           {editingItem.photos.map((photo, index) => (
                             <div key={index} className="relative group">
                               <img
                                 src={getImageSource(photo)}
-                                alt={`Photo ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg border"
                                 onError={handlePhotoError}
                               />
@@ -3429,28 +2868,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     )}
                   </div>
                 </div>
-
               </div>
-              
               <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                 <Button 
                   onClick={handleCancelEdit} 
                   variant="outline"
-                  className={`${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                                      className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </Button>
                 <Button 
                   onClick={handleEditActionReport} 
-                  className={`${
-                    isDarkMode 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Save className="h-4 w-4 mr-2" />
                   Update Report
@@ -3459,29 +2888,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-
         {/* View Details Modal */}
         {showViewModal && viewingItem && (
           <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-            <div className={`p-6 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border ${
-              isDarkMode 
-                ? 'bg-gray-900/95 text-white border-gray-600 shadow-gray-900/50' 
-                : 'bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20'
-            }`}>
+            <div className="p-6 rounded-xl shadow-2xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                  <div className={`p-3 rounded-xl ${
-                    isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                  }`}>
-                    <Eye className={`h-6 w-6 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`} />
+                  <div className="p-3 rounded-xl bg-blue-100">
+                    <Eye className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold">Action Report Details</h3>
-                    <p className={`text-sm ${
-                      isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>Complete incident and action information</p>
+                    <p className="text-sm text-gray-600">Complete incident and action information</p>
                   </div>
                 </div>
                 <Button
@@ -3493,74 +2911,44 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <X className="h-4 w-4" />
                 </Button>
               </div>
-              
               {/* Main Content Grid */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 {/* Left Column - Basic Info & Photos */}
                 <div className="lg:col-span-1 space-y-4">
                   {/* Basic Information Card */}
-                  <div className={`p-5 rounded-xl border shadow-sm ${
-                    isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
-                  }`}>
+                  <div className="p-5 rounded-xl border shadow-sm bg-gray-50/80 border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className={`w-2 h-2 rounded-full ${
-                        isDarkMode ? 'bg-blue-400' : 'bg-blue-600'
-                      }`}></div>
-                      <h4 className={`font-semibold text-lg ${
-                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                      }`}>Basic Information</h4>
+                      <div className="w-2 h-2 rounded-full bg-blue-600"></div>
+                      <h4 className="font-semibold text-lg text-gray-800">Basic Information</h4>
                     </div>
                     <div className="space-y-4">
-                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Department</span>
-                        <Badge className={`${
-                          isDarkMode ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-100 text-blue-800'
-                        }`}>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">Department</span>
+                        <Badge className="bg-blue-100 text-blue-800">
                           {viewingItem.department?.toUpperCase() || 'N/A'}
                         </Badge>
                       </div>
-                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Municipality</span>
-                        <span className={`text-sm font-semibold ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.municipality}</span>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">Municipality</span>
+                        <span className="text-sm font-semibold text-gray-700">{viewingItem.municipality}</span>
                       </div>
-                      <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>District</span>
-                        <span className={`text-sm font-semibold ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{viewingItem.district}</span>
+                      <div className="flex justify-between items-center py-2 border-b border-gray-200">
+                        <span className="text-sm font-medium text-gray-600">District</span>
+                        <span className="text-sm font-semibold text-gray-700">{viewingItem.district}</span>
                       </div>
                       <div className="flex justify-between items-center py-2">
-                        <span className={`text-sm font-medium ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                        }`}>Date & Time</span>
-                        <span className={`text-sm font-semibold ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{formatDate(viewingItem.when)}</span>
+                        <span className="text-sm font-medium text-gray-600">Date & Time</span>
+                        <span className="text-sm font-semibold text-gray-700">{formatDate(viewingItem.when)}</span>
                       </div>
                     </div>
                   </div>
-
                   {/* Photos Section */}
                   {viewingItem.photos && viewingItem.photos.length > 0 && (
-                    <div className={`p-5 rounded-xl border shadow-sm ${
-                      isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
-                    }`}>
+                    <div className="p-5 rounded-xl border shadow-sm bg-gray-50/80 border-gray-200">
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            isDarkMode ? 'bg-pink-400' : 'bg-pink-600'
-                          }`}></div>
-                          <h4 className={`font-semibold text-lg ${
-                            isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                          }`}>Photos ({viewingItem.photos.length})</h4>
+                          <div className="w-2 h-2 rounded-full bg-pink-600"></div>
+                          <h4 className="font-semibold text-lg text-gray-800">Photos ({viewingItem.photos.length})</h4>
                         </div>
                         {/* Migration button for legacy photos */}
                         {viewingItem.photos.some(photo => photo.isLegacy) && (
@@ -3575,17 +2963,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           </Button>
                         )}
                       </div>
-                      
-
                       <div className="grid grid-cols-2 gap-3">
                         {viewingItem.photos.map((photo, index) => {
                           const imageSource = getImageSource(photo);
-                          
                           return (
                             <div key={index} className="relative group">
                               <img
                                 src={imageSource}
-                                alt={`Photo ${index + 1}`}
                                 className="w-full h-24 object-cover rounded-lg border cursor-pointer hover:scale-105 transition-transform duration-200 shadow-sm"
                                 onError={(event) => handlePhotoError(event, photo)}
                                 onClick={() => {
@@ -3604,9 +2988,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                 }}
                               />
                               <div className="absolute top-2 right-2">
-                                <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                  isDarkMode ? 'bg-black/70 text-white' : 'bg-white/90 text-gray-800'
-                                }`}>
+                                <div className="px-2 py-1 rounded-full text-xs font-medium bg-white/90 text-gray-800">
                                   {index + 1}
                                 </div>
                               </div>
@@ -3634,7 +3016,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               {/* Show photo info on hover */}
                               <div className="absolute bottom-1 left-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
                                 <div className="bg-black/70 text-white text-xs p-1 rounded">
-                                  {photo.fileName || photo.name || `Photo ${index + 1}`}
                                   {photo.isLegacy && ' (Legacy)'}
                                 </div>
                               </div>
@@ -3642,132 +3023,66 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           );
                         })}
                       </div>
-                      
-
                     </div>
                   )}
                 </div>
-
                 {/* Right Column - Incident Details */}
                 <div className="lg:col-span-2 space-y-4">
                   {/* Incident Details Card */}
-                  <div className={`p-5 rounded-xl border shadow-sm ${
-                    isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
-                  }`}>
+                  <div className="p-5 rounded-xl border shadow-sm bg-gray-50/80 border-gray-200">
                     <div className="flex items-center gap-2 mb-4">
-                      <div className={`w-2 h-2 rounded-full ${
-                        isDarkMode ? 'bg-purple-400' : 'bg-purple-600'
-                      }`}></div>
-                      <h4 className={`font-semibold text-lg ${
-                        isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                      }`}>Incident Details</h4>
+                      <div className="w-2 h-2 rounded-full bg-purple-600"></div>
+                      <h4 className="font-semibold text-lg text-gray-800">Incident Details</h4>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-4">
                         <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>What Happened</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.what}</p>
+                          <span className="text-sm font-medium text-gray-600">What Happened</span>
+                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.what}</p>
                         </div>
                         {/* Type of Illegals - Visible for all departments */}
                         {viewingItem.department && (
                           <div className="space-y-2">
-                            <span className={`text-sm font-medium ${
-                              isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                            }`}>Type of Illegals</span>
-                            <p className={`text-sm p-3 rounded-lg ${
-                              isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                            }`}>
+                            <span className="text-sm font-medium text-gray-600">Type of Illegals</span>
+                            <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">
                               {viewingItem.illegalType === "other" 
                                 ? viewingItem.otherIllegalType || 'N/A'
-                                : viewingItem.illegalType 
-                                  ? viewingItem.illegalType.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
-                                  : 'N/A'
-                              }
+                                : viewingItem.illegalType || 'N/A'}
                             </p>
                           </div>
                         )}
                         <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Location</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.where}</p>
+                          <span className="text-sm font-medium text-gray-600">Gender</span>
+                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.gender ? viewingItem.gender.charAt(0).toUpperCase() + viewingItem.gender.slice(1) : 'N/A'}</p>
                         </div>
                         <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Personnel Involved</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.who || 'N/A'}</p>
-                        </div>
-                      </div>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Gender</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.gender ? viewingItem.gender.charAt(0).toUpperCase() + viewingItem.gender.slice(1) : 'N/A'}</p>
+                          <span className="text-sm font-medium text-gray-600">Reason</span>
+                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.why || 'N/A'}</p>
                         </div>
                         <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Reason</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.why || 'N/A'}</p>
-                        </div>
-                        <div className="space-y-2">
-                          <span className={`text-sm font-medium ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Source</span>
-                          <p className={`text-sm p-3 rounded-lg ${
-                            isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                          }`}>{viewingItem.source || 'N/A'}</p>
+                          <span className="text-sm font-medium text-gray-600">Source</span>
+                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.source || 'N/A'}</p>
                         </div>
                       </div>
                     </div>
                   </div>
-
                   {/* Additional Information Card */}
                   {viewingItem.otherInfo && (
-                    <div className={`p-5 rounded-xl border shadow-sm ${
-                      isDarkMode ? 'bg-gray-800/80 border-gray-700' : 'bg-gray-50/80 border-gray-200'
-                    }`}>
+                    <div className="p-5 rounded-xl border shadow-sm bg-gray-50/80 border-gray-200">
                       <div className="flex items-center gap-2 mb-4">
-                        <div className={`w-2 h-2 rounded-full ${
-                          isDarkMode ? 'bg-orange-400' : 'bg-orange-600'
-                        }`}></div>
-                        <h4 className={`font-semibold text-lg ${
-                          isDarkMode ? 'text-gray-200' : 'text-gray-800'
-                        }`}>Additional Information</h4>
+                        <div className="w-2 h-2 rounded-full bg-orange-600"></div>
+                        <h4 className="font-semibold text-lg text-gray-800">Additional Information</h4>
                       </div>
-                      <p className={`text-sm p-4 rounded-lg ${
-                        isDarkMode ? 'bg-gray-700/50 text-gray-300' : 'bg-gray-100 text-gray-700'
-                      }`}>{viewingItem.otherInfo}</p>
+                      <p className="text-sm p-4 rounded-lg bg-gray-100 text-gray-700">{viewingItem.otherInfo}</p>
                     </div>
                   )}
                 </div>
               </div>
-
-
-              
-              <div className="flex gap-3 justify-end pt-6 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex gap-3 justify-end pt-6 border-t border-gray-200">
                 <Button 
                   onClick={handleCloseViewModal} 
                   variant="outline"
-                  className={`${
-                    isDarkMode 
-                      ? 'border-gray-600 text-gray-300 hover:bg-gray-800' 
-                      : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                  }`}
+                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
                 >
                   Close
                 </Button>
@@ -3776,11 +3091,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     handleCloseViewModal();
                     handleAction(viewingItem.id, "edit");
                   }}
-                  className={`${
-                    isDarkMode 
-                      ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                      : 'bg-blue-600 hover:bg-blue-700 text-white'
-                  }`}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
                 >
                   <Edit className="h-4 w-4 mr-2" />
                   Edit Report
@@ -3789,13 +3100,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-
         {/* Image Modal */}
         {showImageModal && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-            <div className={`relative max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl ${
-              isDarkMode ? 'bg-gray-900' : 'bg-white'
-            }`}>
+            <div className="relative max-w-4xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl bg-white">
               {/* Close button */}
               <Button
                 onClick={() => setShowImageModal(false)}
@@ -3805,7 +3113,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               >
                 <X className="h-5 w-5" />
               </Button>
-              
               {/* Image */}
               <div className="flex items-center justify-center p-4">
                 <img
@@ -3815,27 +3122,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   onError={handlePhotoError}
                 />
               </div>
-              
               {/* Image info */}
-              <div className={`absolute bottom-0 left-0 right-0 p-4 ${
-                isDarkMode ? 'bg-gray-900/90' : 'bg-white/90'
-              }`}>
-                <p className={`text-center font-medium ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+              <div className="absolute bottom-0 left-0 right-0 p-4 bg-white/90">
+                <p className="text-center font-medium text-gray-900">
                   {imageModalData.fileName}
                 </p>
               </div>
             </div>
           </div>
         )}
-
         {/* Delete Confirmation Modal */}
         {showDeleteModal && (
           <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
-            <div className={`p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full border ${
-              isDarkMode ? 'bg-gray-800/90 text-white border-gray-700' : 'bg-white/90 text-gray-900 border-gray-200'
-            }`}>
+            <div className="p-4 sm:p-6 rounded-lg shadow-lg max-w-md w-full border bg-white/90 text-gray-900 border-gray-200">
               <div className="flex items-center gap-3 mb-3 sm:mb-4">
                 <AlertTriangle className="h-6 w-6 text-red-500" />
                 <h3 className="text-lg font-semibold">Confirm Delete</h3>

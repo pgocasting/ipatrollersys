@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Badge } from "./components/ui/badge";
-import { useTheme } from "./ThemeContext";
+
 import { useData } from "./DataContext";
-import { useFirebase } from "./hooks/useFirebase";
+
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import html2canvas from 'html2canvas';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -37,7 +40,11 @@ import {
   AlertCircle,
   X,
   RefreshCw,
-  Target
+  Target,
+  Trophy,
+  Calendar,
+  Eye,
+  Image
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 
@@ -54,7 +61,6 @@ ChartJS.register(
 );
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
-  const { isDarkMode } = useTheme();
   const { 
     actionReports, 
     incidents, 
@@ -66,6 +72,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const [showInactiveModal, setShowInactiveModal] = useState(false);
   const [showTotalIncidentsModal, setShowTotalIncidentsModal] = useState(false);
   const [showTotalActionsModal, setShowTotalActionsModal] = useState(false);
+  const [showTopPerformersModal, setShowTopPerformersModal] = useState(false);
+  const [showTopPerformersPreview, setShowTopPerformersPreview] = useState(false);
+  const [selectedTopPerformersMonth, setSelectedTopPerformersMonth] = useState(new Date().getMonth());
+  const [selectedTopPerformersYear, setSelectedTopPerformersYear] = useState(new Date().getFullYear());
 
   const handleLogout = async () => {
     try {
@@ -88,27 +98,560 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     return date.toLocaleDateString();
   };
 
+  // State for filtered top performers data
+  const [filteredTopPerformersData, setFilteredTopPerformersData] = useState([]);
+  const [loadingTopPerformers, setLoadingTopPerformers] = useState(false);
+  
+  // Ref for the preview modal to capture as image
+  const topPerformersPreviewRef = useRef(null);
 
+  // Function to load top performers data for specific month and year
+  const loadTopPerformersData = useCallback(async (month, year) => {
+    try {
+      setLoadingTopPerformers(true);
+      const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+      
+      // Import Firebase functions dynamically to avoid circular dependencies
+      const { collection, getDocs } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      
+      const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+      const querySnapshot = await getDocs(municipalitiesRef);
+      const monthData = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          monthData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
+      
+      setFilteredTopPerformersData(monthData);
+      console.log(`✅ Top performers data loaded for ${monthYearId}:`, monthData.length, 'municipalities');
+    } catch (error) {
+      console.error(`❌ Error loading top performers data for ${month}-${year}:`, error);
+      
+      // Provide user feedback on error
+      if (error.code === 'permission-denied') {
+        console.warn('Permission denied - falling back to local data');
+      } else if (error.code === 'unavailable') {
+        console.warn('Firestore unavailable - falling back to local data');
+      }
+      
+      // Fallback to current data if loading fails
+      setFilteredTopPerformersData(ipatrollerData || []);
+    } finally {
+      setLoadingTopPerformers(false);
+    }
+  }, [ipatrollerData]);
 
-  // Sample data for charts
-  const monthlyData = {
-    labels: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-    datasets: [
-      {
-        label: 'Patrols Completed',
-        data: [65, 59, 80, 81, 56, 55, 40, 45, 60, 70, 85, 90],
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.4,
-      },
-      {
-        label: 'Incidents Reported',
-        data: [28, 48, 40, 19, 86, 27, 90, 35, 50, 40, 30, 45],
-        borderColor: 'rgb(239, 68, 68)',
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        tension: 0.4,
-      },
-    ],
+  // Load data when month/year changes
+  useEffect(() => {
+    if (showTopPerformersModal) {
+      loadTopPerformersData(selectedTopPerformersMonth, selectedTopPerformersYear);
+    }
+  }, [selectedTopPerformersMonth, selectedTopPerformersYear, showTopPerformersModal, loadTopPerformersData]);
+
+  // Helper function to get top performers data
+  const getTopPerformers = () => {
+    // Use filtered data if available, otherwise fall back to current data
+    const dataToUse = filteredTopPerformersData.length > 0 ? filteredTopPerformersData : ipatrollerData;
+    
+    if (!dataToUse || dataToUse.length === 0) {
+      console.warn('No data available for top performers calculation');
+      return [];
+    }
+    
+    return dataToUse
+      .filter(item => item && (item.municipality || item.id)) // Filter out invalid entries
+      .map(item => {
+        // Calculate actual active days and percentage from monthly patrol data
+        let actualActiveDays = 0;
+        let actualInactiveDays = 0;
+        let actualTotalPatrols = 0;
+        
+        if (item.data && Array.isArray(item.data) && item.data.length > 0) {
+          // Count days with patrols > 0 as active days
+          actualActiveDays = item.data.filter(patrols => typeof patrols === 'number' && patrols > 0).length;
+          actualInactiveDays = item.data.filter(patrols => typeof patrols === 'number' && patrols === 0).length;
+          actualTotalPatrols = item.data.reduce((sum, patrols) => sum + (Number(patrols) || 0), 0);
+        }
+        
+        return {
+          municipality: item.municipality || item.id || 'Unknown',
+          district: item.district || 'Unknown',
+          totalPatrols: actualTotalPatrols,
+          activeDays: actualActiveDays,
+          inactiveDays: actualInactiveDays,
+          activePercentage: actualActiveDays, // Store actual active days count
+          avgPatrolsPerDay: item.data && item.data.length > 0 
+            ? (actualActiveDays / item.data.length).toFixed(1) 
+            : '0.0'
+        };
+      })
+      .filter(item => item.activeDays > 0 || item.inactiveDays > 0) // Only include municipalities with data
+      .sort((a, b) => {
+        // Sort by active days first, then by total patrols if tied
+        if (b.activeDays !== a.activeDays) {
+          return b.activeDays - a.activeDays;
+        }
+        return b.totalPatrols - a.totalPatrols;
+      })
+      .slice(0, 12); // Top 12 performers by active days
+  };
+
+  // Function to export top performers to PDF
+  const exportTopPerformersToPDF = () => {
+    try {
+      console.log('🚀 Starting PDF export...');
+      console.log('📊 autoTable function:', typeof autoTable);
+      console.log('📊 jsPDF constructor:', typeof jsPDF);
+      
+      const topPerformers = getTopPerformers();
+      if (topPerformers.length === 0) {
+        alert('No performance data available to export.');
+        return;
+      }
+
+      // Use portrait orientation and points for better width control
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      
+      // Set font fallback system for better compatibility
+      try {
+        doc.setFont('times');
+      } catch (e) {
+        try {
+          doc.setFont('helvetica');
+        } catch (e2) {
+          try {
+            doc.setFont('arial');
+          } catch (e3) {
+            console.warn('Using default font due to compatibility issues');
+          }
+        }
+      }
+      
+      // Add header - center based on page width
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // Add border around the entire page
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(1);
+              doc.rect(18, 18, pageWidth - 36, pageHeight - 36);
+      
+      // Add title with better styling
+      doc.setFontSize(18);
+      doc.setFont('times', 'bold');
+      doc.setTextColor(59, 130, 246); // Blue color
+      doc.text('Top Performers Report', pageWidth / 2, 45, { align: 'center' });
+      
+      // Add subtitle
+      doc.setFontSize(10);
+      doc.setFont('times', 'normal');
+      doc.setTextColor(0, 0, 0); // Black color
+      doc.text(`Performance Analysis for ${new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`, pageWidth / 2, 62, { align: 'center' });
+      
+      // Add generation info
+      doc.setFontSize(8);
+      doc.setFont('times', 'normal');
+      doc.setTextColor(0, 0, 0); // Black color
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+      })} at ${new Date().toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })}`, pageWidth / 2, 75, { align: 'center' });
+      
+      // Add "Performance Data Table" title
+      doc.setFontSize(12);
+      doc.setFont('times', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Performance Data Table', 30, 100);
+      
+      // Add table
+      const tableData = topPerformers.map((performer, index) => {
+        const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+          ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+          : 0;
+        
+        let status = 'Needs Improvement';
+        if (activePercentage === 100) status = 'Very Satisfactory';
+        else if (activePercentage >= 75) status = 'Very Good';
+        else if (activePercentage >= 50) status = 'Good';
+        
+        return [
+          index + 1,
+          performer.municipality,
+          performer.district,
+          performer.activeDays,
+          performer.inactiveDays,
+          `${activePercentage}%`,
+          status
+        ];
+      });
+      
+      // Use the imported autoTable function with error handling
+      let tableResult;
+      try {
+        // Check if autoTable is available
+        if (typeof autoTable !== 'function') {
+          throw new Error('autoTable function not available');
+        }
+        
+        // Use the correct autoTable API - it modifies the doc and returns undefined
+        autoTable(doc, {
+          head: [['Rank', 'Municipality', 'District', 'Total Active', 'Total Inactive', 'Active %', 'Status']],
+          body: tableData,
+          startY: 115,
+          styles: {
+            font: 'times',
+            fontSize: 9,
+            cellPadding: 5,
+            overflow: 'linebreak',
+            halign: 'center',
+            valign: 'middle',
+            textColor: [0, 0, 0],
+            lineColor: [200, 200, 200],
+            lineWidth: 0.5
+          },
+          headStyles: {
+            fillColor: [59, 130, 246],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            fontSize: 11,
+            cellPadding: 6,
+            halign: 'center'
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252]
+          },
+          // Fit within page width with optimal distribution
+          margin: { top: 115, left: 25, right: 25 },
+          tableWidth: 'auto',
+          columnStyles: {
+            0: { halign: 'center', fontStyle: 'bold' },   // Rank
+            1: { halign: 'left' },                        // Municipality
+            2: { halign: 'left' },                        // District  
+            3: { halign: 'center' },                      // Total Active
+            4: { halign: 'center' },                      // Total Inactive
+            5: { halign: 'center' },                      // Active %
+            6: { halign: 'center' }                       // Status
+          },
+          didParseCell: function(data) {
+            try {
+              // Color coding for status column
+              if (data.column.index === 6 && data.section === 'body') {
+                const status = data.cell.text[0];
+                if (status === 'Very Satisfactory') {
+                  data.cell.styles.fillColor = [16, 185, 129]; // Emerald
+                  data.cell.styles.textColor = [255, 255, 255];
+                } else if (status === 'Very Good') {
+                  data.cell.styles.fillColor = [34, 197, 94]; // Green
+                  data.cell.styles.textColor = [255, 255, 255];
+                } else if (status === 'Good') {
+                  data.cell.styles.fillColor = [245, 158, 11]; // Yellow
+                  data.cell.styles.textColor = [0, 0, 0];
+                } else if (status === 'Needs Improvement') {
+                  data.cell.styles.fillColor = [239, 68, 68]; // Red
+                  data.cell.styles.textColor = [255, 255, 255];
+                }
+              }
+              
+              // Color coding for Total Active column (green)
+              if (data.column.index === 3 && data.section === 'body') {
+                data.cell.styles.textColor = [34, 197, 94]; // Green
+                data.cell.styles.fontStyle = 'bold';
+              }
+              
+              // Color coding for Total Inactive column (red)
+              if (data.column.index === 4 && data.section === 'body') {
+                data.cell.styles.textColor = [239, 68, 68]; // Red
+                data.cell.styles.fontStyle = 'bold';
+              }
+              
+              // Color coding for Active % column (purple)
+              if (data.column.index === 5 && data.section === 'body') {
+                data.cell.styles.textColor = [147, 51, 234]; // Purple
+                data.cell.styles.fontStyle = 'bold';
+              }
+            } catch (cellError) {
+              console.warn('Error in cell styling:', cellError);
+            }
+          }
+        });
+        
+        // Get the finalY from the document's lastAutoTable property
+        tableResult = { 
+          finalY: doc.lastAutoTable ? doc.lastAutoTable.finalY : 
+                 doc.autoTable ? doc.autoTable.previous.finalY : 
+                 125 + (tableData.length * 20) + 30 // Fallback calculation
+        };
+      } catch (tableError) {
+        console.error('Error creating table:', tableError);
+        tableResult = { finalY: 400 };
+      }
+      
+      // Ensure tableResult has a valid finalY value
+      if (!tableResult || typeof tableResult.finalY === 'undefined') {
+        tableResult = { finalY: 400 };
+      }
+      
+      // Add "Summary Statistics" section
+      const summaryStartY = tableResult.finalY + 40;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Summary Statistics', 40, summaryStartY);
+      
+      // Create summary statistics in a grid layout
+      const summaryY = summaryStartY + 20;
+      const leftColumn = 60;
+      const rightColumn = 320;
+      
+      // Most Active (top left)
+      doc.setFontSize(10);
+      doc.setFont('times', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('• Most Active', leftColumn, summaryY);
+      doc.setFont('times', 'normal');
+      doc.text(`${topPerformers[0]?.municipality || 'N/A'} (${topPerformers[0]?.activeDays || 0} active days)`, leftColumn, summaryY + 15);
+      
+      // Average Active Days (top right)
+      doc.setFont('times', 'bold');
+      doc.text('• Average Active Days', rightColumn, summaryY);
+      doc.setFont('times', 'normal');
+      doc.text(`${(topPerformers.reduce((sum, p) => sum + p.activeDays, 0) / Math.max(topPerformers.length, 1)).toFixed(1)}`, rightColumn, summaryY + 15);
+      
+      // Total Active Days (bottom left)
+      doc.setFont('times', 'bold');
+      doc.text('• Total Active Days', leftColumn, summaryY + 50);
+      doc.setFont('times', 'normal');
+      doc.text(`${topPerformers.reduce((sum, p) => sum + p.activeDays, 0)}`, leftColumn, summaryY + 65);
+      
+      // Average Active % (bottom right)
+      doc.setFont('times', 'bold');
+      doc.text('• Average Active %', rightColumn, summaryY + 50);
+      doc.setFont('times', 'normal');
+      const avgPercentage = Math.round(topPerformers.reduce((sum, p) => {
+        const activePercentage = p.activeDays + p.inactiveDays > 0 
+          ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+          : 0;
+        return sum + activePercentage;
+      }, 0) / Math.max(topPerformers.length, 1));
+      doc.text(`${avgPercentage}%`, rightColumn, summaryY + 65);
+      
+      // Add footer
+      const footerY = pageHeight - 60;
+      doc.setFontSize(9);
+      doc.setFont('times', 'italic');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Report generated by iPatroller Management System', pageWidth / 2, footerY, { align: 'center' });
+      doc.text('Page 1 of 1', pageWidth / 2, footerY + 15, { align: 'center' });
+      
+      // Save the PDF
+      doc.save(`top-performers-${selectedTopPerformersMonth + 1}-${selectedTopPerformersYear}.pdf`);
+      
+      console.log('✅ PDF exported successfully');
+    } catch (error) {
+      console.error('❌ Error exporting PDF:', error);
+      alert('Error exporting PDF. Please try again or contact support.');
+    }
+  };
+
+  // Function to export top performers as image (PNG/JPG)
+  const exportTopPerformersAsImage = async (format = 'png') => {
+    try {
+      console.log(`🚀 Starting ${format.toUpperCase()} export...`);
+      
+      if (!topPerformersPreviewRef.current) {
+        alert('Preview not available. Please view the report first.');
+        return;
+      }
+
+      // Show loading state
+      const exportButton = document.querySelector(`[data-export-image="${format}"]`);
+      if (exportButton) {
+        exportButton.disabled = true;
+        exportButton.innerHTML = 'Exporting...';
+      }
+
+      // Create a completely clean export container
+      const exportContainer = document.createElement('div');
+      exportContainer.style.cssText = `
+        position: fixed;
+        top: -9999px;
+        left: -9999px;
+        width: 800px;
+        background: white;
+        padding: 20px;
+        font-family: Arial, sans-serif;
+        color: black;
+        z-index: -1;
+        border: 1px solid #ccc;
+      `;
+      
+      // Get the data and create a simple HTML structure
+      const topPerformers = getTopPerformers();
+      const monthYear = new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      
+      exportContainer.innerHTML = `
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h1 style="color: #3b82f6; font-size: 24px; margin: 0 0 10px 0;">Top Performers Report</h1>
+          <p style="color: #6b7280; margin: 5px 0;">Performance Analysis for ${monthYear}</p>
+          <p style="color: #9ca3af; font-size: 12px; margin: 5px 0;">Generated on: ${new Date().toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric'
+          })} at ${new Date().toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+          })}</p>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #374151; font-size: 18px; margin: 20px 0 10px 0;">Performance Data Table</h3>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #ccc;">
+            <thead>
+              <tr style="background: #3b82f6; color: white;">
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Rank</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">Municipality</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: left;">District</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Total Active</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Total Inactive</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Active %</th>
+                <th style="padding: 8px; border: 1px solid #ccc; text-align: center;">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${topPerformers.map((performer, index) => {
+                const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+                  ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                  : 0;
+                
+                let status = 'Needs Improvement';
+                let statusColor = '#ef4444';
+                if (activePercentage === 100) {
+                  status = 'Very Satisfactory';
+                  statusColor = '#10b981';
+                } else if (activePercentage >= 75) {
+                  status = 'Very Good';
+                  statusColor = '#22c55e';
+                } else if (activePercentage >= 50) {
+                  status = 'Good';
+                  statusColor = '#eab308';
+                }
+                
+                return `
+                  <tr>
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; font-weight: bold;">${index + 1}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${performer.municipality}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc;">${performer.district}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; color: #22c55e; font-weight: bold;">${performer.activeDays}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; color: #ef4444; font-weight: bold;">${performer.inactiveDays}</td>
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; color: #a855f7; font-weight: bold;">${activePercentage}%</td>
+                    <td style="padding: 8px; border: 1px solid #ccc; text-align: center; background: ${statusColor}; color: white; font-weight: bold;">${status}</td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+          <h3 style="color: #374151; font-size: 18px; margin: 20px 0 10px 0;">Summary Statistics</h3>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div style="padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h4 style="color: #374151; margin: 0 0 10px 0;">• Most Active</h4>
+              <p style="color: #6b7280; margin: 5px 0;">${topPerformers[0]?.municipality || 'N/A'} (${topPerformers[0]?.activeDays || 0} active days)</p>
+            </div>
+            <div style="padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h4 style="color: #374151; margin: 0 0 10px 0;">• Average Active Days</h4>
+              <p style="color: #6b7280; margin: 5px 0;">${(topPerformers.reduce((sum, p) => sum + p.activeDays, 0) / Math.max(topPerformers.length, 1)).toFixed(1)}</p>
+            </div>
+            <div style="padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h4 style="color: #374151; margin: 0 0 10px 0;">• Total Active Days</h4>
+              <p style="color: #6b7280; margin: 5px 0;">${topPerformers.reduce((sum, p) => sum + p.activeDays, 0)}</p>
+            </div>
+            <div style="padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h4 style="color: #374151; margin: 0 0 10px 0;">• Average Active %</h4>
+              <p style="color: #6b7280; margin: 5px 0;">${Math.round(topPerformers.reduce((sum, p) => {
+                const activePercentage = p.activeDays + p.inactiveDays > 0 
+                  ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+                  : 0;
+                return sum + activePercentage;
+              }, 0) / Math.max(topPerformers.length, 1))}%</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="text-align: center; padding: 15px; background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px;">
+          <p style="color: #6b7280; font-style: italic; margin: 5px 0;">Report generated by iPatroller Management System</p>
+          <p style="color: #9ca3af; font-size: 12px; margin: 5px 0;">Page 1 of 1</p>
+        </div>
+      `;
+      
+      document.body.appendChild(exportContainer);
+      
+      // Capture the clean content
+      const canvas = await html2canvas(exportContainer, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        width: 800,
+        height: exportContainer.scrollHeight,
+        logging: false,
+        useCORS: false,
+        allowTaint: false
+      });
+      
+      // Clean up
+      document.body.removeChild(exportContainer);
+      
+      // Convert canvas to blob
+      const blob = await new Promise(resolve => {
+        canvas.toBlob(resolve, `image/${format}`, 0.95);
+      });
+
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `top-performers-${selectedTopPerformersMonth + 1}-${selectedTopPerformersYear}.${format}`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      // Cleanup
+      URL.revokeObjectURL(url);
+
+      console.log(`✅ ${format.toUpperCase()} exported successfully`);
+      
+      // Reset button state
+      if (exportButton) {
+        exportButton.disabled = false;
+        exportButton.innerHTML = format === 'png' ? 'Export PNG' : 'Export JPG';
+      }
+    } catch (error) {
+      console.error(`❌ Error exporting ${format.toUpperCase()}:`, error);
+      alert(`Error exporting ${format.toUpperCase()}. Please try the PDF export instead.`);
+      
+      // Reset button state on error
+      const exportButton = document.querySelector(`[data-export-image="${format}"]`);
+      if (exportButton) {
+        exportButton.disabled = false;
+        exportButton.innerHTML = format === 'png' ? 'Export PNG' : 'Export JPG';
+      }
+    }
   };
 
      // Calculate weekly activity from IPatroller data
@@ -214,17 +757,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       legend: {
         position: 'top',
         labels: {
-          color: isDarkMode ? '#ffffff' : '#000000',
+          color: '#000000',
           font: {
             weight: '600'
           }
         },
       },
       tooltip: {
-        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        titleColor: isDarkMode ? '#ffffff' : '#000000',
-        bodyColor: isDarkMode ? '#d1d5db' : '#374151',
-        borderColor: isDarkMode ? '#374151' : '#e5e7eb',
+        backgroundColor: '#ffffff',
+        titleColor: '#000000',
+        bodyColor: '#374151',
+        borderColor: '#e5e7eb',
         borderWidth: 1,
         cornerRadius: 8,
         displayColors: true,
@@ -236,39 +779,39 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     scales: {
       x: {
         ticks: {
-          color: isDarkMode ? '#9ca3af' : '#6b7280',
+          color: '#6b7280',
           font: {
             weight: '500'
           }
         },
         grid: {
-          color: isDarkMode ? '#374151' : '#e5e7eb',
-          borderColor: isDarkMode ? '#374151' : '#e5e7eb'
+          color: '#e5e7eb',
+          borderColor: '#e5e7eb'
         },
         border: {
-          color: isDarkMode ? '#374151' : '#e5e7eb'
+          color: '#e5e7eb'
         }
       },
       y: {
         ticks: {
-          color: isDarkMode ? '#9ca3af' : '#6b7280',
+          color: '#6b7280',
           font: {
             weight: '500'
           }
         },
         grid: {
-          color: isDarkMode ? '#374151' : '#e5e7eb',
-          borderColor: isDarkMode ? '#374151' : '#e5e7eb'
+          color: '#e5e7eb',
+          borderColor: '#e5e7eb'
         },
         border: {
-          color: isDarkMode ? '#374151' : '#e5e7eb'
+          color: '#e5e7eb'
         }
       },
     },
     elements: {
       point: {
-        backgroundColor: isDarkMode ? '#3b82f6' : '#2563eb',
-        borderColor: isDarkMode ? '#ffffff' : '#ffffff',
+        backgroundColor: '#2563eb',
+        borderColor: '#ffffff',
         borderWidth: 2,
         radius: 4,
         hoverRadius: 6
@@ -286,7 +829,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       legend: {
         position: 'bottom',
         labels: {
-          color: isDarkMode ? '#ffffff' : '#000000',
+          color: '#000000',
           font: {
             weight: '600'
           },
@@ -296,10 +839,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         },
       },
       tooltip: {
-        backgroundColor: isDarkMode ? '#1f2937' : '#ffffff',
-        titleColor: isDarkMode ? '#ffffff' : '#000000',
-        bodyColor: isDarkMode ? '#d1d5db' : '#374151',
-        borderColor: isDarkMode ? '#374151' : '#e5e7eb',
+        backgroundColor: '#ffffff',
+        titleColor: '#000000',
+        bodyColor: '#374151',
+        borderColor: '#e5e7eb',
         borderWidth: 1,
         cornerRadius: 8,
         displayColors: true,
@@ -311,7 +854,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     elements: {
       arc: {
         borderWidth: 2,
-        borderColor: isDarkMode ? '#1f2937' : '#ffffff'
+        borderColor: '#ffffff'
       }
     }
   };
@@ -322,14 +865,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
               Dashboard Management
             </h1>
-            <p className={`text-base md:text-lg transition-colors duration-300 ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-600'
-            }`}>
+            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
               {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} • System Overview Dashboard
             </p>
             <div className="flex items-center gap-2 mt-2">
@@ -385,19 +924,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <Activity className="w-4 h-4 md:w-5 md:h-5" />
               <span className="hidden sm:inline ml-2">Actions</span>
             </Button>
+            <Button
+              onClick={() => setShowTopPerformersModal(true)}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm md:text-base"
+              title="View Top Performers"
+            >
+              <Target className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">Top Performers</span>
+            </Button>
           </div>
         </div>
 
         {/* Loading Indicator */}
         {dataLoading && (
-          <div className={`mb-4 p-3 md:p-4 rounded-lg ${
-            isDarkMode ? 'bg-blue-900/20 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
-          }`}>
+          <div className="mb-4 p-3 md:p-4 rounded-lg bg-blue-50 border border-blue-200">
             <div className="flex items-center gap-2 md:gap-3">
               <div className="animate-spin rounded-full h-5 w-5 md:h-6 md:w-6 border-b-2 border-blue-600"></div>
-              <span className={`text-xs md:text-sm font-medium transition-colors duration-300 ${
-                isDarkMode ? 'text-blue-300' : 'text-blue-700'
-              }`}>
+              <span className="text-xs md:text-sm font-medium transition-colors duration-300 text-blue-700">
                 Loading dashboard data...
               </span>
             </div>
@@ -406,89 +949,65 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-xs md:text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Total Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Municipalities</p>
+                  <p className="text-2xl md:text-3xl font-bold text-blue-600">
                     {totalMunicipalities.toLocaleString()}
                   </p>
                 </div>
-                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
-                  <Building2 className="h-5 w-5 md:h-6 md:w-6 text-blue-600 dark:text-blue-400" />
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                  <Building2 className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-xs md:text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Active Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-green-600 dark:text-green-400">
+                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Active Municipalities</p>
+                  <p className="text-2xl md:text-3xl font-bold text-green-600">
                     {activeCount.toLocaleString()}
                   </p>
                 </div>
-                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                }`}>
-                  <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600 dark:text-green-400" />
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
+                  <CheckCircle className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-xs md:text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Inactive Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-red-600 dark:text-red-400">
+                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Municipalities</p>
+                  <p className="text-2xl md:text-3xl font-bold text-red-600">
                     {inactiveCount.toLocaleString()}
                   </p>
                 </div>
-                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-red-900/30' : 'bg-red-100'
-                }`}>
-                  <XCircle className="h-5 w-5 md:h-6 md:w-6 text-red-600 dark:text-red-400" />
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
+                  <XCircle className="h-5 w-5 md:h-6 md:w-6 text-red-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-xs md:text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Active Percentage</p>
-                  <p className="text-2xl md:text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Active Percentage</p>
+                  <p className="text-2xl md:text-3xl font-bold text-purple-600">
                     {totalMunicipalities > 0 ? Math.round((activeCount / totalMunicipalities) * 100) : 0}%
                   </p>
                 </div>
-                <div className={`h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
-                }`}>
-                  <Target className="h-5 w-5 md:h-6 md:w-6 text-purple-600 dark:text-purple-400" />
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
+                  <Target className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
                 </div>
               </div>
             </CardContent>
@@ -496,59 +1015,39 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* IPatroller Data Card - Full Width */}
-        <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-          isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-        }`}>
+        <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
           <CardContent className="p-4 md:p-6">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
               <div className="text-center">
-                <div className={`h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
+                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 bg-blue-100">
                   <Activity className="h-6 w-6 md:h-8 md:w-8 text-blue-600 dark:text-blue-400" />
                 </div>
-                <p className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <p className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
                   {summaryStats.totalDailyPatrols ? summaryStats.totalDailyPatrols.toLocaleString() : '0'}
                 </p>
-                <p className={`text-sm md:text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
+                <p className="text-sm md:text-lg font-medium transition-colors duration-300 text-gray-600">
                   Daily Patrols
                 </p>
               </div>
               <div className="text-center">
-                <div className={`h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 ${
-                  isDarkMode ? 'bg-indigo-900/30' : 'bg-indigo-100'
-                }`}>
+                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 bg-indigo-100">
                   <Building2 className="h-6 w-6 md:h-8 md:w-8 text-indigo-600 dark:text-indigo-400" />
                 </div>
-                <p className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <p className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
                   {summaryStats.activeDistricts || 0}
                 </p>
-                <p className={`text-sm md:text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
+                <p className="text-sm md:text-lg font-medium transition-colors duration-300 text-gray-600">
                   Active Districts
                 </p>
               </div>
               <div className="text-center">
-                <div className={`h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 ${
-                  isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
-                }`}>
+                <div className="h-12 w-12 md:h-16 md:w-16 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 bg-purple-100">
                   <Users className="h-6 w-6 md:h-8 md:w-8 text-purple-600 dark:text-purple-400" />
                 </div>
-                <p className={`text-2xl md:text-3xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <p className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
                   12
                 </p>
-                <p className={`text-sm md:text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                }`}>
+                <p className="text-sm md:text-lg font-medium transition-colors duration-300 text-gray-600">
                   Total Municipalities
                 </p>
               </div>
@@ -560,19 +1059,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           
           {/* Weekly Activity Chart */}
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardHeader className="pb-3 md:pb-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className={`h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
-                  <BarChart3 className="h-4 w-4 md:h-5 md:w-5 text-blue-600 dark:text-blue-400" />
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center bg-blue-100">
+                  <BarChart3 className="h-4 w-4 md:h-5 md:w-5 text-blue-600" />
                 </div>
-                <CardTitle className={`text-lg md:text-xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Weekly Activity</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Weekly Activity</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
@@ -583,19 +1076,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </Card>
 
           {/* District Distribution Chart */}
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardHeader className="pb-3 md:pb-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className={`h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center ${
-                  isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                }`}>
-                  <PieChart className="h-4 w-4 md:h-5 md:w-5 text-green-600 dark:text-green-400" />
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center bg-green-100">
+                  <PieChart className="h-4 w-4 md:h-5 md:w-5 text-green-600" />
                 </div>
-                <CardTitle className={`text-lg md:text-xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>District Distribution</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">District Distribution</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
@@ -610,19 +1097,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           
           {/* Recent Activity */}
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardHeader className="pb-3 md:pb-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className={`h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center ${
-                  isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'
-                }`}>
-                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-orange-600 dark:text-orange-400" />
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center bg-orange-100">
+                  <Activity className="h-4 w-4 md:h-5 md:w-5 text-orange-600" />
                 </div>
-                <CardTitle className={`text-lg md:text-xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Recent Activity</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Recent Activity</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
@@ -632,13 +1113,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                     const getActivityIcon = (iconName) => {
                       switch (iconName) {
                         case 'MapPin':
-                          return <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+                          return <MapPin className="h-4 w-4 text-blue-600" />;
                         case 'FileText':
-                          return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />;
+                          return <FileText className="h-4 w-4 text-green-600" />;
                         case 'AlertTriangle':
-                          return <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
+                          return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
                         default:
-                          return <Activity className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+                          return <Activity className="h-4 w-4 text-gray-600" />;
                       }
                     };
 
@@ -646,22 +1127,22 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       switch (type) {
                         case 'patrol':
                           return {
-                            bg: isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-900/30'
+                            bg: 'bg-blue-50 border-blue-200',
+                            icon: 'bg-blue-100'
                           };
                         case 'action':
                           return {
-                            bg: isDarkMode ? 'bg-green-900/20 border-green-800/30' : 'bg-green-50 border-green-200',
-                            icon: 'bg-green-900/30'
+                            bg: 'bg-green-50 border-green-200',
+                            icon: 'bg-green-100'
                           };
                         case 'incident':
                           return {
-                            bg: isDarkMode ? 'bg-yellow-900/20 border-yellow-800/30' : 'bg-yellow-50 border-yellow-200',
+                            bg: 'bg-yellow-50 border-yellow-200',
                             icon: 'bg-yellow-900/30'
                           };
                         default:
                           return {
-                            bg: isDarkMode ? 'bg-gray-900/20 border-gray-800/30' : 'bg-gray-50 border-gray-200',
+                            bg: 'bg-gray-50 border-gray-200',
                             icon: 'bg-gray-900/30'
                           };
                       }
@@ -679,24 +1160,16 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                             {getActivityIcon(activity.icon)}
                           </div>
                           <div>
-                            <p className={`font-semibold transition-colors duration-300 ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>{activity.title}</p>
-                            <p className={`text-sm transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-500'
-                            }`}>{activity.description}</p>
+                            <p className="font-semibold transition-colors duration-300 text-gray-900">{activity.title}</p>
+                            <p className="text-sm transition-colors duration-300 text-gray-500">{activity.description}</p>
                           </div>
                         </div>
-                        <span className={`text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 ${
-                          isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'
-                        }`}>{timeAgo}</span>
+                        <span className="text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 bg-gray-100 text-gray-600">{timeAgo}</span>
                       </div>
                     );
                   })
                 ) : (
-                  <div className={`text-center py-12 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
+                  <div className="text-center py-12 transition-colors duration-300 text-gray-500">
                     <Activity className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-lg font-semibold">No Recent Activity</p>
                     <p className="text-sm">Start using the system to see recent activity here.</p>
@@ -707,19 +1180,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </Card>
 
           {/* Incidents Activity */}
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardHeader className="pb-3 md:pb-4">
               <div className="flex items-center gap-2 md:gap-3">
-                <div className={`h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center ${
-                  isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
-                }`}>
-                  <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-purple-600 dark:text-purple-400" />
+                <div className="h-8 w-8 md:h-10 md:w-10 rounded-xl flex items-center justify-center bg-purple-100">
+                  <AlertTriangle className="h-4 w-4 md:h-5 md:w-5 text-purple-600" />
                 </div>
-                <CardTitle className={`text-lg md:text-xl font-bold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Incidents Activity</CardTitle>
+                <CardTitle className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Incidents Activity</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-4 md:p-6 pt-0">
@@ -730,24 +1197,24 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       switch (status) {
                         case "Completed":
                           return {
-                            bg: isDarkMode ? 'bg-green-900/20 border-green-800/30' : 'bg-green-50 border-green-200',
-                            icon: 'bg-green-900/30',
-                            iconColor: 'text-green-600 dark:text-green-400',
-                            svg: <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400" />
+                            bg: 'bg-green-50 border-green-200',
+                            icon: 'bg-green-100',
+                            iconColor: 'text-green-600',
+                            svg: <CheckCircle className="h-4 w-4 text-green-600" />
                           };
                         case "Under Investigation":
                           return {
-                            bg: isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-900/30',
-                            iconColor: 'text-blue-600 dark:text-blue-400',
-                            svg: <Search className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            bg: 'bg-blue-50 border-blue-200',
+                            icon: 'bg-blue-100',
+                            iconColor: 'text-blue-600',
+                            svg: <Search className="h-4 w-4 text-blue-600" />
                           };
                         default: // Active
                           return {
-                            bg: isDarkMode ? 'bg-blue-900/20 border-blue-800/30' : 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-900/30',
-                            iconColor: 'text-blue-600 dark:text-blue-400',
-                            svg: <Clock className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            bg: 'bg-blue-50 border-blue-200',
+                            icon: 'bg-blue-100',
+                            iconColor: 'text-blue-600',
+                            svg: <Clock className="h-4 w-4 text-blue-600" />
                           };
                       }
                     };
@@ -762,18 +1229,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                             {statusColors.svg}
                           </div>
                           <div>
-                            <p className={`font-semibold transition-colors duration-300 ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>{incident.title || 'Incident Report'}</p>
-                            <p className={`text-sm transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-500'
-                            }`}>{incident.description || 'No description available'}</p>
+                            <p className="font-semibold transition-colors duration-300 text-gray-900">{incident.title || 'Incident Report'}</p>
+                            <p className="text-sm transition-colors duration-300 text-gray-500">{incident.description || 'No description available'}</p>
                           </div>
                         </div>
                         <div className="text-right">
-                          <span className={`text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 ${
-                            isDarkMode ? 'bg-gray-800 text-gray-300' : 'bg-gray-100 text-gray-600'
-                          }`}>{timeAgo}</span>
+                          <span className="text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 bg-gray-100 text-gray-600">{timeAgo}</span>
                           <div className={`text-xs font-medium mt-1 px-2 py-1 rounded-full transition-colors duration-300 ${
                             statusColors.bg.replace('bg-', 'bg-').replace('/20', '/30').replace('/30', '/40')
                           }`}>
@@ -784,9 +1245,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                     );
                   })
                 ) : (
-                  <div className={`text-center py-12 transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>
+                  <div className="text-center py-12 transition-colors duration-300 text-gray-500">
                     <AlertTriangle className="h-16 w-16 mx-auto mb-4 text-gray-400" />
                     <p className="text-lg font-semibold">No Incidents</p>
                     <p className="text-sm">No incidents have been reported yet.</p>
@@ -798,11 +1257,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Footer Section */}
-        <div className={`text-center py-6 md:py-8 border-t ${
-          isDarkMode 
-            ? 'text-slate-400 border-slate-700/50' 
-            : 'text-slate-500 border-slate-200'
-        }`}>
+        <div className="text-center py-6 md:py-8 border-t text-slate-500 border-slate-200">
           <p className="text-xs md:text-sm">
             Dashboard updated automatically • Data refreshes every 30 seconds
           </p>
@@ -812,33 +1267,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       {/* Active Municipalities Modal */}
       {showActiveModal && (
         <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
+          <div className="rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden bg-white">
             {/* Header */}
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                   isDarkMode ? 'bg-green-900/30' : 'bg-green-100'
-                 }`}>
-                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                                 <div className="h-10 w-10 rounded-full flex items-center justify-center bg-green-100">
+                   <CheckCircle className="h-6 w-6 text-green-600" />
                  </div>
                 <div>
-                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Active Municipalities</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{summaryStats.activeMunicipalities} municipalities with ≥5 average patrols per day</p>
+                  <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Active Municipalities</h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.activeMunicipalities} municipalities with ≥5 average patrols per day</p>
                 </div>
               </div>
                              <button
                  onClick={() => setShowActiveModal(false)}
-                 className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                   isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                 }`}
+                 className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                >
                  <X className="h-6 w-6" />
                </button>
@@ -851,32 +1294,22 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {activeMunicipalitiesList.map((municipality, index) => {
                     const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
                     return (
-                      <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
-                        isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
-                      }`}>
+                      <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className={`font-semibold transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>{municipality.municipality}</h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                          }`}>
+                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                             {municipality.district}
                           </span>
                         </div>
-                        <div className={`text-sm transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
-                          Average Patrols: <span className="font-semibold text-green-600 dark:text-green-400">{avgPatrols.toFixed(1)}</span> per day
+                        <div className="text-sm transition-colors duration-300 text-gray-600">
+                          Average Patrols: <span className="font-semibold text-green-600">{avgPatrols.toFixed(1)}</span> per day
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                                 <div className={`text-center py-8 transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                 }`}>
+                                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                    <p className="text-lg font-medium">No Active Municipalities</p>
                    <p className="text-sm">No municipalities meet the active criteria (≥5 average patrols per day)</p>
@@ -890,33 +1323,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       {/* Inactive Municipalities Modal */}
       {showInactiveModal && (
         <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
+          <div className="rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden bg-white">
             {/* Header */}
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                                 <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                   isDarkMode ? 'bg-red-900/30' : 'bg-red-100'
-                 }`}>
+                                 <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
                    <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
                  </div>
                 <div>
-                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Inactive Municipalities</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{summaryStats.inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
+                  <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Inactive Municipalities</h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
                 </div>
               </div>
                              <button
                  onClick={() => setShowInactiveModal(false)}
-                 className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                   isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                 }`}
+                 className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
                >
                  <X className="h-6 w-6" />
                </button>
@@ -929,22 +1350,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {inactiveMunicipalitiesList.map((municipality, index) => {
                     const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
                     return (
-                      <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
-                        isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
-                      }`}>
+                      <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className={`font-semibold transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>{municipality.municipality}</h4>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            isDarkMode ? 'bg-red-900/30 text-red-400' : 'bg-red-100 text-red-700'
-                          }`}>
+                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
                             {municipality.district}
                           </span>
                         </div>
-                        <div className={`text-sm transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="text-sm transition-colors duration-300 text-gray-600">
                           Average Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{avgPatrols.toFixed(1)}</span> per day
                         </div>
                       </div>
@@ -952,9 +1365,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   })}
                 </div>
               ) : (
-                                 <div className={`text-center py-8 transition-colors duration-300 ${
-                   isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                 }`}>
+                                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                    <p className="text-lg font-medium">No Inactive Municipalities</p>
                    <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
@@ -970,33 +1381,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       {/* Total Incidents Modal */}
       {showTotalIncidentsModal && (
         <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
+          <div className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden bg-white">
             {/* Header */}
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                  isDarkMode ? 'bg-purple-900/30' : 'bg-purple-100'
-                }`}>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100">
                   <AlertTriangle className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Total Incidents Breakdown</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{summaryStats.totalIncidents} total incidents reported</p>
+                  <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Total Incidents Breakdown</h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.totalIncidents} total incidents reported</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowTotalIncidentsModal(false)}
-                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -1007,36 +1406,26 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               {incidents.length > 0 ? (
                 <div className="space-y-4">
                   {incidents.map((incident, index) => (
-                    <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
-                      isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
-                    }`}>
+                    <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className={`font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>{incident.incidentType || 'Unknown Type'}</h4>
+                        <h4 className="font-semibold transition-colors duration-300 text-gray-900">{incident.incidentType || 'Unknown Type'}</h4>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           incident.status === 'Completed' || incident.actionType
-                            ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                            : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
                         }`}>
                           {incident.status === 'Completed' || incident.actionType ? 'Completed' : 'Active'}
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Location:</span> {incident.location || 'Unknown'}
                         </div>
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Date:</span> {incident.date?.toDate ? incident.date.toDate().toLocaleDateString() : new Date(incident.date).toLocaleDateString()}
                         </div>
                         {incident.description && (
-                          <div className={`md:col-span-2 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                          }`}>
+                          <div className="md:col-span-2 transition-colors duration-300 text-gray-600">
                             <span className="font-medium">Description:</span> {incident.description}
                           </div>
                         )}
@@ -1045,9 +1434,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   ))}
                 </div>
               ) : (
-                <div className={`text-center py-8 transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                }`}>
+                <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                   <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-lg font-medium">No Incidents Found</p>
                   <p className="text-sm">No incidents have been reported yet.</p>
@@ -1061,33 +1448,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       {/* Total Actions Modal */}
       {showTotalActionsModal && (
         <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
+          <div className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden bg-white">
             {/* Header */}
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-blue-100">
                   <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Total Actions Breakdown</h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>{summaryStats.totalActions} total actions taken</p>
+                  <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Total Actions Breakdown</h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.totalActions} total actions taken</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowTotalActionsModal(false)}
-                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -1098,46 +1473,32 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               {actionReports.length > 0 ? (
                 <div className="space-y-4">
                   {actionReports.map((report, index) => (
-                    <div key={index} className={`p-4 rounded-lg border transition-all duration-300 ${
-                      isDarkMode ? 'border-gray-700 bg-gray-800/50' : 'border-gray-200 bg-gray-50'
-                    }`}>
+                    <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                       <div className="flex items-center justify-between mb-2">
-                        <h4 className={`font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>{report.what || 'Action Report'}</h4>
+                        <h4 className="font-semibold transition-colors duration-300 text-gray-900">{report.what || 'Action Report'}</h4>
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
                           report.status === 'Completed' || report.actionTaken === 'Completed'
-                            ? isDarkMode ? 'bg-green-900/30 text-green-400' : 'bg-green-100 text-green-700'
-                            : isDarkMode ? 'bg-yellow-900/30 text-yellow-400' : 'bg-yellow-100 text-yellow-700'
+                            ? 'bg-green-100 text-green-700'
+                            : 'bg-yellow-100 text-yellow-700'
                         }`}>
                           {report.status === 'Completed' || report.actionTaken === 'Completed' ? 'Completed' : 'Active'}
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Location:</span> {report.where || 'Unknown'}
                         </div>
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Date:</span> {report.when?.toDate ? report.when.toDate().toLocaleDateString() : new Date(report.when).toLocaleDateString()}
                         </div>
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Action Taken:</span> {report.actionTaken || 'Not specified'}
                         </div>
-                        <div className={`transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="transition-colors duration-300 text-gray-600">
                           <span className="font-medium">Priority:</span> {report.priority || 'Not specified'}
                         </div>
                         {report.otherInfo && (
-                          <div className={`md:col-span-2 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                          }`}>
+                          <div className="md:col-span-2 transition-colors duration-300 text-gray-600">
                             <span className="font-medium">Additional Info:</span> {report.otherInfo}
                           </div>
                         )}
@@ -1146,14 +1507,600 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   ))}
                 </div>
               ) : (
-                <div className={`text-center py-8 transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                }`}>
+                <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-lg font-medium">No Action Reports</p>
                   <p className="text-sm">No action reports have been submitted yet.</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Performers Modal */}
+      {showTopPerformersModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          <div className="rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                                <div className="flex items-center gap-3">
+                    <div className="h-12 w-12 rounded-full flex items-center justify-center bg-emerald-100">
+                      <Target className="h-7 w-7 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">Top Performers Dashboard</h3>
+                      <p className="text-sm transition-colors duration-300 text-gray-600">
+                        Top 12 performing municipalities based on patrol data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                        <span className="text-xs font-medium text-gray-600">Performance Analytics Active</span>
+                      </div>
+                    </div>
+                  </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={() => setShowTopPerformersPreview(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
+                  title="Preview Report"
+                >
+                  <Eye className="w-4 h-4 mr-2" />
+                  View Report
+                </Button>
+                <button
+                  onClick={() => setShowTopPerformersModal(false)}
+                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[75vh]">
+              {/* Filters Section */}
+              <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80 mb-6">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-gray-600" />
+                      <span className="font-medium text-gray-700">Filter by Period:</span>
+                      {loadingTopPerformers && (
+                        <div className="flex items-center gap-2 ml-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-emerald-600"></div>
+                          <span className="text-xs text-emerald-600">Loading data...</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button
+                        onClick={() => {
+                          setSelectedTopPerformersMonth(new Date().getMonth());
+                          setSelectedTopPerformersYear(new Date().getFullYear());
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="flex items-center gap-2 bg-white hover:bg-gray-50 border-gray-300 text-gray-700"
+                      >
+                        <Calendar className="w-4 h-4" />
+                        Current Month
+                      </Button>
+                      <select
+                        value={selectedTopPerformersMonth}
+                        onChange={(e) => setSelectedTopPerformersMonth(parseInt(e.target.value))}
+                        className="px-3 py-2 rounded-md border transition-colors duration-300 bg-white border-gray-300 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      >
+                        <option value={0}>January</option>
+                        <option value={1}>February</option>
+                        <option value={2}>March</option>
+                        <option value={3}>April</option>
+                        <option value={4}>May</option>
+                        <option value={5}>June</option>
+                        <option value={6}>July</option>
+                        <option value={7}>August</option>
+                        <option value={8}>September</option>
+                        <option value={9}>October</option>
+                        <option value={10}>November</option>
+                        <option value={11}>December</option>
+                      </select>
+                      <select
+                        value={selectedTopPerformersYear}
+                        onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
+                        className="px-3 py-2 rounded-md border transition-colors duration-300 bg-white border-gray-300 text-sm font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      >
+                        <option value={2023}>2023</option>
+                        <option value={2024}>2024</option>
+                        <option value={2025}>2025</option>
+                        <option value={2026}>2026</option>
+                        <option value={2027}>2027</option>
+                      </select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {loadingTopPerformers ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                  <p className="text-lg font-medium text-gray-700">Loading performance data...</p>
+                  <p className="text-sm text-gray-500">Fetching data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                </div>
+              ) : getTopPerformers().length > 0 ? (
+                <div className="space-y-6">
+                  {/* Summary Stats Cards - Matching IPatroller style */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Most Active</p>
+                            <p className="text-3xl font-bold text-emerald-600">
+                              {getTopPerformers()[0]?.activeDays || 0}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-emerald-100">
+                            <Trophy className="h-6 w-6 text-emerald-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Avg Active Days</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                              {(getTopPerformers().reduce((sum, p) => sum + p.activeDays, 0) / getTopPerformers().length).toFixed(1)}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                            <BarChart3 className="h-6 w-6 text-blue-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Total Active Days</p>
+                            <p className="text-3xl font-bold text-green-600">
+                              {getTopPerformers().reduce((sum, p) => sum + p.activeDays, 0)}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
+                            <CheckCircle className="h-6 w-6 text-green-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Top 12 Count</p>
+                            <p className="text-3xl font-bold text-purple-600">
+                              {getTopPerformers().length}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
+                            <Target className="h-6 w-6 text-purple-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Top Performers Table - Matching IPatroller table style */}
+                  <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                    <CardHeader>
+                                        <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                    Top 12 Performers Ranking for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
+                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Rank
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Municipality
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                District
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Total Active
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Total Inactive
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Active %
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {getTopPerformers().length === 0 ? (
+                              <tr>
+                                <td colSpan="7" className="px-6 py-12 text-center">
+                                  <div className="flex flex-col items-center gap-3">
+                                    <div className="h-16 w-16 rounded-full bg-gray-100 flex items-center justify-center">
+                                      <AlertTriangle className="h-8 w-8 text-gray-400" />
+                                    </div>
+                                    <div>
+                                      <h3 className="text-lg font-medium text-gray-900">No Performance Data</h3>
+                                      <p className="text-sm text-gray-500 mt-1">
+                                        No patrol data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ) : getTopPerformers().map((performer, index) => (
+                              <tr key={index} className="transition-colors duration-200 hover:bg-gray-50">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    {index === 0 && <Trophy className="w-5 h-5 text-yellow-500" />}
+                                    {index === 1 && <span className="text-gray-400 text-lg">🥈</span>}
+                                    {index === 2 && <span className="text-gray-400 text-lg">🥉</span>}
+                                    <span className={`font-bold text-lg ${
+                                      index === 0 ? 'text-yellow-600' : 
+                                      index === 1 ? 'text-gray-500' : 
+                                      index === 2 ? 'text-orange-600' : 'text-gray-700'
+                                    }`}>
+                                      #{index + 1}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <MapPin className="w-4 h-4 text-gray-600" />
+                                    <span className="font-medium transition-colors duration-300 text-gray-900">
+                                      {performer.municipality}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <Badge className="transition-all duration-300 bg-gray-100 text-gray-800 border-gray-200">
+                                    {performer.district}
+                                  </Badge>
+                                </td>
+
+                                <td className="px-6 py-4 text-center w-24">
+                                  <span className="text-lg font-semibold text-green-600">
+                                    {performer.activeDays}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-center w-24">
+                                  <span className="text-lg font-semibold text-red-600">
+                                    {performer.inactiveDays}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-center w-24">
+                                  {(() => {
+                                    const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+                                      ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                                      : 0;
+                                    return (
+                                      <span className="text-lg font-semibold text-purple-600">
+                                        {activePercentage}%
+                                      </span>
+                                    );
+                                  })()}
+                                </td>
+                                <td className="px-6 py-4 text-center w-24">
+                                  {(() => {
+                                    const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+                                      ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                                      : 0;
+                                    
+                                    const getStatusStyle = () => {
+                                      if (activePercentage === 100) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                      if (activePercentage >= 75) return 'bg-green-100 text-green-800 border-green-200';
+                                      if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                      return 'bg-red-100 text-red-800 border-red-200';
+                                    };
+                                    
+                                    const getStatusText = () => {
+                                      if (activePercentage === 100) return 'Very Satisfactory';
+                                      if (activePercentage >= 75) return 'Very Good';
+                                      if (activePercentage >= 50) return 'Good';
+                                      return 'Needs Improvement';
+                                    };
+                                    
+                                    return (
+                                      <Badge className={getStatusStyle()}>
+                                        {getStatusText()}
+                                      </Badge>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Performance Insights - Matching IPatroller card style */}
+                  <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                    <CardHeader>
+                                        <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-indigo-500" />
+                    Performance Insights for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-gray-900 text-lg">Top Achievements</h4>
+                          <ul className="space-y-3 text-sm text-gray-600">
+                            <li className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                              <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                              <span><strong className="text-green-800">{getTopPerformers()[0]?.municipality}</strong> is most active with <strong className="text-green-800">{getTopPerformers()[0]?.activeDays}</strong> active days</span>
+                            </li>
+                            <li className="flex items-center gap-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
+                              <BarChart3 className="w-5 h-5 text-blue-500 flex-shrink-0" />
+                              <span>Average of <strong className="text-blue-800">{(getTopPerformers().reduce((sum, p) => sum + p.activeDays, 0) / getTopPerformers().length).toFixed(1)}</strong> active days per municipality</span>
+                            </li>
+                            <li className="flex items-center gap-3 p-3 rounded-lg bg-purple-50 border border-purple-200">
+                              <Target className="w-5 h-5 text-purple-500 flex-shrink-0" />
+                              <span><strong className="text-purple-800">{getTopPerformers().filter(p => {
+                                const activePercentage = p.activeDays + p.inactiveDays > 0 
+                                  ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+                                  : 0;
+                                return activePercentage >= 75;
+                              }).length}</strong> municipalities with ≥75% active days (Very Good & Above)</span>
+                            </li>
+                          </ul>
+                        </div>
+                        <div className="space-y-4">
+                          <h4 className="font-semibold text-gray-900 text-lg">Areas for Improvement</h4>
+                          <ul className="space-y-3 text-sm text-gray-600">
+                            {getTopPerformers().filter(p => {
+                              const activePercentage = p.activeDays + p.inactiveDays > 0 
+                                ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+                                : 0;
+                              return activePercentage < 50;
+                            }).map((performer, index) => (
+                              <li key={index} className="flex items-center gap-3 p-3 rounded-lg bg-orange-50 border border-orange-200">
+                                <AlertCircle className="w-5 h-5 text-orange-500 flex-shrink-0" />
+                                <span><strong className="text-orange-800">{performer.municipality}</strong> needs improvement (<strong className="text-orange-800">{(performer.activeDays + performer.inactiveDays > 0 
+                                  ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                                  : 0)}%</strong> active days)</span>
+                              </li>
+                            ))}
+                            {getTopPerformers().filter(p => {
+                              const activePercentage = p.activeDays + p.inactiveDays > 0 
+                                ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+                                : 0;
+                              return activePercentage < 50;
+                            }).length === 0 && (
+                              <li className="flex items-center gap-3 p-3 rounded-lg bg-green-50 border border-green-200">
+                                <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                                <span className="text-green-800">All top performers maintain good activity levels</span>
+                              </li>
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : filteredTopPerformersData.length === 0 ? (
+                <div className="text-center py-12 transition-colors duration-300 text-gray-500">
+                  <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                  <p className="text-xl font-medium">No Data Available for Selected Period</p>
+                  <p className="text-sm">No patrol data found for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                  <p className="text-xs text-gray-400 mt-2">Try selecting a different month or year</p>
+                </div>
+              ) : (
+                <div className="text-center py-12 transition-colors duration-300 text-gray-500">
+                  <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+                  <p className="text-xl font-medium">No Performance Data Available</p>
+                  <p className="text-sm">No patrol data has been recorded yet.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Top Performers Preview Modal */}
+      {showTopPerformersPreview && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 bg-black/50">
+          <div ref={topPerformersPreviewRef} className="rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden bg-white">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full flex items-center justify-center bg-blue-100">
+                  <Eye className="h-7 w-7 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">Top Performers Report Preview</h3>
+                  <p className="text-sm text-gray-600">
+                    Preview for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">This is exactly what will be exported to PDF</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={exportTopPerformersToPDF}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2"
+                  title="Export to PDF"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export PDF
+                </Button>
+                <Button
+                  onClick={() => exportTopPerformersAsImage('png')}
+                  data-export-image="png"
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2"
+                  title="Export as PNG"
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Export PNG
+                </Button>
+                <Button
+                  onClick={() => exportTopPerformersAsImage('jpeg')}
+                  data-export-image="jpeg"
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2"
+                  title="Export as JPG"
+                >
+                  <Image className="w-4 h-4 mr-2" />
+                  Export JPG
+                </Button>
+                <button
+                  onClick={() => setShowTopPerformersPreview(false)}
+                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Content */}
+            <div className="p-6 overflow-y-auto max-h-[75vh]">
+              {/* Report Header Preview */}
+              <div className="text-center mb-8 p-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                <h1 className="text-3xl font-bold text-blue-600 mb-2">Top Performers Report</h1>
+                <p className="text-lg text-gray-700 mb-1">
+                  Performance Analysis for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </p>
+                <p className="text-sm text-gray-600">
+                  Generated on: {new Date().toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </p>
+              </div>
+
+              {/* Table Preview */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Data Table</h3>
+                <div className="overflow-x-auto border border-gray-200 rounded-lg">
+                  <table className="min-w-full bg-white">
+                    <thead className="bg-blue-600 text-white">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Rank</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">Municipality</th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold">District</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold">Total Active</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold">Total Inactive</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold">Active %</th>
+                        <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {getTopPerformers().map((performer, index) => {
+                        const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+                          ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                          : 0;
+                        
+                        const getStatusStyle = () => {
+                          if (activePercentage === 100) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                          if (activePercentage >= 75) return 'bg-green-100 text-green-800 border-green-200';
+                          if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                          return 'bg-red-100 text-red-800 border-red-200';
+                        };
+                        
+                        const getStatusText = () => {
+                          if (activePercentage === 100) return 'Very Satisfactory';
+                          if (activePercentage >= 75) return 'Very Good';
+                          if (activePercentage >= 50) return 'Good';
+                          return 'Needs Improvement';
+                        };
+
+                        return (
+                          <tr key={index} className="hover:bg-gray-50">
+                            <td className="px-4 py-3 text-center font-bold text-gray-700">
+                              {index + 1}
+                            </td>
+                            <td className="px-4 py-3 font-medium text-gray-900">
+                              {performer.municipality}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              {performer.district}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-green-600">
+                              {performer.activeDays}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-red-600">
+                              {performer.inactiveDays}
+                            </td>
+                            <td className="px-4 py-3 text-center font-semibold text-purple-600">
+                              {activePercentage}%
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <span className={`px-2 py-1 text-xs font-medium rounded-full border ${getStatusStyle()}`}>
+                                {getStatusText()}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Summary Statistics Preview */}
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Summary Statistics</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-800 mb-2">🏆 Most Active</h4>
+                    <p className="text-gray-600">
+                      {getTopPerformers()[0]?.municipality || 'N/A'} ({getTopPerformers()[0]?.activeDays || 0} active days)
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-800 mb-2">📊 Average Active Days</h4>
+                    <p className="text-gray-600">
+                      {(getTopPerformers().reduce((sum, p) => sum + p.activeDays, 0) / Math.max(getTopPerformers().length, 1)).toFixed(1)}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-800 mb-2">📅 Total Active Days</h4>
+                    <p className="text-gray-600">
+                      {getTopPerformers().reduce((sum, p) => sum + p.activeDays, 0)}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h4 className="font-semibold text-gray-800 mb-2">📈 Average Active %</h4>
+                    <p className="text-gray-600">
+                      {Math.round(getTopPerformers().reduce((sum, p) => {
+                        const activePercentage = p.activeDays + p.inactiveDays > 0 
+                          ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+                          : 0;
+                        return sum + activePercentage;
+                      }, 0) / Math.max(getTopPerformers().length, 1))}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Preview */}
+              <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-600 italic">
+                  Report generated by iPatroller Management System
+                </p>
+                <p className="text-xs text-gray-500 mt-1">Page 1 of 1</p>
+              </div>
             </div>
           </div>
         </div>

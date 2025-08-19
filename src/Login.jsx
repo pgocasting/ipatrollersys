@@ -5,7 +5,7 @@ import { Label } from "./components/ui/label";
 import { Alert, AlertDescription } from "./components/ui/alert";
 import { Loader2, Shield, MapPin, Activity, BarChart3, Eye, EyeOff } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
-import { useTheme } from "./ThemeContext";
+
 
 export default function Login({ onLogin }) {
   const [formData, setFormData] = useState({
@@ -17,7 +17,7 @@ export default function Login({ onLogin }) {
   const [showPassword, setShowPassword] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const { signIn } = useFirebase();
-  const { isDarkMode } = useTheme();
+
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -66,18 +66,14 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className={`h-screen flex flex-col lg:flex-row transition-all duration-500 overflow-hidden ${
-      isDarkMode 
-        ? 'bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900' 
-        : 'bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100'
-    }`}>
+    <div className="h-screen flex flex-col lg:flex-row transition-all duration-500 overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
       
       {/* Left Side - Login Form (No Card) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 lg:p-8">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-3 md:p-4 lg:p-8">
         <div className="w-full max-w-sm">
           {/* Mobile Logo */}
-          <div className="lg:hidden text-center mb-6">
-            <div className="flex items-center justify-center w-20 h-20 mx-auto mb-3">
+          <div className="lg:hidden text-center mb-4 md:mb-6">
+            <div className="flex items-center justify-center w-16 h-16 md:w-20 md:h-20 mx-auto mb-2 md:mb-3">
               <img 
                 src="https://upload.wikimedia.org/wikipedia/commons/a/a2/Ph_seal_bataan2.png"
                 alt="Bataan Seal"
@@ -85,41 +81,31 @@ export default function Login({ onLogin }) {
                 loading="eager"
               />
             </div>
-            <h1 className={`text-xl font-bold mb-2 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <h1 className="text-lg md:text-xl font-bold mb-2 text-gray-900">
               iPatroller System
             </h1>
           </div>
 
           {/* Form Header */}
-          <div className="text-center space-y-3 mb-8">
-            <div className="flex items-center justify-center mb-4">
-              <div className="w-12 h-12 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                <Shield className="w-6 h-6 text-white" />
+          <div className="text-center space-y-2 md:space-y-3 mb-6 md:mb-8">
+            <div className="flex items-center justify-center mb-3 md:mb-4">
+              <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                <Shield className="w-5 h-5 md:w-6 md:h-6 text-white" />
               </div>
             </div>
-            <h2 className={`text-2xl font-bold ${
-              isDarkMode 
-                ? 'bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent' 
-                : 'bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent'
-            }`}>
+            <h2 className="text-xl md:text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 bg-clip-text text-transparent">
               Welcome Back
             </h2>
-            <p className={`text-sm font-medium ${
-              isDarkMode ? 'text-slate-300' : 'text-slate-600'
-            }`}>
+            <p className="text-xs md:text-sm font-medium text-slate-600">
               Sign in to access your dashboard
             </p>
           </div>
 
           {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
             {/* Email Field */}
             <div className="space-y-2">
-              <Label htmlFor="email" className={`text-xs font-semibold flex items-center gap-2 ${
-                isDarkMode ? 'text-slate-300' : 'text-slate-700'
-              }`}>
+              <Label htmlFor="email" className="text-xs font-semibold flex items-center gap-2 text-slate-700">
                 <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 12a4 4 0 10-8 0 4 4 0 008 0zm0 0v1.5a2.5 2.5 0 005 0V12a9 9 0 10-9 9m4.5-1.206a8.959 8.959 0 01-4.5 1.207" />
                 </svg>
@@ -138,11 +124,7 @@ export default function Login({ onLogin }) {
                   value={formData.email}
                   onChange={handleChange}
                   required
-                  className={`w-full pl-10 pr-3 py-3 border-2 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md focus:shadow-lg text-sm ${
-                    isDarkMode 
-                      ? 'border-slate-600 bg-slate-800/80 text-white placeholder-slate-400 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500' 
-                      : 'border-slate-200 bg-white/80 text-slate-900 placeholder-slate-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500'
-                  }`}
+                  className="w-full pl-10 pr-3 py-2 md:py-3 border-2 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md focus:shadow-lg text-sm border-slate-200 bg-white/80 text-slate-900 placeholder-slate-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
                   placeholder="Enter your email address"
                 />
               </div>
@@ -150,9 +132,7 @@ export default function Login({ onLogin }) {
 
             {/* Password Field */}
             <div className="space-y-2">
-              <Label htmlFor="password" className={`text-xs font-semibold flex items-center gap-2 ${
-                isDarkMode ? 'text-slate-300' : 'text-slate-700'
-              }`}>
+              <Label htmlFor="password" className="text-xs font-semibold flex items-center gap-2 text-slate-700">
                 <svg className="w-3 h-3 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
@@ -171,11 +151,7 @@ export default function Login({ onLogin }) {
                   value={formData.password}
                   onChange={handleChange}
                   required
-                  className={`w-full pl-10 pr-10 py-3 border-2 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md focus:shadow-lg text-sm ${
-                    isDarkMode 
-                      ? 'border-slate-600 bg-slate-800/80 text-white placeholder-slate-400 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500' 
-                      : 'border-slate-200 bg-white/80 text-slate-900 placeholder-slate-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500'
-                  }`}
+                  className="w-full pl-10 pr-10 py-2 md:py-3 border-2 rounded-xl transition-all duration-300 shadow-sm hover:shadow-md focus:shadow-lg text-sm border-slate-200 bg-white/80 text-slate-900 placeholder-slate-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500"
                   placeholder="Enter your password"
                 />
                 <button
@@ -192,11 +168,7 @@ export default function Login({ onLogin }) {
             {error && (
               <div className="relative animate-in slide-in-from-top-2 duration-300">
                 <div className="absolute inset-0 bg-gradient-to-r from-red-500/20 to-pink-500/20 rounded-xl blur-xl"></div>
-                <Alert variant="destructive" className={`relative rounded-xl shadow-lg border-0 text-sm ${
-                  isDarkMode 
-                    ? 'bg-red-900/20 text-red-300' 
-                    : 'bg-red-50/90 text-red-800'
-                }`}>
+                <Alert variant="destructive" className="relative rounded-xl shadow-lg border-0 text-sm bg-red-50/90 text-red-800">
                   <AlertDescription className="font-medium">
                     {error}
                   </AlertDescription>
@@ -209,7 +181,7 @@ export default function Login({ onLogin }) {
               <Button
                 type="submit"
                 disabled={isLoading}
-                className="w-full font-bold py-3 rounded-xl shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white text-base relative overflow-hidden group"
+                className="w-full font-bold py-2 md:py-3 rounded-xl shadow-xl transform hover:scale-[1.02] transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white text-base relative overflow-hidden group"
               >
                 {/* Button Background Effect */}
                 <div className="absolute inset-0 bg-gradient-to-r from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -232,15 +204,11 @@ export default function Login({ onLogin }) {
           </form>
 
           {/* Footer */}
-          <div className="text-center mt-6 pt-4 border-t border-slate-200/50">
-            <p className={`text-xs font-medium ${
-              isDarkMode ? 'text-slate-400' : 'text-slate-600'
-            }`}>
+          <div className="text-center mt-4 md:mt-6 pt-3 md:pt-4 border-t border-slate-200/50">
+            <p className="text-xs font-medium text-slate-600">
               © 2025 iPatroller System. All rights reserved.
             </p>
-            <p className={`text-xs mt-1 ${
-              isDarkMode ? 'text-slate-500' : 'text-slate-500'
-            }`}>
+            <p className="text-xs mt-1 text-slate-500">
               Secure • Reliable • Efficient
             </p>
           </div>

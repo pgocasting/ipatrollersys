@@ -6,7 +6,6 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
-import { useTheme } from "./ThemeContext";
 import { db } from "./firebase";
 import { 
   collection, 
@@ -137,33 +136,24 @@ const enhancedClasses = {
   gradientPrimary: 'bg-gradient-to-br from-blue-500 to-purple-600',
   gradientSecondary: 'bg-gradient-to-br from-green-500 to-teal-600',
   gradientWarning: 'bg-gradient-to-br from-yellow-500 to-orange-600',
-  
   // Glass morphism effects
   glassEffect: 'backdrop-blur-md bg-white/10 border border-white/20',
   glassEffectDark: 'backdrop-blur-md bg-black/10 border border-white/10',
-  
   // Enhanced shadows
   shadowGlow: 'shadow-lg shadow-blue-500/25',
   shadowGlowGreen: 'shadow-lg shadow-green-500/25',
-  
   // Smooth animations
   hoverScale: 'hover:scale-105 transition-transform duration-300',
   hoverLift: 'hover:-translate-y-1 transition-transform duration-300',
-  
   // Modern borders
   borderGradient: 'border-2 border-transparent bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-border',
 };
-
 export default function IncidentsReports({ onLogout, onNavigate, currentPage }) {
-  const { isDarkMode } = useTheme();
   const fileInputRef = useRef(null);
-  
   // Function to automatically identify incident type from description
   const identifyIncidentType = (description) => {
     if (!description) return "Other";
-    
     const desc = description.toLowerCase();
-    
     // Traffic-related incidents
     if (desc.includes('speeding') || desc.includes('traffic violation') || desc.includes('traffic ticket') || desc.includes('traffic')) {
       return "Traffic Violation";
@@ -180,7 +170,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       }
       return "Traffic Accident";
     }
-    
     // Public safety incidents
     if (desc.includes('public disturbance') || desc.includes('disturbance') || desc.includes('commotion')) {
       return "Public Disturbance";
@@ -191,7 +180,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('suspicious') || desc.includes('suspicious activity') || desc.includes('loitering')) {
       return "Suspicious Activity";
     }
-    
     // Property crimes
     if (desc.includes('theft') || desc.includes('stolen') || desc.includes('shoplifting') || desc.includes('nakaw')) {
       return "Theft";
@@ -202,7 +190,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('property damage') || desc.includes('damage to')) {
       return "Property Damage";
     }
-    
     // Violent crimes
     if (desc.includes('assault') || desc.includes('attack') || desc.includes('physical altercation') || desc.includes('physical injury')) {
       return "Assault";
@@ -213,7 +200,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('harassment') || desc.includes('harassing')) {
       return "Harassment";
     }
-    
     // Drug-related
     if (desc.includes('drug') || desc.includes('illegal drugs') || desc.includes('substance') || desc.includes('shabu') || desc.includes('marijuana')) {
       return "Drug-related";
@@ -221,7 +207,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('illegal drugs') || desc.includes('drug trafficking')) {
       return "Illegal Drugs";
     }
-    
     // Financial crimes
     if (desc.includes('fraud') || desc.includes('credit card fraud') || desc.includes('scam')) {
       return "Fraud";
@@ -232,7 +217,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('extortion') || desc.includes('blackmail')) {
       return "Extortion";
     }
-    
     // Vehicle crimes
     if (desc.includes('car theft') || desc.includes('vehicle stolen')) {
       return "Car Theft";
@@ -243,7 +227,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('carjacking')) {
       return "Carjacking";
     }
-    
     // Serious crimes
     if (desc.includes('robbery') || desc.includes('armed robbery') || desc.includes('holdap')) {
       return "Robbery";
@@ -260,7 +243,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('suicide')) {
       return "Suicide";
     }
-    
     // Other crimes
     if (desc.includes('illegal gambling') || desc.includes('gambling') || desc.includes('sabong')) {
       return "Illegal Gambling";
@@ -274,20 +256,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     if (desc.includes('migrant workers') || desc.includes('overseas filipino')) {
       return "Migrant Workers and Overseas Filipino";
     }
-    
     // Police operations
     if (desc.includes('police operation') || desc.includes('buy bust') || desc.includes('buy-bust') || desc.includes('operation')) {
       return "Police Operation";
     }
-    
     // Warrant arrests
     if (desc.includes('warrant') || desc.includes('arrest')) {
       return "Warrant Arrest";
     }
-    
     return "Other";
   };
-
   // Function to detect municipalities from location text
   const detectMunicipalitiesFromLocation = (locationText, municipalityList) => {
     if (!locationText) return [];
@@ -296,15 +274,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       // More flexible detection - check for any word match
       const locationLower = locationText.toLowerCase();
       const municipalityLower = municipality.toLowerCase();
-      
       // Split municipality name into words for partial matching
       const municipalityWords = municipalityLower.split(' ').filter(word => word.length > 0);
-      
       // Check if any word from municipality name is found in location
       const found = municipalityWords.some(word => {
         // Skip very short words (less than 3 characters) to avoid false matches
         if (word.length < 3) return false;
-        
         // More flexible matching patterns for real data
         const patterns = [
           word,
@@ -323,18 +298,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           word + ' bataan',
           word + ' Bataan'
         ];
-        
         return patterns.some(pattern => locationLower.includes(pattern));
       });
-      
       if (found) {
         detected.push(municipality);
       }
     });
-    
     return detected;
   };
-
   // Incident types for dropdown
   const incidentTypes = [
     "Traffic Violation",
@@ -373,7 +344,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "Carjacking",
     "Other"
   ];
-
   // Districts for selection
   const districts = [
     "1ST DISTRICT",
@@ -382,25 +352,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "4TH DISTRICT",
     "5TH DISTRICT"
   ];
-
   // Municipalities grouped by district
   const municipalitiesByDistrict = {
     "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
     "2ND DISTRICT": ["Balanga City", "Pilar", "Orion", "Limay"],
     "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"]
   };
-
   // All municipalities for selection (flattened)
   const municipalities = [
     "Abucay", "Orani", "Samal", "Hermosa", // 1ST DISTRICT
     "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
     "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
   ];
-  
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState('connecting');
-
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -410,7 +376,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState("all");
-  
   // PDF Edit Interface State
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
@@ -428,17 +393,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       summaryGeneration: true,
       trendAnalysis: true,
       rootCauses: true,
-      recommendations: true
+      recommendations: true,
+      riskForecasting: true
     }
   });
-
-
-
   const [showCleanupDropdown, setShowCleanupDropdown] = useState(false);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [connectionError, setConnectionError] = useState(null);
-  
   const [newIncident, setNewIncident] = useState({
     incidentType: "",
     location: "",
@@ -462,57 +424,49 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     followUpNotes: "",
     priority: "Medium",
   });
-
   // Firestore functions
   const loadIncidents = async () => {
     try {
       setLoading(true);
       setFirestoreStatus('connecting');
       setConnectionError(null);
-      
       // Check if we're online before attempting to connect
       if (!navigator.onLine) {
         throw new Error('No internet connection');
       }
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const incidentsData = [];
       const seenIds = new Set();
       const duplicateIds = new Set();
       const documentsToDelete = [];
-      
       // First pass: identify duplicates and collect documents to delete
       querySnapshot.forEach((doc) => {
         const incidentData = {
           id: doc.id,
           ...doc.data()
         };
-        
         if (seenIds.has(incidentData.id)) {
           duplicateIds.add(incidentData.id);
           documentsToDelete.push(doc.ref);
           console.warn('⚠️ Found duplicate incident ID:', incidentData.id, '- will be automatically cleaned up');
         } else {
-          seenIds.add(incidentData.id);
+        seenIds.add(incidentData.id);
         }
       });
-      
       // Second pass: collect clean data (excluding duplicates)
       querySnapshot.forEach((doc) => {
         const incidentData = {
           id: doc.id,
           ...doc.data()
         };
-        
         // Only include non-duplicate incidents
         if (!duplicateIds.has(incidentData.id) || !seenIds.has(incidentData.id)) {
-          // Clean the data when loading from Firestore
-          const cleanedIncident = cleanIncidentData(incidentData);
-          incidentsData.push(cleanedIncident);
+        // Clean the data when loading from Firestore
+        const cleanedIncident = cleanIncidentData(incidentData);
+        incidentsData.push(cleanedIncident);
         }
       });
-      
       // Automatically clean up duplicates if any were found
       if (documentsToDelete.length > 0) {
         console.log(`🧹 Auto-cleaning ${documentsToDelete.length} duplicate incidents...`);
@@ -528,18 +482,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           console.warn('💡 Duplicates were detected but could not be automatically removed. Use manual cleanup options.');
         }
       }
-      
       setIncidents(incidentsData);
       setFirestoreStatus('connected');
       console.log('✅ Loaded incidents from Firestore:', incidentsData.length);
-      
       if (duplicateIds.size > 0) {
         console.log(`ℹ️ Found and cleaned up ${duplicateIds.size} duplicate incident IDs:`, Array.from(duplicateIds));
       }
     } catch (error) {
       console.error('❌ Error loading incidents:', error);
       setFirestoreStatus('error');
-      
       // Handle different types of errors
       if (error.message === 'No internet connection') {
         setConnectionError('No internet connection. Please check your network and try again.');
@@ -554,19 +505,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const saveIncident = async (incidentData) => {
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentsRef = collection(db, 'incidents');
       const docRef = await addDoc(incidentsRef, {
         ...incidentData,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       });
-      
       setFirestoreStatus('connected');
       console.log('✅ Incident saved to Firestore with ID:', docRef.id);
       return docRef.id;
@@ -578,14 +526,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const updateIncident = async (incidentId, incidentData) => {
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentRef = doc(db, 'incidents', incidentId);
-      
       // Check if document exists before updating
       const docSnap = await getDoc(incidentRef);
       if (!docSnap.exists()) {
@@ -606,7 +551,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         });
         console.log('✅ Incident updated in Firestore:', incidentId);
       }
-      
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error updating incident:', error);
@@ -616,15 +560,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const deleteIncident = async (incidentId) => {
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentRef = doc(db, 'incidents', incidentId);
       await deleteDoc(incidentRef);
-      
       setFirestoreStatus('connected');
       console.log('✅ Incident deleted from Firestore:', incidentId);
     } catch (error) {
@@ -635,20 +576,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const clearAllIncidents = async () => {
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const batch = writeBatch(db);
-      
       querySnapshot.forEach((doc) => {
         batch.delete(doc.ref);
       });
-      
       await batch.commit();
       setIncidents([]);
       setFirestoreStatus('connected');
@@ -661,22 +598,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const cleanupDuplicateIncidents = async () => {
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const incidentsMap = new Map();
       const batch = writeBatch(db);
       let duplicatesRemoved = 0;
-      
       querySnapshot.forEach((doc) => {
         const incidentData = doc.data();
         const key = incidentData.incidentType + '_' + incidentData.date + '_' + incidentData.location;
-        
         if (incidentsMap.has(key)) {
           // This is a duplicate, remove it
           batch.delete(doc.ref);
@@ -686,7 +619,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           incidentsMap.set(key, doc);
         }
       });
-      
       if (duplicatesRemoved > 0) {
         await batch.commit();
         console.log(`✅ Removed ${duplicatesRemoved} duplicate incidents from Firestore`);
@@ -695,7 +627,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       } else {
         console.log('✅ No duplicate incidents found');
       }
-      
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error cleaning up duplicate incidents:', error);
@@ -704,30 +635,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setLoading(false);
     }
   };
-
   const clearCurrentMonthIncidents = async () => {
     try {
       setCleanupLoading(true);
       setFirestoreStatus('saving');
-      
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const batch = writeBatch(db);
       let removedCount = 0;
-      
       querySnapshot.forEach((doc) => {
         const incidentData = doc.data();
         const incidentDate = new Date(incidentData.date);
-        
         if (incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
           batch.delete(doc.ref);
           removedCount++;
         }
       });
-      
       if (removedCount > 0) {
         await batch.commit();
         console.log(`✅ Removed ${removedCount} incidents from current month (${currentMonth + 1}/${currentYear})`);
@@ -737,7 +662,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.log('✅ No incidents found for current month');
         alert('✅ No incidents found for current month');
       }
-      
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing current month incidents:', error);
@@ -747,22 +671,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setCleanupLoading(false);
     }
   };
-
   const clearAllIncidentsData = async () => {
     try {
       setCleanupLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const batch = writeBatch(db);
       let removedCount = 0;
-      
       querySnapshot.forEach((doc) => {
         batch.delete(doc.ref);
         removedCount++;
       });
-      
       if (removedCount > 0) {
         await batch.commit();
         console.log(`✅ Removed all ${removedCount} incidents from Firestore`);
@@ -772,7 +692,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.log('✅ No incidents found to remove');
         alert('✅ No incidents found to remove');
       }
-      
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing all incidents:', error);
@@ -782,22 +701,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setCleanupLoading(false);
     }
   };
-
   // Function to identify and log duplicate incidents for debugging
   const identifyDuplicateIncidents = async () => {
     try {
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      
       const incidentMap = new Map();
       const duplicates = [];
-      
       querySnapshot.forEach((doc) => {
         const incidentData = {
           id: doc.id,
           ...doc.data()
         };
-        
         if (incidentMap.has(incidentData.id)) {
           duplicates.push({
             id: incidentData.id,
@@ -808,7 +723,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           incidentMap.set(incidentData.id, incidentData);
         }
       });
-      
       if (duplicates.length > 0) {
         console.warn('🔍 Found duplicate incidents:', duplicates);
         console.warn('💡 Total duplicates found:', duplicates.length);
@@ -816,60 +730,48 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       } else {
         console.log('✅ No duplicate incidents found');
       }
-      
       return duplicates;
     } catch (error) {
       console.error('❌ Error identifying duplicate incidents:', error);
       return [];
     }
   };
-
   // Function to manually clean up duplicates
   const manualCleanupDuplicates = async () => {
     try {
       setCleanupLoading(true);
       setFirestoreStatus('saving');
-      
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      
       const incidentMap = new Map();
       const documentsToDelete = [];
-      
       // Identify duplicates and collect documents to delete
       querySnapshot.forEach((doc) => {
         const incidentData = {
           id: doc.id,
           ...doc.data()
         };
-        
         if (incidentMap.has(incidentData.id)) {
           documentsToDelete.push(doc.ref);
         } else {
           incidentMap.set(incidentData.id, incidentData);
         }
       });
-      
       if (documentsToDelete.length > 0) {
         console.log(`🧹 Manually cleaning up ${documentsToDelete.length} duplicate incidents...`);
-        
         const batch = writeBatch(db);
         documentsToDelete.forEach(docRef => {
           batch.delete(docRef);
         });
-        
         await batch.commit();
         console.log(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
-        
         // Reload incidents after cleanup
         await loadIncidents();
-        
         alert(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
       } else {
         console.log('✅ No duplicates found to clean up');
         alert('✅ No duplicates found to clean up');
       }
-      
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error during manual duplicate cleanup:', error);
@@ -879,12 +781,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setCleanupLoading(false);
     }
   };
-
   // Load incidents on component mount
   useEffect(() => {
     loadIncidents();
   }, []);
-
   // Close cleanup dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -892,13 +792,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         setShowCleanupDropdown(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showCleanupDropdown]);
-
   // Monitor online/offline status
   useEffect(() => {
     const handleOnline = () => {
@@ -906,27 +804,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setConnectionError(null);
       console.log('🌐 Internet connection restored');
     };
-
     const handleOffline = () => {
       setIsOnline(false);
       setConnectionError('No internet connection');
       console.log('❌ Internet connection lost');
     };
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
   // Clean existing data when incidents are loaded
   useEffect(() => {
     if (incidents.length > 0) {
       const cleanedIncidents = incidents.map(incident => cleanIncidentData(incident));
-      
       // Remove duplicates by ID, keeping the most recent one
       const uniqueIncidents = cleanedIncidents.reduce((acc, incident) => {
         const existingIndex = acc.findIndex(item => item.id === incident.id);
@@ -937,26 +830,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const existing = acc[existingIndex];
           const existingTime = existing.updatedAt || existing.createdAt || '';
           const newTime = incident.updatedAt || incident.createdAt || '';
-          
           if (newTime > existingTime) {
             acc[existingIndex] = incident;
           }
         }
         return acc;
       }, []);
-      
       // Only update if there were changes
       const hasChanges = uniqueIncidents.length !== incidents.length || 
         uniqueIncidents.some((incident, index) => 
           JSON.stringify(incident) !== JSON.stringify(incidents[index])
         );
-      
       if (hasChanges) {
         console.log('Cleaning existing incident data and removing duplicates...');
         console.log(`Original count: ${incidents.length}, Cleaned count: ${uniqueIncidents.length}`);
         setIncidents(uniqueIncidents);
       }
-      
       // Debug: Check for duplicate IDs
       const ids = uniqueIncidents.map(incident => incident.id);
       const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
@@ -967,32 +856,26 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       }
     }
   }, [incidents.length]); // Only run when incidents array length changes
-
   const handleAddIncident = async () => {
     try {
     // Auto-identify incident type if not specified
       let finalIncidentType = newIncident.incidentType || identifyIncidentType(newIncident.description);
-      
       // Format "Other" type with description from "What" field
       if (finalIncidentType === "Other" && newIncident.description) {
         finalIncidentType = `Other (${newIncident.description})`;
       }
-      
       // Validate and clean the incident data
       const validatedIncident = cleanIncidentData({
       ...newIncident,
         incidentType: finalIncidentType
       });
-      
       const extractedMonth = extractMonthFromDate(validatedIncident.date);
       const extractedYear = extractYearFromDate(validatedIncident.date);
-      
       console.log('📅 Date extraction:', {
         input: validatedIncident.date,
         extractedMonth,
         extractedYear
       });
-      
       const incidentData = {
         ...validatedIncident,
         month: extractedMonth,
@@ -1000,13 +883,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
-      
       // Save to Firestore
       await saveIncident(incidentData);
-      
       // Reload incidents from Firestore
       await loadIncidents();
-      
       // Reset form
     setNewIncident({
       incidentType: "",
@@ -1037,39 +917,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       alert('Error adding incident. Please try again.');
     }
   };
-
   // Function to handle district change and update municipality
   const handleDistrictChange = (district) => {
     const municipalitiesForDistrict = municipalitiesByDistrict[district] || [];
     const firstMunicipality = municipalitiesForDistrict[0] || "";
-    
     setNewIncident({
       ...newIncident,
       district: district,
       municipality: firstMunicipality
     });
   };
-
   // Function to handle incident type change with "Other" formatting
   const handleIncidentTypeChange = (incidentType) => {
     let finalIncidentType = incidentType;
-    
     // Format "Other" type with description from "What" field
     if (incidentType === "Other" && newIncident.description) {
       finalIncidentType = `Other (${newIncident.description})`;
       console.log('🔄 Formatting Other type:', finalIncidentType);
     }
-    
     setNewIncident({
       ...newIncident,
       incidentType: finalIncidentType
     });
   };
-
   // Function to handle description change and update "Other" type formatting
   const handleDescriptionChange = (description) => {
     let finalIncidentType = newIncident.incidentType;
-    
     // If type is "Other", update the formatting with new description
     if (newIncident.incidentType === "Other" || newIncident.incidentType.startsWith("Other (")) {
       if (description) {
@@ -1080,14 +953,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.log('🔄 Clearing Other type description');
       }
     }
-    
     setNewIncident({
       ...newIncident,
       description: description,
       incidentType: finalIncidentType
     });
   };
-
   const handleEditIncident = async () => {
     try {
       // Format "Other" type with description from "What" field
@@ -1095,35 +966,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       if (finalIncidentType === "Other" && editingIncident.description) {
         finalIncidentType = `Other (${editingIncident.description})`;
       }
-      
       // Validate and clean the incident data before updating
       const validatedIncident = validateIncidentForEdit({
         ...editingIncident,
         incidentType: finalIncidentType
       });
-      
       const extractedMonth = extractMonthFromDate(validatedIncident.date);
       const extractedYear = extractYearFromDate(validatedIncident.date);
-      
       console.log('📅 Date extraction (edit):', {
         input: validatedIncident.date,
         extractedMonth,
         extractedYear
       });
-      
       const incidentData = {
         ...validatedIncident,
         month: extractedMonth,
         year: extractedYear,
         updatedAt: new Date().toISOString()
       };
-      
       // Update in Firestore
       await updateIncident(String(editingIncident.id), incidentData);
-      
       // Reload incidents from Firestore
       await loadIncidents();
-      
     setEditingIncident(null);
     setShowEditModal(false);
     } catch (error) {
@@ -1131,19 +995,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       alert('Error updating incident. Please try again.');
     }
   };
-
   // Function to handle district change in edit modal
   const handleEditDistrictChange = (district) => {
     const municipalitiesForDistrict = municipalitiesByDistrict[district] || [];
     const firstMunicipality = municipalitiesForDistrict[0] || "";
-    
     setEditingIncident({
       ...editingIncident,
       district: district,
       municipality: firstMunicipality
     });
   };
-
   const handleDeleteIncident = async (id) => {
     if (window.confirm('Are you sure you want to delete this incident? This action cannot be undone.')) {
       try {
@@ -1155,27 +1016,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       }
     }
   };
-
   // Import Excel functionality
   const handleImportExcel = () => {
     fileInputRef.current?.click();
   };
-
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     // Check file type
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     const isCSV = file.name.endsWith('.csv');
-
     if (!isExcel && !isCSV) {
       alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
       return;
     }
-
     const reader = new FileReader();
-    
     if (isCSV) {
       // Handle CSV files - treat as single month data
       reader.onload = async (e) => {
@@ -1183,20 +1038,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const text = e.target.result;
           const lines = text.split('\n');
           const headers = lines[0].split(',').map(header => header.trim());
-          
           // Debug: Log the headers found
-          
-          
           const importedIncidents = [];
-          
           for (let i = 1; i < lines.length; i++) {
             if (lines[i].trim() === '') continue;
-            
             const values = lines[i].split(',').map(value => value.trim());
-            
             // Map to new structure based on user's Excel format
             const description = values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || values[headers.indexOf('Description')] || values[headers.indexOf('DESCRIPTION')] || '';
-            
             const incident = {
               id: importedIncidents.length + 1,
               incidentType: values[headers.indexOf('Type')] || values[headers.indexOf('TYPE')] || identifyIncidentType(description),
@@ -1222,24 +1070,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               followUpNotes: values[headers.indexOf('Follow Up Notes')] || values[headers.indexOf('FollowUpNotes')] || '',
               priority: values[headers.indexOf('Priority')] || values[headers.indexOf('PRIORITY')] || 'Medium',
             };
-            
-
-            
             // Only add incidents that have at least some basic data
             if (incident.incidentType || incident.description || incident.location || incident.officer) {
               importedIncidents.push(incident);
             }
           }
-          
           if (importedIncidents.length > 0) {
             // Save imported incidents to Firestore
             try {
               setLoading(true);
               setFirestoreStatus('saving');
-              
               const batch = writeBatch(db);
               const incidentsRef = collection(db, 'incidents');
-              
               importedIncidents.forEach(incident => {
                 const docRef = doc(incidentsRef);
                 batch.set(docRef, {
@@ -1248,7 +1090,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   updatedAt: new Date().toISOString()
                 });
               });
-              
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
@@ -1267,7 +1108,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           alert('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
         }
       };
-      
       reader.readAsText(file);
     } else {
       // Handle Excel files using XLSX library
@@ -1275,36 +1115,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
-          
           const importedIncidents = [];
-          
           // Process each sheet in the workbook
           workbook.SheetNames.forEach(sheetName => {
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
             if (jsonData.length === 0) return;
-            
             // Get headers from first row
             const headers = jsonData[0].map(header => header ? header.toString().trim() : '');
-            
-
-            
             // Process data rows
             for (let i = 1; i < jsonData.length; i++) {
               const row = jsonData[i];
               if (!row || row.length === 0) continue;
-              
               const values = row.map(value => value ? value.toString().trim() : '');
-              
               // Process all data from the Excel sheet
               const dateValue = values[headers.indexOf('WHEN')] || '';
               const month = extractMonthFromDate(dateValue);
               const year = extractYearFromDate(dateValue);
-              
               // Process all data from the Excel sheet
               const description = values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || values[headers.indexOf('Description')] || values[headers.indexOf('DESCRIPTION')] || '';
-              
               const incident = {
                 id: importedIncidents.length + 1,
                 incidentType: values[headers.indexOf('Type')] || values[headers.indexOf('TYPE')] || identifyIncidentType(description),
@@ -1330,25 +1159,19 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 followUpNotes: values[headers.indexOf('Follow Up Notes')] || values[headers.indexOf('FollowUpNotes')] || '',
                 priority: values[headers.indexOf('Priority')] || values[headers.indexOf('PRIORITY')] || 'Medium',
               };
-              
-
-              
               // Only add incidents that have at least some basic data
               if (incident.incidentType || incident.description || incident.location || incident.officer) {
                 importedIncidents.push(incident);
               }
             }
           });
-          
           if (importedIncidents.length > 0) {
             // Save imported incidents to Firestore
             try {
               setLoading(true);
               setFirestoreStatus('saving');
-              
               const batch = writeBatch(db);
               const incidentsRef = collection(db, 'incidents');
-              
               importedIncidents.forEach(incident => {
                 const docRef = doc(incidentsRef);
                 batch.set(docRef, {
@@ -1357,7 +1180,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   updatedAt: new Date().toISOString()
                 });
               });
-              
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
@@ -1377,30 +1199,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
         }
       };
-      
       reader.readAsArrayBuffer(file);
     }
-    
     event.target.value = ''; // Reset file input
   };
-
   // Function to reset data to sample data with proper municipality detection
-
-
   // Helper function to extract month from date text
   const extractMonthFromDate = (dateString) => {
     if (!dateString) return '';
-    
         const monthNames = [
           'January', 'February', 'March', 'April', 'May', 'June',
           'July', 'August', 'September', 'October', 'November', 'December'
         ];
-        
     const monthAbbreviations = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
-    
     // First try to parse as a Date object
     try {
       const date = new Date(dateString);
@@ -1410,21 +1224,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     } catch (error) {
       // Continue to text parsing
     }
-    
     // Check if dateString contains month name (full name)
         for (let i = 0; i < monthNames.length; i++) {
           if (dateString.toLowerCase().includes(monthNames[i].toLowerCase())) {
             return monthNames[i];
           }
         }
-    
     // Check if dateString contains month abbreviation
     for (let i = 0; i < monthAbbreviations.length; i++) {
       if (dateString.toLowerCase().includes(monthAbbreviations[i].toLowerCase())) {
         return monthNames[i];
       }
     }
-    
     // Try to extract month from MM/DD/YYYY or DD/MM/YYYY format
     const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (dateMatch) {
@@ -1435,7 +1246,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return monthNames[monthIndex];
       }
     }
-    
     // Try to extract month from YYYY-MM-DD format
     const isoMatch = dateString.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (isoMatch) {
@@ -1445,14 +1255,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return monthNames[monthIndex];
       }
     }
-    
     return '';
   };
-
   // Helper function to extract year from date text
   const extractYearFromDate = (dateString) => {
     if (!dateString) return '';
-    
     // First try to parse as a Date object
     try {
       const date = new Date(dateString);
@@ -1462,34 +1269,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     } catch (error) {
       // Continue to text parsing
     }
-    
     // Try to extract year from various formats
-    
     // YYYY-MM-DD format
     const isoMatch = dateString.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
     if (isoMatch) {
       return isoMatch[1];
     }
-    
     // MM/DD/YYYY or DD/MM/YYYY format
     const dateMatch = dateString.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (dateMatch) {
       return dateMatch[3];
     }
-    
     // Any 4-digit year in the text
       const yearMatch = dateString.match(/\b(20\d{2})\b/);
     if (yearMatch) {
       return yearMatch[1];
     }
-    
     // Try to find year in various formats
     const yearPatterns = [
       /\b(20\d{2})\b/,  // 2024, 2023, etc.
       /\b(19\d{2})\b/,  // 1999, 1998, etc.
       /\b(\d{4})\b/     // Any 4-digit number
     ];
-    
     for (const pattern of yearPatterns) {
       const match = dateString.match(pattern);
       if (match) {
@@ -1499,14 +1300,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
       }
     }
-    
       return '';
   };
-
   // Data validation and cleaning functions
   const cleanIncidentData = (incident) => {
     const cleaned = { ...incident };
-    
     // Clean date field - allow any text input but validate basic format
     if (cleaned.date && typeof cleaned.date === 'string') {
       // If the date field contains text that looks like a description, clear it
@@ -1520,20 +1318,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         cleaned.date = '';
       }
     }
-    
     // Ensure all required fields are strings
     cleaned.incidentType = cleaned.incidentType || '';
     cleaned.location = cleaned.location || '';
     cleaned.description = cleaned.description || '';
     cleaned.officer = cleaned.officer || '';
             cleaned.status = cleaned.status || 'Active';
-    
     return cleaned;
   };
-
   const validateIncidentForEdit = (incident) => {
     const cleaned = cleanIncidentData(incident);
-    
     // For text input, just ensure the date field is a reasonable string
     if (cleaned.date && typeof cleaned.date === 'string') {
       // Trim whitespace and ensure it's not too long
@@ -1542,10 +1336,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         cleaned.date = cleaned.date.substring(0, 100);
       }
     }
-    
     return cleaned;
   };
-
   // Ensure unique incidents by ID to prevent duplicate keys
   const uniqueIncidents = incidents.reduce((acc, incident) => {
     if (!acc.find(item => item.id === incident.id)) {
@@ -1553,32 +1345,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     }
     return acc;
   }, []);
-
   const filteredIncidents = uniqueIncidents.filter((incident) => {
     // Filter out incidents with "No description available"
     const hasValidDescription = incident.description && 
                                incident.description.trim() !== "" && 
                                incident.description !== "No description available";
-    
     const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
     const matchesSearch = searchTerm === "" || 
                          (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
-    
-
-    
     return hasValidDescription && matchesStatus && matchesMonth && matchesSearch;
   });
-
-
-
   // Get available months from incidents data
   const availableMonths = [...new Set(incidents.map(incident => incident.month).filter(month => month))];
-
-
-
   const getStatusColor = (status) => {
     switch (status) {
       case "Completed":
@@ -1591,7 +1372,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
     }
   };
-
   const stats = {
     total: filteredIncidents.length,
     completed: filteredIncidents.filter(i => 
@@ -1663,7 +1443,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         i.description?.toLowerCase().includes("work"))
     ).length,
   };
-
   // Action types for dropdown
   const actionTypes = [
     "Investigation",
@@ -1681,7 +1460,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "No Action Required",
     "Other"
   ];
-
   // Priority levels
   const priorityLevels = [
     "Low",
@@ -1689,7 +1467,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "High",
     "Critical"
   ];
-
   const getPriorityColor = (priority) => {
     switch (priority) {
       case "Critical":
@@ -1704,12 +1481,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         return "bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400";
     }
   };
-
   // Export functionality
   const exportToExcel = () => {
     try {
       const workbook = XLSX.utils.book_new();
-      
       // Prepare data for export - filter out incidents with no description
       const exportData = incidents
         .filter(incident => incident.description && 
@@ -1734,10 +1509,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         'Follow-up Notes': incident.followUpNotes,
         'Link': incident.link
       }));
-
       const worksheet = XLSX.utils.json_to_sheet(exportData);
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Incidents Report');
-      
       // Auto-size columns
       const columnWidths = [
         { wch: 20 }, // Incident Type
@@ -1759,12 +1532,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         { wch: 30 }, // Link
       ];
       worksheet['!cols'] = columnWidths;
-
       // Generate filename with current date
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
       const filename = `Incidents_Report_${dateStr}.xlsx`;
-      
       XLSX.writeFile(workbook, filename);
       alert(`Report exported successfully as ${filename}`);
     } catch (error) {
@@ -1772,7 +1543,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       alert('Error exporting report. Please try again.');
     }
   };
-
   const exportToCSV = () => {
     try {
       const headers = [
@@ -1780,7 +1550,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         'Officer', 'Description', 'Why', 'Action Type', 'Action Description',
         'Assigned Officer', 'Action Date', 'Priority', 'Status', 'Follow-up Notes', 'Link'
       ];
-      
       const csvData = incidents
         .filter(incident => incident.description && 
                            incident.description.trim() !== "" && 
@@ -1804,48 +1573,39 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         incident.followUpNotes,
         incident.link
       ]);
-
       const csvContent = [headers, ...csvData]
         .map(row => row.map(cell => `"${cell || ''}"`).join(','))
         .join('\n');
-
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
       const filename = `Incidents_Report_${dateStr}.csv`;
-      
       link.setAttribute('download', filename);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
       alert(`Report exported successfully as ${filename}`);
     } catch (error) {
       console.error('Export error:', error);
       alert('Error exporting report. Please try again.');
     }
   };
-
   // Export Summary Insights to PDF
   const exportSummaryToPDF = () => {
     try {
       console.log('Starting Summary PDF export...');
     const insights = generateSummaryInsights(filteredIncidents);
       console.log('Insights generated:', insights);
-      
       const doc = new jsPDF();
       console.log('PDF document created for summary');
-      
       // Page 1: MEMORANDUM Header and Overview
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('MEMORANDUM', 14, 22);
-      
       // Memorandum details
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
@@ -1853,27 +1613,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.text('FROM: PGBxPNP - Crime Analyst', 14, 42);
       doc.text(`DATE: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`, 14, 49);
       doc.text(`SUBJECT: Crime Hotspots and High-Risk Areas Analysis - ${selectedMonth === "all" ? "All Months" : selectedMonth} ${new Date().getFullYear()}`, 14, 56);
-      
       // Section B: Crime Hotspots and High-Risk Areas
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('B. Crime Hotspots and High-Risk Areas', 14, 75);
-      
       // All 12 municipalities in Bataan
       const allMunicipalities = [
         'Abucay', 'Orani', 'Samal', 'Hermosa', // 1ST DISTRICT
         'Balanga City', 'Pilar', 'Orion', 'Limay', // 2ND DISTRICT
         'Bagac', 'Dinalupihan', 'Mariveles', 'Morong' // 3RD DISTRICT
       ];
-      
       // Municipality hotspot analysis - include all 12 municipalities
       const municipalityCounts = {};
-      
       // Initialize all municipalities with 0 counts
       allMunicipalities.forEach(municipality => {
         municipalityCounts[municipality] = 0;
       });
-      
       // Count incidents for municipalities that have data
       filteredIncidents.forEach(incident => {
         const municipality = incident.municipality || 'Unknown';
@@ -1881,18 +1636,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           municipalityCounts[municipality]++;
         }
       });
-      
       // Sort municipalities by incident count (including those with 0)
       const sortedMunicipalities = Object.entries(municipalityCounts)
         .sort(([,a], [,b]) => b - a);
-      
       let yPosition = 85;
-      
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Municipal Hotspot:', 14, yPosition);
       yPosition += 8;
-      
       if (sortedMunicipalities.length > 0) {
         const topMunicipality = sortedMunicipalities[0];
         const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
@@ -1901,19 +1652,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.text(`${topMunicipality[0]} is identified as having the highest number of incidents (${topMunicipality[1]}), accounting for approximately ${percentage}% of the total for the province.`, 14, yPosition);
         yPosition += 15;
       }
-      
       // Add page number
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Page 1', 190, 280, { align: 'right' });
-      
       // Page 2: Location Analysis Table
       doc.addPage();
-      
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('Location Analysis:', 14, 22);
-      
       // Prepare location table data - include all 12 municipalities
       const locationData = allMunicipalities.map(municipality => {
         const count = municipalityCounts[municipality] || 0;
@@ -1923,7 +1670,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           count > 0 ? 'Various incident types' : 'No incidents recorded'
         ];
       });
-      
       doc.autoTable({
         head: [['Location', 'Number of Incidents', 'Incident Types']],
         body: locationData,
@@ -1938,47 +1684,38 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         },
         margin: { top: 35 }
       });
-      
       // Page 3: Trend & Pattern Analysis
       doc.addPage();
-      
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('3. Trend & Pattern Analysis', 14, 22);
-      
       let analysisY = 35;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Dominant Crime Type:', 14, analysisY);
       analysisY += 8;
-      
       const mostCommonType = insights.mostCommonType;
       const mostCommonCount = insights.incidentTypeCounts[mostCommonType] || 0;
       const percentage = ((mostCommonCount / insights.totalIncidents) * 100).toFixed(1);
-      
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`${mostCommonType} is the most prevalent issue with ${mostCommonCount} incidents, accounting for ${percentage}% of all recorded events.`, 14, analysisY);
       analysisY += 20;
-      
       // Add more analysis sections
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Time of Day Analysis:', 14, analysisY);
       analysisY += 8;
-      
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('• Afternoon (12:00 PM - 5:59 PM): Highest frequency of police operations', 20, analysisY);
       analysisY += 6;
       doc.text('• Evening/Late Night (6:00 PM - 11:59 PM): Critical for drug operations and vehicular incidents', 20, analysisY);
       analysisY += 15;
-      
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Root Cause & Contributing Factors:', 14, analysisY);
       analysisY += 8;
-      
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('• Socioeconomic Factors: Unemployment linked to criminal activities', 20, analysisY);
@@ -1987,12 +1724,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       analysisY += 6;
       doc.text('• Mental Health: Family problems and depression in suicide cases', 20, analysisY);
       analysisY += 15;
-      
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Actionable Recommendations:', 14, analysisY);
       analysisY += 8;
-      
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('• Enhanced Police Visibility and Patrols in hotspot areas', 20, analysisY);
@@ -2002,25 +1737,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.text('• Technology and Infrastructure improvements', 20, analysisY);
       analysisY += 6;
       doc.text('• Inter-Agency Collaboration for comprehensive solutions', 20, analysisY);
-      
       // Add page numbers
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Page 2', 190, 280, { align: 'right' });
       doc.setPage(3);
       doc.text('Page 3', 190, 280, { align: 'right' });
-      
       console.log('Multi-page summary PDF created');
-      
       // Generate filename
       const now = new Date();
       const dateStr = now.toISOString().split('T')[0];
       const filename = `Crime_Hotspots_Analysis_${selectedMonth === "all" ? "All_Months" : selectedMonth}_${new Date().getFullYear()}.pdf`;
-      
       // Show preview window
       const pdfDataUri = doc.output('datauristring');
       const previewWindow = window.open('', '_blank', 'width=800,height=600,scrollbars=yes,resizable=yes');
-      
       previewWindow.document.write(`
         <!DOCTYPE html>
       <html>
@@ -2129,7 +1859,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <h1>📄 PDF Preview</h1>
               <p>Crime Hotspots Analysis - ${selectedMonth === "all" ? "All Months" : selectedMonth} ${new Date().getFullYear()}</p>
             </div>
-            
             <div class="preview-content">
               <div class="preview-info">
                                  <h3>📋 Report Summary</h3>
@@ -2141,11 +1870,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                    <li><strong>Generated:</strong> ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</li>
                  </ul>
               </div>
-              
               <h3>📖 PDF Preview</h3>
               <embed src="${pdfDataUri}" type="application/pdf" class="pdf-embed" />
             </div>
-            
             <div class="preview-actions">
               <button class="btn btn-primary" onclick="savePDF()">
                 💾 Save PDF
@@ -2158,7 +1885,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               </button>
             </div>
           </div>
-          
           <script>
             function savePDF() {
               const link = document.createElement('a');
@@ -2169,14 +1895,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               document.body.removeChild(link);
               alert('PDF saved successfully as ${filename}');
             }
-            
             function printPDF() {
               const printWindow = window.open('${pdfDataUri}', '_blank');
               printWindow.onload = function() {
                 printWindow.print();
               };
             }
-            
             function closePreview() {
               window.close();
             }
@@ -2184,7 +1908,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         </body>
         </html>
       `);
-      
              previewWindow.document.close();
        console.log('Summary PDF preview window opened');
      } catch (error) {
@@ -2192,7 +1915,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
        alert(`Error exporting Summary PDF: ${error.message}`);
      }
    };
-
   // Show PDF Edit Interface
   const showPdfEditInterface = () => {
     // Update memorandum data with current filters
@@ -2205,18 +1927,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     }));
     setShowPdfEditModal(true);
   };
-
   // Preview PDF Report
   const previewPdfReport = () => {
     setShowPdfPreviewModal(true);
   };
-
   // Export Incidents to PDF (after editing)
   const exportIncidentsToPDF = async () => {
     setIsGeneratingPdf(true);
     try {
       console.log('Starting PDF export...');
-      
       // Filter incidents based on current filters
       const filtered = incidents.filter(incident => {
         // Filter out incidents with "No description available"
@@ -2225,12 +1944,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             incident.description === "No description available") {
           return false;
         }
-        
         // Filter by status if not "all"
         if (filterStatus !== "all" && incident.status !== filterStatus) {
           return false;
         }
-        
         // Filter by month if not "all"
         if (selectedMonth !== "all") {
           const incidentMonth = new Date(incident.date).toLocaleString('en-US', { month: 'long' });
@@ -2238,7 +1955,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             return false;
           }
         }
-        
         // Filter by search term
         if (searchTerm) {
           const searchLower = searchTerm.toLowerCase();
@@ -2249,37 +1965,29 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             incident.municipality?.toLowerCase().includes(searchLower)
           );
         }
-        
         return true;
       });
-      
       console.log('Filtered incidents:', filtered);
-      
       if (!filtered || filtered.length === 0) {
         alert('No incidents found matching the current filters. Please adjust your filters and try again.');
         return;
       }
-      
       // Initialize actual incident types object at the beginning of the function
       let actualIncidentTypes = {};
-      
       // Count actual incident types from the data
       filtered.forEach(incident => {
         const identifiedType = identifyIncidentType(incident.description || incident.incidentType || '');
         actualIncidentTypes[identifiedType] = (actualIncidentTypes[identifiedType] || 0) + 1;
       });
-      
       // Initialize municipality data processing at the beginning of the function
       const municipalityData = {};
       console.log('Processing incidents for municipality data...');
-      
       // Initialize with all municipalities
       const allMunicipalities = [
         'Abucay', 'Orani', 'Samal', 'Hermosa', // 1ST DISTRICT
         'Balanga City', 'Pilar', 'Orion', 'Limay', // 2ND DISTRICT
         'Bagac', 'Dinalupihan', 'Mariveles', 'Morong' // 3RD DISTRICT
       ];
-      
       allMunicipalities.forEach(municipality => {
         municipalityData[municipality] = {
           total: 0,
@@ -2297,13 +2005,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           policeOps: 0
         };
       });
-      
       // Process incidents for municipality data
       filtered.forEach(incident => {
         try {
           // Priority 1: Try to detect municipality from location first (most reliable)
           let municipality = null;
-          
         if (incident.location) {
             const detectedMunicipalities = detectMunicipalitiesFromLocation(incident.location, allMunicipalities);
             if (detectedMunicipalities.length > 0) {
@@ -2311,7 +2017,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               console.log(`Detected municipality from location: ${municipality} for location: "${incident.location}"`);
             }
           }
-          
           // Priority 2: Use municipality field if location detection failed
           if (!municipality) {
             municipality = incident.municipality;
@@ -2319,13 +2024,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               console.log(`Using municipality field: ${municipality}`);
             }
           }
-          
           // Fallback to 'Unknown' if still no municipality
           municipality = municipality || 'Unknown';
           if (municipality === 'Unknown') {
             console.log(`Could not detect municipality for incident:`, incident);
           }
-          
           if (!municipalityData[municipality]) {
             municipalityData[municipality] = {
               total: 0,
@@ -2343,28 +2046,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               policeOps: 0
             };
           }
-          
           municipalityData[municipality].total++;
-          
           // Categorize incident using the identifyIncidentType function
           const description = incident.description || '';
           const incidentType = incident.incidentType || '';
           const location = incident.location || '';
           const combinedText = `${description} ${incidentType} ${location}`.trim();
-          
           const identifiedType = identifyIncidentType(combinedText);
-          
           // Store the identified type in municipality data
           municipalityData[municipality].types[identifiedType] = (municipalityData[municipality].types[identifiedType] || 0) + 1;
-          
         } catch (error) {
           console.error('Error processing incident for municipality data:', error, incident);
         }
       });
-      
       // Initialize report text variable at the beginning of the function
       let reportText = '';
-      
       // Update report text with dynamic content
       if (filtered.length > 0) {
       const municipalitiesWithData = Object.entries(municipalityData).filter(([municipality, data]) => data.total > 0).length;
@@ -2373,26 +2069,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const topIncidentTypes = Object.entries(actualIncidentTypes)
             .sort(([,a], [,b]) => b - a)
         .slice(0, 3);
-      
         reportText = `This report provides a comprehensive analysis of ${filtered.length} incidents recorded in the Province of Bataan for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}. The data has been processed from ${municipalitiesWithData} out of ${totalMunicipalities} municipalities and categorized into ${uniqueIncidentTypes} distinct incident types. `;
-        
         if (topIncidentTypes.length > 0) {
           const topTypesText = topIncidentTypes.map(([type, count]) => `${count} ${type}`).join(', ');
           reportText += `The most common incidents include ${topTypesText}. `;
         }
-        
         reportText += `All entries were reviewed for completeness and accuracy.`;
       } else {
         reportText = `This report provides a comprehensive analysis of ${filtered.length} incidents recorded in the Province of Bataan for ${selectedMonth === "all" ? "the reporting period" : selectedMonth} ${new Date().getFullYear()}. No incidents were recorded during this period. All entries were reviewed for completeness and accuracy.`;
       }
-
       // Initialize sortedMunicipalities at the beginning of the function
       const sortedMunicipalities = Object.entries(municipalityData)
         .sort(([,a], [,b]) => b.total - a.total)
         .map(([municipality, data]) => {
           // Create breakdown text using actual incident types from the data
           const breakdownParts = [];
-          
           // Use the actual incident types stored in data.types
           Object.entries(data.types).forEach(([type, count]) => {
             if (count > 0) {
@@ -2401,16 +2092,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               breakdownParts.push(`${count} ${formattedType}`);
             }
           });
-          
           const breakdown = breakdownParts.join(', ') || 'No incidents recorded';
-        
         return [
           municipality,
             data.total.toString(),
           breakdown
         ];
       });
-      
       // Create PDF with auto-fit settings
       const doc = new jsPDF({
         orientation: 'portrait',
@@ -2424,78 +2112,61 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           right: 15
         }
       });
-      
       // Enhanced auto-fit helper function to check page overflow and add new pages
       const checkPageOverflow = (yPosition, requiredSpace = 10) => {
         const pageHeight = doc.internal.pageSize.height;
         const bottomMargin = 20; // Adequate bottom margin for page numbers
         const availableSpace = pageHeight - bottomMargin;
-        
         if (yPosition + requiredSpace > availableSpace) {
           doc.addPage();
           return 20; // Reset to top of new page with proper margin
         }
         return yPosition;
       };
-      
       // Enhanced auto-fit text function that handles overflow with minimal spacing
       const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 5) => {
         if (!text || text.trim() === '') {
           return y + lineSpacing;
         }
-        
         doc.setFontSize(fontSize);
         const lines = doc.splitTextToSize(text.trim(), maxWidth);
         let currentY = y;
-        
         lines.forEach((line, index) => {
           currentY = checkPageOverflow(currentY, lineSpacing);
           doc.text(line, x, currentY);
           currentY += lineSpacing;
         });
-        
         return currentY;
       };
-      
       // Enhanced section header function with minimal spacing
       const addSectionHeader = (text, yPosition, fontSize = 14) => {
         const newY = checkPageOverflow(yPosition, 15);
-        
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
         doc.text(text, leftMargin, newY);
-        
         // Add underline for section header
         doc.setLineWidth(0.2);
         doc.line(leftMargin, newY + 1, doc.internal.pageSize.width - leftMargin, newY + 1);
-        
         return newY + 8; // Return position after header with minimal spacing
       };
-      
       // Enhanced bullet list function with minimal spacing
       const addBulletList = (items, yPosition, fontSize = 10, indent = 15) => {
         let currentY = yPosition;
-        
         items.forEach((item, index) => {
           currentY = checkPageOverflow(currentY, 6);
-          
           // Bullet point
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'bold');
           doc.text('•', leftMargin, currentY);
-          
           // Item text
           const itemText = typeof item === 'string' ? item : `${item.title}: ${item.content}`;
           const textX = leftMargin + indent;
           const textWidth = doc.internal.pageSize.width - leftMargin * 2 - indent;
-          
           currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 5);
           currentY += 2; // Minimal gap between items
         });
-        
         return currentY;
       };
-      
       // Initialize autoTable plugin
       if (typeof autoTable === 'function') {
         autoTable(doc, {
@@ -2507,23 +2178,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.error('autoTable is not a function:', typeof autoTable);
         throw new Error('PDF table plugin not available');
       }
-      
       // Set default line height
       const lineHeight = 7;
-      
       // Page 1: MEMORANDUM Header and Overview - Enhanced Auto-fit format
       const leftMargin = 25; // Increased left margin for better spacing
       const contentMargin = 45; // Increased content margin
       const maxContentWidth = doc.internal.pageSize.width - leftMargin * 2;
-      
       // MEMORANDUM title - bold, uppercase, left-aligned with minimal spacing
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('MEMORANDUM', leftMargin, 20);
-      
       // Memorandum details with minimal spacing
       let yPos = 30; // Reduced starting position
-      
       // FOR line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
@@ -2533,7 +2199,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.setFont('helvetica', 'normal');
       yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
       yPos += 5; // Minimal spacing between fields
-      
       // FROM line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
@@ -2542,7 +2207,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.setFont('helvetica', 'normal');
       yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
       yPos += 5;
-      
       // DATE line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
@@ -2551,7 +2215,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.setFont('helvetica', 'normal');
       yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
       yPos += 5;
-      
       // SUBJECT line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
@@ -2560,48 +2223,38 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.setFont('helvetica', 'normal');
       yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
       yPos += 8; // Minimal spacing before custom notes
-      
       // Add custom notes if provided
       if (pdfReportData.customNotes && pdfReportData.customNotes.trim()) {
         yPos = checkPageOverflow(yPos, 10);
         yPos = addAutoFitText(pdfReportData.customNotes, leftMargin, yPos, maxContentWidth, 11, 5);
         yPos += 5; // Minimal spacing after custom notes
       }
-      
       // Section 1: Data Cleaning & Categorization
       if (pdfReportData.includeSections.dataCleaning) {
         yPos = addSectionHeader('1. Data Cleaning & Categorization', yPos + 5);
-        
         doc.setFontSize(11);
         doc.setFont('helvetica', 'normal');
-      
         // Main content - Dynamic based on actual data
         yPos = addAutoFitText(reportText, leftMargin, yPos, maxContentWidth, 11, 5);
-      
         // Incident categorization based on actual data
         yPos += 8;
         yPos = checkPageOverflow(yPos, 15);
         doc.setFont('helvetica', 'bold');
         doc.text('The incidents are categorized as follows:', leftMargin, yPos);
-      
         // Show actual incident types found in the data
         yPos += 6;
         const subIndent = leftMargin + 15;
-      
       if (Object.keys(actualIncidentTypes).length > 0) {
         // Categorize into Index and Non-Index crimes
         const indexCrimes = ['Murder', 'Homicide', 'Physical Injury', 'Rape', 'Robbery', 'Theft', 'Carnapping'];
         const nonIndexCrimes = ['Drug-related', 'Traffic Accident', 'Traffic Violation', 'Suicide', 'Illegal Firearms', 'Police Operation'];
-        
         // Index Crimes
       doc.setFont('helvetica', 'bold');
         doc.text('• Index Crimes:', leftMargin, yPos);
         yPos += lineHeight;
-        
         const indexCrimeTypes = Object.entries(actualIncidentTypes)
           .filter(([type]) => indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
           .sort(([,a], [,b]) => b - a);
-        
         if (indexCrimeTypes.length > 0) {
           indexCrimeTypes.forEach(([type, count]) => {
             yPos = checkPageOverflow(yPos, 8);
@@ -2614,19 +2267,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const noIndexText = `  - No index crimes recorded`;
           yPos = addAutoFitText(noIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
         }
-        
         yPos += 5; // Minimal spacing between categories
         yPos = checkPageOverflow(yPos, 10);
-        
         // Non-Index Crimes & Other Incidents
         doc.setFont('helvetica', 'bold');
         doc.text('• Non-Index Crimes & Other Incidents:', leftMargin, yPos);
         yPos += 5;
-        
         const nonIndexCrimeTypes = Object.entries(actualIncidentTypes)
           .filter(([type]) => nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
           .sort(([,a], [,b]) => b - a);
-        
         if (nonIndexCrimeTypes.length > 0) {
           nonIndexCrimeTypes.forEach(([type, count]) => {
             yPos = checkPageOverflow(yPos, 8);
@@ -2639,20 +2288,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const noNonIndexText = `  - No non-index crimes recorded`;
           yPos = addAutoFitText(noNonIndexText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 5);
         }
-        
         // Other incidents not categorized
         const otherTypes = Object.entries(actualIncidentTypes)
           .filter(([type]) => !indexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())) && 
                                !nonIndexCrimes.some(crime => type.toLowerCase().includes(crime.toLowerCase())))
           .sort(([,a], [,b]) => b - a);
-        
         if (otherTypes.length > 0) {
           yPos += 5; // Minimal spacing
           yPos = checkPageOverflow(yPos, 10);
           doc.setFont('helvetica', 'bold');
           doc.text('• Other Incidents:', leftMargin, yPos);
           yPos += 5;
-          
           otherTypes.forEach(([type, count]) => {
             yPos = checkPageOverflow(yPos, 8);
             const text = `  - ${type}: ${count} incident${count !== 1 ? 's' : ''}`;
@@ -2665,41 +2311,31 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         yPos = addAutoFitText(noIncidentsText, subIndent, yPos, doc.internal.pageSize.width - subIndent - leftMargin, 10, 6);
       }
       } // End of Section 1 conditional
-
       // Section 2: Summary Generation
       if (pdfReportData.includeSections.summaryGeneration) {
         yPos = addSectionHeader('2. Summary Generation', yPos + 5);
-
       // Create table headers
       const headers = [['Municipality/City', 'Total Incidents', 'Breakdown']];
-      
       // Now generate dynamic content for Data Cleaning section
       const municipalitiesWithData = Object.entries(municipalityData).filter(([municipality, data]) => data.total > 0).length;
       const totalMunicipalities = allMunicipalities.length;
-      
       // Use the reportText and sortedMunicipalities already defined at the beginning of the function
-
       // Debug: Log all municipalities and their data
       console.log('All municipalities data:', municipalityData);
       console.log('Sorted municipalities for table:', sortedMunicipalities);
       console.log('Total municipalities in table:', sortedMunicipalities.length);
-      
       // Debug: Show sample incidents to understand the data structure
       console.log('Sample incidents for debugging:', filtered.slice(0, 3));
       console.log('Total incidents being processed:', filtered.length);
-      
       // Generate and display dynamic summary content
       const generateDynamicSummary = () => {
         const summary = [];
-        
         // A. Crime Distribution by Municipality/City
         const municipalitiesWithIncidents = Object.entries(municipalityData).filter(([municipality, data]) => data.total > 0);
         const totalIncidents = filtered.length;
-        
         if (municipalitiesWithIncidents.length > 0) {
           const topMunicipality = municipalitiesWithIncidents[0];
           const percentage = totalIncidents > 0 ? ((topMunicipality[1].total / totalIncidents) * 100).toFixed(1) : 0;
-          
           summary.push({
             title: 'A. Crime Distribution by Municipality/City:',
             content: [
@@ -2717,10 +2353,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             ]
           });
         }
-        
         return summary;
       };
-      
       // Display dynamic summary
       const dynamicSummary = generateDynamicSummary();
       dynamicSummary.forEach((section, index) => {
@@ -2730,22 +2364,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         doc.text(section.title, leftMargin, yPos);
         doc.setFont('helvetica', 'normal');
         yPos += 8;
-        
         section.content.forEach(content => {
            yPos = addAutoFitText(content, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 11, 5);
            yPos += 3; // Small gap between content items
         });
-        
          yPos += 8; // Minimal spacing between sections
       });
-      
              // Add table with enhanced spacing and overflow protection
       console.log('Generating table with data:', { headers, sortedMunicipalities });
       try {
         // Check if we have enough space for the table
         const estimatedTableHeight = (sortedMunicipalities.length + 1) * 12; // Rough estimate
         yPos = checkPageOverflow(yPos, estimatedTableHeight);
-        
         let finalY = yPos;
         autoTable(doc, {
           head: headers,
@@ -2787,34 +2417,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             doc.text(`Page ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
           }
         });
-        
         // Update yPos to after table with minimal spacing
         yPos = finalY + 8; // Minimal spacing after table
       } catch (tableError) {
         console.error('Error generating table:', tableError);
         throw new Error('Failed to generate incident table: ' + tableError.message);
       }
-
             // B. Crime Hotspots and High-Risk Areas
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
       doc.text('B. Crime Hotspots and High-Risk Areas:', leftMargin, yPos);
       yPos += 5;
-
       // Generate dynamic crime hotspots content
       const generateDynamicHotspots = () => {
         const hotspots = [];
-        
         if (sortedMunicipalities.length > 0) {
           const topMunicipality = sortedMunicipalities[0];
           const percentage = filtered.length > 0 ? ((parseInt(topMunicipality[1]) / filtered.length) * 100).toFixed(1) : 0;
-          
           // Municipal Hotspot
           hotspots.push({
             title: 'Municipal Hotspot:',
             content: `${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing approximately ${percentage}% of the total for the province.`
           });
-          
           // City Hotspot
           const cityData = sortedMunicipalities.find(([municipality]) => municipality.toLowerCase().includes('city'));
           if (cityData && cityData[0] !== topMunicipality[0]) {
@@ -2823,7 +2447,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               content: `${cityData[0]} follows with ${cityData[1]} incidents.`
             });
           }
-          
           // Highway Concerns - only if there are traffic incidents
           const trafficIncidents = actualIncidentTypes['Traffic Accident'] || actualIncidentTypes['Traffic Violation'] || 0;
           if (trafficIncidents > 0) {
@@ -2837,7 +2460,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               ]
             });
           }
-          
           // Barangay Hotspots - only if there are multiple municipalities with incidents
           if (sortedMunicipalities.length > 1) {
             const topMunicipalities = sortedMunicipalities.slice(0, 3);
@@ -2855,29 +2477,23 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: 'No incidents were recorded during this period, therefore no crime hotspots were identified.'
           });
         }
-        
         return hotspots;
       };
-      
       // Display dynamic hotspots
       const dynamicHotspots = generateDynamicHotspots();
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-
       dynamicHotspots.forEach((hotspot, index) => {
         // Check for page overflow before each hotspot
         yPos = checkPageOverflow(yPos, 20);
-        
         // Add page break before Barangay Hotspots if it's a long section
         if (hotspot.title === 'Barangay Hotspots:' && yPos > doc.internal.pageSize.height * 0.7) {
           doc.addPage();
           yPos = 25; // Account for header
         }
-        
         const text = `${hotspot.title} ${hotspot.content}`;
         yPos = addAutoFitText(text, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 10, 5);
         yPos += 3;
-        
         if (hotspot.subItems) {
           hotspot.subItems.forEach(item => {
             yPos = addAutoFitText(`• ${item}`, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
@@ -2887,34 +2503,27 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
       });
       } // End of Section 2 conditional
-      
       // Add new page for Trend & Pattern Analysis (Page 3)
       doc.addPage();
       yPos = 25; // Start with proper margin accounting for header
-
       // 3. Trend & Pattern Analysis
       if (pdfReportData.includeSections.trendAnalysis) {
         yPos = addSectionHeader('3. Trend & Pattern Analysis', yPos);
-
       // Generate dynamic trend analysis
       const generateDynamicTrendAnalysis = (incidentTypes) => {
         const trends = [];
-        
         // Dominant Crime Type
         const topIncidentTypes = Object.entries(incidentTypes)
           .sort(([,a], [,b]) => b - a)
           .slice(0, 2);
-        
         if (topIncidentTypes.length > 0) {
           const totalIncidents = filtered.length;
           const topType = topIncidentTypes[0];
-          
           if (topIncidentTypes.length >= 2) {
             // If we have at least 2 incident types
             const secondType = topIncidentTypes[1];
           const topPercentage = totalIncidents > 0 ? ((topType[1] / totalIncidents) * 100).toFixed(1) : 0;
           const secondPercentage = totalIncidents > 0 ? ((secondType[1] / totalIncidents) * 100).toFixed(1) : 0;
-          
           trends.push({
             title: 'Dominant Crime Type:',
             content: `${topType[0]} and ${secondType[0]} are the most prevalent issues, with ${topType[1]} and ${secondType[1]} incidents respectively. Together, they account for ${(parseFloat(topPercentage) + parseFloat(secondPercentage)).toFixed(1)}% of all recorded events.`
@@ -2922,38 +2531,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           } else {
             // If we only have 1 incident type
             const topPercentage = totalIncidents > 0 ? ((topType[1] / totalIncidents) * 100).toFixed(1) : 0;
-            
             trends.push({
               title: 'Dominant Crime Type:',
               content: `${topType[0]} is the most prevalent issue, with ${topType[1]} incidents recorded, accounting for ${topPercentage}% of all recorded events.`
             });
           }
         }
-        
         // Time of Day Analysis - analyze actual incident times if available
         const timeAnalysis = [];
         const morningIncidents = filtered.filter(incident => {
           const time = incident.time || '';
           return time.includes('AM') || (time.includes(':') && parseInt(time.split(':')[0]) < 12);
         }).length;
-        
         const afternoonIncidents = filtered.filter(incident => {
           const time = incident.time || '';
           return time.includes('PM') && !time.includes('12') || (time.includes(':') && parseInt(time.split(':')[0]) >= 12 && parseInt(time.split(':')[0]) < 18);
         }).length;
-        
         const eveningIncidents = filtered.filter(incident => {
           const time = incident.time || '';
           return time.includes('PM') && time.includes('12') || (time.includes(':') && parseInt(time.split(':')[0]) >= 18);
         }).length;
-        
         if (morningIncidents > 0 || afternoonIncidents > 0 || eveningIncidents > 0) {
           const peakTime = Math.max(morningIncidents, afternoonIncidents, eveningIncidents);
           let peakPeriod = '';
           if (peakTime === morningIncidents) peakPeriod = 'Morning (6:00 AM - 11:59 AM)';
           else if (peakTime === afternoonIncidents) peakPeriod = 'Afternoon (12:00 PM - 5:59 PM)';
           else peakPeriod = 'Evening/Late Night (6:00 PM - 11:59 PM)';
-          
           trends.push({
             title: 'Time of Day Analysis:',
             content: `${peakPeriod} shows the highest frequency with ${peakTime} incidents.`,
@@ -2964,7 +2567,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             ]
           });
         }
-        
         // Modus Operandi - based on actual incident types
         const modusOperandi = [];
         if (incidentTypes['Theft'] > 0) {
@@ -2976,7 +2578,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         if (incidentTypes['Traffic Accident'] > 0) {
           modusOperandi.push(`Traffic Incidents: ${incidentTypes['Traffic Accident']} vehicular incidents, primarily due to human error.`);
         }
-        
         if (modusOperandi.length > 0) {
           trends.push({
             title: 'Modus Operandi:',
@@ -2984,29 +2585,23 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             subItems: modusOperandi
           });
         }
-        
         return trends;
       };
-      
       // Display dynamic trend analysis
       const dynamicTrends = generateDynamicTrendAnalysis(actualIncidentTypes);
           doc.setFontSize(10);
           doc.setFont('helvetica', 'normal');
-      
       dynamicTrends.forEach((trend, index) => {
         // Check for page overflow before each trend
         yPos = checkPageOverflow(yPos, 15);
-        
         // Add bullet point and bold header
         doc.setFont('helvetica', 'bold');
         doc.text(`• ${trend.title}`, leftMargin, yPos);
         yPos += 5;
-        
         // Add content in normal font with minimal spacing
         doc.setFont('helvetica', 'normal');
         yPos = addAutoFitText(trend.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
         yPos += 5; // Minimal spacing between trends
-        
         if (trend.subItems) {
           trend.subItems.forEach(item => {
             yPos = addAutoFitText(`• ${item}`, leftMargin + 15, yPos, doc.internal.pageSize.width - leftMargin * 2 - 15, 10, 5);
@@ -3016,17 +2611,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
       });
       } // End of Section 3 conditional
-      
       yPos += 8;
-
       // 4. Root Cause & Contributing Factors (Page 3)
       if (pdfReportData.includeSections.rootCauses) {
         yPos = addSectionHeader('4. Root Cause & Contributing Factors', yPos + 5);
-
       // Generate dynamic root cause analysis
       const generateDynamicRootCauses = (incidentTypes) => {
         const rootCauses = [];
-        
         // Socioeconomic Factors - if there are theft, robbery, or drug incidents
         const socioeconomicCrimes = (incidentTypes['Theft'] || 0) + (incidentTypes['Robbery'] || 0) + (incidentTypes['Drug-related'] || 0);
         if (socioeconomicCrimes > 0) {
@@ -3035,7 +2626,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: `Analysis of ${socioeconomicCrimes} incidents (Theft, Robbery, Drug Offenses) suggests potential links between economic factors and criminal activities.`
           });
         }
-        
         // Vehicular Incidents
         const trafficIncidents = (incidentTypes['Traffic Accident'] || 0) + (incidentTypes['Traffic Violation'] || 0);
         if (trafficIncidents > 0) {
@@ -3044,7 +2634,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: `${trafficIncidents} traffic-related incidents were recorded, with human error being the primary contributing factor.`
           });
         }
-        
         // Mental Health - if there are suicide incidents
         if (incidentTypes['Suicide'] > 0) {
           rootCauses.push({
@@ -3052,7 +2641,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: `${incidentTypes['Suicide']} suicide incidents were recorded, highlighting underlying public health issues requiring multi-agency response.`
           });
         }
-        
         // Firearms Control - if there are illegal firearms incidents
         if (incidentTypes['Illegal Firearms'] > 0) {
           rootCauses.push({
@@ -3060,7 +2648,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: `${incidentTypes['Illegal Firearms']} incidents involving illegal firearms were recorded, primarily linked to drug trade operations.`
           });
         }
-        
         // General patterns
         if (filtered.length > 0) {
           rootCauses.push({
@@ -3068,61 +2655,48 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             content: `Analysis of ${filtered.length} total incidents reveals patterns in contributing factors across different incident types.`
           });
         }
-        
         return rootCauses;
       };
-      
       // Display dynamic root causes
       const dynamicRootCauses = generateDynamicRootCauses(actualIncidentTypes);
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
       dynamicRootCauses.forEach((cause, index) => {
         // Check for page overflow before each cause
         yPos = checkPageOverflow(yPos, 15);
-        
         // Add bullet point and bold header
         doc.setFont('helvetica', 'bold');
         doc.text(`• ${cause.title}`, leftMargin, yPos);
         yPos += 5;
-        
         // Add content in normal font with minimal spacing
         doc.setFont('helvetica', 'normal');
         yPos = addAutoFitText(cause.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
         yPos += 5; // Minimal spacing between causes
       });
       } // End of Section 4 conditional
-      
       yPos += 15;
-
       // 5. Actionable Recommendations (Page 3)
       if (pdfReportData.includeSections.recommendations) {
         yPos = addSectionHeader('5. Actionable Recommendations', yPos + 5);
-
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-
       // Generate dynamic recommendations based on actual data
       const generateDynamicRecommendations = () => {
         const recommendations = [];
-        
         // Get top municipalities with incidents
         const topMunicipalities = Object.entries(municipalityData)
           .filter(([municipality, data]) => data.total > 0)
           .sort(([,a], [,b]) => b.total - a.total)
           .slice(0, 3);
-        
         // Get incident type analysis
         const incidentTypeCounts = {};
         filtered.forEach(incident => {
           const type = identifyIncidentType(incident.description || incident.incidentType || '');
           incidentTypeCounts[type] = (incidentTypeCounts[type] || 0) + 1;
         });
-        
         const topIncidentTypes = Object.entries(incidentTypeCounts)
           .sort(([,a], [,b]) => b - a)
           .slice(0, 3);
-        
         // Enhanced Police Visibility and Patrols
         if (topMunicipalities.length > 0) {
           const municipalityNames = topMunicipalities.map(([name]) => name).join(', ');
@@ -3135,13 +2709,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             ]
           });
         }
-        
         // Targeted Law Enforcement Operations
         if (topIncidentTypes.length > 0) {
           const drugRelated = incidentTypeCounts['Drug-related'] || 0;
           const trafficRelated = (incidentTypeCounts['Traffic Violation'] || 0) + (incidentTypeCounts['Traffic Accident'] || 0);
           const theftRelated = incidentTypeCounts['Theft'] || 0;
-          
           const operations = [];
           if (drugRelated > 0) {
             operations.push(`Continue proactive anti-drug operations in areas with ${drugRelated} drug-related incidents`);
@@ -3152,7 +2724,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           if (theftRelated > 0) {
             operations.push(`Strengthen anti-theft measures with ${theftRelated} theft incidents reported`);
           }
-          
           if (operations.length > 0) {
             recommendations.push({
               title: 'Targeted Law Enforcement Operations:',
@@ -3160,11 +2731,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             });
           }
         }
-        
         // Technology and Infrastructure
         const hasTrafficIncidents = (incidentTypeCounts['Traffic Accident'] || 0) > 0;
         const hasTheftIncidents = (incidentTypeCounts['Theft'] || 0) > 0;
-        
         if (hasTrafficIncidents || hasTheftIncidents) {
           const techRecommendations = [];
           if (hasTrafficIncidents) {
@@ -3173,18 +2742,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           if (hasTheftIncidents) {
             techRecommendations.push('Deploy surveillance cameras in commercial areas and public markets');
           }
-          
           recommendations.push({
             title: 'Technology and Infrastructure:',
             content: techRecommendations.map(rec => `• ${rec}.`)
           });
         }
-        
         // Inter-Agency Collaboration
         const hasDrugIncidents = (incidentTypeCounts['Drug-related'] || 0) > 0;
         const hasSuicideIncidents = (incidentTypeCounts['Suicide'] || 0) > 0;
         const hasTrafficIncidents2 = (incidentTypeCounts['Traffic Accident'] || 0) > 0;
-        
         const collaborations = [];
         if (hasDrugIncidents) {
           collaborations.push('LGU/DSWD: Address socioeconomic factors linked to drug-related incidents');
@@ -3195,27 +2761,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         if (hasTrafficIncidents2) {
           collaborations.push('LTO/DPWH: Conduct road safety engineering interventions in high-incident areas');
         }
-        
         if (collaborations.length > 0) {
           recommendations.push({
             title: 'Inter-Agency Collaboration:',
             content: collaborations.map(collab => `• ${collab}.`)
           });
         }
-        
         return recommendations;
       };
-      
       // Generate and display dynamic recommendations
       const dynamicRecommendations = generateDynamicRecommendations();
-      
       if (dynamicRecommendations.length > 0) {
         dynamicRecommendations.forEach((recommendation, index) => {
           // Add section title
           doc.setFont('helvetica', 'bold');
           doc.text(recommendation.title, leftMargin, yPos);
           yPos += 7;
-          
           // Add content
           doc.setFont('helvetica', 'normal');
           recommendation.content.forEach(content => {
@@ -3223,9 +2784,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             doc.text(lines, leftMargin + 10, yPos);
             yPos += lines.length * 5;
           });
-          
           yPos += 10; // Add space between sections
-          
           // Add page break after "Enhanced Police Visibility and Patrols" to move remaining sections to page 4
           if (recommendation.title === 'Enhanced Police Visibility and Patrols:') {
             doc.addPage();
@@ -3242,123 +2801,94 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         yPos += 15;
       }
       } // End of Section 5 conditional
-
-      // 6. Risk Forecasting (Page 4)
+      // Insert Risk Forecasting immediately after Recommendations
       if (pdfReportData.includeSections.riskForecasting) {
-        // 6. Risk Forecasting
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('6. Risk Forecasting', leftMargin, yPos);
-        yPos += 15;
-
-      // Generate dynamic risk forecasting
-
-
-      // Section 4: Root Cause Analysis
-      if (pdfReportData.includeSections.rootCauseAnalysis) {
-        yPos += 10;
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.text('4. Root Cause Analysis', leftMargin, yPos);
-        
-        // Add underline for section header
-        doc.setLineWidth(0.2);
-        doc.line(leftMargin, yPos + 1, doc.internal.pageSize.width - leftMargin, yPos + 1);
-        yPos += 15;
-
-        // Display dynamic root cause analysis
-        const dynamicCauses = generateDynamicRootCauses(actualIncidentTypes);
+        // Start new page if near bottom
+        yPos = checkPageOverflow(yPos, 40);
+        yPos = addSectionHeader('6. Risk Forecasting', yPos + 5);
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        
-        dynamicCauses.forEach((cause, index) => {
-          // Add bullet point and bold header
-          doc.setFont('helvetica', 'bold');
-          doc.text(`• ${cause.title}`, leftMargin, yPos);
-          yPos += 7;
-          
-          // Add content in normal font
-          doc.setFont('helvetica', 'normal');
-          const lines = doc.splitTextToSize(cause.content, doc.internal.pageSize.width - leftMargin * 2);
-          doc.text(lines, leftMargin + 10, yPos);
-          yPos += lines.length * 5 + 5;
-        });
-      } // End of Section 4 conditional
-
-      // Section 5: Recommendations
-      if (pdfReportData.includeSections.recommendations) {
-        yPos = addSectionHeader('5. Recommendations', yPos + 10);
-
-        // Display dynamic recommendations
-        const dynamicRecommendations = generateDynamicRecommendations();
-
-          // Specific recommendations based on incident types
-          if (Object.keys(actualIncidentTypes).length > 0) {
-            const topType = Object.entries(actualIncidentTypes).sort(([,a], [,b]) => b - a)[0];
-            if (topType) {
-              recommendations.push({
-                title: `Focus on ${topType[0]}:`,
-                content: `Develop targeted strategies to address the most common incident type (${topType[0]}) with ${topType[1]} recorded cases.`
-              });
-            }
+        const generateRiskForecasting = () => {
+          const items = [];
+          // 1) Municipality risk outlook based on recent counts
+          const muniEntries = Object.entries(municipalityData)
+            .filter(([, data]) => (data.total || 0) > 0)
+            .sort(([, a], [, b]) => (b.total || 0) - (a.total || 0))
+            .slice(0, 3);
+          if (muniEntries.length > 0) {
+            const list = muniEntries.map(([name, data]) => `${name} (${data.total})`).join(', ');
+            items.push({
+              title: 'High-Risk Municipalities (Next 30 Days):',
+              content: `Based on recent incident density, the following areas may require proactive attention: ${list}.`
+            });
           }
-
-          return recommendations;
+          // 2) Incident type risk outlook
+          const typeEntries = Object.entries(actualIncidentTypes)
+            .sort(([, a], [, b]) => b - a)
+            .slice(0, 3);
+          if (typeEntries.length > 0) {
+            const list = typeEntries.map(([type, count]) => `${type} (${count})`).join(', ');
+            items.push({
+              title: 'Likely Incident Types:',
+              content: `The following incident types are likely to remain elevated given recent patterns: ${list}.`
+            });
+          }
+          // 3) Temporal risk window
+          const morning = filtered.filter(i => (i.time || '').toLowerCase().includes('am')).length;
+          const night = filtered.filter(i => (i.time || '').toLowerCase().includes('pm')).length;
+          if (morning + night > 0) {
+            const peak = morning >= night ? 'morning hours (6:00 AM - 12:00 NN)' : 'evening hours (6:00 PM - 12:00 MN)';
+            items.push({
+              title: 'Peak Risk Window:',
+              content: `Historical data suggests higher occurrence during ${peak}. Schedule patrols accordingly.`
+            });
+          }
+          // 4) Seasonality hint (if selectedMonth == all)
+          if (selectedMonth === 'all') {
+            items.push({
+              title: 'Seasonality Considerations:',
+              content: 'Expect fluctuations around holidays, weekends, and local events; plan surge deployments and checkpoint operations.'
+            });
+          }
+          if (items.length === 0) {
+            items.push({ title: 'Risk Outlook:', content: 'No sufficient signals for forecasting. Maintain baseline operations.' });
+          }
+          return items;
         };
-
-        // Display dynamic recommendations
-        const dynamicRecommendations = generateDynamicRecommendations();
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        dynamicRecommendations.forEach((recommendation, index) => {
-          // Add bullet point and bold header
+        const riskItems = generateRiskForecasting();
+        riskItems.forEach((rf) => {
+          yPos = checkPageOverflow(yPos, 15);
           doc.setFont('helvetica', 'bold');
-          doc.text(`• ${recommendation.title}`, leftMargin, yPos);
-          yPos += 8;
-          
-          // Add content in normal font with better spacing
+          doc.text(`• ${rf.title}`, leftMargin, yPos);
+          yPos += 6;
           doc.setFont('helvetica', 'normal');
-          yPos = addAutoFitText(recommendation.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 6);
-          yPos += 8; // Increased spacing between recommendations
+          yPos = addAutoFitText(rf.content, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
+          yPos += 6;
         });
-      } // End of Section 5 conditional
-
-
-
-
-
+      }
       // Add page numbers and headers to all pages
       const totalPages = doc.internal.getNumberOfPages();
       for (let i = 1; i <= totalPages; i++) {
         doc.setPage(i);
-        
         // Add page number at bottom
         doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         doc.text(`Page ${i} of ${totalPages}`, doc.internal.pageSize.width - 25, doc.internal.pageSize.height - 15, { align: 'right' });
-        
-
       }
-
       // Generate filename and save
       const filename = `Crime_Analysis_Report_${selectedMonth === "all" ? "All_Months" : selectedMonth}_${new Date().getFullYear()}.pdf`;
-      
       try {
         doc.save(filename);
         console.log('PDF generated successfully:', filename);
-        
         // Show success message
         const successMessage = `PDF Report generated successfully!\n\nFilename: ${filename}\nTotal Pages: ${totalPages}\nSections Included: ${Object.keys(pdfReportData.includeSections).filter(key => pdfReportData.includeSections[key]).length}\nTotal Incidents: ${filtered.length}`;
         alert(successMessage);
-        
       } catch (saveError) {
         console.error('Error saving PDF:', saveError);
         alert('Error saving PDF file. Please check your browser settings and try again.');
       }
     } catch (error) {
       console.error('Error generating PDF:', error);
-      
       // More detailed error handling
       let errorMessage = 'Error generating PDF report. ';
       if (error.message.includes('autoTable')) {
@@ -3370,13 +2900,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       } else {
         errorMessage += 'Please try again or contact support if the problem persists.';
       }
-      
       alert(errorMessage);
     } finally {
       setIsGeneratingPdf(false);
     }
   }; // End of exportIncidentsToPDF function
-
   // Generate summary insights
   const generateSummaryInsights = (filteredData = incidents) => {
     // Function to assign district based on municipality
@@ -3397,7 +2925,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       return districtMap[municipality] || 'UNKNOWN';
     };
-
     const totalIncidents = filteredData.length;
     const completedIncidents = filteredData.filter(incident => 
       incident.status === 'Completed' || 
@@ -3413,11 +2940,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       incident.status === 'UNDER INVESTIGATION' ||
       incident.status === 'Under investigation'
     ).length;
-    
     const drugsIncidents = filteredData.filter(incident => 
       incident.incidentType === 'Drug-related'
     ).length;
-    
     const othersIncidents = filteredData.filter(incident => 
       incident.incidentType !== 'Drug-related' && 
       incident.incidentType !== 'Theft' && 
@@ -3436,7 +2961,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       incident.incidentType !== 'Emergency Response' && 
       incident.incidentType !== 'Other'
     ).length;
-    
     const accidentsIncidents = filteredData.filter(incident => 
       incident.incidentType === 'Traffic Accident' || 
       incident.incidentType === 'Work Accident' || 
@@ -3445,7 +2969,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       incident.description?.toLowerCase().includes('crash') ||
       incident.description?.toLowerCase().includes('collision')
     ).length;
-    
     const trafficAccidents = filteredData.filter(incident => 
       incident.incidentType === 'Traffic Accident' || 
       incident.incidentType === 'Traffic Violation' ||
@@ -3455,7 +2978,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         incident.description?.toLowerCase().includes('collision')
       )
     ).length;
-    
     const workAccidents = filteredData.filter(incident => 
       incident.incidentType === 'Work Accident' ||
       incident.description?.toLowerCase().includes('work') && (
@@ -3464,7 +2986,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         incident.description?.toLowerCase().includes('fall')
       )
     ).length;
-    
     const otherAccidents = filteredData.filter(incident => 
       (incident.incidentType === 'Accident' || 
        incident.description?.toLowerCase().includes('accident')) &&
@@ -3473,7 +2994,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         incident.description?.toLowerCase().includes('traffic') ||
         incident.description?.toLowerCase().includes('work'))
     ).length;
-    
     // Incident type analysis
     const incidentTypeCounts = {};
     filteredData.forEach(incident => {
@@ -3481,14 +3001,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     });
     const mostCommonType = Object.keys(incidentTypeCounts).reduce((a, b) => 
       incidentTypeCounts[a] > incidentTypeCounts[b] ? a : b, 'None');
-    
     // District analysis for 3 districts - count based on detected municipalities
     const districtCounts = {
       '1ST DISTRICT': 0,
       '2ND DISTRICT': 0,
       '3RD DISTRICT': 0
     };
-    
     // Count incidents by detected municipalities
     filteredData.forEach(incident => {
       const detectedMunicipalities = detectMunicipalitiesFromLocation(incident.location, [
@@ -3496,7 +3014,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         'Balanga City', 'Pilar', 'Orion', 'Limay', // 2ND DISTRICT
         'Bagac', 'Dinalupihan', 'Mariveles', 'Morong' // 3RD DISTRICT
       ]);
-      
       detectedMunicipalities.forEach(municipality => {
         const district = assignDistrictByMunicipality(municipality);
         if (district !== 'UNKNOWN') {
@@ -3504,9 +3021,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
       });
     });
-    
-
-
     // Debug: Log detection results for each incident
     console.log('=== MUNICIPALITY DETECTION DEBUG ===');
     filteredData.forEach((incident, index) => {
@@ -3515,7 +3029,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         'Balanga City', 'Pilar', 'Orion', 'Limay', // 2ND DISTRICT
         'Bagac', 'Dinalupihan', 'Mariveles', 'Morong' // 3RD DISTRICT
       ]);
-      
       console.log(`Incident ${index + 1}:`, {
         location: incident.location,
         detectedMunicipalities: detectedMunicipalities,
@@ -3523,7 +3036,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
     });
     console.log('=== END DEBUG ===');
-
     // Ensure all 3 districts are represented with detected municipalities from locations
     const threeDistricts = {
       '1ST DISTRICT': {
@@ -3548,12 +3060,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
       }
     };
-
-
-    
     const mostActiveDistrict = Object.keys(districtCounts).reduce((a, b) => 
       districtCounts[a] > districtCounts[b] ? a : b, 'None');
-    
     // Location analysis
     const locationCounts = {};
     const municipalityCounts = {};
@@ -3567,23 +3075,19 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         municipalityCounts[incident.municipality] = (municipalityCounts[incident.municipality] || 0) + 1;
       }
     });
-    
     // Get top locations and municipalities
     const topLocations = Object.entries(locationCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 5)
       .map(([location, count]) => ({ location, count }));
-    
     const topMunicipalities = Object.entries(municipalityCounts)
       .sort(([,a], [,b]) => b - a)
       .slice(0, 5)
       .map(([municipality, count]) => ({ municipality, count }));
-    
     // Monthly trend - improved detection
     const monthlyCounts = {};
     filteredData.forEach(incident => {
       let month = '';
-      
       // Handle different date formats
       if (incident.date) {
         try {
@@ -3600,7 +3104,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               'jan', 'feb', 'mar', 'apr', 'may', 'jun',
               'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
             ];
-            
             for (let i = 0; i < monthNames.length; i++) {
               if (dateStr.includes(monthNames[i])) {
                 month = new Date(2024, i % 12, 1).toLocaleString('default', { month: 'long' });
@@ -3612,18 +3115,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           console.log('Date parsing error for incident:', incident.date);
         }
       }
-      
       if (month) {
         monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
       }
     });
-    
     const highestMonth = Object.keys(monthlyCounts).reduce((a, b) => 
       monthlyCounts[a] > monthlyCounts[b] ? a : b, 'None');
-    
     // Resolution rate
     const completionRate = totalIncidents > 0 ? ((completedIncidents / totalIncidents) * 100).toFixed(1) : 0;
-    
     return {
       totalIncidents,
               completedIncidents,
@@ -3638,7 +3137,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       mostCommonType,
       mostActiveDistrict,
       highestMonth,
-      resolutionRate,
+      completionRate,
       incidentTypeCounts,
       districtCounts,
       threeDistricts,
@@ -3649,21 +3148,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       municipalityCounts
     };
   };
-
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <section className="flex-1 p-6 space-y-6">
+      <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6"> 
+      <div className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
-            <h1 className={`text-3xl font-bold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
               Incidents Reports
             </h1>
-            <p className={`text-lg transition-colors duration-300 ${
-              isDarkMode ? 'text-gray-400' : 'text-gray-600'
-            }`}>
+            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
               Manage and track incident reports with Excel/CSV import support
             </p>
             <div className="flex items-center gap-2 mt-2">
@@ -3673,11 +3168,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 firestoreStatus === 'saving' ? 'bg-blue-500' :
                 'bg-red-500'
               }`}></div>
-              <span className={`text-sm font-medium ${
-                firestoreStatus === 'connected' ? 'text-green-600 dark:text-green-400' :
-                firestoreStatus === 'connecting' ? 'text-yellow-600 dark:text-yellow-400' :
-                firestoreStatus === 'saving' ? 'text-blue-600 dark:text-blue-400' :
-                'text-red-600 dark:text-red-400'
+              <span className={`text-xs md:text-sm font-medium ${
+                firestoreStatus === 'connected' ? 'text-green-600' :
+                firestoreStatus === 'connecting' ? 'text-yellow-600' :
+                firestoreStatus === 'saving' ? 'text-blue-600' :
+                'text-red-600'
               }`}>
                 {firestoreStatus === 'connected' ? 'Connected to Firestore' :
                  firestoreStatus === 'connecting' ? 'Connecting...' :
@@ -3686,40 +3181,37 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               </span>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               onClick={handleImportExcel}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Import Excel/CSV"
               disabled={loading}
             >
-              <Upload className="w-5 h-5" />
+              <Upload className="w-4 h-4 md:w-5 md:h-5" />
+              <span className="hidden sm:inline ml-2">Import</span>
             </Button>
             <Button
               onClick={loadIncidents}
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
               title="Refresh Data"
             >
-              <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
+              <span className="hidden sm:inline ml-2">Refresh</span>
             </Button>
             <div className="relative">
-              <Button
+            <Button
                 onClick={() => setShowCleanupDropdown(!showCleanupDropdown)}
                 disabled={loading || cleanupLoading}
-                className="bg-orange-600 hover:bg-orange-700 text-white"
+              className="bg-orange-600 hover:bg-orange-700 text-white"
                 title="Cleanup Options"
-              >
-                <Trash2 className="w-5 h-5" />
-              </Button>
-              
+            >
+              <Trash2 className="w-5 h-5" />
+            </Button>
               {/* Cleanup Dropdown Menu */}
               {showCleanupDropdown && (
-                <div className={`absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 ${
-                  isDarkMode 
-                    ? 'bg-gray-800 border-gray-600' 
-                    : 'bg-white border-gray-200'
-                }`}>
+                <div className="absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 bg-white border-gray-200">
                   <div className="py-1">
                     <button
                       onClick={() => {
@@ -3727,11 +3219,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         setShowCleanupDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
-                        isDarkMode 
-                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
                     >
                       🔍 Identify Duplicates
                     </button>
@@ -3741,11 +3229,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         setShowCleanupDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
-                        isDarkMode 
-                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
                     >
                       🧹 Clean Duplicates
                     </button>
@@ -3755,11 +3239,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         setShowCleanupDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
-                        isDarkMode 
-                          ? 'text-gray-300 hover:bg-gray-700 hover:text-white' 
-                          : 'text-gray-700 hover:bg-gray-100'
-                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
                     >
                       📅 Clear Current Month
                     </button>
@@ -3771,11 +3251,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         }
                       }}
                       disabled={cleanupLoading}
-                      className={`w-full text-left px-4 py-2 text-sm transition-colors duration-300 ${
-                        isDarkMode 
-                          ? 'text-red-400 hover:bg-gray-700 hover:text-red-300' 
-                          : 'text-red-600 hover:bg-gray-100 hover:text-red-700'
-                      } ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-red-600 hover:bg-gray-100 hover:text-red-700 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
                     >
                       🗑️ Clear All Data
                     </button>
@@ -3799,16 +3275,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             >
               <BarChart3 className="w-5 h-5" />
             </Button>
-
             <Button
-              onClick={showPdfEditInterface}
+                              onClick={showPdfEditInterface}
               className="bg-blue-600 hover:bg-blue-700 text-white"
               title="Export to PDF"
             >
               <Printer className="w-5 h-5" />
             </Button>
-            
-
             <input
               id="incidents-file-input"
               name="incidents-file-input"
@@ -3818,20 +3291,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               accept=".csv,.xlsx,.xls"
               className="hidden"
             />
-
           </div>
         </div>
-
         {/* Loading Indicator */}
         {loading && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            isDarkMode ? 'bg-blue-900/20 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
-          }`}>
+          <div className="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
             <div className="flex items-center gap-3">
               <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className={`text-sm font-medium transition-colors duration-300 ${
-                isDarkMode ? 'text-blue-300' : 'text-blue-700'
-              }`}>
+              <span className="text-sm font-medium transition-colors duration-300 ${
+                text-blue-700
+              }">
                 {firestoreStatus === 'saving' ? 'Saving to database...' : 
                  firestoreStatus === 'connecting' ? 'Loading from database...' : 
                  'Processing...'}
@@ -3839,31 +3308,30 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </div>
         )}
-
         {/* Connection Error Display */}
         {connectionError && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            isDarkMode ? 'bg-red-900/20 border border-red-600/30' : 'bg-red-50 border border-red-200'
-          }`}>
+          <div className="mb-4 p-4 rounded-lg ${
+            bg-red-50 border border-red-200
+          }">
             <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                isDarkMode ? 'bg-red-600/30' : 'bg-red-100'
-              }`}>
-                <AlertTriangle className={`w-4 h-4 ${
-                  isDarkMode ? 'text-red-400' : 'text-red-600'
-                }`} />
+              <div className="w-6 h-6 rounded-full flex items-center justify-center ${
+                bg-red-100
+              }">
+                <AlertTriangle className="w-4 h-4 ${
+                  text-red-600
+                }" />
               </div>
               <div className="flex-1">
-                <span className={`text-sm font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-red-300' : 'text-red-700'
-                }`}>
+                <span className="text-sm font-medium transition-colors duration-300 ${
+                  text-red-700
+                }">
                   {connectionError}
                 </span>
                 {!isOnline && (
                   <div className="mt-1">
-                    <span className={`text-xs transition-colors duration-300 ${
-                      isDarkMode ? 'text-red-400' : 'text-red-600'
-                    }`}>
+                    <span className="text-xs transition-colors duration-300 ${
+                      text-red-600
+                    }">
                       📡 You are currently offline
                     </span>
                   </div>
@@ -3874,9 +3342,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 disabled={loading}
                 size="sm"
                 variant="outline"
-                className={`h-8 px-3 text-xs ${
-                  isDarkMode ? 'border-red-600 text-red-400 hover:bg-red-600/20' : 'border-red-500 text-red-600 hover:bg-red-50'
-                }`}
+                className="h-8 px-3 text-xs ${
+                  border-red-500 text-red-600 hover:bg-red-50
+                }"
               >
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Retry
@@ -3884,173 +3352,160 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </div>
         )}
-
         {/* Connection Status Indicator */}
         {!isOnline && !connectionError && (
-          <div className={`mb-4 p-4 rounded-lg ${
-            isDarkMode ? 'bg-yellow-900/20 border border-yellow-600/30' : 'bg-yellow-50 border border-yellow-200'
-          }`}>
+          <div className="mb-4 p-4 rounded-lg ${
+            bg-yellow-50 border border-yellow-200
+          }">
             <div className="flex items-center gap-3">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                isDarkMode ? 'bg-yellow-600/30' : 'bg-yellow-100'
-              }`}>
-                <AlertTriangle className={`w-4 h-4 ${
-                  isDarkMode ? 'text-yellow-400' : 'text-yellow-600'
-                }`} />
+              <div className="w-6 h-6 rounded-full flex items-center justify-center ${
+                bg-yellow-100
+              }">
+                <AlertTriangle className="w-4 h-4 ${
+                  text-yellow-600
+                }" />
               </div>
-              <span className={`text-sm font-medium transition-colors duration-300 ${
-                isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
-              }`}>
+              <span className="text-sm font-medium transition-colors duration-300 ${
+                text-yellow-700
+              }">
                 📡 You are currently offline. Some features may not work properly.
               </span>
             </div>
           </div>
         )}
-
         {/* Stats Cards */}
         {selectedMonth !== "all" && (
-          <div className={`mb-4 p-3 rounded-lg ${
-            isDarkMode ? 'bg-blue-900/20 border border-blue-600/30' : 'bg-blue-50 border border-blue-200'
-          }`}>
+          <div className="mb-4 p-3 rounded-lg ${
+            bg-blue-50 border border-blue-200
+          }">
             <div className="flex items-center gap-2">
               <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className={`text-sm font-medium transition-colors duration-300 ${
-                isDarkMode ? 'text-blue-300' : 'text-blue-700'
-              }`}>
+              <span className="text-sm font-medium transition-colors duration-300 ${
+                text-blue-700
+              }">
                 Showing data for: <strong>{selectedMonth}</strong>
               </span>
             </div>
           </div>
         )}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            bg-white/80
+          }">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Total Incidents</p>
+                  <p className="text-sm font-medium transition-colors duration-300 ${
+                    text-gray-500
+                  }">Total Incidents</p>
                   <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</p>
                 </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-blue-900/30' : 'bg-blue-100'
-                }`}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  bg-blue-100
+                }">
                   <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            bg-white/80
+          }">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Action Taken</p>
+                  <p className="text-sm font-medium transition-colors duration-300 ${
+                    text-gray-500
+                  }">Action Taken</p>
                   <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.actionTaken}</p>
                 </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-yellow-900/30' : 'bg-yellow-100'
-                }`}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  bg-yellow-100
+                }">
                   <CheckCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            bg-white/80
+          }">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Drugs</p>
+                  <p className="text-sm font-medium transition-colors duration-300 ${
+                    text-gray-500
+                  }">Drugs</p>
                   <p className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.drugs}</p>
                 </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-red-900/30' : 'bg-red-100'
-                }`}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  bg-red-100
+                }">
                   <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            bg-white/80
+          }">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Others</p>
+                  <p className="text-sm font-medium transition-colors duration-300 ${
+                    text-gray-500
+                  }">Others</p>
                   <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{stats.others}</p>
                 </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-gray-700/30' : 'bg-gray-200'
-                }`}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                  bg-gray-200
+                }">
                   <MoreHorizontal className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className={`backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-          }`}>
+          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
+            bg-white/80
+          }">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className={`text-sm font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                  }`}>Accidents</p>
+                  <p className="text-sm font-medium transition-colors duration-300 ${
+                    text-gray-500
+                  }">Accidents</p>
                   <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.accidents}</p>
                   <div className="mt-2 space-y-1">
                     <div className="flex justify-between text-xs">
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Traffic:</span>
+                      <span className="text-gray-600">Traffic:</span>
                       <span className="font-medium text-orange-600 dark:text-orange-400">{stats.trafficAccidents}</span>
-                    </div>
+        </div>
                     <div className="flex justify-between text-xs">
-                      <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other</span>
+                      <span className="text-gray-600">Other</span>
                       <span className="font-medium text-orange-600 dark:text-orange-400">{stats.otherAccidents}</span>
                     </div>
                   </div>
                 </div>
-                <div className={`h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  isDarkMode ? 'bg-orange-900/30' : 'bg-orange-100'
-                }`}>
+                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
                   <Car className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
-
         {/* Filters and Search */}
-        <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-          isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-        }`}>
+        <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
           <CardHeader>
-            <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
               Filters & Search
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div>
-                <Label htmlFor="search" className={`transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <Label htmlFor="search" className="transition-colors duration-300 ${
+                  text-gray-700
+                }">
                   Search
                 </Label>
                 <Input
@@ -4058,24 +3513,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   placeholder="Search incidents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`mt-1 transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
+                  className="mt-1 transition-colors duration-300 ${
+                    bg-white border-gray-300
+                  }"
                 />
               </div>
               <div>
-                <Label htmlFor="month-filter" className={`transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <Label htmlFor="month-filter" className="transition-colors duration-300 ${
+                  text-gray-700
+                }">
                   Month
                 </Label>
                 <select
                   id="month-filter"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className={`mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
+                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
+                    bg-white border-gray-300
+                  }"
                 >
                   <option value="all">All Months</option>
                   {availableMonths.map((month) => (
@@ -4086,26 +3541,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </select>
               </div>
               <div>
-                <Label htmlFor="status-filter" className={`transition-colors duration-300 ${
-                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                }`}>
+                <Label htmlFor="status-filter" className="transition-colors duration-300 ${
+                  text-gray-700
+                }">
                   Status
                 </Label>
                 <select
                   id="status-filter"
                   value={filterStatus}
                   onChange={(e) => setFilterStatus(e.target.value)}
-                  className={`mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
+                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
+                    bg-white border-gray-300
+                  }"
                 >
                   <option value="all">All Status</option>
                                   <option value="Active">Active</option>
-                <option value="Under Investigation">Under Investigation</option>
+                  <option value="Under Investigation">Under Investigation</option>
                 <option value="Completed">Completed</option>
                 </select>
               </div>
-
               <div className="flex items-end">
                 <Button
                   onClick={() => {
@@ -4119,19 +3573,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   Clear Filters
                 </Button>
               </div>
-
             </div>
           </CardContent>
         </Card>
-
         {/* Incidents Table */}
-        <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-          isDarkMode ? 'bg-gray-900/80' : 'bg-white/80'
-        }`}>
+        <Card className="backdrop-blur-sm border-0 shadow-lg ${
+          bg-white/80
+        }">
           <CardHeader>
-            <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-              isDarkMode ? 'text-white' : 'text-gray-900'
-            }`}>
+            <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
+              text-gray-900
+            }">
               Incidents List ({filteredIncidents.length} incidents)
             </CardTitle>
           </CardHeader>
@@ -4139,42 +3591,42 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className={`border-b transition-colors duration-300 ${
-                    isDarkMode ? 'border-gray-700' : 'border-gray-200'
-                  }`}>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Type</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>What</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>When</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Location</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Who</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Why</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Action Taken</th>
-                    <th className={`text-left p-3 font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Actions</th>
+                  <tr className="border-b transition-colors duration-300 ${
+                    border-gray-200
+                  }">
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Type</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">What</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">When</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Location</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Who</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Why</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Action Taken</th>
+                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredIncidents.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center">
-                        <div className={`text-lg transition-colors duration-300 ${
-                          isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`}>
+                        <div className="text-lg transition-colors duration-300 ${
+                          text-gray-500
+                        }">
                           {incidents.length === 0 ? (
                             <div>
                               <p className="mb-2">No incidents found.</p>
@@ -4191,63 +3643,51 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     </tr>
                   ) : (
                     filteredIncidents.map((incident, index) => (
-                    <tr key={`${incident.id}-${index}`} className={`border-b transition-colors duration-300 ${
-                      isDarkMode ? 'border-gray-700 hover:bg-gray-800/50' : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
+                      <tr key={index} className="border-b transition-colors duration-300 border-gray-200 hover:bg-gray-50">
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 text-gray-900">
                             {incident.incidentType}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 text-gray-900">
                             {incident.description || '-'}
                           </p>
-
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 text-gray-900">
                             {incident.date}
                           </p>
-
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 ${
+                            text-gray-900
+                          }">
                             {incident.location}
                           </p>
-
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 ${
+                            text-gray-900
+                          }">
                             {incident.officer}
                           </p>
-
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className={`transition-colors duration-300 ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>
+                          <p className="transition-colors duration-300 ${
+                            text-gray-900
+                          }">
                             {incident.why}
                           </p>
                         </div>
@@ -4255,15 +3695,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                                               <td className="p-3">
                           <div>
                             {incident.actionType ? (
-                              <p className={`transition-colors duration-300 ${
-                                isDarkMode ? 'text-white' : 'text-gray-900'
-                              }`}>
+                              <p className="transition-colors duration-300 ${
+                                text-gray-900
+                              }">
                                 {incident.actionType}
                               </p>
                             ) : (
-                              <p className={`transition-colors duration-300 ${
-                                isDarkMode ? 'text-white' : 'text-gray-900'
-                              }`}>
+                              <p className="transition-colors duration-300 ${
+                                text-gray-900
+                              }">
                                 No Action
                               </p>
                             )}
@@ -4324,91 +3764,79 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </CardContent>
         </Card>
-      </section>
-
+      </div>
       {/* Add Incident Modal */}
       {showAddModal && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
           {/* Completely transparent backdrop */}
           <div className="absolute inset-0"></div>
-          
           {/* Modal Container */}
-          <div className={`relative rounded-3xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden border ${
-            isDarkMode 
-              ? 'bg-gray-900 border-gray-700' 
-              : 'bg-white border-gray-200'
-          }`}>
-            
+          <div className="relative rounded-3xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden border ${
+            bg-white border-gray-200
+          }">
             {/* Header with solid background */}
-            <div className={`relative p-6 border-b ${
-              isDarkMode 
-                ? 'bg-gray-800 border-gray-700' 
-                : 'bg-gray-50 border-gray-200'
-            }`}>
+            <div className="relative p-6 border-b ${
+              bg-gray-50 border-gray-200
+            }">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-xl ${
-                  isDarkMode ? 'bg-blue-600/20' : 'bg-blue-100'
-                }`}>
-                  <FileText className={`h-6 w-6 ${
-                    isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                  }`} />
+                <div className="p-2 rounded-xl ${
+                  bg-blue-100
+                }">
+                  <FileText className="h-6 w-6 ${
+                    text-blue-600
+                  }" />
                 </div>
-                <h3 className={`text-2xl font-bold transition-colors duration-300 ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>
+                <h3 className="text-2xl font-bold transition-colors duration-300 ${
+                text-gray-900
+              }">
                   Add New Action Report
               </h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className={`absolute top-4 right-4 p-2 rounded-xl transition-all duration-300 hover:scale-110 ${
-                  isDarkMode 
-                    ? 'text-gray-400 hover:text-white hover:bg-gray-800/50' 
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                }`}
+                className="absolute top-4 right-4 p-2 rounded-xl transition-all duration-300 hover:scale-110 ${
+                  text-gray-500 hover:text-gray-700 hover:bg-gray-100
+                }"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
-            
                         {/* Content with improved spacing and styling */}
             <div className="p-8 overflow-y-auto max-h-[75vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="incidentType" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="incidentType" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Department *
                   </Label>
                   <select
                     id="incidentType"
                     value={newIncident.incidentType}
                     onChange={(e) => handleIncidentTypeChange(e.target.value)}
-                    className={`mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   >
                     <option value="">Select Incident Type</option>
                     {incidentTypes.map((type, index) => (
-                      <option key={`${type}-${index}`} value={type}>
+                      <option key={index} value={type}>
                         {type}
                       </option>
                     ))}
                   </select>
                   {newIncident.incidentType && newIncident.incidentType.startsWith("Other (") && (
-                    <p className={`mt-1 text-xs transition-colors duration-300 ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`}>
+                    <p className="mt-1 text-xs transition-colors duration-300 ${
+                      text-blue-600
+                    }">
                       ✅ Formatted as: {newIncident.incidentType}
                     </p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="date" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="date" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     When *
                   </Label>
                   <Input
@@ -4417,28 +3845,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={newIncident.date}
                     onChange={(e) => setNewIncident({...newIncident, date: e.target.value})}
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="district" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="district" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     District *
                   </Label>
                   <select
                     id="district"
                     value={newIncident.district}
                     onChange={(e) => handleDistrictChange(e.target.value)}
-                    className={`mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   >
                     {districts.map((district) => (
                       <option key={district} value={district}>
@@ -4448,20 +3872,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="municipality" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="municipality" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Municipality *
                   </Label>
                   <select
                     id="municipality"
                     value={newIncident.municipality}
                     onChange={(e) => setNewIncident({...newIncident, municipality: e.target.value})}
-                    className={`mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   >
                     {municipalitiesByDistrict[newIncident.district]?.map((municipality) => (
                       <option key={municipality} value={municipality}>
@@ -4471,9 +3893,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="location" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="location" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Where *
                   </Label>
                   <Input
@@ -4481,17 +3903,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.location}
                     onChange={(e) => setNewIncident({...newIncident, location: e.target.value})}
                     placeholder="Location of the incident..."
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="officer" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="officer" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Who *
                   </Label>
                   <Input
@@ -4499,17 +3919,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.officer}
                     onChange={(e) => setNewIncident({...newIncident, officer: e.target.value})}
                     placeholder="Personnel involved..."
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="why" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="why" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Why
                   </Label>
                   <Input
@@ -4517,17 +3935,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.why}
                     onChange={(e) => setNewIncident({...newIncident, why: e.target.value})}
                     placeholder="Reason for the action..."
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="what" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="what" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     What *
                   </Label>
                   <Input
@@ -4535,17 +3951,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.description}
                     onChange={(e) => handleDescriptionChange(e.target.value)}
                     placeholder="Describe what happened..."
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="actionType" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="actionType" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Action Taken *
                   </Label>
                   <div className="grid grid-cols-1 gap-3 mt-2">
@@ -4553,11 +3967,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       id="actionType"
                       value={newIncident.actionType}
                       onChange={(e) => setNewIncident({...newIncident, actionType: e.target.value})}
-                      className={`w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        isDarkMode 
-                          ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                      }`}
+                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                      }"
                     >
                       <option value="">Select Action</option>
                       {actionTypes.map((type) => (
@@ -4566,38 +3978,30 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         </option>
                       ))}
                     </select>
-                    
                     <Input
                       placeholder="Assigned Officer"
                       value={newIncident.assignedOfficer}
                       onChange={(e) => setNewIncident({...newIncident, assignedOfficer: e.target.value})}
-                      className={`p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        isDarkMode 
-                          ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                      }`}
+                      className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                      }"
                     />
-                    
                     <div className="grid grid-cols-2 gap-3">
                       <Input
                         type="date"
                         placeholder="Action Date"
                         value={newIncident.actionDate}
                         onChange={(e) => setNewIncident({...newIncident, actionDate: e.target.value})}
-                        className={`p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          isDarkMode 
-                            ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                            : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                        }`}
+                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                        }"
                       />
                       <select
                         value={newIncident.priority}
                         onChange={(e) => setNewIncident({...newIncident, priority: e.target.value})}
-                        className={`p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          isDarkMode 
-                            ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                            : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                        }`}
+                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                          bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                        }"
                       >
                         {priorityLevels.map((level) => (
                           <option key={level} value={level}>
@@ -4606,24 +4010,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         ))}
                       </select>
                     </div>
-                    
                     <textarea
                       placeholder="Action Description"
                       value={newIncident.actionDescription}
                       onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
                       rows={2}
-                      className={`w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                        isDarkMode 
-                          ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                          : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                      }`}
+                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                      }"
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="how" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="how" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     How
                   </Label>
                   <Input
@@ -4631,17 +4032,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.actionDescription}
                     onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
                     placeholder="Method or procedure used..."
-                    className={`mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="otherInfo" className={`text-sm font-semibold transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="otherInfo" className="text-sm font-semibold transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Other Information
                   </Label>
                   <textarea
@@ -4650,28 +4049,23 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     onChange={(e) => setNewIncident({...newIncident, followUpNotes: e.target.value})}
                     placeholder="Additional details and notes..."
                     rows={4}
-                    className={`mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                      isDarkMode 
-                        ? 'bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 hover:border-gray-500' 
-                        : 'bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400'
-                    }`}
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
+                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
+                    }"
                   />
                 </div>
               </div>
             </div>
-            
             {/* Footer with solid background */}
-            <div className={`flex justify-end gap-4 p-6 border-t ${
-              isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-            }`}>
+            <div className="flex justify-end gap-4 p-6 border-t ${
+              border-gray-200 bg-gray-50
+            }">
               <Button
                 variant="outline"
                 onClick={() => setShowAddModal(false)}
-                className={`px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 ${
-                  isDarkMode 
-                    ? 'border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white' 
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 ${
+                  border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900
+                }"
               >
                 Cancel
               </Button>
@@ -4686,26 +4080,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         </div>
       )}
-
       {/* View Incident Modal */}
       {showViewModal && viewingIncident && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
-              <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>
+          <div className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
+            bg-white
+          }">
+            <div className="flex items-center justify-between p-6 border-b ${
+              border-gray-200
+            }">
+              <h3 className="text-xl font-bold transition-colors duration-300 ${
+                text-gray-900
+              }">
                 View Incident Details
               </h3>
               <button
                 onClick={() => setShowViewModal(false)}
-                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  text-gray-500 hover:text-gray-700
+                }"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -4713,98 +4106,97 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="p-6 overflow-y-auto max-h-[70vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     What
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.incidentType}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     When
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
-                    {viewingIncident.date} {viewingIncident.time && `at ${viewingIncident.time}`}
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Location
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.location}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     District
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.district}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Municipality
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.municipality}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Who
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.officer}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Why
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.why || 'Not specified'}
                   </p>
                 </div>
                 <div>
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Action Taken
                   </Label>
-                  <div className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <div className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <span className="font-medium">Type:</span>
@@ -4848,22 +4240,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </div>
                 </div>
                 <div className="md:col-span-2">
-                  <Label className={`font-medium transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label className="font-medium transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     How
                   </Label>
-                  <p className={`mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-gray-50 border-gray-200 text-gray-900'
-                  }`}>
+                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
+                    bg-gray-50 border-gray-200 text-gray-900
+                  }">
                     {viewingIncident.description || 'No description provided'}
                   </p>
                 </div>
                 {viewingIncident.link && (
                   <div className="md:col-span-2">
-                    <Label className={`font-medium transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>
+                    <Label className="font-medium transition-colors duration-300 ${
+                      text-gray-700
+                    }">
                       Link
                     </Label>
                     <Button
@@ -4877,9 +4269,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 )}
               </div>
             </div>
-            <div className={`flex justify-end gap-3 p-6 border-t ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex justify-end gap-3 p-6 border-t ${
+              border-gray-200
+            }">
               <Button
                 variant="outline"
                 onClick={() => setShowViewModal(false)}
@@ -4890,26 +4282,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         </div>
       )}
-
       {/* Edit Incident Modal */}
       {showEditModal && editingIncident && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
-              <h3 className={`text-xl font-bold transition-colors duration-300 ${
-                isDarkMode ? 'text-white' : 'text-gray-900'
-              }`}>
+          <div className="rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden ${
+            bg-white
+          }">
+            <div className="flex items-center justify-between p-6 border-b ${
+              border-gray-200
+            }">
+              <h3 className="text-xl font-bold transition-colors duration-300 ${
+                text-gray-900
+              }">
                 Edit Incident
               </h3>
               <button
                 onClick={() => setShowEditModal(false)}
-                className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                }`}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                  text-gray-500 hover:text-gray-700
+                }"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -4917,31 +4308,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="p-6 overflow-y-auto max-h-[70vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-incidentType" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-incident-type" className="transition-colors duration-300 text-gray-700">
                     Type
                   </Label>
                   <select
-                    id="edit-incidentType"
+                    id="edit-incident-type"
                     value={editingIncident.incidentType}
                     onChange={(e) => setEditingIncident({...editingIncident, incidentType: e.target.value})}
-                    className={`mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
                   >
                     <option value="">Select Incident Type</option>
                     {incidentTypes.map((type, index) => (
-                      <option key={`edit-${type}-${index}`} value={type}>
+                      <option key={index} value={type}>
                         {type}
                       </option>
                     ))}
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="edit-date" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-date" className="transition-colors duration-300 text-gray-700">
                     When
                   </Label>
                   <Input
@@ -4950,24 +4335,18 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={editingIncident.date || ''}
                     onChange={(e) => setEditingIncident({...editingIncident, date: e.target.value})}
-                    className={`mt-1 transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="edit-district" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-district" className="transition-colors duration-300 text-gray-700">
                     District
                   </Label>
                   <select
                     id="edit-district"
                     value={editingIncident.district}
                     onChange={(e) => handleEditDistrictChange(e.target.value)}
-                    className={`mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
                   >
                     {districts.map((district) => (
                       <option key={district} value={district}>
@@ -4977,18 +4356,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="edit-municipality" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-municipality" className="transition-colors duration-300 text-gray-700">
                     Municipality
                   </Label>
                   <select
                     id="edit-municipality"
                     value={editingIncident.municipality}
                     onChange={(e) => setEditingIncident({...editingIncident, municipality: e.target.value})}
-                    className={`mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
                   >
                     {municipalitiesByDistrict[editingIncident.district]?.map((municipality) => (
                       <option key={municipality} value={municipality}>
@@ -4998,9 +4373,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </select>
                 </div>
                 <div>
-                  <Label htmlFor="edit-location" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-location" className="transition-colors duration-300 text-gray-700">
                     Location
                   </Label>
                   <Input
@@ -5008,15 +4381,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={editingIncident.location}
                     onChange={(e) => setEditingIncident({...editingIncident, location: e.target.value})}
                     placeholder="Enter specific location"
-                    className={`mt-1 transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="edit-officer" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-officer" className="transition-colors duration-300 text-gray-700">
                     Who
                   </Label>
                   <Input
@@ -5024,15 +4393,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={editingIncident.officer}
                     onChange={(e) => setEditingIncident({...editingIncident, officer: e.target.value})}
                     placeholder="Enter officer/accused details"
-                    className={`mt-1 transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="edit-why" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-why" className="transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Why
                   </Label>
                   <Input
@@ -5040,15 +4407,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={editingIncident.why}
                     onChange={(e) => setEditingIncident({...editingIncident, why: e.target.value})}
                     placeholder="Enter reason (optional)"
-                    className={`mt-1 transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 transition-colors duration-300 ${
+                      bg-white border-gray-300
+                    }"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="edit-status" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-status" className="transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Action Taken
                   </Label>
                   <div className="grid grid-cols-1 gap-3 mt-1">
@@ -5056,9 +4423,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       id="edit-actionType"
                       value={editingIncident.actionType}
                       onChange={(e) => setEditingIncident({...editingIncident, actionType: e.target.value})}
-                      className={`w-full p-2 rounded-md border transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="w-full p-2 rounded-md border transition-colors duration-300 ${
+                        bg-white border-gray-300
+                      }"
                     >
                       <option value="">Select Action Type</option>
                       {actionTypes.map((type) => (
@@ -5067,32 +4434,30 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         </option>
                       ))}
                     </select>
-                    
                     <Input
                       placeholder="Assigned Officer"
                       value={editingIncident.assignedOfficer}
                       onChange={(e) => setEditingIncident({...editingIncident, assignedOfficer: e.target.value})}
-                      className={`transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="transition-colors duration-300 ${
+                        bg-white border-gray-300
+                      }"
                     />
-                    
                     <div className="grid grid-cols-2 gap-2">
                       <Input
                         type="date"
                         placeholder="Action Date"
                         value={editingIncident.actionDate}
                         onChange={(e) => setEditingIncident({...editingIncident, actionDate: e.target.value})}
-                        className={`transition-colors duration-300 ${
-                          isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                        }`}
+                        className="transition-colors duration-300 ${
+                          bg-white border-gray-300
+                        }"
                       />
                       <select
                         value={editingIncident.priority}
                         onChange={(e) => setEditingIncident({...editingIncident, priority: e.target.value})}
-                        className={`p-2 rounded-md border transition-colors duration-300 ${
-                          isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                        }`}
+                        className="p-2 rounded-md border transition-colors duration-300 ${
+                          bg-white border-gray-300
+                        }"
                       >
                         {priorityLevels.map((level) => (
                           <option key={level} value={level}>
@@ -5101,22 +4466,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         ))}
                       </select>
                     </div>
-                    
                     <textarea
                       placeholder="Action Description"
                       value={editingIncident.actionDescription}
                       onChange={(e) => setEditingIncident({...editingIncident, actionDescription: e.target.value})}
                       rows={2}
-                      className={`w-full p-2 rounded-md border transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="w-full p-2 rounded-md border transition-colors duration-300 ${
+                        bg-white border-gray-300
+                      }"
                     />
                   </div>
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="edit-description" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-description" className="transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     How
                   </Label>
                   <textarea
@@ -5125,15 +4489,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     onChange={(e) => setEditingIncident({...editingIncident, description: e.target.value})}
                     placeholder="Enter detailed description"
                     rows={4}
-                    className={`mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
+                      bg-white border-gray-300
+                    }"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="edit-link" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-link" className="transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Link (Optional)
                   </Label>
                   <Input
@@ -5141,15 +4505,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={editingIncident.link}
                     onChange={(e) => setEditingIncident({...editingIncident, link: e.target.value})}
                     placeholder="Enter URL link"
-                    className={`mt-1 transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 transition-colors duration-300 ${
+                      bg-white border-gray-300
+                    }"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="edit-followUpNotes" className={`transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                  }`}>
+                  <Label htmlFor="edit-followUpNotes" className="transition-colors duration-300 ${
+                    text-gray-700
+                  }">
                     Follow-up Notes (Optional)
                   </Label>
                   <textarea
@@ -5158,16 +4522,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     onChange={(e) => setEditingIncident({...editingIncident, followUpNotes: e.target.value})}
                     placeholder="Enter any follow-up notes or additional information"
                     rows={3}
-                    className={`mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
-                      isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                    }`}
+                    className="mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
+                      bg-white border-gray-300
+                    }"
                   />
                 </div>
               </div>
             </div>
-            <div className={`flex justify-end gap-3 p-6 border-t ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex justify-end gap-3 p-6 border-t ${
+              border-gray-200
+            }">
               <Button
                 variant="outline"
                 onClick={() => setShowEditModal(false)}
@@ -5184,33 +4548,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         </div>
       )}
-
       {/* Summary Insights Modal */}
       {showSummaryModal && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className={`rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`flex items-center justify-between p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+          <div className="rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden bg-white">
+            <div className="flex items-center justify-between p-6 border-b ${
+              border-gray-200
+            }">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg transition-all duration-300 ${
-                  isDarkMode ? 'bg-blue-600/20 border border-blue-500/30' : 'bg-blue-100 border border-blue-200'
-                }`}>
-                  <BarChart3 className={`w-6 h-6 transition-colors duration-300 ${
-                    isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                  }`} />
+              <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
+                <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className={`text-2xl font-bold transition-colors duration-300 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>
+                <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
                     Summary Insights
                   </h3>
-                  <p className={`text-sm transition-colors duration-300 ${
-                    isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                  }`}>Comprehensive analysis of incident data</p>
+                <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -5218,11 +4571,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   onClick={() => {
                     const insights = generateSummaryInsights();
                     alert(`Detection Test Results:
-                    
 1ST DISTRICT: ${insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
 2ND DISTRICT: ${insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
 3RD DISTRICT: ${insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
-
 Check browser console for detailed debug information.`);
                   }}
                   className="bg-yellow-600 hover:bg-yellow-700 text-white"
@@ -5239,9 +4590,9 @@ Check browser console for detailed debug information.`);
                 </Button>
                 <button
                   onClick={() => setShowSummaryModal(false)}
-                  className={`p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    isDarkMode ? 'text-gray-400 hover:text-white' : 'text-gray-500 hover:text-gray-700'
-                  }`}
+                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
+                    text-gray-500 hover:text-gray-700
+                  }"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -5254,279 +4605,271 @@ Check browser console for detailed debug information.`);
                   <div className="space-y-8">
                     {/* Overview Section */}
                     <div 
-                      className={`p-6 rounded-xl border-2 ${enhancedClasses.hoverLift} ${
-                      isDarkMode ? 'bg-blue-900/20 border-blue-600/30' : 'bg-blue-50 border-blue-200'
-                    }`}>
+                      className="p-6 rounded-xl border-2 ${enhancedClasses.hoverLift} ${
+                      bg-blue-50 border-blue-200
+                    }">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className={`p-2 rounded-lg ${
-                          isDarkMode ? 'bg-blue-600/30' : 'bg-blue-100'
-                        }`}>
+                        <div className="p-2 rounded-lg ${
+                          bg-blue-100
+                        }">
                           <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <h3 className={`text-xl font-bold ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>📊 Data Overview {selectedMonth !== "all" && `(${selectedMonth})`}</h3>
+                        <h3 className="text-xl font-bold ${
+                          text-gray-900
+                        }">📊 Data Overview {selectedMonth !== "all" && `(${selectedMonth})`}</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                        <div className={`p-4 rounded-lg ${enhancedClasses.hoverLift} ${
-                          isDarkMode ? 'bg-blue-800/30' : 'bg-blue-100'
-                        }`}>
+                        <div className="p-4 rounded-lg ${enhancedClasses.hoverLift} ${
+                          bg-blue-100
+                        }">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-blue-600/30' : 'bg-blue-200'
-                            }`}>
+                            <div className="p-2 rounded-full ${
+                              bg-blue-200
+                            }">
                               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-blue-300' : 'text-blue-600'
-                            }`}>Total Incidents</p>
+                            <p className="text-sm font-medium ${
+                              text-blue-600
+                            }">Total Incidents</p>
                           </div>
                           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{insights.totalIncidents}</p>
-                          <p className={`text-xs ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>{selectedMonth === "all" ? "All records in database" : `Records for ${selectedMonth}`}</p>
+                          <p className="text-xs ${
+                            text-gray-600
+                          }"></p>
                         </div>
-                        <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-red-800/30' : 'bg-red-100'
-                        }`}>
+                        <div className="p-4 rounded-lg ${
+                          bg-red-100
+                        }">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-red-600/30' : 'bg-red-200'
-                            }`}>
+                            <div className="p-2 rounded-full ${
+                              bg-red-200
+                            }">
                               <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
                             </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-red-300' : 'text-red-600'
-                            }`}>Drugs</p>
+                            <p className="text-sm font-medium ${
+                              text-red-600
+                            }">Drugs</p>
                           </div>
                           <p className="text-2xl font-bold text-red-600 dark:text-red-400">{insights.drugsIncidents}</p>
-                          <p className={`text-xs ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Drug-related incidents</p>
+                          <p className="text-xs ${
+                            text-gray-600
+                          }">Drug-related incidents</p>
                         </div>
-                        <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-gray-800/30' : 'bg-gray-100'
-                        }`}>
+                        <div className="p-4 rounded-lg ${
+                          bg-gray-100
+                        }">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-gray-600/30' : 'bg-gray-200'
-                            }`}>
+                            <div className="p-2 rounded-full ${
+                              bg-gray-200
+                            }">
                               <MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                             </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`}>Others</p>
+                            <p className="text-sm font-medium ${
+                              text-gray-600
+                            }">Others</p>
                           </div>
                           <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">{insights.othersIncidents}</p>
-                          <p className={`text-xs ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Other incident types</p>
+                          <p className="text-xs ${
+                            text-gray-600
+                          }">Other incident types</p>
                         </div>
-                        <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-orange-800/30' : 'bg-orange-100'
-                        }`}>
+                        <div className="p-4 rounded-lg ${
+                          bg-orange-100
+                        }">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-orange-600/30' : 'bg-orange-200'
-                            }`}>
+                            <div className="p-2 rounded-full ${
+                              bg-orange-200
+                            }">
                               <Car className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                             </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-orange-300' : 'text-orange-600'
-                            }`}>Accidents</p>
+                            <p className="text-sm font-medium ${
+                              text-orange-600
+                            }">Accidents</p>
                           </div>
                           <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{insights.accidentsIncidents}</p>
                           <div className="mt-2 space-y-1">
                             <div className="flex justify-between text-xs">
-                              <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Traffic:</span>
+                              <span className="text-gray-600">Traffic:</span>
                               <span className="font-medium text-orange-600 dark:text-orange-400">{insights.trafficAccidents}</span>
-                            </div>
-                            <div className="flex justify-between text-xs">
-                              <span className={isDarkMode ? 'text-gray-400' : 'text-gray-500'}>Other:</span>
-                              <span className="font-medium text-orange-600 dark:text-orange-400">{insights.otherAccidents}</span>
-                            </div>
-                          </div>
-                          <p className={`text-xs mt-2 ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Accident breakdown</p>
                         </div>
-                        <div className={`p-4 rounded-lg ${
-                          isDarkMode ? 'bg-yellow-800/30' : 'bg-yellow-100'
-                        }`}>
+                            <div className="flex justify-between text-xs">
+                              <span className="text-gray-600">Other:</span>
+                              <span className="font-medium text-orange-600 dark:text-orange-400">{insights.otherAccidents}</span>
+                      </div>
+                    </div>
+                          <p className="text-xs mt-2 text-gray-600">Accident breakdown</p>
+                        </div>
+                        <div className="p-4 rounded-lg bg-yellow-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className={`p-2 rounded-full ${
-                              isDarkMode ? 'bg-yellow-600/30' : 'bg-yellow-200'
-                            }`}>
+                            <div className="p-2 rounded-full ${
+                              bg-yellow-200
+                            }">
                               <CheckCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                             </div>
-                            <p className={`text-sm font-medium ${
-                              isDarkMode ? 'text-yellow-300' : 'text-yellow-600'
-                            }`}>Action Taken</p>
+                            <p className="text-sm font-medium ${
+                              text-yellow-600
+                            }">Action Taken</p>
                           </div>
                           <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{insights.actionTakenIncidents}</p>
-                          <p className={`text-xs ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-600'
-                          }`}>Actions completed</p>
+                          <p className="text-xs ${
+                            text-gray-600
+                          }">Actions completed</p>
                         </div>
                       </div>
                     </div>
-
                     {/* Three Districts Analysis */}
-                    <div className={`p-6 rounded-xl border-2 ${
-                      isDarkMode ? 'bg-green-900/20 border-green-600/30' : 'bg-green-50 border-green-200'
-                    }`}>
+                    <div className="p-6 rounded-xl border-2 ${
+                      bg-green-50 border-green-200
+                    }">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className={`p-2 rounded-lg ${
-                          isDarkMode ? 'bg-green-600/30' : 'bg-green-100'
-                        }`}>
+                        <div className="p-2 rounded-lg ${
+                          bg-green-100
+                        }">
                           <MapPin className="w-6 h-6 text-green-600 dark:text-green-400" />
                         </div>
-                        <h3 className={`text-xl font-bold ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>🗺️ Three Districts Analysis</h3>
+                        <h3 className="text-xl font-bold ${
+                          text-gray-900
+                        }">🗺️ Three Districts Analysis</h3>
                       </div>
-                      
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* 1ST DISTRICT */}
-                        <div className={`p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
-                          isDarkMode ? 'bg-blue-800/30 border-blue-600/30' : 'bg-blue-100 border-blue-200'
-                        }`}>
+                        <div className="p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
+                          bg-blue-100 border-blue-200
+                        }">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                            <h4 className={`font-bold ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>1ST DISTRICT</h4>
+                            <h4 className="font-bold ${
+                              text-gray-900
+                            }">1ST DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                              <p className={`text-sm ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                              }`}>Incidents Detected</p>
+                              <p className="text-sm ${
+                                text-gray-600
+                              }">Incidents Detected</p>
                             </div>
-                            <div className={`p-3 rounded-lg ${
-                              isDarkMode ? 'bg-blue-900/30' : 'bg-blue-50'
-                            }`}>
-                              <p className={`text-sm font-semibold mb-2 ${
-                                isDarkMode ? 'text-blue-300' : 'text-blue-700'
-                              }`}>📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg ${
+                              bg-blue-50
+                            }">
+                              <p className="text-sm font-semibold mb-2 ${
+                                text-blue-700
+                              }">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className={`text-xs px-2 py-1 rounded ${
-                                      isDarkMode ? 'bg-blue-800/50 text-blue-300' : 'bg-blue-200 text-blue-800'
-                                    }`}>
+                                    <div key={index} className="text-xs px-2 py-1 rounded ${
+                                      bg-blue-200 text-blue-800
+                                    }">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className={`text-xs ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                }`}>No municipalities detected</p>
+                                <p className="text-xs ${
+                                  text-gray-500
+                                }">No municipalities detected</p>
                               )}
                             </div>
-                            <div className={`text-xs p-2 rounded ${
-                              isDarkMode ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <div className="text-xs p-2 rounded ${
+                              bg-gray-100 text-gray-600
+                            }">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Abucay, Orani, Samal, Hermosa</p>
                               <p>in location descriptions</p>
                             </div>
                           </div>
                         </div>
-
                         {/* 2ND DISTRICT */}
-                        <div className={`p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
-                          isDarkMode ? 'bg-green-800/30 border-green-600/30' : 'bg-green-100 border-green-200'
-                        }`}>
+                        <div className="p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
+                          bg-green-100 border-green-200
+                        }">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                            <h4 className={`font-bold ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>2ND DISTRICT</h4>
+                            <h4 className="font-bold ${
+                              text-gray-900
+                            }">2ND DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-green-600 dark:text-green-400">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                              <p className={`text-sm ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                              }`}>Incidents Detected</p>
+                              <p className="text-sm ${
+                                text-gray-600
+                              }">Incidents Detected</p>
                             </div>
-                            <div className={`p-3 rounded-lg ${
-                              isDarkMode ? 'bg-green-900/30' : 'bg-green-50'
-                            }`}>
-                              <p className={`text-sm font-semibold mb-2 ${
-                                isDarkMode ? 'text-green-300' : 'text-green-700'
-                              }`}>📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg ${
+                              bg-green-50
+                            }">
+                              <p className="text-sm font-semibold mb-2 ${
+                                text-green-700
+                              }">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className={`text-xs px-2 py-1 rounded ${
-                                      isDarkMode ? 'bg-green-800/50 text-green-300' : 'bg-green-200 text-green-800'
-                                    }`}>
+                                    <div key={index} className="text-xs px-2 py-1 rounded ${
+                                      bg-green-200 text-green-800
+                                    }">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className={`text-xs ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                }`}>No municipalities detected</p>
+                                <p className="text-xs ${
+                                  text-gray-500
+                                }">No municipalities detected</p>
                               )}
                             </div>
-                            <div className={`text-xs p-2 rounded ${
-                              isDarkMode ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <div className="text-xs p-2 rounded ${
+                              bg-gray-100 text-gray-600
+                            }">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Balanga City, Pilar, Orion, Limay</p>
                               <p>in location descriptions</p>
                             </div>
                           </div>
                         </div>
-
                         {/* 3RD DISTRICT */}
-                        <div className={`p-4 rounded-lg border-2 ${
-                          isDarkMode ? 'bg-purple-800/30 border-purple-600/30' : 'bg-purple-100 border-purple-200'
-                        }`}>
+                        <div className="p-4 rounded-lg border-2 ${
+                          bg-purple-100 border-purple-200
+                        }">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-purple-600"></div>
-                            <h4 className={`font-bold ${
-                              isDarkMode ? 'text-white' : 'text-gray-900'
-                            }`}>3RD DISTRICT</h4>
+                            <h4 className="font-bold ${
+                              text-gray-900
+                            }">3RD DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                              <p className={`text-sm ${
-                                isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                              }`}>Incidents Detected</p>
+                              <p className="text-sm ${
+                                text-gray-600
+                              }">Incidents Detected</p>
                             </div>
-                            <div className={`p-3 rounded-lg ${
-                              isDarkMode ? 'bg-purple-900/30' : 'bg-purple-50'
-                            }`}>
-                              <p className={`text-sm font-semibold mb-2 ${
-                                isDarkMode ? 'text-purple-300' : 'text-purple-700'
-                              }`}>📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg ${
+                              bg-purple-50
+                            }">
+                              <p className="text-sm font-semibold mb-2 ${
+                                text-purple-700
+                              }">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className={`text-xs px-2 py-1 rounded ${
-                                      isDarkMode ? 'bg-purple-800/50 text-purple-300' : 'bg-purple-200 text-purple-800'
-                                    }`}>
+                                    <div key={index} className="text-xs px-2 py-1 rounded ${
+                                      bg-purple-200 text-purple-800
+                                    }">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className={`text-xs ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                }`}>No municipalities detected</p>
+                                <p className="text-xs ${
+                                  text-gray-500
+                                }">No municipalities detected</p>
                               )}
                             </div>
-                            <div className={`text-xs p-2 rounded ${
-                              isDarkMode ? 'bg-gray-800/50 text-gray-300' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <div className="text-xs p-2 rounded ${
+                              bg-gray-100 text-gray-600
+                            }">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Bagac, Dinalupihan, Mariveles, Morong</p>
                               <p>in location descriptions</p>
@@ -5534,20 +4877,19 @@ Check browser console for detailed debug information.`);
                           </div>
                         </div>
                       </div>
-
                       {/* Explanation Section */}
-                      <div className={`mt-6 p-4 rounded-lg ${
-                        isDarkMode ? 'bg-gray-800/50 border border-gray-700' : 'bg-gray-50 border border-gray-200'
-                      }`}>
+                      <div className="mt-6 p-4 rounded-lg ${
+                        bg-gray-50 border border-gray-200
+                      }">
                         <div className="flex items-center gap-2 mb-3">
                           <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                          <h4 className={`font-bold ${
-                            isDarkMode ? 'text-white' : 'text-gray-900'
-                          }`}>💡 How Detection Works</h4>
+                          <h4 className="font-bold ${
+                            text-gray-900
+                          }">💡 How Detection Works</h4>
                         </div>
-                        <div className={`text-sm space-y-2 ${
-                          isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                        }`}>
+                        <div className="text-sm space-y-2 ${
+                          text-gray-600
+                        }">
                           <p>• <strong>Location Analysis:</strong> The system reads the "Location" field from each incident</p>
                           <p>• <strong>Municipality Search:</strong> It searches for municipality names within the location text</p>
                           <p>• <strong>District Assignment:</strong> Each municipality is automatically assigned to its correct district</p>
@@ -5556,15 +4898,14 @@ Check browser console for detailed debug information.`);
                         </div>
                       </div>
                     </div>
-
                     {/* Three Districts Overview */}
-                    <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-                      isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'
-                    }`}>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg ${
+                      bg-white/80
+                    }">
                       <CardHeader>
-                        <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>Three Districts Overview</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
+                          text-gray-900
+                        }">Three Districts Overview</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -5574,9 +4915,9 @@ Check browser console for detailed debug information.`);
                               <span className="font-semibold text-blue-700 dark:text-blue-300">1ST DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                            <p className={`text-sm transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`}>Incidents</p>
+                            <p className="text-sm transition-colors duration-300 ${
+                              text-gray-600
+                            }">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-blue-600 dark:text-blue-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -5594,9 +4935,9 @@ Check browser console for detailed debug information.`);
                               <span className="font-semibold text-green-700 dark:text-green-300">2ND DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-green-600 dark:text-green-400">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                            <p className={`text-sm transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`}>Incidents</p>
+                            <p className="text-sm transition-colors duration-300 ${
+                              text-gray-600
+                            }">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-green-600 dark:text-green-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -5614,9 +4955,9 @@ Check browser console for detailed debug information.`);
                               <span className="font-semibold text-purple-700 dark:text-purple-300">3RD DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                            <p className={`text-sm transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                            }`}>Incidents</p>
+                            <p className="text-sm transition-colors duration-300 ${
+                              text-gray-600
+                            }">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-purple-600 dark:text-purple-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -5631,43 +4972,39 @@ Check browser console for detailed debug information.`);
                         </div>
                       </CardContent>
                     </Card>
-
-
-
                     {/* Incident Type Analysis */}
-                    <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-                      isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'
-                    }`}>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg ${
+                      bg-white/80
+                    }">
                       <CardHeader>
-                        <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>Incident Type Analysis</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
+                          text-gray-900
+                        }">Incident Type Analysis</CardTitle>
                       </CardHeader>
                       <CardContent>
                         {/* Summary Total */}
                         <div className="mb-4 p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
                           <div className="flex items-center justify-between">
-                            <span className={`text-lg font-semibold transition-colors duration-300 ${
-                              isDarkMode ? 'text-blue-300' : 'text-blue-700'
-                            }`}>Total Incidents by Type</span>
+                            <span className="text-lg font-semibold transition-colors duration-300 ${
+                              text-blue-700
+                            }">Total Incidents by Type</span>
                             <Badge variant="secondary" className="bg-blue-600 text-white dark:bg-blue-500 dark:text-white text-lg px-4 py-2">
                               {Object.values(insights.incidentTypeCounts).reduce((sum, count) => sum + count, 0)} Total
                             </Badge>
                           </div>
                         </div>
-                        
                         <div className="space-y-3">
                           {Object.entries(insights.incidentTypeCounts)
                             .sort(([,a], [,b]) => b - a)
                             .map(([type, count]) => (
                               <div key={type} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <span className={`font-medium transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`}>{type}</span>
+                                <span className="font-medium transition-colors duration-300 ${
+                                  text-gray-700
+                                }">{type}</span>
                                 <div className="flex items-center gap-2">
-                                  <span className={`text-sm transition-colors duration-300 ${
-                                    isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                  }`}>
+                                  <span className="text-sm transition-colors duration-300 ${
+                                    text-gray-500
+                                  }">
                                     {((count / Object.values(insights.incidentTypeCounts).reduce((sum, c) => sum + c, 0)) * 100).toFixed(1)}%
                                   </span>
                                   <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -5679,34 +5016,33 @@ Check browser console for detailed debug information.`);
                         </div>
                       </CardContent>
                     </Card>
-
                     {/* Location Analysis */}
-                    <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-                      isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'
-                    }`}>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg ${
+                      bg-white/80
+                    }">
                       <CardHeader>
-                        <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>Location Analysis</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
+                          text-gray-900
+                        }">Location Analysis</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                           {/* Top Municipalities */}
                           <div>
-                            <h4 className={`text-md font-semibold mb-3 transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>Top Municipalities</h4>
+                            <h4 className="text-md font-semibold mb-3 transition-colors duration-300 ${
+                              text-gray-700
+                            }">Top Municipalities</h4>
                             <div className="space-y-2">
                               {insights.topMunicipalities.length > 0 ? (
                                 insights.topMunicipalities.map((item, index) => (
                                   <div key={item.municipality} className="flex items-center justify-between p-2 rounded-lg bg-blue-50 dark:bg-blue-900/20">
                                     <div className="flex items-center gap-2">
-                                      <span className={`text-sm font-medium transition-colors duration-300 ${
-                                        isDarkMode ? 'text-blue-300' : 'text-blue-700'
-                                      }`}>#{index + 1}</span>
-                                      <span className={`font-medium transition-colors duration-300 ${
-                                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                      }`}>{item.municipality}</span>
+                                      <span className="text-sm font-medium transition-colors duration-300 ${
+                                        text-blue-700
+                                      }">#{index + 1}</span>
+                                      <span className="font-medium transition-colors duration-300 ${
+                                        text-gray-700
+                                      }">{item.municipality}</span>
                                     </div>
                                     <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
                                       {item.count} incidents
@@ -5714,31 +5050,30 @@ Check browser console for detailed debug information.`);
                                   </div>
                                 ))
                               ) : (
-                                <div className={`text-center py-4 text-sm transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                }`}>
+                                <div className="text-center py-4 text-sm transition-colors duration-300 ${
+                                  text-gray-500
+                                }">
                                   No municipality data available
                                 </div>
                               )}
                             </div>
                           </div>
-
                           {/* Top Specific Locations */}
                           <div>
-                            <h4 className={`text-md font-semibold mb-3 transition-colors duration-300 ${
-                              isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>Top Specific Locations</h4>
+                            <h4 className="text-md font-semibold mb-3 transition-colors duration-300 ${
+                              text-gray-700
+                            }">Top Specific Locations</h4>
                             <div className="space-y-2">
                               {insights.topLocations.length > 0 ? (
                                 insights.topLocations.map((item, index) => (
                                   <div key={item.location} className="flex items-center justify-between p-2 rounded-lg bg-green-50 dark:bg-green-900/20">
                                     <div className="flex items-center gap-2">
-                                      <span className={`text-sm font-medium transition-colors duration-300 ${
-                                        isDarkMode ? 'text-green-300' : 'text-green-700'
-                                      }`}>#{index + 1}</span>
-                                      <span className={`font-medium transition-colors duration-300 ${
-                                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                      }`} title={item.location}>
+                                      <span className="text-sm font-medium transition-colors duration-300 ${
+                                        text-green-700
+                                      }">#{index + 1}</span>
+                                      <span className="font-medium transition-colors duration-300 ${
+                                        text-gray-700
+                                      }" title={item.location}>
                                         {item.location.length > 25 ? item.location.substring(0, 25) + '...' : item.location}
                                       </span>
                                     </div>
@@ -5748,9 +5083,9 @@ Check browser console for detailed debug information.`);
                                   </div>
                                 ))
                               ) : (
-                                <div className={`text-center py-4 text-sm transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                                }`}>
+                                <div className="text-center py-4 text-sm transition-colors duration-300 ${
+                                  text-gray-500
+                                }">
                                   No location data available
                                 </div>
                               )}
@@ -5759,15 +5094,14 @@ Check browser console for detailed debug information.`);
                         </div>
                       </CardContent>
                     </Card>
-
                     {/* District Analysis */}
-                    <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-                      isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'
-                    }`}>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg ${
+                      bg-white/80
+                    }">
                       <CardHeader>
-                        <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>District Activity</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
+                          text-gray-900
+                        }">District Activity</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
@@ -5775,9 +5109,9 @@ Check browser console for detailed debug information.`);
                             .sort(([,a], [,b]) => b - a)
                             .map(([district, count]) => (
                               <div key={district} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50">
-                                <span className={`font-medium transition-colors duration-300 ${
-                                  isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                }`}>{district}</span>
+                                <span className="font-medium transition-colors duration-300 ${
+                                  text-gray-700
+                                }">{district}</span>
                                 <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300">
                                   {count} incidents
                                 </Badge>
@@ -5786,33 +5120,23 @@ Check browser console for detailed debug information.`);
                         </div>
                       </CardContent>
                     </Card>
-
                     {/* Monthly Trends */}
-                    <Card className={`backdrop-blur-sm border-0 shadow-lg ${
-                      isDarkMode ? 'bg-gray-800/80' : 'bg-white/80'
-                    }`}>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
                       <CardHeader>
-                        <CardTitle className={`text-lg font-semibold transition-colors duration-300 ${
-                          isDarkMode ? 'text-white' : 'text-gray-900'
-                        }`}>📅 Monthly Trends</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">📅 Monthly Trends</CardTitle>
                       </CardHeader>
                       <CardContent>
                         {Object.keys(insights.monthlyCounts).length > 0 ? (
                           <div className="space-y-3">
                             {/* Summary */}
-                            <div className={`p-3 rounded-lg ${
-                              isDarkMode ? 'bg-purple-900/20' : 'bg-purple-50'
-                            }`}>
+                            <div className="p-3 rounded-lg bg-purple-50">
                               <div className="flex items-center justify-between">
-                                <span className={`text-sm font-medium transition-colors duration-300 ${
-                                  isDarkMode ? 'text-purple-300' : 'text-purple-700'
-                                }`}>Most Active Month</span>
+                                <span className="text-sm font-medium transition-colors duration-300 text-purple-700">Most Active Month</span>
                                 <Badge variant="secondary" className="bg-purple-600 text-white dark:bg-purple-500">
                                   {insights.highestMonth}
                                 </Badge>
                               </div>
                             </div>
-                            
                             {/* Monthly Breakdown */}
                             <div className="space-y-2">
                               {Object.entries(insights.monthlyCounts)
@@ -5829,9 +5153,9 @@ Check browser console for detailed debug information.`);
                                       <div className={`w-2 h-2 rounded-full ${
                                         month === insights.highestMonth ? 'bg-purple-600' : 'bg-gray-400'
                                       }`}></div>
-                                      <span className={`font-medium transition-colors duration-300 ${
-                                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                                      }`}>{month}</span>
+                                      <span className="font-medium transition-colors duration-300 ${
+                                        text-gray-700
+                                      }">{month}</span>
                                     </div>
                                     <Badge variant="secondary" className="bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300">
                                       {count} incidents
@@ -5841,9 +5165,7 @@ Check browser console for detailed debug information.`);
                             </div>
                           </div>
                         ) : (
-                          <div className={`text-center py-6 transition-colors duration-300 ${
-                            isDarkMode ? 'text-gray-400' : 'text-gray-500'
-                          }`}>
+                          <div className="text-center py-6 transition-colors duration-300 text-gray-500">
                             <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-400" />
                             <p className="text-sm">No monthly data available</p>
                             <p className="text-xs mt-1">Add incidents with dates to see monthly trends</p>
@@ -5855,9 +5177,7 @@ Check browser console for detailed debug information.`);
                 );
               })()}
             </div>
-            <div className={`flex justify-end gap-3 p-6 border-t ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowSummaryModal(false)}
@@ -5868,20 +5188,13 @@ Check browser console for detailed debug information.`);
           </div>
         </div>
       )}
-
       {/* PDF Edit Modal */}
       {showPdfEditModal && (
         <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-          <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl bg-white">
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className={`text-xl font-semibold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <h2 className="text-xl font-semibold transition-colors duration-300 text-gray-900">
                   📄 Edit PDF Report
                 </h2>
                 <Button
@@ -5894,19 +5207,13 @@ Check browser console for detailed debug information.`);
                 </Button>
               </div>
             </div>
-
             <div className="p-6 space-y-6">
               {/* Memorandum Details */}
               <div className="space-y-4">
-                <h3 className={`text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Memorandum Details</h3>
-                
+                <h3 className="text-lg font-medium transition-colors duration-300 text-gray-900">Memorandum Details</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="for" className={`transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>FOR:</Label>
+                    <Label htmlFor="for" className="transition-colors duration-300 text-gray-700">FOR:</Label>
                     <Input
                       id="for"
                       value={pdfReportData.memorandum.for}
@@ -5914,16 +5221,11 @@ Check browser console for detailed debug information.`);
                         ...prev,
                         memorandum: { ...prev.memorandum, for: e.target.value }
                       }))}
-                      className={`mt-1 transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                     />
                   </div>
-                  
                   <div>
-                    <Label htmlFor="from" className={`transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>FROM:</Label>
+                    <Label htmlFor="from" className="transition-colors duration-300 text-gray-700">FROM:</Label>
                     <Input
                       id="from"
                       value={pdfReportData.memorandum.from}
@@ -5931,16 +5233,11 @@ Check browser console for detailed debug information.`);
                         ...prev,
                         memorandum: { ...prev.memorandum, from: e.target.value }
                       }))}
-                      className={`mt-1 transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                     />
                   </div>
-                  
                   <div>
-                    <Label htmlFor="date" className={`transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>DATE:</Label>
+                          <Label htmlFor="date" className="transition-colors duration-300 text-gray-700">DATE:</Label>
                     <Input
                       id="date"
                       value={pdfReportData.memorandum.date}
@@ -5948,16 +5245,11 @@ Check browser console for detailed debug information.`);
                         ...prev,
                         memorandum: { ...prev.memorandum, date: e.target.value }
                       }))}
-                      className={`mt-1 transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                     />
                   </div>
-                  
                   <div>
-                    <Label htmlFor="subject" className={`transition-colors duration-300 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>SUBJECT:</Label>
+                    <Label htmlFor="subject" className="transition-colors duration-300 text-gray-700">SUBJECT:</Label>
                     <Input
                       id="subject"
                       value={pdfReportData.memorandum.subject}
@@ -5965,20 +5257,14 @@ Check browser console for detailed debug information.`);
                         ...prev,
                         memorandum: { ...prev.memorandum, subject: e.target.value }
                       }))}
-                      className={`mt-1 transition-colors duration-300 ${
-                        isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                      }`}
+                      className="mt-1 transition-colors duration-300 bg-white border-gray-300"
                     />
                   </div>
                 </div>
               </div>
-
               {/* Section Selection */}
               <div className="space-y-4">
-                <h3 className={`text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Include Sections</h3>
-                
+                <h3 className="text-lg font-medium transition-colors duration-300 text-gray-900">Include Sections</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {Object.entries(pdfReportData.includeSections).map(([section, included]) => (
                     <div key={section} className="flex items-center space-x-2">
@@ -5995,26 +5281,21 @@ Check browser console for detailed debug information.`);
                         }))}
                         className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                       />
-                      <Label htmlFor={section} className={`text-sm transition-colors duration-300 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                      <Label htmlFor={section} className="text-sm transition-colors duration-300 text-gray-700">
                         {section === 'dataCleaning' && 'Data Cleaning & Categorization'}
                         {section === 'summaryGeneration' && 'Summary Generation'}
                         {section === 'trendAnalysis' && 'Trend & Pattern Analysis'}
                         {section === 'rootCauses' && 'Root Cause & Contributing Factors'}
                         {section === 'recommendations' && 'Actionable Recommendations'}
+                        {section === 'riskForecasting' && 'Risk Forecasting'}
                       </Label>
                     </div>
                   ))}
                 </div>
               </div>
-
               {/* Custom Notes */}
               <div className="space-y-4">
-                <h3 className={`text-lg font-medium transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Custom Notes (Optional)</h3>
-                
+                <h3 className="text-lg font-medium transition-colors duration-300 text-gray-900">Custom Notes (Optional)</h3>
                 <Textarea
                   value={pdfReportData.customNotes}
                   onChange={(e) => setPdfReportData(prev => ({
@@ -6023,16 +5304,11 @@ Check browser console for detailed debug information.`);
                   }))}
                   placeholder="Add any additional notes or comments for the report..."
                   rows={4}
-                  className={`transition-colors duration-300 ${
-                    isDarkMode ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300'
-                  }`}
+                  className="transition-colors duration-300 bg-white border-gray-300"
                 />
               </div>
             </div>
-
-            <div className={`flex justify-end gap-3 p-6 border-t ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowPdfEditModal(false)}
@@ -6070,20 +5346,13 @@ Check browser console for detailed debug information.`);
           </div>
         </div>
       )}
-
       {/* PDF Preview Modal */}
       {showPdfPreviewModal && (
         <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-          <div className={`w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-lg shadow-xl ${
-            isDarkMode ? 'bg-gray-900' : 'bg-white'
-          }`}>
-            <div className={`p-6 border-b ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+          <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-lg shadow-xl bg-white">
+            <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
-                <h2 className={`text-xl font-semibold transition-colors duration-300 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>
+                <h2 className="text-xl font-semibold transition-colors duration-300 text-gray-900">
                   📄 PDF Report Preview
                 </h2>
                 <Button
@@ -6096,82 +5365,47 @@ Check browser console for detailed debug information.`);
                 </Button>
               </div>
             </div>
-
             <div className="p-6 space-y-6">
               {/* Memorandum Preview */}
-              <div className={`p-6 border rounded-lg ${
-                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <h3 className={`text-lg font-bold mb-4 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>MEMORANDUM</h3>
-                
+              <div className="p-6 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-bold mb-4 text-gray-900">MEMORANDUM</h3>
                 <div className="space-y-3">
                   <div className="flex">
-                    <span className={`font-semibold w-20 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>FOR:</span>
-                    <span className={`ml-4 ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
-                    }`}>{pdfReportData.memorandum.for}</span>
+                    <span className="font-semibold w-20 text-gray-700">FOR:</span>
+                    <span className="ml-4 text-gray-900">{pdfReportData.memorandum.for}</span>
                   </div>
                   <div className="flex">
-                    <span className={`font-semibold w-20 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>FROM:</span>
-                    <span className={`ml-4 ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
-                    }`}>{pdfReportData.memorandum.from}</span>
+                    <span className="font-semibold w-20 text-gray-700">FROM:</span>
+                    <span className="ml-4 text-gray-900">{pdfReportData.memorandum.from}</span>
                   </div>
                   <div className="flex">
-                    <span className={`font-semibold w-20 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>DATE:</span>
-                    <span className={`ml-4 ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
-                    }`}>{pdfReportData.memorandum.date}</span>
+                    <span className="font-semibold w-20 text-gray-700">DATE:</span>
+                    <span className="ml-4 text-gray-900">{pdfReportData.memorandum.date}</span>
                   </div>
                   <div className="flex">
-                    <span className={`font-semibold w-20 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>SUBJECT:</span>
-                    <span className={`ml-4 ${
-                      isDarkMode ? 'text-white' : 'text-gray-900'
-                    }`}>{pdfReportData.memorandum.subject}</span>
+                    <span className="font-semibold w-20 text-gray-700">SUBJECT:</span>
+                    <span className="ml-4 text-gray-900">{pdfReportData.memorandum.subject}</span>
                   </div>
                 </div>
               </div>
-
               {/* Custom Notes Preview */}
               {pdfReportData.customNotes && (
-                <div className={`p-6 border rounded-lg ${
-                  isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-                }`}>
-                  <h3 className={`text-lg font-bold mb-4 ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>Custom Notes</h3>
-                  <p className={`whitespace-pre-wrap ${
-                    isDarkMode ? 'text-white' : 'text-gray-900'
-                  }`}>{pdfReportData.customNotes}</p>
+                <div className="p-6 border rounded-lg border-gray-200 bg-gray-50">
+                  <h3 className="text-lg font-bold mb-4 text-gray-900">Custom Notes</h3>
+                  <p className="whitespace-pre-wrap text-gray-900">{pdfReportData.customNotes}</p>
                 </div>
               )}
-
               {/* Sections Preview */}
-              <div className={`p-6 border rounded-lg ${
-                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <h3 className={`text-lg font-bold mb-4 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Report Sections</h3>
-                
+              <div className="p-6 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-bold mb-4 text-gray-900">Report Sections</h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {Object.entries(pdfReportData.includeSections).map(([section, included]) => (
                     <div key={section} className={`flex items-center space-x-2 p-2 rounded ${
                       included 
-                        ? (isDarkMode ? 'bg-green-900 text-green-200' : 'bg-green-100 text-green-800')
-                        : (isDarkMode ? 'bg-gray-700 text-gray-400' : 'bg-gray-100 text-gray-600')
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
                     }`}>
-                      <span className="text-sm">
+                      <span className="text-lg">
                         {included ? '✓' : '✗'}
                       </span>
                       <span className="text-sm">
@@ -6180,27 +5414,18 @@ Check browser console for detailed debug information.`);
                         {section === 'trendAnalysis' && 'Trend & Pattern Analysis'}
                         {section === 'rootCauses' && 'Root Cause & Contributing Factors'}
                         {section === 'recommendations' && 'Actionable Recommendations'}
+                        {section === 'riskForecasting' && 'Risk Forecasting'}
                       </span>
                     </div>
                   ))}
                 </div>
               </div>
-
               {/* Data Summary Preview */}
-              <div className={`p-6 border rounded-lg ${
-                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <h3 className={`text-lg font-bold mb-4 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>Data Summary</h3>
-                
+              <div className="p-6 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-bold mb-4 text-gray-900">Data Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className={`p-4 rounded-lg ${
-                    isDarkMode ? 'bg-gray-700' : 'bg-white'
-                  }`}>
-                    <div className={`text-2xl font-bold ${
-                      isDarkMode ? 'text-blue-400' : 'text-blue-600'
-                    }`}>
+                  <div className="p-4 rounded-lg bg-white">
+                    <div className="text-2xl font-bold text-blue-600">
                       {incidents.filter(incident => {
                         if (filterStatus !== "all" && incident.status !== filterStatus) return false;
                         if (selectedMonth !== "all") {
@@ -6219,59 +5444,31 @@ Check browser console for detailed debug information.`);
                         return true;
                       }).length}
                     </div>
-                    <div className={`text-sm ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                    }`}>Total Incidents</div>
+                    <div className="text-sm text-gray-600">Total Incidents</div>
                   </div>
-                  
-                  <div className={`p-4 rounded-lg ${
-                    isDarkMode ? 'bg-gray-700' : 'bg-white'
-                  }`}>
-                    <div className={`text-2xl font-bold ${
-                      isDarkMode ? 'text-green-400' : 'text-green-600'
-                    }`}>
+                  <div className="p-4 rounded-lg bg-white">
+                    <div className="text-2xl font-bold text-green-600">
                       {selectedMonth === "all" ? "All Months" : selectedMonth}
                     </div>
-                    <div className={`text-sm ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                    }`}>Reporting Period</div>
+                    <div className="text-sm text-gray-600">Reporting Period</div>
                   </div>
-                  
-                  <div className={`p-4 rounded-lg ${
-                    isDarkMode ? 'bg-gray-700' : 'bg-white'
-                  }`}>
-                    <div className={`text-2xl font-bold ${
-                      isDarkMode ? 'text-purple-400' : 'text-purple-600'
-                    }`}>
+                  <div className="p-4 rounded-lg bg-white">
+                    <div className="text-2xl font-bold text-purple-600">
                       {Object.keys(pdfReportData.includeSections).filter(key => pdfReportData.includeSections[key]).length}
                     </div>
-                    <div className={`text-sm ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-600'
-                    }`}>Sections Included</div>
+                    <div className="text-sm text-gray-600">Sections Included</div>
                   </div>
                 </div>
               </div>
-
               {/* Detailed Content Preview */}
-              <div className={`p-6 border rounded-lg ${
-                isDarkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'
-              }`}>
-                <h3 className={`text-lg font-bold mb-4 ${
-                  isDarkMode ? 'text-white' : 'text-gray-900'
-                }`}>PDF Content Preview</h3>
-                
+              <div className="p-6 border rounded-lg border-gray-200 bg-gray-50">
+                <h3 className="text-lg font-bold mb-4 text-gray-900">PDF Content Preview</h3>
                 <div className="space-y-4">
                   {/* Sample Data Cleaning Section */}
                   {pdfReportData.includeSections.dataCleaning && (
-                    <div className={`p-4 border-l-4 border-blue-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-blue-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-blue-300' : 'text-blue-700'
-                      }`}>1. Data Cleaning & Categorization</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                    <div className="p-4 border-l-4 border-blue-500 bg-blue-50">
+                      <h4 className="font-semibold mb-2 text-blue-700">1. Data Cleaning & Categorization</h4>
+                      <p className="text-sm text-gray-700">
                         This report provides a comprehensive analysis of {incidents.filter(incident => {
                           if (filterStatus !== "all" && incident.status !== filterStatus) return false;
                           if (selectedMonth !== "all") {
@@ -6283,100 +5480,66 @@ Check browser console for detailed debug information.`);
                       </p>
                     </div>
                   )}
-
                   {/* Sample Summary Generation Section */}
                   {pdfReportData.includeSections.summaryGeneration && (
-                    <div className={`p-4 border-l-4 border-green-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-green-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-green-300' : 'text-green-700'
-                      }`}>2. Summary Generation</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                    <div className="p-4 border-l-4 border-green-500 bg-green-50">
+                      <h4 className="font-semibold mb-2 text-green-700">2. Summary Generation</h4>
+                      <p className="text-sm text-gray-700">
                         Municipality breakdown table with incident counts and detailed breakdowns by incident type. Dynamic summary content based on actual data analysis.
                       </p>
                     </div>
                   )}
-
                   {/* Sample Trend Analysis Section */}
                   {pdfReportData.includeSections.trendAnalysis && (
-                    <div className={`p-4 border-l-4 border-yellow-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-yellow-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-yellow-300' : 'text-yellow-700'
-                      }`}>3. Trend & Pattern Analysis</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                                         <div className="p-4 border-l-4 border-yellow-500 bg-yellow-50">
+                       <h4 className="font-semibold mb-2 text-yellow-700">3. Trend & Pattern Analysis</h4>
+                       <p className="text-sm text-gray-700">
                         Dynamic trend analysis including temporal patterns, geographic hotspots, and incident type distributions. Statistical analysis of crime patterns and seasonal variations.
                       </p>
                     </div>
                   )}
-
                   {/* Sample Root Causes Section */}
                   {pdfReportData.includeSections.rootCauses && (
-                    <div className={`p-4 border-l-4 border-red-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-red-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-red-300' : 'text-red-700'
-                      }`}>4. Root Cause & Contributing Factors</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                                         <div className="p-4 border-l-4 border-red-500 bg-red-50">
+                       <h4 className="font-semibold mb-2 text-red-700">4. Root Cause & Contributing Factors</h4>
+                       <p className="text-sm text-gray-700">
                         Analysis of socioeconomic factors, vehicular incidents, mental health considerations, and firearms control issues. Inter-agency collaboration recommendations.
                       </p>
                     </div>
                   )}
-
                   {/* Sample Recommendations Section */}
                   {pdfReportData.includeSections.recommendations && (
-                    <div className={`p-4 border-l-4 border-purple-500 ${
-                      isDarkMode ? 'bg-gray-700' : 'bg-purple-50'
-                    }`}>
-                      <h4 className={`font-semibold mb-2 ${
-                        isDarkMode ? 'text-purple-300' : 'text-purple-700'
-                      }`}>5. Actionable Recommendations</h4>
-                      <p className={`text-sm ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                                         <div className="p-4 border-l-4 border-purple-500 bg-purple-50">
+                       <h4 className="font-semibold mb-2 text-purple-700">5. Actionable Recommendations</h4>
+                       <p className="text-sm text-gray-700">
                         Enhanced police visibility and patrols, targeted law enforcement operations, technology and infrastructure improvements, and inter-agency collaboration strategies.
                       </p>
                     </div>
                   )}
-
-
-
+                  {/* Sample Risk Forecasting Section */}
+                  {pdfReportData.includeSections.riskForecasting && (
+                    <div className="p-4 border-l-4 border-amber-500 bg-amber-50">
+                      <h4 className="font-semibold mb-2 text-amber-700">6. Risk Forecasting</h4>
+                      <p className="text-sm text-gray-700">
+                        Forward-looking assessment of potential high-risk areas and periods based on recent trends, incident density, and seasonality. Suggests proactive deployment and preventive actions.
+                      </p>
+                    </div>
+                  )}
                   {/* Sample Municipality Table Preview */}
-                  <div className={`p-4 border-l-4 border-gray-500 ${
-                    isDarkMode ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <h4 className={`font-semibold mb-2 ${
-                      isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                    }`}>Municipality Breakdown Table</h4>
-                    <div className={`text-xs border rounded ${
-                      isDarkMode ? 'border-gray-600' : 'border-gray-300'
-                    }`}>
-                      <div className={`grid grid-cols-3 gap-2 p-2 font-semibold ${
-                        isDarkMode ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700'
-                      }`}>
+                                     <div className="p-4 border-l-4 border-gray-500 bg-gray-50">
+                     <h4 className="font-semibold mb-2 text-gray-700">Municipality Breakdown Table</h4>
+                     <div className="text-xs border rounded border-gray-300">
+                       <div className="grid grid-cols-3 gap-2 p-2 font-semibold bg-gray-100 text-gray-700">
                         <div>Municipality/City</div>
                         <div>Total Incidents</div>
                         <div>Breakdown</div>
                       </div>
-                      <div className={`grid grid-cols-3 gap-2 p-2 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                       <div className="grid grid-cols-3 gap-2 p-2 text-gray-700">
                         <div>Balanga City</div>
                         <div>15</div>
                         <div>5 Traffic, 3 Theft, 2 Drug-related...</div>
                       </div>
-                      <div className={`grid grid-cols-3 gap-2 p-2 ${
-                        isDarkMode ? 'text-gray-300' : 'text-gray-700'
-                      }`}>
+                       <div className="grid grid-cols-3 gap-2 p-2 text-gray-700">
                         <div>Dinalupihan</div>
                         <div>12</div>
                         <div>4 Traffic, 2 Theft, 1 Drug-related...</div>
@@ -6386,10 +5549,9 @@ Check browser console for detailed debug information.`);
                 </div>
               </div>
             </div>
-
-            <div className={`flex justify-end gap-3 p-6 border-t ${
-              isDarkMode ? 'border-gray-700' : 'border-gray-200'
-            }`}>
+            <div className="flex justify-end gap-3 p-6 border-t ${
+              border-gray-200
+            }">
               <Button
                 variant="outline"
                 onClick={() => setShowPdfPreviewModal(false)}
@@ -6417,6 +5579,7 @@ Check browser console for detailed debug information.`);
           </div>
         </div>
       )}
+      </section>
     </Layout>
   );
 }

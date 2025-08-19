@@ -6,7 +6,7 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
-import { ThemeProvider } from "./ThemeContext";
+
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
@@ -37,7 +37,6 @@ export default function App() {
       console.log('⏳ Delay completed');
       
       // Clear any stored data or state if needed
-      localStorage.removeItem('theme'); // Keep theme preference
       console.log('🧹 Local storage cleared');
       
       // Reset to dashboard page (this will be overridden by the user state change)
@@ -101,7 +100,6 @@ export default function App() {
 
   return (
     <DebugComponent>
-      <ThemeProvider>
         <PatrolDataProvider>
           <DataProvider>
             <div className="App">
@@ -109,7 +107,6 @@ export default function App() {
             </div>
           </DataProvider>
         </PatrolDataProvider>
-      </ThemeProvider>
     </DebugComponent>
   );
 }
