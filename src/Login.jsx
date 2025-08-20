@@ -65,34 +65,66 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="min-h-screen flex">
-      {/* Left Section - Blue Branding */}
-      <div className="hidden lg:flex flex-col justify-center items-center w-3/5 bg-gradient-to-br from-blue-600 to-blue-800 p-12 text-white">
-        {/* Logo */}
-        <div className="mb-12 text-center w-full">
-          <div className="flex flex-col items-center mb-8">
-            <div className="mb-4">
-              <img 
-                src={ipatrollerLogo}
-                alt="IPatroller Logo"
-                className="w-48 h-48 object-contain"
-                onError={(e) => {
-                  console.error('Failed to load logo image:', e.target.src);
-                  e.target.src = logoFallback;
-                }}
-              />
+      {/* Left Section - Enhanced Gradient Branding */}
+      <div className="hidden lg:flex flex-col justify-center items-center w-3/5 relative overflow-hidden">
+        {/* Multi-layer Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800"></div>
+        <div className="absolute inset-0 bg-gradient-to-tr from-blue-500/30 via-transparent to-purple-600/20"></div>
+        <div className="absolute inset-0 bg-gradient-to-bl from-cyan-500/20 via-transparent to-blue-900/30"></div>
+        
+        {/* Animated Background Elements */}
+        <div className="absolute top-20 left-20 w-32 h-32 bg-white/10 rounded-full blur-xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-20 w-40 h-40 bg-cyan-400/20 rounded-full blur-xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/2 left-10 w-24 h-24 bg-purple-400/15 rounded-full blur-lg animate-pulse delay-500"></div>
+        <div className="absolute bottom-1/3 right-10 w-20 h-20 bg-blue-400/20 rounded-full blur-lg animate-pulse delay-700"></div>
+        
+        {/* Geometric Shapes */}
+        <div className="absolute top-32 right-32 w-16 h-16 border border-white/20 rotate-45"></div>
+        <div className="absolute bottom-32 left-32 w-12 h-12 border border-white/15 rotate-12"></div>
+        <div className="absolute top-1/3 left-1/4 w-8 h-8 border border-cyan-300/25 rotate-45"></div>
+        
+        {/* Content Container */}
+        <div className="relative z-10 flex flex-col justify-center items-center w-full p-12 text-white">
+          {/* Logo */}
+          <div className="mb-12 text-center w-full">
+            <div className="flex flex-col items-center mb-8">
+              <div className="mb-6 relative">
+                {/* Logo Glow Effect */}
+                <div className="absolute inset-0 bg-blue-400/30 rounded-full blur-2xl scale-150"></div>
+                <img 
+                  src={ipatrollerLogo}
+                  alt="IPatroller Logo"
+                  className="w-48 h-48 object-contain relative z-10 drop-shadow-2xl"
+                  onError={(e) => {
+                    console.error('Failed to load logo image:', e.target.src);
+                    e.target.src = logoFallback;
+                  }}
+                />
+              </div>
+              <span className="text-5xl font-bold text-center drop-shadow-lg" style={{ fontFamily: 'Arial Black, Helvetica Bold, sans-serif' }}>
+                - 1Bataan I-Patroller -
+              </span>
             </div>
-            <span className="text-5xl font-bold text-center" style={{ fontFamily: 'Arial Black, Helvetica Bold, sans-serif' }}>- 1Bataan I-Patroller -</span>
           </div>
-        </div>
 
-        {/* Main Content */}
-        <div className="text-center w-full">
-          <h1 className="text-3xl mb-6 text-white/70 italic" style={{ fontFamily: 'Calibri, sans-serif' }}>
-            Provincial Government of Bataan
-          </h1>
-          <p className="text-xl text-blue-100/70 italic whitespace-nowrap" style={{ fontFamily: 'Calibri, sans-serif' }}>
-            Advanced patrol management and incident reporting system for enhanced security operations.
-          </p>
+          {/* Main Content */}
+          <div className="text-center w-full">
+            <h1 className="text-3xl mb-6 text-white/90 italic drop-shadow-md" style={{ fontFamily: 'Calibri, sans-serif' }}>
+              Provincial Government of Bataan
+            </h1>
+            <p className="text-xl text-blue-100/90 italic whitespace-nowrap drop-shadow-md leading-relaxed" style={{ fontFamily: 'Calibri, sans-serif' }}>
+              Advanced patrol management and incident reporting system for enhanced security operations.
+            </p>
+          </div>
+          
+          {/* Bottom Decorative Elements */}
+          <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+            <div className="flex space-x-4">
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-cyan-300/60 rounded-full animate-pulse delay-300"></div>
+              <div className="w-2 h-2 bg-white/40 rounded-full animate-pulse delay-600"></div>
+            </div>
+          </div>
         </div>
       </div>
 
