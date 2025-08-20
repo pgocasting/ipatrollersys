@@ -4,7 +4,10 @@ import {
   createUserWithEmailAndPassword, 
   signOut, 
   onAuthStateChanged,
-  updateProfile 
+  updateProfile,
+  updatePassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential
 } from 'firebase/auth';
 import { 
   doc, 
@@ -397,6 +400,36 @@ export const useFirebase = () => {
     }
   }, []);
 
+  // Change password function
+  const changePassword = async (currentPassword, newPassword) => {
+    try {
+      if (!user) {
+        return { success: false, error: "No user logged in" };
+      }
+
+      // Re-authenticate user with current password
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // Update password
+      await updatePassword(user, newPassword);
+
+      return { success: true, message: "Password updated successfully" };
+    } catch (error) {
+      console.error('Error changing password:', error);
+      
+      if (error.code === 'auth/wrong-password') {
+        return { success: false, error: "Current password is incorrect" };
+      } else if (error.code === 'auth/weak-password') {
+        return { success: false, error: "New password is too weak" };
+      } else if (error.code === 'auth/requires-recent-login') {
+        return { success: false, error: "Please log in again to change your password" };
+      } else {
+        return { success: false, error: error.message };
+      }
+    }
+  };
+
   return {
     user,
     loading,
@@ -417,6 +450,7 @@ export const useFirebase = () => {
     saveActionReport,
     getActionReports,
     updateActionReport,
-    deleteActionReport
+    deleteActionReport,
+    changePassword
   };
 }; 

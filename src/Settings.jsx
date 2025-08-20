@@ -11,10 +11,14 @@ import {
   Eye, 
   EyeOff,
   Shield,
-  CheckCircle
+  CheckCircle,
+  AlertCircle
 } from "lucide-react";
+import { useFirebase } from "./hooks/useFirebase";
 
 export default function Settings({ onLogout, onNavigate, currentPage }) {
+  const { changePassword } = useFirebase();
+  
   // Password change state
   const [passwords, setPasswords] = useState({
     currentPassword: "",
@@ -26,33 +30,69 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
     new: false,
     confirm: false
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
+
+  // Password validation
+  const validatePassword = (password) => {
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    const isLongEnough = password.length >= 8;
+    
+    return {
+      hasUpperCase,
+      hasLowerCase,
+      hasNumbers,
+      hasSpecialChar,
+      isLongEnough,
+      isValid: hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar && isLongEnough
+    };
+  };
 
   // Handle password change
-  const handlePasswordChange = () => {
+  const handlePasswordChange = async () => {
+    // Clear previous messages
+    setMessage({ type: '', text: '' });
+
+    // Validation
     if (!passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword) {
-      alert("Please fill in all password fields");
+      setMessage({ type: 'error', text: 'Please fill in all password fields' });
       return;
     }
 
     if (passwords.newPassword !== passwords.confirmPassword) {
-      alert("New passwords do not match");
+      setMessage({ type: 'error', text: 'New passwords do not match' });
       return;
     }
 
-    if (passwords.newPassword.length < 8) {
-      alert("New password must be at least 8 characters long");
+    const passwordValidation = validatePassword(passwords.newPassword);
+    if (!passwordValidation.isValid) {
+      setMessage({ type: 'error', text: 'Password does not meet all requirements' });
       return;
     }
 
-    // In a real app, this would validate current password and update
-    alert("Password changed successfully!");
-    
+    setIsLoading(true);
+    try {
+      const result = await changePassword(passwords.currentPassword, passwords.newPassword);
+      
+      if (result.success) {
+        setMessage({ type: 'success', text: result.message });
         // Reset form
-    setPasswords({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: ""
-    });
+        setPasswords({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: ""
+        });
+      } else {
+        setMessage({ type: 'error', text: result.error });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'An unexpected error occurred' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   // Toggle password visibility
@@ -98,24 +138,46 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     </h3>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-blue-700">Minimum 8 characters</span>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${validatePassword(passwords.newPassword).isLongEnough ? 'bg-green-100/50' : 'bg-blue-100/50'}`}>
+                      {validatePassword(passwords.newPassword).isLongEnough ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                      <span className={`text-sm ${validatePassword(passwords.newPassword).isLongEnough ? 'text-green-700' : 'text-blue-700'}`}>Minimum 8 characters</span>
                     </div>
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-blue-700">Uppercase letter</span>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${validatePassword(passwords.newPassword).hasUpperCase ? 'bg-green-100/50' : 'bg-blue-100/50'}`}>
+                      {validatePassword(passwords.newPassword).hasUpperCase ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                      <span className={`text-sm ${validatePassword(passwords.newPassword).hasUpperCase ? 'text-green-700' : 'text-blue-700'}`}>Uppercase letter</span>
                     </div>
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-blue-700">Lowercase letter</span>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${validatePassword(passwords.newPassword).hasLowerCase ? 'bg-green-100/50' : 'bg-blue-100/50'}`}>
+                      {validatePassword(passwords.newPassword).hasLowerCase ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                      <span className={`text-sm ${validatePassword(passwords.newPassword).hasLowerCase ? 'text-green-700' : 'text-blue-700'}`}>Lowercase letter</span>
                     </div>
-                  <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                    <span className="text-sm text-blue-700">Special character</span>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${validatePassword(passwords.newPassword).hasNumbers ? 'bg-green-100/50' : 'bg-blue-100/50'}`}>
+                      {validatePassword(passwords.newPassword).hasNumbers ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                      <span className={`text-sm ${validatePassword(passwords.newPassword).hasNumbers ? 'text-green-700' : 'text-blue-700'}`}>Numbers</span>
+                    </div>
+                    <div className={`flex items-center gap-2 p-3 rounded-lg ${validatePassword(passwords.newPassword).hasSpecialChar ? 'bg-green-100/50' : 'bg-blue-100/50'}`}>
+                      {validatePassword(passwords.newPassword).hasSpecialChar ? <CheckCircle className="w-4 h-4 text-green-500" /> : <AlertCircle className="w-4 h-4 text-blue-500" />}
+                      <span className={`text-sm ${validatePassword(passwords.newPassword).hasSpecialChar ? 'text-green-700' : 'text-blue-700'}`}>Special character</span>
                     </div>
                   </div>
-                </div>
+                                  </div>
+
+                {/* Message Display */}
+                {message.text && (
+                  <div className={`p-4 rounded-lg border ${
+                    message.type === 'success' 
+                      ? 'bg-green-50 border-green-200 text-green-800' 
+                      : 'bg-red-50 border-red-200 text-red-800'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {message.type === 'success' ? (
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                      ) : (
+                        <AlertCircle className="w-5 h-5 text-red-600" />
+                      )}
+                      <span className="font-medium">{message.text}</span>
+                    </div>
+                  </div>
+                )}
 
                 {/* Password Change Form */}
                 <div className="space-y-6">
@@ -192,10 +254,20 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                 <div className="flex items-center gap-4 pt-6">
                     <Button
                     onClick={handlePasswordChange}
-                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
+                    disabled={isLoading}
+                    className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <Key className="w-5 h-5 mr-2" />
-                      Update Password
+                      {isLoading ? (
+                        <div className="flex items-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          <span>Updating...</span>
+                        </div>
+                      ) : (
+                        <>
+                          <Key className="w-5 h-5 mr-2" />
+                          Update Password
+                        </>
+                      )}
                     </Button>
                     <Button
                       variant="outline"

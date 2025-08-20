@@ -1807,60 +1807,50 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full table-fixed">
-                      <thead>
+                    <table className="w-full min-w-[800px]">
+                      <thead className="sticky top-0 bg-white z-10">
                         <tr className="border-b transition-all duration-300 border-gray-200">
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("municipality")}
-                              className="flex items-center gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
                             >
                               Municipality
                               {sortBy === "municipality" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-28 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("district")}
-                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               District
                               {sortBy === "district" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-32 md:w-40 transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[200px] max-w-[300px] transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("when")}
-                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               When
                               {sortBy === "when" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
-                          {/* Temporarily hidden columns */}
-                          {false && (
-                            <>
-                              <th className="text-left p-4 font-semibold w-28 transition-colors duration-300 text-gray-700">Who</th>
-                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Why</th>
-                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">How</th>
-                            </>
-                          )}
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[180px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
                           {/* Hide Source column for Agriculture tab */}
                           {activeTab !== "agriculture" && (
-                            <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
                           )}
-                                                     {/* Other Information column hidden */}
-                           {/* <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Other Information</th> */}
-                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-24 transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2054,32 +2044,36 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           };
                           const IconComponent = getIconComponent(item.icon || 'AlertCircle');
                           return (
-                            <tr key={item.id || `item-${Math.random()}`}>
-                              <td className="p-2 md:p-4">
-                                <div className="flex items-center gap-2 md:gap-3">
-                                  <div className="p-1.5 md:p-2 rounded-lg bg-blue-100">
-                                    <IconComponent className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
+                            <tr key={item.id || `item-${Math.random()}`} className="hover:bg-gray-50 transition-colors duration-200">
+                              <td className="p-2 md:p-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-lg bg-blue-100 flex-shrink-0">
+                                    <IconComponent className="h-3 w-3 text-blue-600" />
                                   </div>
-                                  <span className="font-medium transition-colors duration-300 text-xs md:text-sm text-gray-900">{item.municipality}</span>
+                                  <span className="font-medium text-xs md:text-sm text-gray-900 truncate" title={item.municipality}>
+                                    {item.municipality}
+                                  </span>
                                 </div>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <Badge variant="outline" className="text-xs md:text-sm bg-gray-100 text-gray-700 border-gray-300">
+                              <td className="p-2 md:p-3">
+                                <Badge variant="outline" className="text-xs bg-gray-100 text-gray-700 border-gray-300">
                                   {item.district}
                                 </Badge>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.what}>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[280px] block" title={item.what}>
                                   {typeof item.what === 'string' ? item.what : 'N/A'}
                                 </span>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm transition-colors duration-300 text-gray-600">
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
                                   {formatDate(item.when)}
                                 </span>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700">{typeof item.where === 'string' ? item.where : 'N/A'}</span>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[160px] block" title={item.where}>
+                                  {typeof item.where === 'string' ? item.where : 'N/A'}
+                                </span>
                               </td>
                               {false && (
                               <td className="p-4">
@@ -2100,8 +2094,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </td>
                                 </>
                               )}
-                              <td className="p-2 md:p-4">
-                                <Badge className={`rounded-none text-xs md:text-sm ${
+                              <td className="p-2 md:p-3">
+                                <Badge className={`rounded-none text-xs ${
                                   item.actionTaken === "Resolved" 
                                     ? "bg-green-100 text-green-800"
                                     : "bg-gray-100 text-gray-800"
@@ -2111,11 +2105,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </td>
                               {/* Hide Source column data for Agriculture tab */}
                               {activeTab !== "agriculture" && (
-                                <td className="p-2 md:p-4">
-                                  <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.source}>
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.source}>
                                     {typeof item.source === 'string' ? item.source : 'N/A'}
-                                </span>
-                              </td>
+                                  </span>
+                                </td>
                               )}
                                                              {/* Other Information column data hidden */}
                                {/* <td className="p-4">
@@ -2123,34 +2117,34 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                    {item.otherInfo}
                                  </span>
                                </td> */}
-                              <td className="p-2 md:p-4">
-                                <div className="flex items-center gap-1 md:gap-2">
+                              <td className="p-2 md:p-3">
+                                <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "view")}
                                     title="View Details"
-                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 p-1 md:p-2"
+                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 p-1"
                                   >
-                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Eye className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "edit")}
                                     title="Edit"
-                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400 p-1 md:p-2"
+                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 p-1"
                                   >
-                                    <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Edit className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "delete")}
                                     title="Delete"
-                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 p-1 md:p-2"
+                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 p-1"
                                   >
-                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </td>
