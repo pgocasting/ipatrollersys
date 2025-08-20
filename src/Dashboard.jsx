@@ -1264,40 +1264,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {incidents.length > 0 ? (
                   incidents.slice(0, 5).map((incident, index) => {
-                    const getStatusColor = (status) => {
-                      switch (status) {
-                        case "Completed":
-                          return {
-                            bg: 'bg-green-50 border-green-200',
-                            icon: 'bg-green-100',
-                            iconColor: 'text-green-600',
-                            svg: <CheckCircle className="h-4 w-4 text-green-600" />
-                          };
-                        case "Under Investigation":
-                          return {
-                            bg: 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-100',
-                            iconColor: 'text-blue-600',
-                            svg: <Search className="h-4 w-4 text-blue-600" />
-                          };
-                        default: // Active
-                          return {
-                            bg: 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-100',
-                            iconColor: 'text-blue-600',
-                            svg: <Clock className="h-4 w-4 text-blue-600" />
-                          };
-                      }
+                    const getIncidentStyle = () => {
+                      return {
+                        bg: 'bg-blue-50 border-blue-200',
+                        icon: 'bg-blue-100',
+                        iconColor: 'text-blue-600',
+                        svg: <AlertTriangle className="h-4 w-4 text-blue-600" />
+                      };
                     };
 
-                    const statusColors = getStatusColor(incident.status);
+                    const incidentStyle = getIncidentStyle();
                     const timeAgo = incident.date ? new Date(incident.date).toLocaleDateString() : 'No date';
 
                     return (
-                      <div key={incident.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 hover:scale-105 ${statusColors.bg}`}>
+                      <div key={incident.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 hover:scale-105 ${incidentStyle.bg}`}>
                         <div className="flex items-center gap-3">
-                          <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${statusColors.icon}`}>
-                            {statusColors.svg}
+                          <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${incidentStyle.icon}`}>
+                            {incidentStyle.svg}
                           </div>
                           <div>
                             <p className="font-semibold transition-colors duration-300 text-gray-900">{incident.title || 'Incident Report'}</p>
@@ -1306,11 +1289,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                         </div>
                         <div className="text-right">
                           <span className="text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 bg-gray-100 text-gray-600">{timeAgo}</span>
-                          <div className={`text-xs font-medium mt-1 px-2 py-1 rounded-full transition-colors duration-300 ${
-                            statusColors.bg.replace('bg-', 'bg-').replace('/20', '/30').replace('/30', '/40')
-                          }`}>
-                            {incident.status || 'Active'}
-                          </div>
                         </div>
                       </div>
                     );
@@ -1478,15 +1456,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-4">
                   {incidents.map((incident, index) => (
                     <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2">
                         <h4 className="font-semibold transition-colors duration-300 text-gray-900">{incident.incidentType || 'Unknown Type'}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          incident.status === 'Completed' || incident.actionType
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {incident.status === 'Completed' || incident.actionType ? 'Completed' : 'Active'}
-                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="transition-colors duration-300 text-gray-600">
@@ -1545,15 +1516,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-4">
                   {actionReports.map((report, index) => (
                     <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2">
                         <h4 className="font-semibold transition-colors duration-300 text-gray-900">{report.what || 'Action Report'}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          report.status === 'Completed' || report.actionTaken === 'Completed'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {report.status === 'Completed' || report.actionTaken === 'Completed' ? 'Completed' : 'Active'}
-                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="transition-colors duration-300 text-gray-600">
