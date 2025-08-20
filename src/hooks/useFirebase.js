@@ -7,7 +7,10 @@ import {
   updateProfile,
   updatePassword,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence
 } from 'firebase/auth';
 import { 
   doc, 
@@ -38,8 +41,15 @@ export const useFirebase = () => {
   }, []);
 
   // Authentication functions
-  const signIn = async (email, password) => {
+  const signIn = async (email, password, keepLoggedIn = false) => {
     try {
+      // Set persistence based on user preference
+      if (keepLoggedIn) {
+        await setPersistence(auth, browserLocalPersistence);
+      } else {
+        await setPersistence(auth, browserSessionPersistence);
+      }
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       
       // Check user role in Firestore

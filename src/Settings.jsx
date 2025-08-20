@@ -12,7 +12,9 @@ import {
   EyeOff,
   Shield,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  LogOut,
+  User
 } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
 
@@ -32,6 +34,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ type: '', text: '' });
+  const [showChoiceModal, setShowChoiceModal] = useState(false);
 
   // Password validation
   const validatePassword = (password) => {
@@ -78,7 +81,8 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
       const result = await changePassword(passwords.currentPassword, passwords.newPassword);
       
       if (result.success) {
-        setMessage({ type: 'success', text: result.message });
+        // Show choice modal instead of success message
+        setShowChoiceModal(true);
         // Reset form
         setPasswords({
           currentPassword: "",
@@ -287,8 +291,53 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
               </div>
             </CardContent>
           </Card>
-             </div>
-           </div>
-       </Layout>
-     );
-   }
+        </div>
+      </div>
+
+      {/* Choice Modal */}
+      {showChoiceModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
+            <div className="text-center mb-6">
+              <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckCircle className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">
+                Password Updated Successfully!
+              </h3>
+              <p className="text-gray-600">
+                Your password has been changed. For security reasons, you can choose to:
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <Button
+                onClick={() => {
+                  setShowChoiceModal(false);
+                  onLogout();
+                }}
+                className="w-full bg-red-600 hover:bg-red-700 text-white py-3 text-lg font-semibold"
+              >
+                <LogOut className="w-5 h-5 mr-2" />
+                Logout Now
+              </Button>
+              
+              <Button
+                onClick={() => setShowChoiceModal(false)}
+                variant="outline"
+                className="w-full py-3 text-lg font-medium border-gray-300 text-gray-700 hover:bg-gray-50"
+              >
+                <User className="w-5 h-5 mr-2" />
+                Stay Logged In
+              </Button>
+            </div>
+
+            <p className="text-xs text-gray-500 text-center mt-4">
+              Note: Staying logged in means you'll continue using your current session
+            </p>
+          </div>
+        </div>
+      )}
+    </Layout>
+  );
+}

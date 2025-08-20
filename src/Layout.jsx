@@ -87,17 +87,17 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       {/* Responsive Sidebar */}
       <aside 
         id="sidebar"
-        className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-2 flex flex-col transition-all duration-300 overflow-y-auto ${
+        className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-1 flex flex-col transition-all duration-300 overflow-y-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } bg-white/95 border-gray-200`}
       >        
         {/* Sidebar Header */}
-        <div className="flex items-center justify-center mb-4">
+        <div className="flex items-center justify-center mb-2">
           <div className="flex items-center justify-center transition-colors duration-300">
             <img 
               src="/images/Ipatroller_Logo.png" 
               alt="IPatroller Logo" 
-              className="h-48 w-auto"
+              className="h-32 w-auto"
             />
           </div>
           

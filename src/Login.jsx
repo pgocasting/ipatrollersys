@@ -14,6 +14,7 @@ export default function Login({ onLogin }) {
   const [formData, setFormData] = useState({
     email: "",
     password: "",
+    keepLoggedIn: false,
   });
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ export default function Login({ onLogin }) {
 
     try {
       console.log('🔐 Attempting login with:', formData.email);
-      const result = await signIn(formData.email, formData.password);
+      const result = await signIn(formData.email, formData.password, formData.keepLoggedIn);
       
       if (result.success) {
         console.log('✅ Login successful:', result.user?.email);
@@ -55,10 +56,10 @@ export default function Login({ onLogin }) {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
     }));
   };
 
@@ -158,9 +159,12 @@ export default function Login({ onLogin }) {
               <input
                 type="checkbox"
                 id="keepLoggedIn"
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                name="keepLoggedIn"
+                checked={formData.keepLoggedIn}
+                onChange={handleChange}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 hover:border-blue-500 transition-colors duration-200"
               />
-              <Label htmlFor="keepLoggedIn" className="text-sm text-gray-700">
+              <Label htmlFor="keepLoggedIn" className="text-sm text-gray-700 cursor-pointer hover:text-blue-600 transition-colors duration-200">
                 Keep me logged in
               </Label>
             </div>
