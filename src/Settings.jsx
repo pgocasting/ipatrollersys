@@ -7,8 +7,8 @@ import { Label } from "./components/ui/label";
 import { 
   Lock,
   Key,
-  Save,
-  Eye,
+  Save, 
+  Eye, 
   EyeOff,
   Shield,
   CheckCircle
@@ -47,7 +47,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
     // In a real app, this would validate current password and update
     alert("Password changed successfully!");
     
-    // Reset form
+        // Reset form
     setPasswords({
       currentPassword: "",
       newPassword: "",
@@ -72,7 +72,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold text-gray-900 mb-2">Settings</h1>
             <p className="text-lg text-gray-600">Change your account password</p>
-          </div>
+              </div>
 
           {/* Password Change Card */}
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-xl">
@@ -80,49 +80,49 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
               <CardTitle className="flex items-center gap-3 text-center justify-center">
                 <Lock className="w-8 h-8 text-red-600" />
                 Change Password
-              </CardTitle>
+                    </CardTitle>
               <p className="text-center text-gray-600">
                 Update your password to keep your account secure
               </p>
-            </CardHeader>
+              </CardHeader>
             <CardContent className="space-y-6">
               
               {/* Password Requirements */}
               <div className="p-6 rounded-xl border bg-blue-50 border-blue-200">
-                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex items-center gap-3 mb-4">
                   <div className="p-2 rounded-lg bg-blue-100">
                     <Shield className="w-5 h-5 text-blue-600" />
-                  </div>
+                    </div>
                   <h3 className="text-lg font-semibold text-blue-700">
-                    Password Requirements
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      Password Requirements
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500" />
                     <span className="text-sm text-blue-700">Minimum 8 characters</span>
-                  </div>
+                    </div>
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500" />
                     <span className="text-sm text-blue-700">Uppercase letter</span>
-                  </div>
+                    </div>
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500" />
                     <span className="text-sm text-blue-700">Lowercase letter</span>
-                  </div>
+                    </div>
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-100/50">
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4 text-green-500" />
                     <span className="text-sm text-blue-700">Special character</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Password Change Form */}
-              <div className="space-y-6">
-                <div>
+                {/* Password Change Form */}
+                <div className="space-y-6">
+                  <div>
                   <Label htmlFor="currentPassword" className="text-lg font-semibold text-gray-900">
-                    Current Password
-                  </Label>
+                      Current Password
+                    </Label>
                   <div className="relative mt-2">
                     <Input
                       id="currentPassword"
@@ -140,12 +140,12 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                       {showPasswords.current ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                </div>
+                  </div>
 
-                <div>
+                  <div>
                   <Label htmlFor="newPassword" className="text-lg font-semibold text-gray-900">
-                    New Password
-                  </Label>
+                      New Password
+                    </Label>
                   <div className="relative mt-2">
                     <Input
                       id="newPassword"
@@ -163,12 +163,12 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                       {showPasswords.new ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                </div>
+                  </div>
 
-                <div>
+                  <div>
                   <Label htmlFor="confirmPassword" className="text-lg font-semibold text-gray-900">
-                    Confirm New Password
-                  </Label>
+                      Confirm New Password
+                    </Label>
                   <div className="relative mt-2">
                     <Input
                       id="confirmPassword"
@@ -186,20 +186,20 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                       {showPasswords.confirm ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                     </button>
                   </div>
-                </div>
+                  </div>
 
-                {/* Action Buttons */}
+                  {/* Action Buttons */}
                 <div className="flex items-center gap-4 pt-6">
-                  <Button
+                    <Button
                     onClick={handlePasswordChange}
                     className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300"
-                  >
-                    <Key className="w-5 h-5 mr-2" />
-                    Update Password
-                  </Button>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
+                    >
+                      <Key className="w-5 h-5 mr-2" />
+                      Update Password
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => {
                       setPasswords({
                         currentPassword: "",
                         newPassword: "",
@@ -209,14 +209,14 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     className="px-8 py-3 text-lg font-medium transition-all duration-300 hover:scale-105 border-gray-300 text-gray-700 hover:bg-gray-50"
                   >
                     <Save className="w-4 h-4 mr-2" />
-                    Clear Form
-                  </Button>
+                      Clear Form
+                    </Button>
                 </div>
               </div>
             </CardContent>
           </Card>
-        </div>
-      </div>
-    </Layout>
-  );
-}
+             </div>
+           </div>
+       </Layout>
+     );
+   }

@@ -22,7 +22,6 @@ import {
   Trash2,
   Filter,
   MapPin,
-  RefreshCw,
   Search,
   Settings,
   Shield,
@@ -99,7 +98,11 @@ import {
   Star,
   Heart,
   Briefcase,
-  FileText
+  FileText,
+  Pill,
+  Leaf,
+  Fish,
+  Trees
 } from "lucide-react";
 /**
  * Action Center Component
@@ -1432,31 +1435,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           <div className="flex flex-wrap gap-2">
               <Button 
                 onClick={handleAddActionReport}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Add Action Report"
+                className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 h-12 w-12 rounded-full"
+                title="Add Action Report"
               >
-              <Plus className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Add Report</span>
+                <Plus className="w-6 h-6" />
               </Button>
-              <Button 
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => setLoading(false), 500);
-                }} 
-                disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Refresh Data"
+
+              <Button
+                onClick={openPreviewModal}
+                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 h-12 w-12 rounded-full"
+                title="Preview Report"
               >
-              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-              </Button>
-            <Button
-              onClick={openPreviewModal}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Preview Report"
-            >
-              <Eye className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Preview</span>
+                <Eye className="w-6 h-6" />
               </Button>
 
             </div>
@@ -1811,7 +1801,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center gap-3">
-                      <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
                       <span className="text-base transition-colors duration-300 text-gray-600">Loading action items...</span>
                     </div>
                   </div>
@@ -1909,8 +1899,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               case "MapPin":
                                 return MapPin;
 
-                              case "RefreshCw":
-                                return RefreshCw;
+
                               case "Search":
                                 return Search;
                               case "Settings":
@@ -3091,7 +3080,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             size="sm"
                             className="text-yellow-600 border-yellow-600 hover:bg-yellow-50"
                           >
-                            <RefreshCw className="h-4 w-4 mr-2" />
+                            <RotateCw className="h-4 w-4 mr-2" />
                             Migrate Legacy Photos
                           </Button>
                         )}
@@ -3336,91 +3325,148 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               
               {/* Preview Content */}
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                                 {/* Report Header */}
-                 <div className="text-center mb-8 p-6 bg-blue-50 rounded-xl border border-blue-200">
-                   <h1 className="text-3xl font-bold text-blue-900 mb-2">Action Center Report</h1>
-                   {pdfDescription && pdfDescription.trim() && (
-                     <p className="text-sm italic text-blue-700 mb-4 max-w-2xl mx-auto">
-                       {pdfDescription}
-                     </p>
-                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="font-semibold text-blue-700">Month:</span>
-                      <p className="text-blue-900">{months[selectedMonth] || 'All Months'}</p>
+                {/* Report Header */}
+                <div className="mb-8">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+                    <div className="mb-4 md:mb-0">
+                      <h1 className="text-3xl font-bold mb-2">Action Center Report</h1>
+                      {pdfDescription && pdfDescription.trim() && (
+                        <p className="text-sm text-blue-100 max-w-2xl">
+                          {pdfDescription}
+                        </p>
+                      )}
                     </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">Year:</span>
-                      <p className="text-blue-900">{selectedYear || 'All Years'}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">District:</span>
-                      <p className="text-blue-900">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">Department:</span>
-                      <p className="text-blue-900">{(activeTab || 'unknown').toUpperCase()}</p>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Month</p>
+                        <p className="font-semibold">{months[selectedMonth] || 'All Months'}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Year</p>
+                        <p className="font-semibold">{selectedYear || 'All Years'}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">District</p>
+                        <p className="font-semibold">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Department</p>
+                        <p className="font-semibold">{(activeTab || 'unknown').toUpperCase()}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Summary Statistics */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Summary Statistics</h2>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                    Summary Statistics
+                  </h2>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Total Actions</p>
-                      <p className="text-2xl font-bold text-blue-600">{totalActions}</p>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-blue-600">Total Actions</p>
+                        <p className="text-3xl font-bold text-blue-700">{totalActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Activity className="w-16 h-16 text-blue-600" />
+                      </div>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Pending Actions</p>
-                      <p className="text-2xl font-bold text-orange-600">{pendingActions}</p>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-orange-600">Pending Actions</p>
+                        <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Clock className="w-16 h-16 text-orange-600" />
+                      </div>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Resolved Actions</p>
-                      <p className="text-2xl font-bold text-green-600">{resolvedActions}</p>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-green-600">Resolved Actions</p>
+                        <p className="text-3xl font-bold text-green-700">{resolvedActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <CheckCircle className="w-16 h-16 text-green-600" />
+                      </div>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">High Priority</p>
-                      <p className="text-2xl font-bold text-red-600">{highPriorityActions}</p>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-red-600">High Priority</p>
+                        <p className="text-3xl font-bold text-red-700">{highPriorityActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <AlertTriangle className="w-16 h-16 text-red-600" />
+                      </div>
                     </div>
                     
                     {/* Tab-specific statistics */}
                     {activeTab === "pnp" && (
                       <>
-                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                          <p className="text-sm font-medium text-red-600">Total Drugs</p>
-                          <p className="text-2xl font-bold text-red-600">{totalDrugs}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-red-600">Total Drugs</p>
+                            <p className="text-3xl font-bold text-red-700">{totalDrugs}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Pill className="w-16 h-16 text-red-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                          <p className="text-sm font-medium text-purple-600">Total Illegals</p>
-                          <p className="text-2xl font-bold text-purple-600">{totalIllegals}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-purple-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-purple-700">{totalIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Shield className="w-16 h-16 text-purple-600" />
+                          </div>
                         </div>
                       </>
                     )}
                     
                     {activeTab === "agriculture" && (
                       <>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-medium text-green-600">Total Illegals</p>
-                          <p className="text-2xl font-bold text-green-600">{totalAgricultureIllegals}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-green-700">{totalAgricultureIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Leaf className="w-16 h-16 text-green-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
-                          <p className="text-2xl font-bold text-blue-600">{totalFishingViolations}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalFishingViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Fish className="w-16 h-16 text-blue-600" />
+                          </div>
                         </div>
                       </>
                     )}
                     
                     {activeTab === "pg-enro" && (
                       <>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-medium text-green-600">Environmental</p>
-                          <p className="text-2xl font-bold text-green-600">{totalEnvironmentalViolations}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Environmental</p>
+                            <p className="text-3xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trees className="w-16 h-16 text-green-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-sm font-medium text-blue-600">Waste Management</p>
-                          <p className="text-2xl font-bold text-blue-600">{totalWasteManagement}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Waste Management</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalWasteManagement}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trash2 className="w-16 h-16 text-blue-600" />
+                          </div>
                         </div>
                       </>
                     )}
@@ -3429,58 +3475,130 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                 {/* Action Items Table */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Action Items Details</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-200 rounded-lg">
-                      <thead className="bg-blue-600 text-white">
-                        <tr>
-                          <th className="p-3 text-left text-sm font-semibold">Municipality</th>
-                          <th className="p-3 text-left text-sm font-semibold">District</th>
-                          <th className="p-3 text-left text-sm font-semibold">What</th>
-                          <th className="p-3 text-left text-sm font-semibold">When</th>
-                          <th className="p-3 text-left text-sm font-semibold">Where</th>
-                          <th className="p-3 text-left text-sm font-semibold">Action Taken</th>
-                          {activeTab === "pnp" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
-                          {activeTab === "agriculture" && <th className="p-3 text-left text-sm font-semibold">Illegal Type</th>}
-                          {activeTab === "pg-enro" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
-                          <th className="p-3 text-left text-sm font-semibold">Other Info</th>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                    Action Items Details
+                  </h2>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Municipality</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">District</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">What</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">When</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Where</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Taken</div>
+                          </th>
+                          {activeTab === "pnp" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                            </th>
+                          )}
+                          {activeTab === "agriculture" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Illegal Type</div>
+                            </th>
+                          )}
+                          {activeTab === "pg-enro" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                            </th>
+                          )}
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Info</div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-gray-200">
                         {(sortedItems || []).slice(0, 20).map((item, index) => (
-                          <tr key={item.id || index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                            <td className="p-3 text-sm border-b border-gray-200">{item.municipality || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">{item.district || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.what}>{item.what || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">{formatDate(item.when)}</td>
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.where}>{item.where || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                item.actionTaken === "Resolved" 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {item.actionTaken || 'N/A'}
-                              </span>
+                          <tr 
+                            key={item.id || index} 
+                            className="hover:bg-gray-50 transition-colors duration-150"
+                          >
+                            <td className="p-4">
+                              <div className="flex items-center">
+                                <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                                <span className="text-sm font-medium text-gray-900">{item.municipality || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className="font-medium">
+                                {item.district || 'N/A'}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.what}>
+                                {item.what || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="text-sm text-gray-700">{formatDate(item.when)}</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.where}>
+                                {item.where || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge 
+                                className={`${
+                                  item.actionTaken === "Resolved"
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                }`}
+                              >
+                                {item.actionTaken || 'Pending'}
+                              </Badge>
                             </td>
                             {activeTab === "pnp" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
+                                  {item.source || 'N/A'}
+                                </div>
+                              </td>
                             )}
                             {activeTab === "agriculture" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.illegalType}>{item.illegalType || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.illegalType}>
+                                  {item.illegalType || 'N/A'}
+                                </div>
+                              </td>
                             )}
                             {activeTab === "pg-enro" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
+                                  {item.source || 'N/A'}
+                                </div>
+                              </td>
                             )}
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.otherInfo}>{item.otherInfo || 'N/A'}</td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                {item.otherInfo || 'N/A'}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     {sortedItems && sortedItems.length > 20 && (
-                      <p className="text-sm text-gray-600 mt-2 text-center">
-                        Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
-                      </p>
+                      <div className="p-4 border-t border-gray-200 bg-gray-50">
+                        <p className="text-sm text-gray-600 text-center flex items-center justify-center">
+                          <AlertCircle className="w-4 h-4 mr-2 text-blue-500" />
+                          Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>

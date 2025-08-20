@@ -23,7 +23,6 @@ import {
   Save,
   Download,
   Upload,
-  RefreshCw,
   CheckCircle,
   XCircle,
   BarChart3,
@@ -51,7 +50,8 @@ import {
   Zap,
   Sun,
   Moon,
-  Camera
+  Camera,
+  MoreVertical
 } from "lucide-react";
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [patrolData, setPatrolData] = useState([]);
@@ -79,6 +79,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showSummaryReport, setShowSummaryReport] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [selectedItemForPhotos, setSelectedItemForPhotos] = useState(null);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
   const [beforePhoto, setBeforePhoto] = useState(null);
   const [afterPhoto, setAfterPhoto] = useState(null);
   const [beforePhotoFile, setBeforePhotoFile] = useState(null);
@@ -91,6 +92,20 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const fileInputRef = useRef(null);
   const beforePhotoInputRef = useRef(null);
   const afterPhotoInputRef = useRef(null);
+  const moreOptionsRef = useRef(null);
+
+  // Handle click outside for more options dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (moreOptionsRef.current && !moreOptionsRef.current.contains(event.target)) {
+        setShowMoreOptions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
   // Helper function to generate random colors for placeholder images
   const getRandomColor = () => {
     const colors = ['4F46E5', '10B981', 'F59E0B', 'EF4444', '8B5CF6', '06B6D4', 'EC4899', '14B8A6', 'F97316', '6366F1'];
@@ -1083,54 +1098,68 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             <Button
               onClick={savePatrolData}
               disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
+              className="bg-green-600 hover:bg-green-700 text-white p-2.5 h-12 w-12 rounded-full"
               title="Save Data"
             >
-              <Save className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Save</span>
+              <Save className="w-6 h-6" />
             </Button>
-            <Button
-              onClick={loadPatrolData}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-            </Button>
+
             <Button
               onClick={() => setShowSummaryReport(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Summary Report"
+              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 h-12 w-12 rounded-full"
+              title="Summary"
             >
-              <BarChart3 className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Report</span>
+              <BarChart3 className="w-6 h-6" />
             </Button>
-            <Button
-              onClick={() => fileInputRef.current?.click()}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Import Excel"
-            >
-              <Upload className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Import</span>
-            </Button>
-            <Button
-              onClick={downloadTemplate}
-              className="bg-gray-600 hover:bg-gray-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Download Template"
-            >
-              <Download className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Template</span>
-            </Button>
-            <Button
-              onClick={() => setShowClearModal(true)}
-              disabled={clearLoading}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Clear Data"
-            >
-              <Trash className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Clear</span>
-            </Button>
+            <div className="relative" ref={moreOptionsRef}>
+              <Button
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className="bg-gray-600 hover:bg-gray-700 text-white p-2.5 h-12 w-12 rounded-full"
+                title="More Options"
+              >
+                <MoreVertical className="w-6 h-6" />
+              </Button>
+              {showMoreOptions && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-50">
+                  <div className="py-1" role="menu" aria-orientation="vertical">
+                    <button
+                      onClick={() => {
+                        fileInputRef.current?.click();
+                        setShowMoreOptions(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Excel
+                    </button>
+                    <button
+                      onClick={() => {
+                        downloadTemplate();
+                        setShowMoreOptions(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download Template
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowClearModal(true);
+                        setShowMoreOptions(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center text-red-600 hover:text-red-700"
+                      role="menuitem"
+                      disabled={clearLoading}
+                    >
+                      <Trash className="w-4 h-4 mr-2" />
+                      Clear Data
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
             <input
               id="patrol-file-input"
               name="patrol-file-input"

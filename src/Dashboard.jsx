@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -39,7 +40,6 @@ import {
   TrendingUp,
   AlertCircle,
   X,
-  RefreshCw,
   Target,
   Trophy,
   Calendar,
@@ -129,8 +129,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
       
-      setFilteredTopPerformersData(monthData);
-      console.log(`✅ Top performers data loaded for ${monthYearId}:`, monthData.length, 'municipalities');
+      // If no documents were found, set empty array
+      if (monthData.length === 0) {
+        console.log(`ℹ️ No data found for ${monthYearId}`);
+        setFilteredTopPerformersData([]);
+      } else {
+        setFilteredTopPerformersData(monthData);
+        console.log(`✅ Top performers data loaded for ${monthYearId}:`, monthData.length, 'municipalities');
+      }
     } catch (error) {
       console.error(`❌ Error loading top performers data for ${month}-${year}:`, error);
       
@@ -141,8 +147,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         console.warn('Firestore unavailable - falling back to local data');
       }
       
-      // Fallback to current data if loading fails
-      setFilteredTopPerformersData(ipatrollerData || []);
+      // Don't fall back to current data, just set empty array if no data exists
+      setFilteredTopPerformersData([]);
     } finally {
       setLoadingTopPerformers(false);
     }
@@ -157,11 +163,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Helper function to get top performers data
   const getTopPerformers = () => {
-    // Use filtered data if available, otherwise fall back to current data
-    const dataToUse = filteredTopPerformersData.length > 0 ? filteredTopPerformersData : ipatrollerData;
+    // Only use filtered data, no fallback to current data
+    const dataToUse = filteredTopPerformersData;
     
     if (!dataToUse || dataToUse.length === 0) {
-      console.warn('No data available for top performers calculation');
+      console.warn('No data available for selected month');
       return [];
     }
     
@@ -933,15 +939,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => window.location.reload()}
-              disabled={dataLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-4 h-4 md:w-5 md:h-5 ${dataLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-            </Button>
+
             <Button
               onClick={() => setShowActiveModal(true)}
               className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base"
@@ -1704,6 +1702,16 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <p className="text-lg font-medium text-gray-700">Loading performance data...</p>
                   <p className="text-sm text-gray-500">Fetching data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
                 </div>
+              ) : (!filteredTopPerformersData || filteredTopPerformersData.length === 0) ? (
+                <div className="text-center py-12">
+                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
+                    <p className="text-gray-600 text-center">
+                      There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+                    </p>
+                  </div>
+                </div>
               ) : getTopPerformers().length > 0 ? (
                 <div className="space-y-6">
                   {/* Summary Stats Cards - Matching IPatroller style */}
@@ -1975,18 +1983,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                     </CardContent>
                   </Card>
                 </div>
-              ) : filteredTopPerformersData.length === 0 ? (
-                <div className="text-center py-12 transition-colors duration-300 text-gray-500">
-                  <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                  <p className="text-xl font-medium">No Data Available for Selected Period</p>
-                  <p className="text-sm">No patrol data found for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-                  <p className="text-xs text-gray-400 mt-2">Try selecting a different month or year</p>
-                </div>
               ) : (
-                <div className="text-center py-12 transition-colors duration-300 text-gray-500">
-                  <Target className="h-16 w-16 mx-auto mb-4 text-gray-400" />
-                  <p className="text-xl font-medium">No Performance Data Available</p>
-                  <p className="text-sm">No patrol data has been recorded yet.</p>
+                <div className="text-center py-12">
+                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
+                    <p className="text-gray-600 text-center">
+                      There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+                    </p>
+                  </div>
                 </div>
               )}
             </div>

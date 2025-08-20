@@ -40,6 +40,7 @@ import {
   AlertTriangle,
   Eye,
   Edit,
+  Eraser,
   Download,
   Printer,
   Filter,
@@ -64,6 +65,7 @@ import {
   Save,
   RefreshCw,
   MoreHorizontal,
+  MoreVertical,
   ChevronDown,
   ChevronUp,
   ChevronLeft,
@@ -398,6 +400,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     }
   });
   const [showCleanupDropdown, setShowCleanupDropdown] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const moreOptionsRef = useRef(null);
+
+  // Handle click outside for more options dropdown
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (moreOptionsRef.current && !moreOptionsRef.current.contains(event.target)) {
+        setShowMoreOptions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [connectionError, setConnectionError] = useState(null);
@@ -3183,105 +3200,109 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={handleImportExcel}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Import Excel/CSV"
+              onClick={() => setShowAddModal(true)}
+              className="bg-green-600 hover:bg-green-700 text-white p-2.5 h-12 w-12 rounded-full"
+              title="Add New Incident"
               disabled={loading}
             >
-              <Upload className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Import</span>
+              <Plus className="w-6 h-6" />
             </Button>
             <Button
-              onClick={loadIncidents}
+              onClick={() => setShowSummaryModal(true)}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 h-12 w-12 rounded-full"
+              title="Summary Insights"
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Refresh Data"
             >
-              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
-              <span className="hidden sm:inline ml-2">Refresh</span>
+              <BarChart3 className="w-6 h-6" />
             </Button>
-            <div className="relative">
-            <Button
-                onClick={() => setShowCleanupDropdown(!showCleanupDropdown)}
-                disabled={loading || cleanupLoading}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-                title="Cleanup Options"
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
-              {/* Cleanup Dropdown Menu */}
-              {showCleanupDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 bg-white border-gray-200">
-                  <div className="py-1">
+            <div className="relative" ref={moreOptionsRef}>
+              <Button
+                onClick={() => setShowMoreOptions(!showMoreOptions)}
+                className="bg-gray-600 hover:bg-gray-700 text-white p-2.5 h-12 w-12 rounded-full"
+                title="More Options"
+              >
+                <MoreVertical className="w-6 h-6" />
+              </Button>
+              {showMoreOptions && (
+                <div className="absolute right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 bg-white border-gray-200">
+                  <div className="py-1" role="menu" aria-orientation="vertical">
+                    <button
+                      onClick={() => {
+                        handleImportExcel();
+                        setShowMoreOptions(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Import Excel/CSV
+                    </button>
+                    <button
+                      onClick={() => {
+                        showPdfEditInterface();
+                        setShowMoreOptions(false);
+                      }}
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Export to PDF
+                    </button>
+                    <div className="border-t border-gray-200 my-1"></div>
                     <button
                       onClick={() => {
                         identifyDuplicateIncidents();
-                        setShowCleanupDropdown(false);
+                        setShowMoreOptions(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
                     >
-                      🔍 Identify Duplicates
+                      <Search className="w-4 h-4 mr-2" />
+                      Identify Duplicates
                     </button>
                     <button
                       onClick={() => {
                         manualCleanupDuplicates();
-                        setShowCleanupDropdown(false);
+                        setShowMoreOptions(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
                     >
-                      🧹 Clean Duplicates
+                      <Eraser className="w-4 h-4 mr-2" />
+                      Clean Duplicates
                     </button>
                     <button
                       onClick={() => {
                         clearCurrentMonthIncidents();
-                        setShowCleanupDropdown(false);
+                        setShowMoreOptions(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 hover:text-gray-900 flex items-center"
+                      role="menuitem"
                     >
-                      📅 Clear Current Month
+                      <Calendar className="w-4 h-4 mr-2" />
+                      Clear Current Month
                     </button>
                     <button
                       onClick={() => {
                         if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
                           clearAllIncidentsData();
-                          setShowCleanupDropdown(false);
+                          setShowMoreOptions(false);
                         }
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-red-600 hover:bg-gray-100 hover:text-red-700 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-gray-100 hover:text-red-700 flex items-center"
+                      role="menuitem"
                     >
-                      🗑️ Clear All Data
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Clear All Data
                     </button>
                   </div>
                 </div>
               )}
             </div>
-            <Button
-              onClick={() => setShowAddModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white"
-              title="Add New Incident"
-              disabled={loading}
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() => setShowSummaryModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              title="Summary Insights"
-              disabled={loading}
-            >
-              <BarChart3 className="w-5 h-5" />
-            </Button>
-            <Button
-                              onClick={showPdfEditInterface}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              title="Export to PDF"
-            >
-              <Printer className="w-5 h-5" />
-            </Button>
             <input
               id="incidents-file-input"
               name="incidents-file-input"

@@ -10,7 +10,6 @@ import {
   AlertTriangle, 
   BarChart3, 
   Settings,
-  Shield,
   Menu,
   X,
   Bell,
@@ -93,11 +92,13 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         } bg-white/95 border-gray-200`}
       >        
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between mb-8">
-                      <div className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2 transition-colors duration-300 text-blue-700">
-            <Shield className="h-8 w-8" />
-            <span className="hidden md:inline">Dashboard</span>
-            <span className="md:hidden">IPatroller</span>
+        <div className="flex items-center justify-center mb-8">
+          <div className="flex items-center justify-center transition-colors duration-300">
+            <img 
+              src="/images/Ipatroller_Logo.png" 
+              alt="IPatroller Logo" 
+              className="h-24 w-auto"
+            />
           </div>
           
           {/* Close button for mobile */}
@@ -168,9 +169,16 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         </Button>
 
         {/* Page Title */}
-        <h1 className="text-lg md:text-2xl font-bold capitalize flex-1 truncate transition-colors duration-300 text-gray-900">
-          {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
-        </h1>
+        <div className="flex items-center gap-3 flex-1">
+          <img 
+            src="/images/Ipatroller_Logo.png" 
+            alt="IPatroller Logo" 
+            className="h-20 w-auto md:hidden"
+          />
+          <h1 className="text-lg md:text-2xl font-bold capitalize truncate transition-colors duration-300 text-gray-900">
+            {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
+          </h1>
+        </div>
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 md:gap-3">
