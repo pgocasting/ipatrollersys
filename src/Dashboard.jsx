@@ -938,47 +938,42 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-3">
 
             <Button
               onClick={() => setShowActiveModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base"
+              className="bg-green-600 hover:bg-green-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               title="View Active Municipalities"
             >
-              <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Active</span>
+              <CheckCircle className="w-6 h-6" />
             </Button>
             <Button
               onClick={() => setShowInactiveModal(true)}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm md:text-base"
+              className="bg-red-600 hover:bg-red-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               title="View Inactive Municipalities"
             >
-              <XCircle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Inactive</span>
+              <XCircle className="w-6 h-6" />
             </Button>
             <Button
               onClick={() => setShowTotalIncidentsModal(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white text-sm md:text-base"
+              className="bg-orange-600 hover:bg-orange-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               title="View Total Incidents"
             >
-              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Incidents</span>
+              <AlertTriangle className="w-6 h-6" />
             </Button>
             <Button
               onClick={() => setShowTotalActionsModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base"
+              className="bg-indigo-700 hover:bg-indigo-800 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               title="View Total Actions"
             >
-              <Activity className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Actions</span>
+              <Activity className="w-6 h-6" />
             </Button>
             <Button
               onClick={() => setShowTopPerformersModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm md:text-base"
+              className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
               title="View Top Performers"
             >
-              <Target className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Top Performers</span>
+              <Target className="w-6 h-6" />
             </Button>
           </div>
         </div>
