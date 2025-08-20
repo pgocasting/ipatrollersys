@@ -97,7 +97,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             <img 
               src="/images/Ipatroller_Logo.png" 
               alt="IPatroller Logo" 
-              className="h-24 w-auto"
+              className="h-32 w-auto"
             />
           </div>
           
@@ -173,7 +173,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
           <img 
             src="/images/Ipatroller_Logo.png" 
             alt="IPatroller Logo" 
-            className="h-20 w-auto md:hidden"
+            className="h-28 w-auto md:hidden"
           />
           <h1 className="text-lg md:text-2xl font-bold capitalize truncate transition-colors duration-300 text-gray-900">
             {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
