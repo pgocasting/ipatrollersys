@@ -51,6 +51,13 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [sidebarOpen]);
+
+  // Close sidebar when navigating to a new page on mobile
+  useEffect(() => {
+    if (sidebarOpen && window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, [currentPage, sidebarOpen]);
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
@@ -73,6 +80,19 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" /> },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" /> },
   ];
+
+  const handleNavigation = (pageId) => {
+    // Close mobile sidebar
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+    
+    // Navigate to page
+    onNavigate(pageId);
+    
+    // Update browser history without adding to back stack
+    window.history.replaceState({ page: pageId }, '', `/${pageId}`);
+  };
 
   return (
     <div className="min-h-screen transition-all duration-300 max-w-full bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -118,8 +138,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             <Button
               key={item.id}
               onClick={() => { 
-                setSidebarOpen(false); 
-                onNavigate(item.id); 
+                handleNavigation(item.id); 
               }}
               variant={currentPage === item.id ? "default" : "ghost"}
               className={`justify-start h-12 text-base font-medium transition-all duration-200 ${
@@ -138,8 +157,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         <div className="mt-auto pt-4 border-t transition-colors duration-300 border-gray-200">
           <Button
             onClick={() => { 
-              setSidebarOpen(false); 
-              onNavigate('settings'); 
+              handleNavigation('settings'); 
             }}
             variant={currentPage === 'settings' ? "default" : "ghost"}
             className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 ${

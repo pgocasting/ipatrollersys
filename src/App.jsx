@@ -11,15 +11,14 @@ import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import DebugComponent from "./DebugComponent";
+import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState(() => {
-    // Get the current page from URL on initial load
-    const path = window.location.pathname.replace('/', '');
-    const validPages = ['dashboard', 'ipatroller', 'reports', 'incidents', 'actioncenter', 'settings'];
-    return validPages.includes(path) ? path : 'dashboard';
+    // Get the current page from URL on initial load using utility function
+    return getCurrentPageFromURL();
   });
   const { user, loading, logout } = useFirebase();
 
@@ -53,19 +52,20 @@ export default function App() {
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
-    window.history.pushState({}, '', `/${page}`);
+    // Use utility function to update URL
+    window.history.replaceState({}, '', `/${page}`);
   };
 
-  // Listen for browser back/forward buttons
+  // Listen for browser back/forward buttons and URL changes using utility function
   useEffect(() => {
-    const handlePopState = () => {
-      const path = window.location.pathname.replace('/', '');
-      setCurrentPage(path || 'dashboard');
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const cleanup = handleBrowserNavigation(setCurrentPage);
+    return cleanup;
   }, []);
+
+  // Ensure URL is always in sync with current page
+  useEffect(() => {
+    syncURLWithPage(currentPage);
+  }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
