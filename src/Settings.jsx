@@ -14,7 +14,11 @@ import {
   CheckCircle,
   AlertCircle,
   LogOut,
-  User
+  User,
+  Database,
+  Cloud,
+  Code,
+  TestTube
 } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
 
@@ -291,6 +295,82 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Development Tools Section */}
+          <div className="mt-8">
+            <Card className="border-2 border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl text-blue-900">
+                  <Code className="w-6 h-6" />
+                  Development Tools
+                </CardTitle>
+                <p className="text-blue-700 text-sm">
+                  Access development and testing tools for system administration
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Firebase Testing */}
+                  <Button
+                    onClick={() => onNavigate('firebase-test')}
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-center gap-2 border-blue-300 text-blue-700 hover:bg-blue-100 hover:border-blue-400 transition-all duration-200"
+                  >
+                    <Database className="w-8 h-8" />
+                    <div className="text-center">
+                      <div className="font-semibold">Firebase Testing</div>
+                      <div className="text-xs text-blue-600">Connection diagnostics & health checks</div>
+                    </div>
+                  </Button>
+
+                  {/* Cloudinary Demo */}
+                  <Button
+                    onClick={() => onNavigate('cloudinary-demo')}
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-center gap-2 border-purple-300 text-purple-700 hover:bg-purple-100 hover:border-purple-400 transition-all duration-200"
+                  >
+                    <Cloud className="w-8 h-8" />
+                    <div className="text-center">
+                      <div className="font-semibold">Cloudinary Demo</div>
+                      <div className="text-xs text-purple-600">File upload & management testing</div>
+                    </div>
+                  </Button>
+
+                                 {/* Firebase-Cloudinary Integration */}
+               <Button
+                 onClick={() => onNavigate('firebase-cloudinary-demo')}
+                 variant="outline"
+                 className="h-auto p-4 flex flex-col items-center gap-2 border-green-300 text-green-700 hover:bg-green-100 hover:border-green-400 transition-all duration-200"
+               >
+                 <TestTube className="w-8 h-8" />
+                 <div className="text-center">
+                   <div className="font-semibold">Integration Demo</div>
+                   <div className="text-xs text-green-600">Firebase + Cloudinary integration testing</div>
+                 </div>
+               </Button>
+
+               {/* Photo Migration Tool */}
+               <Button
+                 onClick={() => onNavigate('photo-migration')}
+                 variant="outline"
+                 className="h-auto p-4 flex flex-col items-center gap-2 border-orange-300 text-orange-700 hover:bg-orange-100 hover:border-orange-400 transition-all duration-200"
+               >
+                 <Cloud className="w-8 h-8" />
+                 <div className="text-center">
+                   <div className="font-semibold">Photo Migration</div>
+                   <div className="text-xs text-orange-600">Migrate existing photos to Cloudinary</div>
+                 </div>
+               </Button>
+                </div>
+                
+                <div className="pt-4 border-t border-blue-200">
+                  <p className="text-xs text-blue-600 text-center">
+                    These tools are for development and testing purposes. Use them to verify system functionality.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
 

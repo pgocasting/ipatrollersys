@@ -6,8 +6,20 @@ window.testFirebase = async () => {
   console.log('🧪 Testing Firebase connection...');
   
   try {
-    // Import Firebase functions dynamically
-    const { checkConnectionHealth, initializeAndTest } = await import('./firebase.js');
+    // Check if Firebase is already available
+    if (window.db && window.auth) {
+      console.log('✅ Firebase already available');
+      
+      // Test basic connectivity
+      const { collection, query, getDocs } = await import('firebase/firestore');
+      const testQuery = query(collection(window.db, '_test_collection'));
+      await getDocs(testQuery);
+      
+      return { status: 'connected', message: 'Firebase is working correctly' };
+    }
+    
+    // Try to import and test
+    const { checkConnectionHealth, initializeAndTest } = await import('/src/firebase.js');
     
     console.log('✅ Firebase modules loaded');
     
@@ -27,7 +39,7 @@ window.runFirebaseDiagnostics = async () => {
   console.log('🔍 Running Firebase diagnostics...');
   
   try {
-    const { firebaseDiagnostics } = await import('./firebaseDiagnostics.js');
+    const { firebaseDiagnostics } = await import('/src/utils/firebaseDiagnostics.js');
     const results = await firebaseDiagnostics.runDiagnostics();
     
     console.log('📊 Diagnostics results:', results);
@@ -131,7 +143,7 @@ window.forceFirebaseReconnect = async () => {
   console.log('🔄 Forcing Firebase reconnection...');
   
   try {
-    const { initializeAndTest } = await import('./firebase.js');
+    const { initializeAndTest } = await import('/src/firebase.js');
     
     await initializeAndTest();
     console.log('✅ Firebase reconnection completed');

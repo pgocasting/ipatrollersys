@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
-import { handleActionCenterPhotoUpload } from "./utils/cloudinaryIntegration";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -9,8 +8,8 @@ import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { writeBatch, doc } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { db, storage } from "./firebase";
+import { cloudinaryUtils } from "./utils/cloudinary";
+import { db } from "./firebase";
 import { 
   Activity,
   AlertTriangle,
@@ -1022,8 +1021,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return photo;
   };
 
-  // Function to upload photos to Firebase Storage
-  const uploadPhotosToStorage = async (photos) => {
+  // Function to upload photos to Cloudinary
+  const uploadPhotosToCloudinary = async (photos) => {
     if (!photos || !Array.isArray(photos) || photos.length === 0) {
       return [];
     }
@@ -1035,30 +1034,32 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       }
       
       try {
-        // Create a unique filename
-        const timestamp = Date.now();
-        const randomId = Math.random().toString(36).substring(2);
-        const fileExtension = photo.fileType.split('/')[1] || 'jpg';
-        const fileName = `action-reports/${timestamp}-${randomId}.${fileExtension}`;
+        // Convert blob to File object for Cloudinary upload
+        const file = new File([photo.blob], photo.fileName, { type: photo.fileType });
         
-        // Upload to Firebase Storage
-        const storageRef = ref(storage, fileName);
-        await uploadBytes(storageRef, photo.blob);
+        // Upload to Cloudinary
+        const result = await cloudinaryUtils.uploadImage(file, {
+          folder: 'ipatroller/action-reports',
+          publicId: `action-report-${Date.now()}-${Math.random().toString(36).substring(2)}`
+        });
         
-        // Get download URL
-        const downloadURL = await getDownloadURL(storageRef);
-        
-        return {
-          id: photo.id,
-          fileName: photo.fileName,
-          fileSize: photo.fileSize,
-          fileType: photo.fileType,
-          lastModified: photo.lastModified,
-          uploadDate: photo.uploadDate,
-          storageUrl: downloadURL
-        };
+        if (result.success) {
+          return {
+            id: photo.id,
+            fileName: photo.fileName,
+            fileSize: photo.fileSize,
+            fileType: photo.fileType,
+            lastModified: photo.lastModified,
+            uploadDate: photo.uploadDate,
+            storageUrl: result.data.url,
+            cloudinaryId: result.data.publicId
+          };
+        } else {
+          console.error('Cloudinary upload failed:', result.error);
+          return null;
+        }
       } catch (error) {
-        console.error('Error uploading photo:', error);
+        console.error('Error uploading photo to Cloudinary:', error);
         return null;
       }
     });
@@ -1101,7 +1102,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     setImageModalData({ imageSource, fileName });
     setShowImageModal(true);
   };
-  const handlePhotoUpload = async (event, setReport) => {
+  const handlePhotoUpload = (event, setReport) => {
     if (!event || !event.target) {
       console.error('Invalid event object');
       return;
@@ -1110,61 +1111,80 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       console.error('setReport is not a function');
       return;
     }
-    
     const files = Array.from(event.target?.files || []);
     if (!Array.isArray(files)) {
       console.error('Files is not an array');
       return;
     }
-    
     const validFiles = files.filter(file => file && file.type && file.type.startsWith('image/'));
     if (!validFiles || !Array.isArray(validFiles) || validFiles.length === 0) {
       alert('Please select valid image files only.');
       return;
     }
-    
     if (validFiles.length > 10) {
       alert('Maximum 10 images allowed.');
       return;
     }
-
-    try {
-      // Show loading state
-      setReport(prevReport => ({
-        ...(prevReport || {}),
-        photoUploadLoading: true
-      }));
-
-      // Upload to Cloudinary
-      const result = await handleActionCenterPhotoUpload(validFiles, {
-        reportType: 'action-reports',
-        district: 'general', // You can pass actual district if available
-        municipality: 'general' // You can pass actual municipality if available
+    
+    // Process images with compression and store file objects
+    if (validFiles && Array.isArray(validFiles)) {
+      validFiles.forEach(file => {
+        if (!file || typeof file !== 'object' || !(file instanceof File)) return;
+        
+        // Create a compressed version of the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+          // Calculate new dimensions (max 800x800 to reduce size)
+          const maxSize = 800;
+          let { width, height } = img;
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress image
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to blob with compression
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const newPhoto = {
+                id: Date.now() + Math.random(),
+                fileName: file.name || 'Unknown',
+                fileSize: blob.size,
+                fileType: file.type || 'image/jpeg',
+                lastModified: file.lastModified || Date.now(),
+                uploadDate: new Date().toISOString(),
+                // Store the compressed blob instead of base64
+                blob: blob,
+                // Create a preview URL for display
+                preview: URL.createObjectURL(blob)
+              };
+              
+              setReport(prevReport => ({
+                ...(prevReport || {}),
+                photos: [...(prevReport?.photos || []), newPhoto]
+              }));
+            }
+          }, 'image/jpeg', 0.8); // Compress to JPEG with 80% quality
+        };
+        
+        img.src = URL.createObjectURL(file);
       });
-
-      if (result.success) {
-        // Add photos to report
-        setReport(prevReport => ({
-          ...(prevReport || {}),
-          photos: [...(prevReport?.photos || []), ...result.photos],
-          photoUploadLoading: false
-        }));
-
-        console.log('✅ Photos uploaded to Cloudinary:', result.photos);
-        alert(`✅ Successfully uploaded ${result.photos.length} photos to Cloudinary!`);
-      } else {
-        throw new Error(result.error || 'Upload failed');
-      }
-
-    } catch (error) {
-      console.error('❌ Photo upload failed:', error);
-      alert(`❌ Failed to upload photos: ${error.message}`);
-      
-      // Reset loading state
-      setReport(prevReport => ({
-        ...(prevReport || {}),
-        photoUploadLoading: false
-      }));
     }
   };
   const handlePhotoRemove = (photoId, setActionReport) => {
@@ -1206,11 +1226,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Source field is not shown for Agriculture
       }
 
-      // Upload photos to Firebase Storage and get URLs
+              // Upload photos to Cloudinary and get URLs
       let photoUrls = [];
       if (newActionReport.photos && newActionReport.photos.length > 0) {
         try {
-          photoUrls = await uploadPhotosToStorage(newActionReport.photos);
+          photoUrls = await uploadPhotosToCloudinary(newActionReport.photos);
         } catch (error) {
           console.error('Error uploading photos:', error);
           alert('Error uploading photos. Please try again.');
@@ -1319,7 +1339,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       const newPhotos = editingItem.photos ? editingItem.photos.filter(photo => photo.blob) : [];
       if (newPhotos.length > 0) {
         try {
-          const newPhotoUrls = await uploadPhotosToStorage(newPhotos);
+          const newPhotoUrls = await uploadPhotosToCloudinary(newPhotos);
           const newCleanPhotos = newPhotoUrls.map(url => ({
             id: url.id,
             fileName: url.fileName,
@@ -1826,6 +1846,68 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
               </div>
+                </>
+              )}
+              {/* PG-ENRO Tab - Environment Stats */}
+              {activeTab === "pg-enro" && (
+                <>
+                  {/* Total Entries Card */}
+                  <div className="bg-purple-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-100 text-xs font-medium">Total Entries</p>
+                        <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
+                        <p className="text-purple-200 text-xs">All environment records</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Illegals Card */}
+                  <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-red-100 text-xs font-medium mb-1">Illegals (Auto-Detected)</p>
+                        <p className="text-lg font-bold mb-1">{totalIllegals}</p>
+                        <p className="text-red-200 text-xs leading-tight">
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts)
+                            .slice(0, 3) // Show only first 3 categories to fit better
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ')}
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 3 && '...'}
+                        </p>
+                        {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 0 && (
+                          <p className="text-red-200 text-xs mt-1">
+                            {Object.entries(illegalCategoryCounts).length} categories detected
+                            {Object.entries(illegalCategoryCounts).length > 3 && (
+                              <span className="ml-1 cursor-help" title={Object.entries(illegalCategoryCounts)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join('\n')}>
+                                (Hover for details)
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Action Taken Card */}
+                  <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
                 </>
               )}
             </div>

@@ -6,7 +6,6 @@ import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { Label } from "./components/ui/label";
 import { db } from "./firebase";
-import { handleIPatrollerPhotoUpload } from "./utils/cloudinaryIntegration";
 import {
   collection,
   doc,
@@ -469,58 +468,31 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     setAfterPhotoFile(null);
     setActionTaken('');
   };
-  const handleBeforePhotoChange = async (event) => {
+  const handleBeforePhotoChange = (event) => {
     const file = event.target.files[0];
     if (file) {
       if (file.type.startsWith('image/')) {
-        try {
-          // Upload to Cloudinary
-          const result = await handleIPatrollerPhotoUpload(file, 'before', {
-            municipality: selectedItemForPhotos?.municipality || 'Unknown',
-            district: selectedItemForPhotos?.district || 'Unknown',
-            date: selectedDate
-          });
-
-          if (result.success) {
-            setBeforePhotoFile(file);
-            setBeforePhoto(result.photo.url);
-            console.log('✅ Before photo uploaded to Cloudinary:', result.photo);
-          } else {
-            alert(`❌ Upload failed: ${result.error}`);
-          }
-        } catch (error) {
-          console.error('❌ Before photo upload error:', error);
-          alert('❌ Failed to upload before photo. Please try again.');
-        }
+        setBeforePhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setBeforePhoto(e.target.result);
+        };
+        reader.readAsDataURL(file);
       } else {
         alert('Please select an image file');
       }
     }
   };
-
-  const handleAfterPhotoChange = async (event) => {
+  const handleAfterPhotoChange = (event) => {
     const file = event.target.files[0];
     if (file) {
       if (file.type.startsWith('image/')) {
-        try {
-          // Upload to Cloudinary
-          const result = await handleIPatrollerPhotoUpload(file, 'after', {
-            municipality: selectedItemForPhotos?.municipality || 'Unknown',
-            district: selectedItemForPhotos?.district || 'Unknown',
-            date: selectedDate
-          });
-
-          if (result.success) {
-            setAfterPhotoFile(file);
-            setAfterPhoto(result.photo.url);
-            console.log('✅ After photo uploaded to Cloudinary:', result.photo);
-          } else {
-            alert(`❌ Upload failed: ${result.error}`);
-          }
-        } catch (error) {
-          console.error('❌ After photo upload error:', error);
-          alert('❌ Failed to upload after photo. Please try again.');
-        }
+        setAfterPhotoFile(file);
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setAfterPhoto(e.target.result);
+        };
+        reader.readAsDataURL(file);
       } else {
         alert('Please select an image file');
       }
@@ -535,41 +507,34 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     const handleSavePhotos = async () => {
     if (!selectedItemForPhotos) return;
     try {
-      console.log('💾 Saving photos to Cloudinary for:', selectedItemForPhotos.municipality);
-      console.log('📅 Selected date:', selectedDate);
-      console.log('📸 Before photo URL:', beforePhoto);
-      console.log('📸 After photo URL:', afterPhoto);
-      
-      // Store photos with Cloudinary URLs
+      // TODO: Implement actual photo upload to Firebase Storage
+      console.log('Saving photos for:', selectedItemForPhotos.municipality);
+      console.log('Selected date:', selectedDate);
+      console.log('Before photo:', beforePhotoFile);
+      console.log('After photo:', afterPhotoFile);
+      // Store photos in local state for now (replace with Firebase later)
       const photoKey = `${selectedItemForPhotos.municipality}-${selectedDate}`;
       setUploadedPhotos(prev => ({
         ...prev,
         [photoKey]: {
-          beforePhoto: beforePhoto, // Now contains Cloudinary URL
-          afterPhoto: afterPhoto,   // Now contains Cloudinary URL
+          beforePhoto: beforePhoto,
+          afterPhoto: afterPhoto,
           beforePhotoFile: beforePhotoFile,
           afterPhotoFile: afterPhotoFile,
-          actionTaken: actionTaken,
+          actionTaken: actionTaken, // Store action taken text
           uploadDate: new Date().toISOString(),
           municipality: selectedItemForPhotos.municipality,
           district: selectedItemForPhotos.district,
-          selectedDate: selectedDate,
-          // Add Cloudinary metadata
-          cloudinaryStorage: true,
-          storageProvider: 'Cloudinary',
-          lastUpdated: new Date().toISOString()
+          selectedDate: selectedDate // Store the selected date
         }
       }));
-
-      // Show success message with Cloudinary confirmation
-      const successMessage = `✅ Photos saved successfully to Cloudinary!\n\n📍 Location: ${selectedItemForPhotos.municipality} - ${selectedItemForPhotos.district}\n📅 Date: ${selectedDate}\n📸 Before Photo: ${beforePhoto ? '✅ Uploaded to Cloudinary' : '❌ Not uploaded'}\n📸 After Photo: ${afterPhoto ? '✅ Uploaded to Cloudinary' : '❌ Not uploaded'}\n📝 Action Taken: ${actionTaken ? '✅ Recorded' : '❌ Not recorded'}\n☁️ Storage: Cloudinary CDN`;
+      // Show success message with more details
+      const successMessage = `✅ Photos saved successfully!\n\n📍 Location: ${selectedItemForPhotos.municipality} - ${selectedItemForPhotos.district}\n📅 Date: ${selectedDate}\n📸 Before Photo: ${beforePhoto ? '✅ Uploaded' : '❌ Not uploaded'}\n📸 After Photo: ${afterPhoto ? '✅ Uploaded' : '❌ Not uploaded'}\n📝 Action Taken: ${actionTaken ? '✅ Recorded' : '❌ Not recorded'}`;
       alert(successMessage);
-      
-      console.log('✅ Photos saved with Cloudinary URLs');
       handleClosePhotoModal();
     } catch (error) {
-      console.error('❌ Error saving photos:', error);
-      alert('❌ Error saving photos. Please try again.');
+      console.error('Error saving photos:', error);
+      alert('Error saving photos. Please try again.');
     }
   };
   const filteredData = patrolData
@@ -648,39 +613,24 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     municipalityCount: patrolData.length,
   };
   // Excel import functions
-  const handleFileUpload = async (event) => {
+  const handleFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    
-    try {
-      // First upload to Cloudinary for backup
-      const cloudinaryResult = await handleFileImportUpload(file, {
-        importType: 'patrol-data',
-        district: selectedDistrict,
-        municipality: 'general'
-      });
-
-      if (!cloudinaryResult.success) {
-        console.warn('⚠️ Cloudinary upload failed, continuing with local processing:', cloudinaryResult.error);
-      } else {
-        console.log('✅ File backed up to Cloudinary:', cloudinaryResult.file);
-      }
-
-      // Check file extension and type
-      const fileName = file.name.toLowerCase();
-      const isCSV = fileName.endsWith(".csv") || file.type === "text/csv";
-      const isExcel =
-        fileName.endsWith(".xlsx") ||
-        fileName.endsWith(".xls") ||
-        file.type ===
-          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
-        file.type === "application/vnd.ms-excel";
-      if (!isCSV && !isExcel) {
-        setImportError(
-          "Please select a valid Excel (.xlsx, .xls) or CSV (.csv) file.",
-        );
-        return;
-      }
+    // Check file extension and type
+    const fileName = file.name.toLowerCase();
+    const isCSV = fileName.endsWith(".csv") || file.type === "text/csv";
+    const isExcel =
+      fileName.endsWith(".xlsx") ||
+      fileName.endsWith(".xls") ||
+      file.type ===
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+      file.type === "application/vnd.ms-excel";
+    if (!isCSV && !isExcel) {
+      setImportError(
+        "Please select a valid Excel (.xlsx, .xls) or CSV (.csv) file.",
+      );
+      return;
+    }
     setImportLoading(true);
     setImportError("");
     setImportSuccess("");
@@ -717,12 +667,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       };
       reader.readAsArrayBuffer(file);
     }
-  } catch (error) {
-    console.error("❌ File upload error:", error);
-    setImportError("❌ Failed to process file. Please try again.");
-    setImportLoading(false);
-  }
-};
+  };
   const processExcelData = async (data, fileName) => {
     try {
       // Normalize line endings and split
