@@ -3292,7 +3292,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
                     Summary Statistics
                   </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
                     <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
                       <div className="relative z-10">
                         <p className="text-sm font-medium text-blue-600">Total Actions</p>
@@ -3311,24 +3311,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         <Clock className="w-16 h-16 text-orange-600" />
                       </div>
                     </div>
-                    <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white">
-                      <div className="relative z-10">
-                        <p className="text-sm font-medium text-green-600">Resolved Actions</p>
-                        <p className="text-3xl font-bold text-green-700">{resolvedActions}</p>
-                      </div>
-                      <div className="absolute right-0 bottom-0 opacity-10">
-                        <CheckCircle className="w-16 h-16 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white">
-                      <div className="relative z-10">
-                        <p className="text-sm font-medium text-red-600">High Priority</p>
-                        <p className="text-3xl font-bold text-red-700">{highPriorityActions}</p>
-                      </div>
-                      <div className="absolute right-0 bottom-0 opacity-10">
-                        <AlertTriangle className="w-16 h-16 text-red-600" />
-                      </div>
-                    </div>
+
                     
                     {/* Tab-specific statistics */}
                     {activeTab === "pnp" && (
