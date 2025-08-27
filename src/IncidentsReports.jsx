@@ -7,6 +7,7 @@ import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
 import { db } from "./firebase";
+import { handleFileImportUpload } from "./utils/cloudinaryIntegration";
 import { 
   collection, 
   doc, 
@@ -1040,13 +1041,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-    // Check file type
-    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
-    const isCSV = file.name.endsWith('.csv');
-    if (!isExcel && !isCSV) {
-      alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
-      return;
-    }
+    
+    try {
+      // First upload to Cloudinary for backup
+      const cloudinaryResult = await handleFileImportUpload(file, {
+        importType: 'incidents',
+        district: 'general',
+        municipality: 'general'
+      });
+
+      if (!cloudinaryResult.success) {
+        console.warn('⚠️ Cloudinary upload failed, continuing with local processing:', cloudinaryResult.error);
+      } else {
+        console.log('✅ File backed up to Cloudinary:', cloudinaryResult.file);
+      }
+
+      // Check file type
+      const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+      const isCSV = file.name.endsWith('.csv');
+      if (!isExcel && !isCSV) {
+        alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
+        return;
+      }
     const reader = new FileReader();
     if (isCSV) {
       // Handle CSV files - treat as single month data

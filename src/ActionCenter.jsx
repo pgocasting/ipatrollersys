@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { handleActionCenterPhotoUpload } from "./utils/cloudinaryIntegration";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -8,7 +9,8 @@ import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { writeBatch, doc } from "firebase/firestore";
-import { db } from "./firebase";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { db, storage } from "./firebase";
 import { 
   Activity,
   AlertTriangle,
@@ -462,7 +464,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     'Traffic Violations': ['traffic violation', 'reckless driving', 'illegal parking', 'no license']
   };
   const isIllegal = (item) => {
-    const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, item.source]
+    // For Agriculture and PG-ENRO, use otherInfo instead of source
+    const sourceField = (activeTab === "agriculture" || activeTab === "pg-enro") ? item.otherInfo : item.source;
+    const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, sourceField]
       .map(v => normalize(v))
       .join(' ');
     return ILLEGAL_KEYWORDS.some(kw => text.includes(kw));
@@ -475,7 +479,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return { illegalCategoryCounts: counts, totalIllegals: total };
     }
           sortedItems.forEach(item => {
-        const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, item.source]
+        // For Agriculture and PG-ENRO, use otherInfo instead of source
+        const sourceField = (activeTab === "agriculture" || activeTab === "pg-enro") ? item.otherInfo : item.source;
+        const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, sourceField]
           .map(v => normalize(v))
           .join(' ');
       // Check predefined illegal categories first
@@ -825,7 +831,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         item.otherInfo || 'N/A'
       ]);
     } else if (activeTab === "pg-enro") {
-      tableHeaders.push('Source', 'Other Information');
+      tableHeaders.push('Other Information');
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -833,7 +839,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         formatDate(item.when),
         item.where || 'N/A',
         item.actionTaken || 'N/A',
-        item.source || 'N/A',
         item.otherInfo || 'N/A'
       ]);
     }
@@ -875,8 +880,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         3: { cellWidth: 'auto' }, // When
         4: { cellWidth: 'auto' }, // Where
         5: { cellWidth: 'auto' }, // Action Taken
-        6: { cellWidth: 'auto' }, // Source/Illegal Type
-        7: { cellWidth: 'auto' }  // Other Information
+        6: { cellWidth: 'auto' }  // Source/Illegal Type/Other Information
       }
     });
     
@@ -1017,9 +1021,61 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
     return photo;
   };
+
+  // Function to upload photos to Firebase Storage
+  const uploadPhotosToStorage = async (photos) => {
+    if (!photos || !Array.isArray(photos) || photos.length === 0) {
+      return [];
+    }
+    
+    const uploadPromises = photos.map(async (photo) => {
+      if (!photo.blob) {
+        console.warn('Photo missing blob data:', photo);
+        return null;
+      }
+      
+      try {
+        // Create a unique filename
+        const timestamp = Date.now();
+        const randomId = Math.random().toString(36).substring(2);
+        const fileExtension = photo.fileType.split('/')[1] || 'jpg';
+        const fileName = `action-reports/${timestamp}-${randomId}.${fileExtension}`;
+        
+        // Upload to Firebase Storage
+        const storageRef = ref(storage, fileName);
+        await uploadBytes(storageRef, photo.blob);
+        
+        // Get download URL
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        return {
+          id: photo.id,
+          fileName: photo.fileName,
+          fileSize: photo.fileSize,
+          fileType: photo.fileType,
+          lastModified: photo.lastModified,
+          uploadDate: photo.uploadDate,
+          storageUrl: downloadURL
+        };
+      } catch (error) {
+        console.error('Error uploading photo:', error);
+        return null;
+      }
+    });
+    
+    const results = await Promise.all(uploadPromises);
+    return results.filter(result => result !== null);
+  };
+
   // Function to get the best available image source
   const getImageSource = (photo) => {
-    // Priority: base64 data > legacy URL > placeholder
+    // Priority: storage URL > preview URL > base64 data > legacy URL > placeholder
+    if (photo.storageUrl && typeof photo.storageUrl === 'string') {
+      return photo.storageUrl;
+    }
+    if (photo.preview && typeof photo.preview === 'string') {
+      return photo.preview;
+    }
     if (photo.imageData && typeof photo.imageData === 'string' && photo.imageData.startsWith('data:image')) {
       return photo.imageData;
     }
@@ -1031,7 +1087,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return photo;
     }
     // Return a placeholder for legacy Firebase Storage URLs or invalid photos
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
   };
   // Function to handle photo loading errors
   const handlePhotoError = (event, photo) => {
@@ -1045,7 +1101,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     setImageModalData({ imageSource, fileName });
     setShowImageModal(true);
   };
-  const handlePhotoUpload = (event, setReport) => {
+  const handlePhotoUpload = async (event, setReport) => {
     if (!event || !event.target) {
       console.error('Invalid event object');
       return;
@@ -1054,61 +1110,61 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       console.error('setReport is not a function');
       return;
     }
+    
     const files = Array.from(event.target?.files || []);
     if (!Array.isArray(files)) {
       console.error('Files is not an array');
       return;
     }
+    
     const validFiles = files.filter(file => file && file.type && file.type.startsWith('image/'));
     if (!validFiles || !Array.isArray(validFiles) || validFiles.length === 0) {
       alert('Please select valid image files only.');
       return;
     }
+    
     if (validFiles.length > 10) {
       alert('Maximum 10 images allowed.');
       return;
     }
-    // Convert images to base64 and store in state
-    if (validFiles && Array.isArray(validFiles)) {
-      validFiles.forEach(file => {
-        if (!file || typeof file !== 'object' || !(file instanceof File)) return; // Skip undefined, invalid, or non-File objects
-      const reader = new FileReader();
-      if (!reader) {
-        console.error('Failed to create FileReader');
-        return;
-      }
-      reader.onload = (e) => {
-        if (!e || !e.target) {
-          console.error('Invalid event object in reader.onload');
-          return;
-        }
-        const base64String = e.target?.result;
-        if (!base64String || typeof base64String !== 'string') return; // Skip if no result or not a string
-        const newPhoto = {
-          id: Date.now() + Math.random(),
-          fileName: (file.name && typeof file.name === 'string') ? file.name : 'Unknown',
-          fileSize: (file.size && typeof file.size === 'number') ? file.size : 0,
-          fileType: (file.type && typeof file.type === 'string') ? file.type : 'image/*',
-          lastModified: (file.lastModified && typeof file.lastModified === 'number') ? file.lastModified : Date.now(),
-          // Store only the base64 image data - no blob URLs
-          imageData: base64String,
-          uploadDate: new Date().toISOString()
-        };
+
+    try {
+      // Show loading state
+      setReport(prevReport => ({
+        ...(prevReport || {}),
+        photoUploadLoading: true
+      }));
+
+      // Upload to Cloudinary
+      const result = await handleActionCenterPhotoUpload(validFiles, {
+        reportType: 'action-reports',
+        district: 'general', // You can pass actual district if available
+        municipality: 'general' // You can pass actual municipality if available
+      });
+
+      if (result.success) {
+        // Add photos to report
         setReport(prevReport => ({
           ...(prevReport || {}),
-          photos: [...(prevReport?.photos || []), newPhoto]
+          photos: [...(prevReport?.photos || []), ...result.photos],
+          photoUploadLoading: false
         }));
-      };
-      try {
-        if (file && file instanceof File) {
-          reader.readAsDataURL(file);
-        } else {
-          console.error('Invalid file object');
-        }
-              } catch (error) {
-          console.error('Error reading file as data URL:', error);
-        }
-      });
+
+        console.log('✅ Photos uploaded to Cloudinary:', result.photos);
+        alert(`✅ Successfully uploaded ${result.photos.length} photos to Cloudinary!`);
+      } else {
+        throw new Error(result.error || 'Upload failed');
+      }
+
+    } catch (error) {
+      console.error('❌ Photo upload failed:', error);
+      alert(`❌ Failed to upload photos: ${error.message}`);
+      
+      // Reset loading state
+      setReport(prevReport => ({
+        ...(prevReport || {}),
+        photoUploadLoading: false
+      }));
     }
   };
   const handlePhotoRemove = (photoId, setActionReport) => {
@@ -1150,11 +1206,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Source field is not shown for Agriculture
       }
 
-      // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = newActionReport.photos ? newActionReport.photos
-        .map(validateAndCleanPhoto) // Use the validation function
-        .filter(photo => photo !== null) // Remove any invalid photos
-        : [];
+      // Upload photos to Firebase Storage and get URLs
+      let photoUrls = [];
+      if (newActionReport.photos && newActionReport.photos.length > 0) {
+        try {
+          photoUrls = await uploadPhotosToStorage(newActionReport.photos);
+        } catch (error) {
+          console.error('Error uploading photos:', error);
+          alert('Error uploading photos. Please try again.');
+          return;
+        }
+      }
+      
+      // Clean photos data - only store URLs and metadata, not the actual image data
+      const cleanPhotos = photoUrls.map(url => ({
+        id: url.id,
+        fileName: url.fileName,
+        fileSize: url.fileSize,
+        fileType: url.fileType,
+        lastModified: url.lastModified,
+        uploadDate: url.uploadDate,
+        storageUrl: url.storageUrl
+      }));
       
       const reportToSave = {
         ...newActionReport,
@@ -1236,11 +1309,35 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
   const handleEditActionReport = async () => {
     try {
-      // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = editingItem.photos ? editingItem.photos
-        .map(validateAndCleanPhoto) // Use the validation function
-        .filter(photo => photo !== null) // Remove any invalid photos
-        : [];
+      // Handle photo updates - upload new photos and keep existing ones
+      let cleanPhotos = [];
+      
+      // Keep existing photos that already have storage URLs
+      const existingPhotos = editingItem.photos ? editingItem.photos.filter(photo => photo.storageUrl) : [];
+      
+      // Upload new photos (those with blob data)
+      const newPhotos = editingItem.photos ? editingItem.photos.filter(photo => photo.blob) : [];
+      if (newPhotos.length > 0) {
+        try {
+          const newPhotoUrls = await uploadPhotosToStorage(newPhotos);
+          const newCleanPhotos = newPhotoUrls.map(url => ({
+            id: url.id,
+            fileName: url.fileName,
+            fileSize: url.fileSize,
+            fileType: url.fileType,
+            lastModified: url.lastModified,
+            uploadDate: url.uploadDate,
+            storageUrl: url.storageUrl
+          }));
+          cleanPhotos = [...existingPhotos, ...newCleanPhotos];
+        } catch (error) {
+          console.error('Error uploading new photos:', error);
+          alert('Error uploading new photos. Please try again.');
+          return;
+        }
+      } else {
+        cleanPhotos = existingPhotos;
+      }
       
       const updatedReport = {
         ...editingItem,
@@ -1812,9 +1909,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           </th>
                           <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[180px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
                           <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
-                          {/* Hide Source column for Agriculture tab */}
-                          {activeTab !== "agriculture" && (
+                          {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                          {activeTab === "pnp" && (
                             <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
+                          )}
+                          {(activeTab === "agriculture" || activeTab === "pg-enro") && (
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Other Information</th>
                           )}
                           <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
                         </tr>
@@ -2069,11 +2169,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   {typeof item.actionTaken === 'string' ? item.actionTaken : 'N/A'}
                                 </Badge>
                               </td>
-                              {/* Hide Source column data for Agriculture tab */}
-                              {activeTab !== "agriculture" && (
+                              {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                              {activeTab === "pnp" && (
                                 <td className="p-2 md:p-3">
                                   <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.source}>
                                     {typeof item.source === 'string' ? item.source : 'N/A'}
+                                  </span>
+                                </td>
+                              )}
+                              {(activeTab === "agriculture" || activeTab === "pg-enro") && (
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.otherInfo}>
+                                    {typeof item.otherInfo === 'string' ? item.otherInfo : 'N/A'}
                                   </span>
                                 </td>
                               )}
@@ -2912,10 +3019,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <span className="text-sm font-medium text-gray-600">Reason</span>
                           <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.why || 'N/A'}</p>
                         </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium text-gray-600">Source</span>
-                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.source || 'N/A'}</p>
-                        </div>
+                        {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                        {viewingItem.department === "pnp" && (
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium text-gray-600">Source</span>
+                            <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.source || 'N/A'}</p>
+                          </div>
+                        )}
+                        {(viewingItem.department === "agriculture" || viewingItem.department === "pg-enro") && (
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium text-gray-600">Other Information</span>
+                            <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.otherInfo || 'N/A'}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3239,12 +3355,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           )}
                           {activeTab === "agriculture" && (
                             <th className="p-4 text-left">
-                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Illegal Type</div>
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
                             </th>
                           )}
                           {activeTab === "pg-enro" && (
                             <th className="p-4 text-left">
-                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
                             </th>
                           )}
                           <th className="p-4 text-left">
@@ -3302,13 +3418,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             )}
                             {activeTab === "agriculture" && (
                               <td className="p-4">
-                                
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
+                                </div>
                               </td>
                             )}
                             {activeTab === "pg-enro" && (
                               <td className="p-4">
-                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
-                                  {item.source || 'N/A'}
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
                                 </div>
                               </td>
                             )}

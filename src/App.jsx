@@ -6,12 +6,15 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
+import FirebaseTest from "./FirebaseTest";
+import CloudinaryDemo from "./CloudinaryDemo";
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import DebugComponent from "./DebugComponent";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
+import "./utils/consoleHelpers"; // Load console helper functions
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 
@@ -81,6 +84,10 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'firebase-test':
+        return <FirebaseTest />;
+      case 'cloudinary-demo':
+        return <CloudinaryDemo />;
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }

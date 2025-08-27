@@ -1,150 +1,261 @@
 import React, { useState, useEffect } from 'react';
-import { checkFirebaseConnection, testFirebaseConnection } from '../firebase';
-import { AlertTriangle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Badge } from './ui/badge';
+import { Button } from './ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { 
+  Wifi, 
+  WifiOff, 
+  AlertTriangle, 
+  CheckCircle, 
+  RefreshCw, 
+  XCircle,
+  Activity,
+  Database,
+  Shield
+} from 'lucide-react';
+import { 
+  checkFirebaseConnection, 
+  checkConnectionHealth, 
+  initializeAndTest 
+} from '../firebase';
 
 export default function FirebaseStatus() {
-  const [connectionStatus, setConnectionStatus] = useState(null);
-  const [isTesting, setIsTesting] = useState(false);
-  const [lastTest, setLastTest] = useState(null);
+  const [connectionStatus, setConnectionStatus] = useState('checking');
+  const [lastCheck, setLastCheck] = useState(null);
+  const [errorDetails, setErrorDetails] = useState(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
-  const runConnectionTest = async () => {
-    setIsTesting(true);
+  const checkStatus = async () => {
+    setIsChecking(true);
     try {
-      const result = await testFirebaseConnection();
-      setConnectionStatus(result);
-      setLastTest(new Date());
+      console.log('🔍 Checking Firebase connection status...');
+      
+      // Check basic connection
+      const basicStatus = checkFirebaseConnection();
+      console.log('📊 Basic connection status:', basicStatus);
+      
+      // Check detailed health
+      const healthStatus = await checkConnectionHealth();
+      console.log('🏥 Health check status:', healthStatus);
+      
+      setConnectionStatus(healthStatus.status);
+      setErrorDetails(healthStatus.message);
+      setLastCheck(new Date());
+      setRetryCount(basicStatus.retryCount || 0);
+      
+      // If there are connection issues, try to recover
+      if (healthStatus.status === 'error' || healthStatus.status === 'disconnected') {
+        console.log('⚠️ Connection issues detected, attempting recovery...');
+        await attemptRecovery();
+      }
+      
     } catch (error) {
-      setConnectionStatus({ success: false, error: error.message });
+      console.error('❌ Error checking connection status:', error);
+      setConnectionStatus('error');
+      setErrorDetails(error.message);
+      setLastCheck(new Date());
     } finally {
-      setIsTesting(false);
+      setIsChecking(false);
     }
   };
 
+  const attemptRecovery = async () => {
+    try {
+      console.log('🔧 Attempting connection recovery...');
+      
+      // Wait a bit before attempting recovery
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Try to reinitialize Firebase services
+      await initializeAndTest();
+      
+      // Check status again
+      await checkStatus();
+      
+    } catch (error) {
+      console.error('❌ Recovery attempt failed:', error);
+    }
+  };
+
+  const forceReconnect = async () => {
+    try {
+      setIsChecking(true);
+      console.log('🔄 Force reconnecting to Firebase...');
+      
+      // Force reinitialization
+      await initializeAndTest();
+      
+      // Wait a bit and check status
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await checkStatus();
+      
+    } catch (error) {
+      console.error('❌ Force reconnect failed:', error);
+      setErrorDetails(`Force reconnect failed: ${error.message}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  // Check status on component mount
   useEffect(() => {
-    // Check initial connection status
-    const status = checkFirebaseConnection();
-    setConnectionStatus(status);
+    checkStatus();
     
-    // Run initial test
-    runConnectionTest();
+    // Set up periodic health checks
+    const healthCheckInterval = setInterval(checkStatus, 30000); // Check every 30 seconds
+    
+    return () => clearInterval(healthCheckInterval);
   }, []);
 
-  if (!connectionStatus) {
-    return (
-      <div className="p-4 bg-gray-100 rounded-lg">
-        <div className="animate-pulse">Checking Firebase connection...</div>
-      </div>
-    );
-  }
-
-  const getStatusIcon = (isConnected) => {
-    if (isConnected) {
-      return <CheckCircle className="w-5 h-5 text-green-500" />;
+  const getStatusIcon = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'recovered':
+        return <Activity className="h-5 w-5 text-blue-500" />;
+      case 'error':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case 'disconnected':
+        return <WifiOff className="h-5 w-5 text-red-500" />;
+      case 'checking':
+        return <RefreshCw className={`h-5 w-5 text-gray-500 ${isChecking ? 'animate-spin' : ''}`} />;
+      default:
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
     }
-    return <XCircle className="w-5 h-5 text-red-500" />;
   };
 
-  const getStatusColor = (isConnected) => {
-    return isConnected ? 'text-green-600' : 'text-red-600';
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'recovered':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'error':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'disconnected':
+        return 'bg-red-100 text-red-800 border-red-200';
+      case 'checking':
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+      default:
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    }
+  };
+
+  const getStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return 'Connected';
+      case 'recovered':
+        return 'Recovered';
+      case 'error':
+        return 'Connection Error';
+      case 'disconnected':
+        return 'Disconnected';
+      case 'checking':
+        return 'Checking...';
+      default:
+        return 'Unknown Status';
+    }
   };
 
   return (
-    <div className="p-4 bg-white rounded-lg border shadow-sm">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Firebase Connection Status</h3>
-        <button
-          onClick={runConnectionTest}
-          disabled={isTesting}
-          className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${isTesting ? 'animate-spin' : ''}`} />
-          {isTesting ? 'Testing...' : 'Test Connection'}
-        </button>
-      </div>
-
-      <div className="space-y-3">
-        {/* Overall Status */}
-        <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-          {getStatusIcon(connectionStatus.isConnected)}
-          <div>
-            <p className={`font-medium ${getStatusColor(connectionStatus.isConnected)}`}>
-              {connectionStatus.isConnected ? 'Connected' : 'Connection Issues'}
-            </p>
-            <p className="text-sm text-gray-600">
-              {connectionStatus.isConnected 
-                ? 'Firebase services are available' 
-                : 'Some Firebase services are unavailable'
-              }
-            </p>
+    <Card className="w-full max-w-md">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <Database className="h-5 w-5" />
+          Firebase Status
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Status Display */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {getStatusIcon()}
+            <span className="font-medium">Status:</span>
           </div>
+          <Badge className={getStatusColor()}>
+            {getStatusText()}
+          </Badge>
         </div>
 
-        {/* Individual Service Status */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              {getStatusIcon(connectionStatus.app)}
-              <span className="text-sm font-medium">Firebase App</span>
-            </div>
-            <p className="text-xs text-gray-600">
-              {connectionStatus.app ? 'Initialized' : 'Not available'}
-            </p>
+        {/* Connection Details */}
+        <div className="space-y-2 text-sm">
+          <div className="flex items-center gap-2">
+            <Wifi className="h-4 w-4 text-gray-500" />
+            <span>Connection: {connectionStatus === 'connected' ? 'Active' : 'Inactive'}</span>
           </div>
-
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              {getStatusIcon(connectionStatus.auth)}
-              <span className="text-sm font-medium">Authentication</span>
+          
+          {retryCount > 0 && (
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-4 w-4 text-gray-500" />
+              <span>Retry Count: {retryCount}</span>
             </div>
-            <p className="text-xs text-gray-600">
-              {connectionStatus.auth ? 'Available' : 'Not available'}
-            </p>
-          </div>
-
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              {getStatusIcon(connectionStatus.db)}
-              <span className="text-sm font-medium">Firestore</span>
+          )}
+          
+          {lastCheck && (
+            <div className="flex items-center gap-2">
+              <Activity className="h-4 w-4 text-gray-500" />
+              <span>Last Check: {lastCheck.toLocaleTimeString()}</span>
             </div>
-            <p className="text-xs text-gray-600">
-              {connectionStatus.db ? 'Available' : 'Not available'}
-            </p>
-          </div>
-
-          <div className="p-3 bg-gray-50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              {getStatusIcon(connectionStatus.storage)}
-              <span className="text-sm font-medium">Storage</span>
-            </div>
-            <p className="text-xs text-gray-600">
-              {connectionStatus.storage ? 'Available' : 'Not available'}
-            </p>
-          </div>
+          )}
         </div>
 
-        {/* Last Test Time */}
-        {lastTest && (
-          <div className="text-xs text-gray-500 text-center">
-            Last tested: {lastTest.toLocaleTimeString()}
+        {/* Error Details */}
+        {errorDetails && connectionStatus !== 'connected' && (
+          <div className="rounded-md bg-yellow-50 p-3 border border-yellow-200">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Issue Detected:</span>
+            </div>
+            <p className="text-sm text-yellow-700 mt-1">{errorDetails}</p>
           </div>
         )}
 
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={checkStatus}
+            disabled={isChecking}
+            variant="outline"
+            size="sm"
+            className="flex-1"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? 'animate-spin' : ''}`} />
+            Check Status
+          </Button>
+          
+          {connectionStatus !== 'connected' && (
+            <Button
+              onClick={forceReconnect}
+              disabled={isChecking}
+              variant="default"
+              size="sm"
+              className="flex-1"
+            >
+              <Wifi className="h-4 w-4 mr-2" />
+              Reconnect
+            </Button>
+          )}
+        </div>
+
         {/* Troubleshooting Tips */}
-        {!connectionStatus.isConnected && (
-          <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-800">Troubleshooting Tips</span>
+        {connectionStatus !== 'connected' && (
+          <div className="rounded-md bg-blue-50 p-3 border border-blue-200">
+            <div className="flex items-center gap-2 text-blue-800 mb-2">
+              <Shield className="h-4 w-4" />
+              <span className="text-sm font-medium">Troubleshooting Tips:</span>
             </div>
-            <ul className="text-xs text-yellow-700 space-y-1">
+            <ul className="text-sm text-blue-700 space-y-1">
               <li>• Check your internet connection</li>
               <li>• Verify Firebase project configuration</li>
-              <li>• Check Firebase console for service status</li>
-              <li>• Ensure Firestore rules allow read/write access</li>
+              <li>• Check browser console for detailed errors</li>
+              <li>• Try refreshing the page</li>
+              <li>• Contact administrator if issues persist</li>
             </ul>
           </div>
         )}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }
