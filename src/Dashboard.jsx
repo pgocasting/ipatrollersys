@@ -780,31 +780,47 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
      ],
    };
 
+  // Define all 12 municipalities (3 districts × 4 municipalities each)
+  const allMunicipalities = [
+    "Abucay", "Orani", "Samal", "Hermosa",           // 1ST DISTRICT
+    "Balanga City", "Pilar", "Orion", "Limay",       // 2ND DISTRICT
+    "Bagac", "Dinalupihan", "Mariveles", "Morong"   // 3RD DISTRICT
+  ];
+
   // Calculate active and inactive municipalities using IPatroller data
-  const activeMunicipalitiesList = ipatrollerData.filter(row => {
-    if (!row.data || !Array.isArray(row.data)) return false;
-    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
+  // Ensure all municipalities are counted, even if they don't have data yet
+  const activeMunicipalitiesList = allMunicipalities.filter(municipality => {
+    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
+    if (!municipalityData || !municipalityData.data || !Array.isArray(municipalityData.data)) {
+      return false; // No data means inactive
+    }
+    const avgPatrols = municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length;
     return avgPatrols >= 5;
   });
-  const inactiveMunicipalitiesList = ipatrollerData.filter(row => {
-    if (!row.data || !Array.isArray(row.data)) return false;
-    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
-    return avgPatrols <= 4;
-  });
+
+
   
   // Total municipalities is always 12 (3 districts × 4 municipalities each)
   const totalMunicipalities = 12;
   const activeCount = activeMunicipalitiesList.length;
-  const inactiveCount = inactiveMunicipalitiesList.length;
+  const correctedInactiveCount = totalMunicipalities - activeCount;
   
   // Debug logging
   console.log('Dashboard Data:', {
     ipatrollerDataLength: ipatrollerData.length,
+    allMunicipalitiesCount: allMunicipalities.length,
     activeCount,
-    inactiveCount,
+    correctedInactiveCount,
     totalMunicipalities: 12,
+    calculatedTotal: activeCount + correctedInactiveCount,
+    activeMunicipalities: activeMunicipalitiesList,
     sampleIPatrollerData: ipatrollerData[0] ? ipatrollerData[0].data : 'No IPatroller data'
   });
+
+  // Validation: Ensure counts add up to total municipalities
+  if (activeCount + correctedInactiveCount !== totalMunicipalities) {
+    console.warn(`⚠️ Municipality count mismatch: Active (${activeCount}) + Corrected Inactive (${correctedInactiveCount}) = ${activeCount + correctedInactiveCount}, Expected: ${totalMunicipalities}`);
+  }
 
   const chartOptions = {
     responsive: true,
@@ -1030,7 +1046,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div>
                   <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Municipalities</p>
                   <p className="text-2xl md:text-3xl font-bold text-red-600">
-                    {inactiveCount.toLocaleString()}
+                    {(totalMunicipalities - activeCount).toLocaleString()}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
@@ -1376,34 +1392,46 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                                 <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
-                   <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                 </div>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
+                  <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Inactive Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with &lt;5 average patrols per day</p>
                 </div>
               </div>
-                             <button
-                 onClick={() => setShowInactiveModal(false)}
-                 className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
-               >
-                 <X className="h-6 w-6" />
-               </button>
+              <button
+                onClick={() => setShowInactiveModal(false)}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-6 w-6" />
+              </button>
             </div>
 
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {inactiveMunicipalitiesList.length > 0 ? (
+              {correctedInactiveCount > 0 ? (
                 <div className="space-y-4">
-                  {inactiveMunicipalitiesList.map((municipality, index) => {
-                    const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
+                  {allMunicipalities.filter(municipality => {
+                    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
+                    if (!municipalityData || !municipalityData.data || !Array.isArray(municipalityData.data)) {
+                      return true; // No data means inactive
+                    }
+                    const avgPatrols = municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length;
+                    return avgPatrols < 5;
+                  }).map((municipality, index) => {
+                    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
+                    const avgPatrols = municipalityData && municipalityData.data && Array.isArray(municipalityData.data) 
+                      ? municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length 
+                      : 0;
+                    const district = municipalityData?.district || 'Unknown District';
+                    
                     return (
                       <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality}</h4>
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                            {municipality.district}
+                            {district}
                           </span>
                         </div>
                         <div className="text-sm transition-colors duration-300 text-gray-600">
@@ -1414,11 +1442,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   })}
                 </div>
               ) : (
-                                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
-                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                   <p className="text-lg font-medium">No Inactive Municipalities</p>
-                   <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
-                 </div>
+                <div className="text-center py-8 transition-colors duration-300 text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No Inactive Municipalities</p>
+                  <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
+                </div>
               )}
             </div>
           </div>
