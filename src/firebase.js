@@ -27,8 +27,12 @@ const firebaseConfig = {
   measurementId: "G-HPK93S27LM"
 };
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+// Initialize Firebase with custom settings to force HTTP/2
+const app = initializeApp(firebaseConfig, {
+  // Force HTTP/2 connections and disable QUIC
+  experimentalForceLongPolling: true,
+  useFetchStreams: false
+});
 
 // Initialize Firebase services with enhanced error handling
 let analytics, auth, db, storage;
@@ -134,6 +138,12 @@ const testFirebaseConnection = async () => {
       } catch (firestoreError) {
         console.warn('⚠️ Firestore connection test failed:', firestoreError.message);
         
+        // Handle QUIC protocol errors specifically
+        if (firestoreError.message.includes('QUIC') || firestoreError.message.includes('quic')) {
+          console.warn('⚠️ QUIC protocol error detected, attempting HTTP/2 fallback...');
+          return await handleQUICError();
+        }
+        
         if (firestoreError.code === 'permission-denied') {
           console.warn('⚠️ Firestore permission denied (this is normal for new projects)');
           return true; // Consider this a successful connection
@@ -153,8 +163,45 @@ const testFirebaseConnection = async () => {
     return true;
   } catch (error) {
     console.error('❌ Firebase connection test failed:', error);
+    
+    // Check if it's a QUIC-related error
+    if (error.message.includes('QUIC') || error.message.includes('quic')) {
+      console.warn('⚠️ QUIC protocol error detected, attempting HTTP/2 fallback...');
+      return await handleQUICError();
+    }
+    
     return await retryConnection();
   }
+};
+
+// Handle QUIC protocol errors specifically
+const handleQUICError = async () => {
+  console.log('🔧 Attempting to resolve QUIC protocol error...');
+  
+  try {
+    // Try to disable and re-enable network to force protocol change
+    if (db) {
+      await disableNetwork(db);
+      console.log('✅ Network disabled, waiting for reconnection...');
+      
+      // Wait a bit before re-enabling
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      await enableNetwork(db);
+      console.log('✅ Network re-enabled, testing connection...');
+      
+      // Test connection again
+      const testQuery = query(collection(db, '_test_connection'));
+      await getDocs(testQuery);
+      console.log('✅ Connection recovered after QUIC error');
+      return true;
+    }
+  } catch (error) {
+    console.warn('⚠️ QUIC error recovery failed:', error.message);
+  }
+  
+  // If recovery fails, try retry logic
+  return await retryConnection();
 };
 
 // Retry connection logic
@@ -252,5 +299,6 @@ export {
   testFirebaseConnection, 
   checkFirebaseConnection,
   checkConnectionHealth,
-  initializeAndTest
+  initializeAndTest,
+  handleQUICError
 }; 

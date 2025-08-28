@@ -7,6 +7,7 @@ import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
 import FirebaseTest from "./FirebaseTest";
+import FirebaseConnectionTest from "./FirebaseConnectionTest";
 import CloudinaryDemo from "./CloudinaryDemo";
 import FirebaseCloudinaryDemo from "./FirebaseCloudinaryDemo";
 import PhotoMigrationTool from "./components/PhotoMigrationTool";
@@ -88,6 +89,8 @@ export default function App() {
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'firebase-test':
         return <FirebaseTest />;
+      case 'firebase-connection-test':
+        return <FirebaseConnectionTest />;
       case 'cloudinary-demo':
         return <CloudinaryDemo />;
       case 'firebase-cloudinary-demo':
