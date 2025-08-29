@@ -751,8 +751,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
    const districtTotals = {};
    ipatrollerData.forEach(row => {
      const district = row.district;
-     const totalPatrols = row.data.reduce((sum, val) => sum + val, 0);
-     districtTotals[district] = (districtTotals[district] || 0) + totalPatrols;
+     // Safety check before calling reduce
+     if (row.data && Array.isArray(row.data)) {
+       const totalPatrols = row.data.reduce((sum, val) => sum + (val || 0), 0);
+       districtTotals[district] = (districtTotals[district] || 0) + totalPatrols;
+     }
    });
 
    // Calculate total patrols across all districts
@@ -796,7 +799,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
     const avgPatrols = municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length;
     return avgPatrols >= 5;
-  });
+  }).map(municipality => {
+    // Return the full municipality data object instead of just the name
+    return ipatrollerData.find(row => row.municipality === municipality);
+  }).filter(Boolean); // Remove any undefined entries
 
 
   
@@ -1356,22 +1362,24 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               {activeMunicipalitiesList.length > 0 ? (
                 <div className="space-y-4">
-                  {activeMunicipalitiesList.map((municipality, index) => {
-                    const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
-                    return (
-                      <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                        <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                            {municipality.district}
-                          </span>
+                  {activeMunicipalitiesList
+                    .filter(municipality => municipality && municipality.data && Array.isArray(municipality.data))
+                    .map((municipality, index) => {
+                      const avgPatrols = municipality.data.reduce((a, b) => a + (b || 0), 0) / municipality.data.length;
+                      return (
+                        <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                              {municipality.district}
+                            </span>
+                          </div>
+                          <div className="text-sm transition-colors duration-300 text-gray-600">
+                            Average Patrols: <span className="font-semibold text-green-600">{avgPatrols.toFixed(1)}</span> per day
+                          </div>
                         </div>
-                        <div className="text-sm transition-colors duration-300 text-gray-600">
-                          Average Patrols: <span className="font-semibold text-green-600">{avgPatrols.toFixed(1)}</span> per day
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               ) : (
                                  <div className="text-center py-8 transition-colors duration-300 text-gray-500">
