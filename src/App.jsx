@@ -14,7 +14,7 @@ import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import "./utils/consoleHelpers"; // Load console helper functions
-// Firebase removed - using simple authentication
+import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 
 export default function App() {
