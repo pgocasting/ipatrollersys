@@ -15,6 +15,7 @@ import { db } from './firebase';
 import { 
   Activity,
   AlertTriangle,
+  AlertCircle,
   BarChart3,
   Calendar,
   CheckCircle,
@@ -38,7 +39,6 @@ import {
   ChevronUp,
   Plus,
   RotateCcw,
-  RefreshCw,
   Camera,
   FileText,
   Pill,
@@ -84,8 +84,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     deleteActionReport,
     getAllActionReportsMonths,
     getActionReportsByMonth,
-    queryDocuments,
-    migrateActionReportsToMonthly
+    queryDocuments
   } = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -131,117 +130,103 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const loadActionReports = async () => {
       setLoading(true);
       try {
-        console.log('🔄 Loading action reports...');
+        console.log('🔄 Loading action reports from Firestore...');
         console.log('Current activeTab:', activeTab);
         
-        // First, try to load data using the month-based structure
-        const monthsResult = await getAllActionReportsMonths();
-        console.log('Months result:', monthsResult);
+        // Load all data from actionReports collection
+        const result = await queryDocuments('actionReports');
+        console.log('Firestore query result:', result);
         
-        if (monthsResult.success && monthsResult.data && monthsResult.data.length > 0) {
-          console.log('✅ Found month-based structure, loading from most recent month:', monthsResult.data[0].monthKey);
+        if (result.success && result.data && result.data.length > 0) {
+          console.log(`✅ Found ${result.data.length} documents in Firestore`);
           
-          // Get data from the most recent month
-          const mostRecentMonth = monthsResult.data[0];
-          const monthDataResult = await getActionReportsByMonth(mostRecentMonth.monthKey);
-          console.log('Month data result:', monthDataResult);
+          // Process all documents to extract action reports
+          let allActionReports = [];
           
-          if (monthDataResult.success && monthDataResult.data) {
-            const allReports = monthDataResult.data || [];
-            console.log('All reports from month:', allReports);
-            setAllActionReports(allReports);
-            
-            // Filter by active tab if needed
-            console.log('Loading action reports:', {
-              totalReports: allReports.length,
-              activeTab: activeTab,
-              departments: allReports.map(r => r.department),
-              pgEnroReports: allReports.filter(r => r.department === 'pg-enro')
+          result.data.forEach((doc, index) => {
+            console.log(`Processing document ${index + 1}:`, {
+              id: doc.id,
+              hasData: !!doc.data,
+              hasMonthKey: !!doc.monthKey,
+              department: doc.department
             });
             
-            const filteredReports = allReports.filter(report => 
-              activeTab === "all" || report.department === activeTab
-            );
+            // If document has a 'data' array (monthly structure), extract reports from it
+            if (doc.data && Array.isArray(doc.data)) {
+              console.log(`📅 Monthly document ${doc.id} contains ${doc.data.length} reports`);
+              doc.data.forEach(report => {
+                allActionReports.push({
+                  ...report,
+                  sourceDocument: doc.id,
+                  sourceType: 'monthly'
+                });
+              });
+            }
+            // If document is an individual report
+            else if (doc.department || doc.what || doc.municipality) {
+              console.log(`📋 Individual report: ${doc.id}`);
+              allActionReports.push({
+                ...doc,
+                sourceDocument: doc.id,
+                sourceType: 'individual'
+              });
+            }
+          });
+          
+          console.log(`📊 Total action reports found: ${allActionReports.length}`);
+          
+          if (allActionReports.length > 0) {
+            // Set all reports
+            setAllActionReports(allActionReports);
             
-            console.log('Filtered reports:', {
-              activeTab: activeTab,
+            // Filter by department (PNP, Agriculture, PG-ENRO)
+            const filteredReports = allActionReports.filter(report => {
+              const reportDepartment = report.department?.toLowerCase();
+              const currentTab = activeTab?.toLowerCase();
+              
+              console.log(`Checking report ${report.id}: department="${reportDepartment}", activeTab="${currentTab}"`);
+              
+              // Map department values to match tabs
+              if (currentTab === 'all') return true;
+              if (currentTab === 'pnp' && (reportDepartment === 'pnp' || reportDepartment === 'police')) return true;
+              if (currentTab === 'agriculture' && reportDepartment === 'agriculture') return true;
+              if (currentTab === 'pg-enro' && (reportDepartment === 'pg-enro' || reportDepartment === 'enro' || reportDepartment === 'environment')) return true;
+              
+              return false;
+            });
+            
+            console.log(`🎯 Filtered reports for ${activeTab}:`, {
+              totalReports: allActionReports.length,
               filteredCount: filteredReports.length,
-              filteredDepartments: filteredReports.map(r => r.department)
+              departments: [...new Set(allActionReports.map(r => r.department))],
+              filteredDepartments: [...new Set(filteredReports.map(r => r.department))]
             });
             
             setActionItems(filteredReports);
+            
+            // Show success message
+            if (filteredReports.length > 0) {
+              setSuccessMessage(`✅ Loaded ${filteredReports.length} ${activeTab.toUpperCase()} reports from Firestore`);
+            } else {
+              setSuccessMessage(`ℹ️ Found ${allActionReports.length} total reports, but none match ${activeTab.toUpperCase()} department`);
+            }
           } else {
-            console.error('Error loading month data:', monthDataResult.error);
+            console.log('❌ No action reports found in any documents');
             setActionItems([]);
             setAllActionReports([]);
+            setSuccessMessage('No action reports found in Firestore database');
           }
         } else {
-          console.log('⚠️ No month-based structure found, trying direct collection access...');
-          
-          // Fallback: Try to load data directly from the actionReports collection
-          try {
-            console.log('Attempting to query actionReports collection directly...');
-            const directResult = await queryDocuments('actionReports');
-            console.log('Direct query result:', directResult);
-            
-            if (directResult.success && directResult.data && directResult.data.length > 0) {
-              console.log('✅ Found existing data in direct collection:', directResult.data.length, 'reports');
-              console.log('Sample data structure:', directResult.data[0]);
-              
-              // Filter out monthly documents and get only individual reports
-              const individualReports = directResult.data.filter(doc => 
-                doc.id.startsWith('action-') && !doc.monthKey
-              );
-              
-              console.log(`📋 Found ${individualReports.length} individual reports (excluding monthly docs)`);
-              
-              if (individualReports.length > 0) {
-                const allReports = individualReports || [];
-                setAllActionReports(allReports);
-                
-                // Filter by active tab if needed
-                const filteredReports = allReports.filter(report => {
-                  console.log('Checking report:', report.id, 'department:', report.department, 'activeTab:', activeTab);
-                  return activeTab === "all" || report.department === activeTab;
-                });
-                
-                console.log('Filtered reports from direct collection:', {
-                  activeTab: activeTab,
-                  filteredCount: filteredReports.length,
-                  filteredDepartments: filteredReports.map(r => r.department)
-                });
-                
-                setActionItems(filteredReports);
-                
-                // If no filtered reports, show all reports for debugging
-                if (filteredReports.length === 0 && allReports.length > 0) {
-                  console.log('⚠️ No reports match the current tab, showing all reports for debugging');
-                  setActionItems(allReports);
-                  setSuccessMessage(`Found ${allReports.length} reports but none match the current tab. Check console for details.`);
-                } else {
-                  // Show migration notice
-                  setSuccessMessage(`Found ${allReports.length} existing action reports. Consider migrating to the new month-based structure for better organization.`);
-                }
-              } else {
-                console.log('No individual reports found in direct collection');
-                setActionItems([]);
-                setAllActionReports([]);
-                setSuccessMessage('No individual action reports found. Data may already be in monthly structure.');
-              }
-            } else {
-              console.log('No existing data found in direct collection');
-              setActionItems([]);
-              setAllActionReports([]);
-            }
-          } catch (directError) {
-            console.error('Error loading from direct collection:', directError);
-            setActionItems([]);
-            setAllActionReports([]);
-          }
+          console.log('❌ No data found in Firestore actionReports collection');
+          setActionItems([]);
+          setAllActionReports([]);
+          setSuccessMessage('No data found in Firestore database');
         }
       } catch (error) {
-        console.error('Error loading action reports:', error);
+        console.error('❌ Error loading action reports:', error);
         setActionItems([]);
+        setAllActionReports([]);
+        setSuccessMessage('Error loading data from Firestore');
       } finally {
         setLoading(false);
       }
@@ -320,34 +305,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Migrate existing data to month-based structure
-  const migrateExistingData = async () => {
-    try {
-      setLoading(true);
-      setSuccessMessage('🔄 Starting data migration...');
-      
-      // Use the new migration function from firestoreService
-      const migrationResult = await migrateActionReportsToMonthly();
-      
-      if (migrationResult.success) {
-        if (migrationResult.migrated > 0) {
-          setSuccessMessage(`✅ ${migrationResult.message}`);
-          // Reload data to show the new structure
-          await loadActionReports();
-        } else {
-          setSuccessMessage('ℹ️ No individual reports found to migrate. Data is already in monthly structure.');
-        }
-      } else {
-        setSuccessMessage(`❌ Migration failed: ${migrationResult.error}`);
-      }
-      
-    } catch (error) {
-      console.error('❌ Error during migration:', error);
-      setSuccessMessage('❌ Migration failed. Please check the console for details.');
-    } finally {
-      setLoading(false);
-    }
-  };
+
   const getSeverityColor = (severity) => {
     switch (severity) {
       case "high": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
@@ -1990,16 +1948,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                                  <Button
-                onClick={migrateExistingData}
-                variant="outline"
-                size="sm"
-                className="bg-purple-600 text-white border-purple-600 hover:bg-purple-700 text-xs py-1.5 px-3 h-8"
-                title="Migrate existing data to month-based structure"
-              >
-                <RefreshCw className="h-3 w-3 mr-1" />
-                Migrate Data
-              </Button>
+                    
               <Button
                 onClick={handleCleanDuplicates}
                 variant="outline"
