@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useFirebase } from './hooks/useFirebase';
-import { useFirestore } from './hooks/useFirestore';
 
 const DataContext = createContext();
 
@@ -14,167 +13,210 @@ export const useData = () => {
 
 export const DataProvider = ({ children }) => {
   const { user } = useFirebase();
-  const { 
-    getPatrolData, 
-    getActionReportsByMonth, 
-    getIncidents,
-    getAllActionReportsMonths
-  } = useFirestore();
-  
   const [loading, setLoading] = useState(false);
   const [dashboardData, setDashboardData] = useState({
     patrolData: [],
     actionReports: [],
     incidents: [],
     ipatrollerData: [],
-    summaryStats: {
-      totalPatrols: 0,
-      totalActions: 0,
-      totalIncidents: 0,
-      activeMunicipalities: 0,
-      inactiveMunicipalities: 0,
-      totalDistricts: 0,
-      totalUsers: 0
-    }
+    summaryStats: {},
+    allMonths: [],
+    ipatrollerStats: {}
   });
 
-  // Load current month data
-  const loadCurrentMonthData = async () => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      const currentDate = new Date();
-      const currentMonthKey = `${String(currentDate.getMonth() + 1).padStart(2, '0')}-${currentDate.getFullYear()}`;
-      
-      // Load patrol data for current month
-      const patrolResult = await getPatrolData(currentMonthKey);
-      let patrolData = [];
-      if (patrolResult.success && patrolResult.data) {
-        patrolData = patrolResult.data.data || [];
+  // Mock data to replace Firebase data
+  const mockData = {
+    patrolData: [
+      {
+        municipality: "Abucay",
+        district: "1ST DISTRICT",
+        totalPatrols: 15,
+        activeDays: 8,
+        inactiveDays: 4,
+        activePercentage: 67
+      },
+      {
+        municipality: "Balanga City",
+        district: "2ND DISTRICT", 
+        totalPatrols: 22,
+        activeDays: 12,
+        inactiveDays: 2,
+        activePercentage: 86
+      },
+      {
+        municipality: "Orani",
+        district: "1ST DISTRICT",
+        totalPatrols: 18,
+        activeDays: 10,
+        inactiveDays: 3,
+        activePercentage: 77
       }
-
-      // Load action reports for current month
-      const actionReportsResult = await getActionReportsByMonth(currentMonthKey);
-      let actionReports = [];
-      if (actionReportsResult.success) {
-        actionReports = actionReportsResult.data || [];
+    ],
+    actionReports: [
+      {
+        municipality: "Abucay",
+        department: "pnp",
+        actionTaken: "Patrol completed",
+        when: new Date().toISOString()
+      },
+      {
+        municipality: "Balanga City",
+        department: "agriculture",
+        actionTaken: "Inspection done",
+        when: new Date().toISOString()
+      },
+      {
+        municipality: "Orani",
+        department: "pg-enro",
+        actionTaken: "Environmental check",
+        when: new Date().toISOString()
       }
-
-      // Load incidents
-      const incidentsResult = await getIncidents(50);
-      let incidents = [];
-      if (incidentsResult.success) {
-        incidents = incidentsResult.data || [];
+    ],
+    incidents: [
+      {
+        municipality: "Abucay",
+        incidentType: "Traffic Violation",
+        date: new Date().toISOString()
+      },
+      {
+        municipality: "Balanga City",
+        incidentType: "Theft",
+        date: new Date().toISOString()
+      },
+      {
+        municipality: "Orani",
+        incidentType: "Drug-related",
+        date: new Date().toISOString()
       }
-
-      // Calculate summary statistics
-      const allMunicipalities = [
-        "Abucay", "Orani", "Samal", "Hermosa", // 1ST DISTRICT
-        "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
-        "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
-      ];
-      
-      const activeMunicipalities = new Set([
-        ...patrolData.map(p => p.municipality).filter(Boolean),
-        ...actionReports.map(r => r.municipality).filter(Boolean)
-      ]);
-      
-      const summaryStats = {
-        totalPatrols: patrolData.length,
-        totalActions: actionReports.length,
-        totalIncidents: incidents.length,
-        activeMunicipalities: activeMunicipalities.size,
-        inactiveMunicipalities: allMunicipalities.length - activeMunicipalities.size,
-        totalDistricts: 3, // Fixed number of districts
-        totalUsers: 1 // Assuming single user for now
-      };
-
-      setDashboardData({
-        patrolData,
-        actionReports,
-        incidents,
-        ipatrollerData: [], // Will be enhanced later
-        summaryStats
-      });
-
-    } catch (error) {
-      console.error('❌ Error loading current month data:', error);
-    } finally {
-      setLoading(false);
-    }
+    ],
+    ipatrollerData: [
+      {
+        monthKey: "01-2025",
+        data: [
+          {
+            municipality: "Abucay",
+            district: "1ST DISTRICT",
+            totalPatrols: 15,
+            activeDays: 8,
+            inactiveDays: 4,
+            activePercentage: 67
+          },
+          {
+            municipality: "Balanga City",
+            district: "2ND DISTRICT", 
+            totalPatrols: 22,
+            activeDays: 12,
+            inactiveDays: 2,
+            activePercentage: 86
+          },
+          {
+            municipality: "Orani",
+            district: "1ST DISTRICT",
+            totalPatrols: 18,
+            activeDays: 10,
+            inactiveDays: 3,
+            activePercentage: 77
+          }
+        ],
+        totalPatrols: 3
+      }
+    ],
+    allMonths: [
+      { monthKey: "01-2025", totalReports: 3, lastUpdated: new Date().toISOString() }
+    ]
   };
 
-  // Load data for a specific month
-  const loadMonthData = async (monthKey) => {
-    if (!user) return;
-    
-    try {
-      setLoading(true);
-      
-      // Load patrol data for specified month
-      const patrolResult = await getPatrolData(monthKey);
-      let patrolData = [];
-      if (patrolResult.success && patrolResult.data) {
-        patrolData = patrolResult.data.data || [];
-      }
-
-      // Load action reports for specified month
-      const actionReportsResult = await getActionReportsByMonth(monthKey);
-      let actionReports = [];
-      if (actionReportsResult.success) {
-        actionReports = actionReportsResult.data || [];
-      }
-
-      // Update dashboard data
-      setDashboardData(prev => ({
-        ...prev,
-        patrolData,
-        actionReports,
-        summaryStats: {
-          ...prev.summaryStats,
-          totalPatrols: patrolData.length,
-          totalActions: actionReports.length,
-          activeMunicipalities: new Set(patrolData.map(p => p.municipality).filter(Boolean)).size,
-          totalDistricts: new Set(patrolData.map(p => p.district).filter(Boolean)).size
-        }
-      }));
-
-    } catch (error) {
-      console.error(`❌ Error loading data for month ${monthKey}:`, error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load all available months
-  const loadAvailableMonths = async () => {
-    if (!user) return;
-    
-    try {
-      const monthsResult = await getAllActionReportsMonths();
-      if (monthsResult.success) {
-        console.log('📅 Available months:', monthsResult.data);
-      }
-    } catch (error) {
-      console.error('❌ Error loading available months:', error);
-    }
-  };
-
-  // Load data when user changes
+  // Load mock data when user changes
   useEffect(() => {
     if (user) {
-      loadCurrentMonthData();
-      loadAvailableMonths();
+      setLoading(true);
+      
+      // Simulate loading delay
+      setTimeout(() => {
+        const { patrolData, actionReports, incidents, ipatrollerData, allMonths } = mockData;
+        
+        // Calculate summary statistics
+        const allMunicipalities = [
+          "Abucay", "Orani", "Samal", "Hermosa", // 1ST DISTRICT
+          "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
+          "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
+        ];
+        
+        const activeMunicipalities = new Set([
+          ...patrolData.map(p => p.municipality).filter(Boolean),
+          ...actionReports.map(r => r.municipality).filter(Boolean),
+          ...incidents.map(i => i.municipality).filter(Boolean)
+        ]);
+        
+        const totalPatrolsAllMonths = ipatrollerData.reduce((sum, month) => sum + month.totalPatrols, 0);
+        
+        const summaryStats = {
+          totalPatrols: totalPatrolsAllMonths,
+          totalActions: actionReports.length,
+          totalIncidents: incidents.length,
+          activeMunicipalities: activeMunicipalities.size,
+          inactiveMunicipalities: allMunicipalities.length - activeMunicipalities.size,
+          totalDistricts: 3,
+          totalUsers: 1,
+          currentMonthPatrols: patrolData.length,
+          currentMonthActions: actionReports.length,
+          totalMonthsWithData: allMonths.length
+        };
+
+        // Calculate I-Patroller statistics
+        const ipatrollerStats = {
+          totalPatrols: patrolData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0),
+          totalActive: patrolData.reduce((sum, item) => sum + (item.activeDays || 0), 0),
+          totalInactive: patrolData.reduce((sum, item) => sum + (item.inactiveDays || 0), 0),
+          avgActivePercentage: patrolData.length > 0 ? 
+            Math.round(
+              patrolData.reduce((sum, item) => sum + (item.activePercentage || 0), 0) / 
+              patrolData.length
+            ) : 0,
+          municipalityCount: patrolData.length,
+          activeMunicipalities: activeMunicipalities.size,
+          inactiveMunicipalities: allMunicipalities.length - activeMunicipalities.size,
+          totalMunicipalities: 12,
+          districtsActive: new Set(patrolData.map(p => p.district).filter(Boolean)).size,
+          activeMunicipalitiesList: patrolData.filter(p => p.totalPatrols > 0).map(p => ({
+            name: p.municipality,
+            totalPatrols: p.totalPatrols,
+            activeDays: p.activeDays,
+            inactiveDays: p.inactiveDays,
+            avgPatrols: p.totalPatrols / p.activeDays || 0
+          })),
+          inactiveMunicipalitiesList: allMunicipalities
+            .filter(m => !patrolData.some(p => p.municipality === m && p.totalPatrols > 0))
+            .map(m => ({
+              name: m,
+              totalPatrols: 0,
+              activeDays: 0,
+              inactiveDays: 0,
+              avgPatrols: 0
+            }))
+        };
+
+        setDashboardData({
+          patrolData,
+          actionReports,
+          incidents,
+          ipatrollerData,
+          summaryStats,
+          allMonths,
+          ipatrollerStats
+        });
+
+        setLoading(false);
+      }, 500); // Simulate loading delay
     }
   }, [user]);
 
   const value = {
     ...dashboardData,
     loading,
-    loadCurrentMonthData,
-    loadMonthData,
-    loadAvailableMonths
+    loadCurrentMonthData: () => {}, // No-op function
+    loadMonthData: () => {}, // No-op function
+    loadAvailableMonths: () => {} // No-op function
   };
 
   return (

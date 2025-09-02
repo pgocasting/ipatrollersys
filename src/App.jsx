@@ -6,22 +6,15 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
-import FirebaseTest from "./FirebaseTest";
-import FirebaseConnectionTest from "./FirebaseConnectionTest";
-import FirestoreConnectionTest from "./components/FirestoreConnectionTest";
-import CloudinaryDemo from "./CloudinaryDemo";
-import FirebaseCloudinaryDemo from "./FirebaseCloudinaryDemo";
-import PhotoMigrationTool from "./components/PhotoMigrationTool";
-import FirebaseAuthTest from "./FirebaseAuthTest";
+// Firebase-related components removed
 
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
-import DebugComponent from "./DebugComponent";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import "./utils/consoleHelpers"; // Load console helper functions
-import "./firebase"; // Initialize Firebase
+// Firebase removed - using simple authentication
 import "./mobile.css"; // Mobile responsive styles
 
 export default function App() {
@@ -90,20 +83,7 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      case 'firebase-test':
-        return <FirebaseTest />;
-      case 'firebase-connection-test':
-        return <FirebaseConnectionTest />;
-      case 'firestore-test':
-        return <FirestoreConnectionTest />;
-      case 'cloudinary-demo':
-        return <CloudinaryDemo />;
-      case 'firebase-cloudinary-demo':
-        return <FirebaseCloudinaryDemo />;
-      case 'photo-migration':
-        return <PhotoMigrationTool />;
-      case 'auth-test':
-        return <FirebaseAuthTest />;
+      // Firebase test routes removed
 
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -123,14 +103,12 @@ export default function App() {
   }
 
   return (
-    <DebugComponent>
-        <PatrolDataProvider>
-          <DataProvider>
-            <div className="App">
-              {user ? renderPage() : <Login onLogin={() => {}} />}
-            </div>
-          </DataProvider>
-        </PatrolDataProvider>
-    </DebugComponent>
+    <PatrolDataProvider>
+      <DataProvider>
+        <div className="App">
+          {user ? renderPage() : <Login onLogin={() => {}} />}
+        </div>
+      </DataProvider>
+    </PatrolDataProvider>
   );
 }

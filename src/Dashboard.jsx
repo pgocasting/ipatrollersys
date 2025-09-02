@@ -65,13 +65,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const { 
     actionReports, 
     incidents, 
-    ipatrollerData, // Add IPatroller data
-    summaryStats, 
+    ipatrollerData,
+    summaryStats,
+    allMonths,
+    ipatrollerStats,
     loading: dataLoading 
   } = useData();
 
-  // Calculate comprehensive statistics
+
+
+  // Calculate comprehensive statistics from all data sources
   const comprehensiveStats = React.useMemo(() => {
+    
     // Action Center Statistics by Department
     const actionsByDepartment = {
       pnp: actionReports?.filter(r => r.department === 'pnp' && r.actionTaken && String(r.actionTaken).trim() !== '').length || 0,
@@ -79,56 +84,96 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       'pg-enro': actionReports?.filter(r => r.department === 'pg-enro' && r.actionTaken && String(r.actionTaken).trim() !== '').length || 0
     };
     
-    // Incidents Statistics by Type (current month)
-    const now = new Date();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
-    const monthlyIncidents = incidents?.filter(incident => {
-      try {
-        const rawDate = incident?.date;
-        const d = rawDate?.toDate ? rawDate.toDate() : new Date(rawDate);
-        if (!isNaN(d)) {
-          return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-        }
-        return false;
-      } catch (e) {
-        return false;
-      }
-    }) || [];
-    
+    // Incidents Statistics by Type (all incidents for comprehensive view)
     const incidentsByType = {
-      traffic: monthlyIncidents.filter(i => i.incidentType?.includes('Traffic')).length,
-      drugRelated: monthlyIncidents.filter(i => i.incidentType === 'Drug-related').length,
-      theft: monthlyIncidents.filter(i => i.incidentType === 'Theft').length,
-      assault: monthlyIncidents.filter(i => i.incidentType === 'Assault').length,
-      others: monthlyIncidents.filter(i => !['Traffic Violation', 'Traffic Accident', 'Drug-related', 'Theft', 'Assault'].includes(i.incidentType)).length
+      traffic: incidents?.filter(i => i.incidentType?.includes('Traffic')).length || 0,
+      drugRelated: incidents?.filter(i => i.incidentType === 'Drug-related').length || 0,
+      theft: incidents?.filter(i => i.incidentType === 'Theft').length || 0,
+      assault: incidents?.filter(i => i.incidentType === 'Assault').length || 0,
+      others: incidents?.filter(i => !['Traffic Violation', 'Traffic Accident', 'Drug-related', 'Theft', 'Assault'].includes(i.incidentType)).length || 0
     };
     
-    // I-Patroller Statistics
-    const totalPatrols = ipatrollerData?.reduce((sum, item) => 
-      sum + (item.data?.reduce((daySum, val) => daySum + (val || 0), 0) || 0), 0) || 0;
-    const activeMunicipalities = ipatrollerData?.filter(item => {
-      if (!item.data || !Array.isArray(item.data)) return false;
-      const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-      return avgPatrols >= 5;
-    }).length || 0;
+    // I-Patroller Statistics (comprehensive across all months)
+    const totalPatrols = ipatrollerData?.reduce((sum, month) => sum + (month.totalPatrols || 0), 0) || 0;
     
-    const inactiveMunicipalities = ipatrollerData?.filter(item => {
-      if (!item.data || !Array.isArray(item.data)) return true; // No data = inactive
-      const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-      return avgPatrols < 5;
-    }).length || 0;
-        
-        return {
+    // Municipality Performance (combining all data sources)
+    const municipalityStats = {};
+    const allMunicipalities = [
+      "Abucay", "Orani", "Samal", "Hermosa", // 1ST DISTRICT
+      "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
+      "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
+    ];
+    
+    // Initialize municipality stats
+    allMunicipalities.forEach(municipality => {
+      municipalityStats[municipality] = {
+        patrols: 0,
+        actions: 0,
+        incidents: 0,
+        performanceScore: 0
+      };
+    });
+    
+    // Count patrols by municipality
+    ipatrollerData?.forEach(month => {
+      month.data?.forEach(patrol => {
+        if (patrol.municipality && municipalityStats[patrol.municipality]) {
+          municipalityStats[patrol.municipality].patrols += 1;
+        }
+      });
+    });
+    
+    // Count actions by municipality
+    actionReports?.forEach(action => {
+      if (action.municipality && municipalityStats[action.municipality]) {
+        municipalityStats[action.municipality].actions += 1;
+      }
+    });
+    
+    // Count incidents by municipality
+    incidents?.forEach(incident => {
+      if (incident.municipality && municipalityStats[incident.municipality]) {
+        municipalityStats[incident.municipality].incidents += 1;
+      }
+    });
+    
+    // Calculate performance scores (higher patrols and actions = better performance)
+    Object.keys(municipalityStats).forEach(municipality => {
+      const stats = municipalityStats[municipality];
+      stats.performanceScore = (stats.patrols * 2) + (stats.actions * 3) - (stats.incidents * 1);
+    });
+    
+    // Sort municipalities by performance
+    const topPerformers = Object.entries(municipalityStats)
+      .sort(([,a], [,b]) => b.performanceScore - a.performanceScore)
+      .slice(0, 5);
+    
+    // Monthly trends (last 6 months)
+    const monthlyTrends = ipatrollerData?.slice(0, 6).map(month => ({
+      month: month.monthKey,
+      patrols: month.totalPatrols || 0,
+      actions: actionReports?.filter(r => {
+        try {
+          const reportDate = new Date(r.when);
+          const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+          return monthKey === month.monthKey;
+        } catch {
+          return false;
+        }
+      }).length || 0
+    })) || [];
+    return {
       actionsByDepartment,
       incidentsByType,
-      monthlyIncidents: monthlyIncidents.length,
       totalActions: actionReports?.filter(r => r.actionTaken && String(r.actionTaken).trim() !== '').length || 0,
       totalPatrols,
-      activeMunicipalities,
-      inactiveMunicipalities
+      municipalityStats,
+      topPerformers,
+      monthlyTrends,
+      totalIncidents: incidents?.length || 0,
+      totalMonthsWithData: allMonths?.length || 0
     };
-  }, [actionReports, incidents, ipatrollerData]);
+  }, [actionReports, incidents, ipatrollerData, allMonths]);
 
   const [selectedDashboardTab, setSelectedDashboardTab] = useState('overview');
   // Incidents month/year selector (for Incidents tab only)
@@ -407,6 +452,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           
           
 
+        {/* Loading Indicator */}
+        {dataLoading && (
+          <div className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-2 text-gray-600">Loading dashboard data...</p>
+          </div>
+        )}
+        
         {/* Dashboard Tabs */}
         <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
             <button
@@ -506,14 +559,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-              {/* Monthly Incidents */}
+              {/* Total Incidents */}
           <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Monthly Incidents</p>
+                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Incidents</p>
                   <p className="text-2xl md:text-3xl font-bold text-red-600">
-                        {comprehensiveStats.monthlyIncidents.toLocaleString()}
+                        {comprehensiveStats.totalIncidents.toLocaleString()}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
@@ -530,7 +583,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div>
                       <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Active Municipalities</p>
                   <p className="text-2xl md:text-3xl font-bold text-purple-600">
-                        {comprehensiveStats.activeMunicipalities.toLocaleString()}
+                        {summaryStats.activeMunicipalities.toLocaleString()}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
@@ -540,18 +593,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-              {/* Inactive Municipalities */}
+              {/* Total Months with Data */}
         <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
           <CardContent className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
-                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-red-600">
-                        {comprehensiveStats.inactiveMunicipalities.toLocaleString()}
+                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Months with Data</p>
+                  <p className="text-2xl md:text-3xl font-bold text-indigo-600">
+                        {comprehensiveStats.totalMonthsWithData.toLocaleString()}
                 </p>
               </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
-                      <XCircle className="h-5 w-5 md:h-6 md:w-6 text-red-600" />
+                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-indigo-100">
+                      <Calendar className="h-5 w-5 md:h-6 md:w-6 text-indigo-600" />
               </div>
             </div>
           </CardContent>
@@ -656,6 +709,115 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
         </div>
+
+            {/* Comprehensive Data Overview */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Top Performing Municipalities */}
+              <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                    <Trophy className="w-5 h-5 text-yellow-500" />
+                    Top Performing Municipalities
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {comprehensiveStats.topPerformers.map(([municipality, stats], index) => (
+                      <div key={municipality} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
+                            index === 0 ? 'bg-yellow-100 text-yellow-600' :
+                            index === 1 ? 'bg-gray-100 text-gray-600' :
+                            index === 2 ? 'bg-orange-100 text-orange-600' :
+                            'bg-blue-100 text-blue-600'
+                          }`}>
+                            {index < 3 ? ['🥇', '🥈', '🥉'][index] : index + 1}
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{municipality}</p>
+                            <p className="text-sm text-gray-500">
+                              {stats.patrols} patrols • {stats.actions} actions • {stats.incidents} incidents
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-medium text-gray-900">Score: {stats.performanceScore}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Data Sources Summary */}
+              <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                <CardHeader>
+                  <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-blue-500" />
+                    Data Sources Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Shield className="w-5 h-5 text-blue-600" />
+                        <div>
+                          <p className="font-medium text-gray-900">I-Patroller Data</p>
+                          <p className="text-sm text-gray-500">Patrol records across all months</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-blue-600">{comprehensiveStats.totalPatrols}</p>
+                        <p className="text-xs text-gray-500">patrols</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Activity className="w-5 h-5 text-green-600" />
+                        <div>
+                          <p className="font-medium text-gray-900">Action Center</p>
+                          <p className="text-sm text-gray-500">Action reports by department</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-green-600">{comprehensiveStats.totalActions}</p>
+                        <p className="text-xs text-gray-500">actions</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-600" />
+                        <div>
+                          <p className="font-medium text-gray-900">Incidents Reports</p>
+                          <p className="text-sm text-gray-500">All incident records</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-red-600">{comprehensiveStats.totalIncidents}</p>
+                        <p className="text-xs text-gray-500">incidents</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="w-5 h-5 text-purple-600" />
+                        <div>
+                          <p className="font-medium text-gray-900">Data Coverage</p>
+                          <p className="text-sm text-gray-500">Months with available data</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-purple-600">{comprehensiveStats.totalMonthsWithData}</p>
+                        <p className="text-xs text-gray-500">months</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </>
         )}
 
@@ -703,15 +865,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
-          {/* I-Patroller specific cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          {/* I-Patroller specific cards - Same as I-Patroller page */}
           <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
                           <div>
-                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols (Month)</p>
+                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols</p>
                     <p className="text-2xl md:text-3xl font-bold text-blue-600">
-                      {ipatrollerMonthlyStats.totalPatrols.toLocaleString()}
+                      {ipatrollerStats?.totalPatrols?.toLocaleString() || 0}
                     </p>
                 </div>
                   <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
@@ -725,9 +887,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
                           <div>
-                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Active Municipalities</p>
+                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Active Days</p>
                     <p className="text-2xl md:text-3xl font-bold text-green-600">
-                      {ipatrollerMonthlyStats.activeMunicipalities.toLocaleString()}
+                      {ipatrollerStats?.totalActive?.toLocaleString() || 0}
                     </p>
                           </div>
                   <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
@@ -741,9 +903,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
                           <div>
-                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Municipalities</p>
+                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Days</p>
                     <p className="text-2xl md:text-3xl font-bold text-red-600">
-                      {ipatrollerMonthlyStats.inactiveMunicipalities.toLocaleString()}
+                      {ipatrollerStats?.totalInactive?.toLocaleString() || 0}
                     </p>
                           </div>
                   <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
@@ -757,25 +919,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
                 <div>
-                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Municipalities</p>
-                    <p className="text-2xl md:text-3xl font-bold text-purple-600">12</p>
+                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Avg Active %</p>
+                    <p className="text-2xl md:text-3xl font-bold text-purple-600">{ipatrollerStats?.avgActivePercentage || 0}%</p>
                 </div>
                   <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                    <Building2 className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
-              </div>
-            </div>
-              </CardContent>
-            </Card>
-
-            <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Districts Active</p>
-                    <p className="text-2xl md:text-3xl font-bold text-orange-600">3</p>
-                </div>
-                  <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                    <MapPin className="h-5 w-5 md:h-6 md:w-6 text-orange-600" />
+                    <Target className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
               </div>
             </div>
               </CardContent>
@@ -789,13 +937,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
                     <CheckCircle className="w-5 h-5 text-green-500" />
-                    Active Municipalities ({ipatrollerMonthlyStats.activeMunicipalities})
+                    Active Municipalities ({ipatrollerStats?.activeMunicipalities || 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {ipatrollerMonthlyStats.activeMunicipalitiesList.length > 0 ? (
-                      ipatrollerMonthlyStats.activeMunicipalitiesList
+                    {ipatrollerStats?.activeMunicipalitiesList?.length > 0 ? (
+                      ipatrollerStats.activeMunicipalitiesList
                         .sort((a, b) => parseFloat(b.avgPatrols) - parseFloat(a.avgPatrols))
                         .map((municipality, index) => (
                           <div key={`active-${municipality.name}-${index}`} className="flex items-center justify-between p-3 rounded-lg bg-green-50 border border-green-200">
@@ -821,13 +969,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardHeader>
                   <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
                     <XCircle className="w-5 h-5 text-red-500" />
-                    Inactive Municipalities ({ipatrollerMonthlyStats.inactiveMunicipalities})
+                    Inactive Municipalities ({ipatrollerStats?.inactiveMunicipalities || 0})
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {ipatrollerMonthlyStats.inactiveMunicipalitiesList.length > 0 ? (
-                      ipatrollerMonthlyStats.inactiveMunicipalitiesList
+                    {ipatrollerStats?.inactiveMunicipalitiesList?.length > 0 ? (
+                      ipatrollerStats.inactiveMunicipalitiesList
                         .sort((a, b) => parseFloat(a.avgPatrols) - parseFloat(b.avgPatrols))
                         .map((municipality, index) => (
                           <div key={`inactive-${municipality.name}-${index}`} className="flex items-center justify-between p-3 rounded-lg bg-red-50 border border-red-200">

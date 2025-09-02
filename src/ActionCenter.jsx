@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
-import { useFirestore } from "./hooks/useFirestore";
+// Firebase removed - using local data storage
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -9,8 +9,7 @@ import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { cloudinaryUtils } from "./utils/cloudinary";
-import { writeBatch, doc, collection } from 'firebase/firestore';
-import { db } from './firebase';
+// Firebase imports removed
 
 import { 
   Activity,
@@ -77,15 +76,7 @@ import {
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
-  const { 
-    getActionReports, 
-    saveActionReport, 
-    updateActionReport, 
-    deleteActionReport,
-    getAllActionReportsMonths,
-    getActionReportsByMonth,
-    queryDocuments
-  } = useFirestore();
+  // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState("all");
@@ -256,6 +247,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       "Morong"
     ]
   };
+
 
 
   // Handle cleaning duplicates
@@ -1641,104 +1633,86 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
-          {/* Filters & Search - Ultra Compact Design */}
-          <div className="flex-shrink-0 mb-2">
-            <div className="rounded-lg shadow-sm border p-2 transition-all duration-300 bg-white border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-100/80">
-                    <Filter className="h-3.5 w-3.5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold transition-colors duration-300 text-gray-800">Filters & Search</h3>
-                    <p className="text-xs transition-colors duration-300 text-gray-600">Refine your data view</p>
-                  </div>
-                </div>
+          {/* Dynamic Search & Filter Module */}
+          <div className="flex-shrink-0 mb-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by municipality, district, department, or action..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 py-2 text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
+                
+                {/* Month Filter */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Months</option>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((month, index) => (
+                    <option key={month} value={index}>{month}</option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Years</option>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                {/* District Filter */}
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Districts</option>
+                  <option value="1ST DISTRICT">1ST DISTRICT</option>
+                  <option value="2ND DISTRICT">2ND DISTRICT</option>
+                  <option value="3RD DISTRICT">3RD DISTRICT</option>
+                </select>
+
+                {/* Clear Filters Button */}
                 <Button
                   onClick={() => {
                     setSearchTerm("");
-                    setSelectedDistrict("");
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
+                    setSelectedDistrict("all");
+                    setSelectedMonth("all");
+                    setSelectedYear("all");
                   }}
                   variant="outline"
                   size="sm"
-                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs py-1 px-2 h-7"
+                  className="ml-auto text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Clear All Filters
+                  Clear All
                 </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Month</label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Months</option>
-                    <option value={0}>January</option>
-                    <option value={1}>February</option>
-                    <option value={2}>March</option>
-                    <option value={3}>April</option>
-                    <option value={4}>May</option>
-                    <option value={5}>June</option>
-                    <option value={6}>July</option>
-                    <option value={7}>August</option>
-                    <option value={8}>September</option>
-                    <option value={9}>October</option>
-                    <option value={10}>November</option>
-                    <option value={11}>December</option>
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Year</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Years</option>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">District</label>
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Districts</option>
-                    <option value="1ST DISTRICT">1ST DISTRICT</option>
-                    <option value="2ND DISTRICT">2ND DISTRICT</option>
-                    <option value="3RD DISTRICT">3RD DISTRICT</option>
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search actions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           {/* Summary Cards */}

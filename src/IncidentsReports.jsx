@@ -6,21 +6,7 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
-import { 
-  collection, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  doc, 
-  writeBatch,
-  query,
-  where,
-  orderBy,
-  limit,
-  onSnapshot
-} from 'firebase/firestore';
-import { db } from './firebase';
+// Firebase removed - using local data storage
 
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
