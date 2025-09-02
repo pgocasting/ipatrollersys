@@ -475,6 +475,176 @@ class FirestoreService {
     });
   }
 
+  // Migration function to convert individual action reports to monthly documents
+  async migrateActionReportsToMonthly() {
+    try {
+      console.log('🔄 Starting migration of individual action reports to monthly structure...');
+      
+      // Get all documents from actionReports collection
+      const result = await this.queryDocuments('actionReports');
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      const allDocuments = result.data;
+      console.log(`📊 Found ${allDocuments.length} total documents in actionReports collection`);
+
+      // Separate individual reports from monthly documents
+      const individualReports = allDocuments.filter(doc => 
+        doc.id.startsWith('action-') && !doc.monthKey
+      );
+      const monthlyDocuments = allDocuments.filter(doc => 
+        doc.monthKey && doc.monthKey.includes('-')
+      );
+
+      console.log(`📋 Found ${individualReports.length} individual reports to migrate`);
+      console.log(`📅 Found ${monthlyDocuments.length} existing monthly documents`);
+
+      if (individualReports.length === 0) {
+        return { success: true, message: 'No individual reports found to migrate', migrated: 0 };
+      }
+
+      // Group individual reports by month
+      const reportsByMonth = {};
+      let processedReports = 0;
+
+      for (const report of individualReports) {
+        try {
+          let reportDate;
+          
+          // Try to parse the date from different possible formats
+          if (report.when) {
+            if (typeof report.when === 'string') {
+              reportDate = new Date(report.when);
+            } else if (report.when.seconds) {
+              // Firestore timestamp
+              reportDate = new Date(report.when.seconds * 1000);
+            } else if (report.when instanceof Date) {
+              reportDate = report.when;
+            }
+          }
+          
+          // If no valid date, use current date
+          if (!reportDate || isNaN(reportDate.getTime())) {
+            reportDate = new Date();
+            console.warn(`⚠️ Invalid date for report ${report.id}, using current date`);
+          }
+          
+          const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+          
+          if (!reportsByMonth[monthKey]) {
+            reportsByMonth[monthKey] = [];
+          }
+          
+          // Clean up the report data
+          const cleanReport = {
+            ...report,
+            id: report.id, // Keep original ID
+            when: reportDate.toISOString(), // Normalize date
+            migratedAt: new Date().toISOString()
+          };
+          
+          reportsByMonth[monthKey].push(cleanReport);
+          processedReports++;
+          
+        } catch (error) {
+          console.error(`❌ Error processing report ${report.id}:`, error);
+        }
+      }
+
+      console.log(`📅 Grouped reports into ${Object.keys(reportsByMonth).length} months:`, Object.keys(reportsByMonth));
+
+      // Create or update monthly documents
+      let migratedCount = 0;
+      const batch = writeBatch(this.db);
+
+      for (const [monthKey, reports] of Object.entries(reportsByMonth)) {
+        try {
+          // Check if monthly document already exists
+          const existingResult = await this.getDocument('actionReports', monthKey);
+          let existingReports = [];
+          
+          if (existingResult.success && existingResult.data) {
+            existingReports = existingResult.data.data || [];
+            console.log(`📄 Month ${monthKey} already exists with ${existingReports.length} reports`);
+          }
+
+          // Merge with existing reports (avoid duplicates)
+          const existingIds = new Set(existingReports.map(r => r.id));
+          const newReports = reports.filter(r => !existingIds.has(r.id));
+          
+          if (newReports.length > 0) {
+            const allReports = [...existingReports, ...newReports];
+            
+            const monthData = {
+              data: allReports,
+              monthKey: monthKey,
+              totalReports: allReports.length,
+              lastUpdated: new Date().toISOString(),
+              metadata: {
+                year: parseInt(monthKey.split('-')[1]),
+                month: parseInt(monthKey.split('-')[0]),
+                districts: [...new Set(allReports.map(r => r.district).filter(Boolean))],
+                municipalities: [...new Set(allReports.map(r => r.municipality).filter(Boolean))],
+                departments: [...new Set(allReports.map(r => r.department).filter(Boolean))]
+              }
+            };
+
+            // Add to batch
+            const docRef = doc(this.db, 'actionReports', monthKey);
+            batch.set(docRef, monthData);
+            
+            migratedCount += newReports.length;
+            console.log(`✅ Prepared ${newReports.length} reports for month ${monthKey} (total: ${allReports.length})`);
+          } else {
+            console.log(`ℹ️ No new reports to add to month ${monthKey}`);
+          }
+          
+        } catch (monthError) {
+          console.error(`❌ Error preparing month ${monthKey}:`, monthError);
+        }
+      }
+
+      // Commit the batch
+      if (migratedCount > 0) {
+        await batch.commit();
+        console.log(`✅ Successfully migrated ${migratedCount} reports to monthly structure`);
+      }
+
+      // Delete individual reports after successful migration
+      if (migratedCount > 0) {
+        const deleteBatch = writeBatch(this.db);
+        let deletedCount = 0;
+        
+        for (const report of individualReports) {
+          try {
+            const docRef = doc(this.db, 'actionReports', report.id);
+            deleteBatch.delete(docRef);
+            deletedCount++;
+          } catch (error) {
+            console.error(`❌ Error deleting report ${report.id}:`, error);
+          }
+        }
+        
+        if (deletedCount > 0) {
+          await deleteBatch.commit();
+          console.log(`🗑️ Deleted ${deletedCount} individual reports after migration`);
+        }
+      }
+
+      return { 
+        success: true, 
+        migrated: migratedCount,
+        months: Object.keys(reportsByMonth).length,
+        message: `Successfully migrated ${migratedCount} reports to ${Object.keys(reportsByMonth).length} monthly documents`
+      };
+
+    } catch (error) {
+      console.error('❌ Error during migration:', error);
+      return { success: false, error: error.message };
+    }
+  }
+
   // Health check
   async healthCheck() {
     try {

@@ -80,6 +80,10 @@ export const useFirestore = () => {
     return await firestoreService.getAllActionReportsMonths();
   }, []);
 
+  const migrateActionReportsToMonthly = useCallback(async () => {
+    return await firestoreService.migrateActionReportsToMonthly();
+  }, []);
+
   // Patrol Data
   const getPatrolData = useCallback(async (monthKey) => {
     return await firestoreService.getPatrolData(monthKey);
@@ -125,6 +129,7 @@ export const useFirestore = () => {
     saveActionReport,
     deleteActionReport,
     getAllActionReportsMonths,
+    migrateActionReportsToMonthly,
     // Patrol Data
     getPatrolData,
     savePatrolData,

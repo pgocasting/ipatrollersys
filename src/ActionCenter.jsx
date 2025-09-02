@@ -84,7 +84,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     deleteActionReport,
     getAllActionReportsMonths,
     getActionReportsByMonth,
-    queryDocuments
+    queryDocuments,
+    migrateActionReportsToMonthly
   } = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -131,18 +132,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(true);
       try {
         console.log('🔄 Loading action reports...');
+        console.log('Current activeTab:', activeTab);
         
         // First, try to load data using the month-based structure
         const monthsResult = await getAllActionReportsMonths();
-        if (monthsResult.success && monthsResult.data.length > 0) {
+        console.log('Months result:', monthsResult);
+        
+        if (monthsResult.success && monthsResult.data && monthsResult.data.length > 0) {
           console.log('✅ Found month-based structure, loading from most recent month:', monthsResult.data[0].monthKey);
           
           // Get data from the most recent month
           const mostRecentMonth = monthsResult.data[0];
           const monthDataResult = await getActionReportsByMonth(mostRecentMonth.monthKey);
+          console.log('Month data result:', monthDataResult);
           
-          if (monthDataResult.success) {
+          if (monthDataResult.success && monthDataResult.data) {
             const allReports = monthDataResult.data || [];
+            console.log('All reports from month:', allReports);
             setAllActionReports(allReports);
             
             // Filter by active tab if needed
@@ -174,28 +180,54 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           
           // Fallback: Try to load data directly from the actionReports collection
           try {
+            console.log('Attempting to query actionReports collection directly...');
             const directResult = await queryDocuments('actionReports');
-            if (directResult.success && directResult.data.length > 0) {
+            console.log('Direct query result:', directResult);
+            
+            if (directResult.success && directResult.data && directResult.data.length > 0) {
               console.log('✅ Found existing data in direct collection:', directResult.data.length, 'reports');
+              console.log('Sample data structure:', directResult.data[0]);
               
-              const allReports = directResult.data || [];
-              setAllActionReports(allReports);
-              
-              // Filter by active tab if needed
-              const filteredReports = allReports.filter(report => 
-                activeTab === "all" || report.department === activeTab
+              // Filter out monthly documents and get only individual reports
+              const individualReports = directResult.data.filter(doc => 
+                doc.id.startsWith('action-') && !doc.monthKey
               );
               
-              console.log('Filtered reports from direct collection:', {
-                activeTab: activeTab,
-                filteredCount: filteredReports.length,
-                filteredDepartments: filteredReports.map(r => r.department)
-              });
+              console.log(`📋 Found ${individualReports.length} individual reports (excluding monthly docs)`);
               
-              setActionItems(filteredReports);
-              
-              // Show migration notice
-              setSuccessMessage(`Found ${allReports.length} existing action reports. Consider migrating to the new month-based structure for better organization.`);
+              if (individualReports.length > 0) {
+                const allReports = individualReports || [];
+                setAllActionReports(allReports);
+                
+                // Filter by active tab if needed
+                const filteredReports = allReports.filter(report => {
+                  console.log('Checking report:', report.id, 'department:', report.department, 'activeTab:', activeTab);
+                  return activeTab === "all" || report.department === activeTab;
+                });
+                
+                console.log('Filtered reports from direct collection:', {
+                  activeTab: activeTab,
+                  filteredCount: filteredReports.length,
+                  filteredDepartments: filteredReports.map(r => r.department)
+                });
+                
+                setActionItems(filteredReports);
+                
+                // If no filtered reports, show all reports for debugging
+                if (filteredReports.length === 0 && allReports.length > 0) {
+                  console.log('⚠️ No reports match the current tab, showing all reports for debugging');
+                  setActionItems(allReports);
+                  setSuccessMessage(`Found ${allReports.length} reports but none match the current tab. Check console for details.`);
+                } else {
+                  // Show migration notice
+                  setSuccessMessage(`Found ${allReports.length} existing action reports. Consider migrating to the new month-based structure for better organization.`);
+                }
+              } else {
+                console.log('No individual reports found in direct collection');
+                setActionItems([]);
+                setAllActionReports([]);
+                setSuccessMessage('No individual action reports found. Data may already be in monthly structure.');
+              }
             } else {
               console.log('No existing data found in direct collection');
               setActionItems([]);
@@ -294,83 +326,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(true);
       setSuccessMessage('🔄 Starting data migration...');
       
-      // Get all existing data from direct collection
-      const directResult = await queryDocuments('actionReports');
-      if (!directResult.success || !directResult.data.length) {
-        alert('No existing data found to migrate.');
-        return;
-      }
+      // Use the new migration function from firestoreService
+      const migrationResult = await migrateActionReportsToMonthly();
       
-      const existingReports = directResult.data;
-      console.log(`🔄 Migrating ${existingReports.length} existing reports to month-based structure...`);
-      
-      // Group reports by month
-      const reportsByMonth = {};
-      
-      existingReports.forEach(report => {
-        let reportDate;
-        
-        // Try to parse the date from different possible formats
-        if (report.when) {
-          if (typeof report.when === 'string') {
-            reportDate = new Date(report.when);
-          } else if (report.when.seconds) {
-            // Firestore timestamp
-            reportDate = new Date(report.when.seconds * 1000);
-          } else if (report.when instanceof Date) {
-            reportDate = report.when;
-          }
+      if (migrationResult.success) {
+        if (migrationResult.migrated > 0) {
+          setSuccessMessage(`✅ ${migrationResult.message}`);
+          // Reload data to show the new structure
+          await loadActionReports();
+        } else {
+          setSuccessMessage('ℹ️ No individual reports found to migrate. Data is already in monthly structure.');
         }
-        
-        // If no valid date, use current date
-        if (!reportDate || isNaN(reportDate.getTime())) {
-          reportDate = new Date();
-        }
-        
-        const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
-        
-        if (!reportsByMonth[monthKey]) {
-          reportsByMonth[monthKey] = [];
-        }
-        
-        reportsByMonth[monthKey].push(report);
-      });
-      
-      console.log('📅 Reports grouped by month:', Object.keys(reportsByMonth));
-      
-      // Save each month's data using the new structure
-      let migratedCount = 0;
-      for (const [monthKey, reports] of Object.entries(reportsByMonth)) {
-        try {
-          const monthData = {
-            data: reports,
-            monthKey: monthKey,
-            totalReports: reports.length,
-            lastUpdated: new Date().toISOString(),
-            metadata: {
-              year: parseInt(monthKey.split('-')[1]),
-              month: parseInt(monthKey.split('-')[0]),
-              districts: [...new Set(reports.map(r => r.district).filter(Boolean))],
-              departments: [...new Set(reports.map(r => r.department).filter(Boolean))]
-            }
-          };
-          
-          const saveResult = await saveActionReport(monthData);
-          if (saveResult.success) {
-            migratedCount += reports.length;
-            console.log(`✅ Migrated ${reports.length} reports for ${monthKey}`);
-          }
-        } catch (monthError) {
-          console.error(`❌ Error migrating month ${monthKey}:`, monthError);
-        }
-      }
-      
-      if (migratedCount > 0) {
-        setSuccessMessage(`✅ Successfully migrated ${migratedCount} reports to month-based structure!`);
-        // Reload data to show the new structure
-        await loadActionReports();
       } else {
-        setSuccessMessage('⚠️ Migration completed but no reports were migrated.');
+        setSuccessMessage(`❌ Migration failed: ${migrationResult.error}`);
       }
       
     } catch (error) {
