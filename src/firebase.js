@@ -27,12 +27,8 @@ const firebaseConfig = {
   measurementId: "G-HPK93S27LM"
 };
 
-// Initialize Firebase with custom settings to force HTTP/2
-const app = initializeApp(firebaseConfig, {
-  // Force HTTP/2 connections and disable QUIC
-  experimentalForceLongPolling: true,
-  useFetchStreams: false
-});
+// Initialize Firebase with standard settings
+const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase services with enhanced error handling
 let analytics, auth, db, storage;

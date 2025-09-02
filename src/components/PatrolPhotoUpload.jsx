@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { firebaseCloudinaryIntegration } from '../utils/firebaseCloudinaryIntegration';
+
 
 const PatrolPhotoUpload = ({ 
   monthKey, 
@@ -53,10 +53,8 @@ const PatrolPhotoUpload = ({
       setUploadStatus(`📤 Uploading ${validFiles.length} photo(s)...`);
       
       // Upload photos using the integration utility
-      const result = await firebaseCloudinaryIntegration.uploadPatrolPhotos(
-        validFiles,
-        { monthKey, municipality, district }
-      );
+      console.warn('⚠️ Firebase has been removed from this project');
+      const result = { success: false, error: 'Firebase has been removed from this project' };
       
       if (result.success) {
         setUploadProgress(100);

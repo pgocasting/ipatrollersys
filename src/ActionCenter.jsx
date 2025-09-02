@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { useFirestore } from "./hooks/useFirestore";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { writeBatch, doc } from "firebase/firestore";
 import { cloudinaryUtils } from "./utils/cloudinary";
-import { db } from "./firebase";
+import { writeBatch, doc, collection } from 'firebase/firestore';
+import { db } from './firebase';
+
 import { 
   Activity,
   AlertTriangle,
@@ -24,86 +26,26 @@ import {
   Filter,
   MapPin,
   Search,
-  Settings,
   Shield,
   TrendingUp,
   Users,
   X,
   XCircle,
-  Zap,
   Target,
-  Flag,
-  Bell,
   Database,
   Save,
-  MoreHorizontal,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Minus,
   Plus,
-  Maximize2,
-  Minimize2,
   RotateCcw,
-  RotateCw,
-  ZoomIn,
-  ZoomOut,
-  Move,
-  Copy,
-  Scissors,
-  Link,
-  Unlink,
-  Lock,
-  Unlock,
-  Key,
-  Mail,
-  Phone,
-  MessageSquare,
-  Video,
+  RefreshCw,
   Camera,
-  Mic,
-  Headphones,
-  Volume2,
-  VolumeX,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Rewind,
-  FastForward,
-  Shuffle,
-  Repeat,
-  Volume1,
-  Volume,
-  Speaker,
-  Radio,
-  Tv,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Laptop,
-  Server,
-  Mouse,
-  Keyboard,
-  MonitorSpeaker,
-  User,
-  AlertCircle,
-  Home,
-  Car,
-  Building2,
-  Star,
-  Heart,
-  Briefcase,
   FileText,
   Pill,
   Leaf,
   Fish,
-  Trees
+  Trees,
+  Building2
 } from "lucide-react";
 /**
  * Action Center Component
@@ -134,7 +76,16 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
+  const { user } = useFirebase();
+  const { 
+    getActionReports, 
+    saveActionReport, 
+    updateActionReport, 
+    deleteActionReport,
+    getAllActionReportsMonths,
+    getActionReportsByMonth,
+    queryDocuments
+  } = useFirestore();
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState("all");
@@ -171,8 +122,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     source: "",
     actionTaken: "",
     otherInfo: "",
-    photos: [],
-
+    photos: []
   });
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pdfDescription, setPdfDescription] = useState("");
@@ -180,30 +130,82 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const loadActionReports = async () => {
       setLoading(true);
       try {
-        const result = await getActionReports();
-        if (result.success) {
-        // Store all reports
-        setAllActionReports(result.data);
-          // Filter by active tab if needed
-        console.log('Loading action reports:', {
-          totalReports: result.data.length,
-          activeTab: activeTab,
-          departments: result.data.map(r => r.department),
-          pgEnroReports: result.data.filter(r => r.department === 'pg-enro')
-        });
-          const filteredReports = result.data.filter(report => 
-            activeTab === "all" || report.department === activeTab
-          );
-        console.log('Filtered reports:', {
-          activeTab: activeTab,
-          filteredCount: filteredReports.length,
-          filteredDepartments: filteredReports.map(r => r.department)
-        });
-          setActionItems(filteredReports);
+        console.log('🔄 Loading action reports...');
+        
+        // First, try to load data using the month-based structure
+        const monthsResult = await getAllActionReportsMonths();
+        if (monthsResult.success && monthsResult.data.length > 0) {
+          console.log('✅ Found month-based structure, loading from most recent month:', monthsResult.data[0].monthKey);
+          
+          // Get data from the most recent month
+          const mostRecentMonth = monthsResult.data[0];
+          const monthDataResult = await getActionReportsByMonth(mostRecentMonth.monthKey);
+          
+          if (monthDataResult.success) {
+            const allReports = monthDataResult.data || [];
+            setAllActionReports(allReports);
+            
+            // Filter by active tab if needed
+            console.log('Loading action reports:', {
+              totalReports: allReports.length,
+              activeTab: activeTab,
+              departments: allReports.map(r => r.department),
+              pgEnroReports: allReports.filter(r => r.department === 'pg-enro')
+            });
+            
+            const filteredReports = allReports.filter(report => 
+              activeTab === "all" || report.department === activeTab
+            );
+            
+            console.log('Filtered reports:', {
+              activeTab: activeTab,
+              filteredCount: filteredReports.length,
+              filteredDepartments: filteredReports.map(r => r.department)
+            });
+            
+            setActionItems(filteredReports);
+          } else {
+            console.error('Error loading month data:', monthDataResult.error);
+            setActionItems([]);
+            setAllActionReports([]);
+          }
         } else {
-          console.error('Error loading action reports:', result.error);
-          setActionItems([]);
-        setAllActionReports([]);
+          console.log('⚠️ No month-based structure found, trying direct collection access...');
+          
+          // Fallback: Try to load data directly from the actionReports collection
+          try {
+            const directResult = await queryDocuments('actionReports');
+            if (directResult.success && directResult.data.length > 0) {
+              console.log('✅ Found existing data in direct collection:', directResult.data.length, 'reports');
+              
+              const allReports = directResult.data || [];
+              setAllActionReports(allReports);
+              
+              // Filter by active tab if needed
+              const filteredReports = allReports.filter(report => 
+                activeTab === "all" || report.department === activeTab
+              );
+              
+              console.log('Filtered reports from direct collection:', {
+                activeTab: activeTab,
+                filteredCount: filteredReports.length,
+                filteredDepartments: filteredReports.map(r => r.department)
+              });
+              
+              setActionItems(filteredReports);
+              
+              // Show migration notice
+              setSuccessMessage(`Found ${allReports.length} existing action reports. Consider migrating to the new month-based structure for better organization.`);
+            } else {
+              console.log('No existing data found in direct collection');
+              setActionItems([]);
+              setAllActionReports([]);
+            }
+          } catch (directError) {
+            console.error('Error loading from direct collection:', directError);
+            setActionItems([]);
+            setAllActionReports([]);
+          }
         }
       } catch (error) {
         console.error('Error loading action reports:', error);
@@ -214,11 +216,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     };
   useEffect(() => {
     loadActionReports();
-  }, [activeTab, getActionReports]);
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  }, [activeTab]);
+
   // Municipalities by district mapping
   const municipalitiesByDistrict = {
     "1ST DISTRICT": [
@@ -240,12 +239,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       "Morong"
     ]
   };
-  const districts = [
-    { id: "all", name: "All Districts" },
-    { id: "1ST DISTRICT", name: "1ST DISTRICT" },
-    { id: "2ND DISTRICT", name: "2ND DISTRICT" },
-    { id: "3RD DISTRICT", name: "3RD DISTRICT" }
-  ];
+
 
   // Handle cleaning duplicates
   const handleCleanDuplicates = async () => {
@@ -276,22 +270,112 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         `Found ${duplicates.length} duplicate entries. The original entries will be kept. Do you want to remove the duplicates? This action cannot be undone.`
       );
       if (confirmed) {
-        // Remove duplicates from Firestore
-        const batch = writeBatch(db);
-        duplicates.forEach(duplicate => {
-          const docRef = doc(db, 'actionReports', duplicate.id);
-          batch.delete(docRef);
-        });
-        await batch.commit();
-        // Update local state - keep only original items
+        // For now, we'll just remove duplicates from local state
+        // Since we're using the month-based structure, we need to handle this differently
         setActionItems(prevItems => 
           prevItems.filter(item => !duplicates.some(dup => dup.id === item.id))
         );
-        alert(`Successfully removed ${duplicates.length} duplicate entries. Original entries have been preserved.`);
+        setAllActionReports(prevReports => 
+          prevReports.filter(item => !duplicates.some(dup => dup.id === item.id))
+        );
+        alert(`Successfully removed ${duplicates.length} duplicate entries from local view. Note: This only affects the current view. To permanently remove duplicates, you'll need to edit the individual reports.`);
       }
     } catch (error) {
       console.error('Error cleaning duplicates:', error);
       alert('Error cleaning duplicates. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Migrate existing data to month-based structure
+  const migrateExistingData = async () => {
+    try {
+      setLoading(true);
+      setSuccessMessage('🔄 Starting data migration...');
+      
+      // Get all existing data from direct collection
+      const directResult = await queryDocuments('actionReports');
+      if (!directResult.success || !directResult.data.length) {
+        alert('No existing data found to migrate.');
+        return;
+      }
+      
+      const existingReports = directResult.data;
+      console.log(`🔄 Migrating ${existingReports.length} existing reports to month-based structure...`);
+      
+      // Group reports by month
+      const reportsByMonth = {};
+      
+      existingReports.forEach(report => {
+        let reportDate;
+        
+        // Try to parse the date from different possible formats
+        if (report.when) {
+          if (typeof report.when === 'string') {
+            reportDate = new Date(report.when);
+          } else if (report.when.seconds) {
+            // Firestore timestamp
+            reportDate = new Date(report.when.seconds * 1000);
+          } else if (report.when instanceof Date) {
+            reportDate = report.when;
+          }
+        }
+        
+        // If no valid date, use current date
+        if (!reportDate || isNaN(reportDate.getTime())) {
+          reportDate = new Date();
+        }
+        
+        const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+        
+        if (!reportsByMonth[monthKey]) {
+          reportsByMonth[monthKey] = [];
+        }
+        
+        reportsByMonth[monthKey].push(report);
+      });
+      
+      console.log('📅 Reports grouped by month:', Object.keys(reportsByMonth));
+      
+      // Save each month's data using the new structure
+      let migratedCount = 0;
+      for (const [monthKey, reports] of Object.entries(reportsByMonth)) {
+        try {
+          const monthData = {
+            data: reports,
+            monthKey: monthKey,
+            totalReports: reports.length,
+            lastUpdated: new Date().toISOString(),
+            metadata: {
+              year: parseInt(monthKey.split('-')[1]),
+              month: parseInt(monthKey.split('-')[0]),
+              districts: [...new Set(reports.map(r => r.district).filter(Boolean))],
+              departments: [...new Set(reports.map(r => r.department).filter(Boolean))]
+            }
+          };
+          
+          const saveResult = await saveActionReport(monthData);
+          if (saveResult.success) {
+            migratedCount += reports.length;
+            console.log(`✅ Migrated ${reports.length} reports for ${monthKey}`);
+          }
+        } catch (monthError) {
+          console.error(`❌ Error migrating month ${monthKey}:`, monthError);
+        }
+      }
+      
+      if (migratedCount > 0) {
+        setSuccessMessage(`✅ Successfully migrated ${migratedCount} reports to month-based structure!`);
+        // Reload data to show the new structure
+        await loadActionReports();
+      } else {
+        setSuccessMessage('⚠️ Migration completed but no reports were migrated.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error during migration:', error);
+      setSuccessMessage('❌ Migration failed. Please check the console for details.');
     } finally {
       setLoading(false);
     }
@@ -737,7 +821,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const lineHeight = 20;
     
     // Report details in two columns
-    doc.text(`Month: ${months[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
+    const monthNamesExport = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    doc.text(`Month: ${monthNamesExport[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
     doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
     
     doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
@@ -891,7 +976,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
     
     // Save the PDF
-    const fileName = `action-center-${activeTab}-${months[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const monthNamesFilename = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const fileName = `action-center-${activeTab}-${monthNamesFilename[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
@@ -1666,9 +1752,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                   >
                     <option value="all">All Months</option>
-                    {months.map((month, index) => (
-                      <option key={index} value={index}>{month}</option>
-                    ))}
+                    <option value={0}>January</option>
+                    <option value={1}>February</option>
+                    <option value={2}>March</option>
+                    <option value={3}>April</option>
+                    <option value={4}>May</option>
+                    <option value={5}>June</option>
+                    <option value={6}>July</option>
+                    <option value={7}>August</option>
+                    <option value={8}>September</option>
+                    <option value={9}>October</option>
+                    <option value={10}>November</option>
+                    <option value={11}>December</option>
                   </select>
                 </div>
                 <div className="space-y-0.5">
@@ -1692,9 +1787,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
                   >
                     <option value="all">All Districts</option>
-                    {districts.map((district) => (
-                      <option key={district.id} value={district.id}>{district.name}</option>
-                    ))}
+                    <option value="1ST DISTRICT">1ST DISTRICT</option>
+                    <option value="2ND DISTRICT">2ND DISTRICT</option>
+                    <option value="3RD DISTRICT">3RD DISTRICT</option>
                   </select>
                 </div>
                 <div className="space-y-0.5">
@@ -1927,15 +2022,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button
-                      onClick={handleCleanDuplicates}
-                      variant="outline"
-                      size="sm"
-                      className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clean Duplicates
-                    </Button>
+                                  <Button
+                onClick={migrateExistingData}
+                variant="outline"
+                size="sm"
+                className="bg-purple-600 text-white border-purple-600 hover:bg-purple-700 text-xs py-1.5 px-3 h-8"
+                title="Migrate existing data to month-based structure"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Migrate Data
+              </Button>
+              <Button
+                onClick={handleCleanDuplicates}
+                variant="outline"
+                size="sm"
+                className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clean Duplicates
+              </Button>
                     <Badge variant="secondary" className="text-sm bg-blue-100/80 text-blue-800">
                                              {sortedItems ? sortedItems.length : 0} items
                   </Badge>
@@ -2007,190 +2112,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           if (!item || typeof item !== 'object') {
                             return null;
                           }
-                          // Handle icon rendering properly
-                          const getIconComponent = (iconName) => {
-                            switch (iconName) {
-                              case "AlertCircle":
-                                return AlertCircle;
-                              case "Activity":
-                                return Activity;
-                              case "AlertTriangle":
-                                return AlertTriangle;
-                              case "BarChart3":
-                                return BarChart3;
-                              case "Calendar":
-                                return Calendar;
-                              case "CheckCircle":
-                                return CheckCircle;
-                              case "Clock":
-                                return Clock;
-                              case "Download":
-                                return Download;
-                              case "Eye":
-                                return Eye;
-                              case "Edit":
-                                return Edit;
-                              case "Trash2":
-                                return Trash2;
-                              case "Filter":
-                                return Filter;
-                              case "MapPin":
-                                return MapPin;
-
-
-                              case "Search":
-                                return Search;
-                              case "Settings":
-                                return Settings;
-                              case "Shield":
-                                return Shield;
-                              case "TrendingUp":
-                                return TrendingUp;
-                              case "Users":
-                                return Users;
-                              case "X":
-                                return X;
-                              case "XCircle":
-                                return XCircle;
-                              case "Zap":
-                                return Zap;
-                              case "Target":
-                                return Target;
-                              case "Flag":
-                                return Flag;
-                              case "Bell":
-                                return Bell;
-                              case "Database":
-                                return Database;
-                              case "Save":
-                                return Save;
-                              case "MoreHorizontal":
-                                return MoreHorizontal;
-                              case "ChevronDown":
-                                return ChevronDown;
-                              case "ChevronUp":
-                                return ChevronUp;
-                              case "ChevronLeft":
-                                return ChevronLeft;
-                              case "ChevronRight":
-                                return ChevronRight;
-                              case "ArrowUp":
-                                return ArrowUp;
-                              case "ArrowDown":
-                                return ArrowDown;
-                              case "ArrowLeft":
-                                return ArrowLeft;
-                              case "ArrowRight":
-                                return ArrowRight;
-                              case "Minus":
-                                return Minus;
-                              case "Maximize2":
-                                return Maximize2;
-                              case "Minimize2":
-                                return Minimize2;
-                              case "RotateCcw":
-                                return RotateCcw;
-                              case "RotateCw":
-                                return RotateCw;
-                              case "ZoomIn":
-                                return ZoomIn;
-                              case "ZoomOut":
-                                return ZoomOut;
-                              case "Move":
-                                return Move;
-                              case "Copy":
-                                return Copy;
-                              case "Scissors":
-                                return Scissors;
-                              case "Link":
-                                return Link;
-                              case "Unlink":
-                                return Unlink;
-                              case "Lock":
-                                return Lock;
-                              case "Unlock":
-                                return Unlock;
-                              case "Key":
-                                return Key;
-                              case "Mail":
-                                return Mail;
-                              case "Phone":
-                                return Phone;
-                              case "MessageSquare":
-                                return MessageSquare;
-                              case "Video":
-                                return Video;
-                              case "Camera":
-                                return Camera;
-                              case "Mic":
-                                return Mic;
-                              case "Headphones":
-                                return Headphones;
-                              case "Volume2":
-                                return Volume2;
-                              case "VolumeX":
-                                return VolumeX;
-                              case "Play":
-                                return Play;
-                              case "Pause":
-                                return Pause;
-                              case "SkipBack":
-                                return SkipBack;
-                              case "SkipForward":
-                                return SkipForward;
-                              case "Rewind":
-                                return Rewind;
-                              case "FastForward":
-                                return FastForward;
-                              case "Shuffle":
-                                return Shuffle;
-                              case "Repeat":
-                                return Repeat;
-                              case "Volume1":
-                                return Volume1;
-                              case "Volume":
-                                return Volume;
-                              case "Speaker":
-                                return Speaker;
-                              case "Radio":
-                                return Radio;
-                              case "Tv":
-                                return Tv;
-                              case "Monitor":
-                                return Monitor;
-                              case "Smartphone":
-                                return Smartphone;
-                              case "Tablet":
-                                return Tablet;
-                              case "Laptop":
-                                return Laptop;
-                              case "Server":
-                                return Server;
-                              case "Mouse":
-                                return Mouse;
-                              case "Keyboard":
-                                return Keyboard;
-                              case "MonitorSpeaker":
-                                return MonitorSpeaker;
-                              case "User":
-                                return User;
-                              case "Home":
-                                return Home;
-                              case "Car":
-                                return Car;
-                              case "Building2":
-                                return Building2;
-                              case "Star":
-                                return Star;
-                              case "Heart":
-                                return Heart;
-                              case "Briefcase":
-                                return Briefcase;
-                              default:
-                                return AlertCircle; // Default fallback
-                            }
-                          };
-                          const IconComponent = getIconComponent(item.icon || 'AlertCircle');
+                          const IconComponent = AlertCircle; // Use AlertCircle as default icon
                           return (
                             <tr key={item.id || `item-${Math.random()}`} className="hover:bg-gray-50 transition-colors duration-200">
                               <td className="p-2 md:p-3">
@@ -3219,7 +3141,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">Action Center Report Preview</h3>
                     <p className="text-sm text-gray-600">
-                      {months[selectedMonth] || 'All Months'} {selectedYear || 'All Years'} • {activeTab?.toUpperCase()}
+                      {(() => {
+                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        return `${monthNames[selectedMonth] || 'All Months'} ${selectedYear || 'All Years'} • ${activeTab?.toUpperCase()}`;
+                      })()}
                     </p>
                   </div>
                 </div>

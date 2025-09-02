@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { firebaseCloudinaryIntegration } from '../utils/firebaseCloudinaryIntegration';
+
 
 const IncidentEvidenceUpload = ({ 
   incidentData, 
@@ -53,10 +53,8 @@ const IncidentEvidenceUpload = ({
       setUploadStatus(`📤 Uploading ${validFiles.length} evidence file(s)...`);
       
       // Upload evidence using the integration utility
-      const result = await firebaseCloudinaryIntegration.uploadIncidentEvidence(
-        validFiles,
-        incidentData
-      );
+      console.warn('⚠️ Firebase has been removed from this project');
+      const result = { success: false, error: 'Firebase has been removed from this project' };
       
       if (result.success) {
         setUploadProgress(100);

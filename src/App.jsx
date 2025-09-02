@@ -8,9 +8,12 @@ import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
 import FirebaseTest from "./FirebaseTest";
 import FirebaseConnectionTest from "./FirebaseConnectionTest";
+import FirestoreConnectionTest from "./components/FirestoreConnectionTest";
 import CloudinaryDemo from "./CloudinaryDemo";
 import FirebaseCloudinaryDemo from "./FirebaseCloudinaryDemo";
 import PhotoMigrationTool from "./components/PhotoMigrationTool";
+import FirebaseAuthTest from "./FirebaseAuthTest";
+
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
@@ -91,12 +94,17 @@ export default function App() {
         return <FirebaseTest />;
       case 'firebase-connection-test':
         return <FirebaseConnectionTest />;
+      case 'firestore-test':
+        return <FirestoreConnectionTest />;
       case 'cloudinary-demo':
         return <CloudinaryDemo />;
       case 'firebase-cloudinary-demo':
         return <FirebaseCloudinaryDemo />;
       case 'photo-migration':
         return <PhotoMigrationTool />;
+      case 'auth-test':
+        return <FirebaseAuthTest />;
+
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }

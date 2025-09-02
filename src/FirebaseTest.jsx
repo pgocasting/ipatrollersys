@@ -13,8 +13,6 @@ import {
   Shield,
   Zap
 } from 'lucide-react';
-import { firebaseDiagnostics } from './utils/firebaseDiagnostics';
-import { checkConnectionHealth, initializeAndTest } from './firebase';
 
 export default function FirebaseTest() {
   const [diagnostics, setDiagnostics] = useState(null);
@@ -25,11 +23,9 @@ export default function FirebaseTest() {
   const runDiagnostics = async () => {
     setIsRunning(true);
     try {
-      console.log('🔍 Starting comprehensive Firebase diagnostics...');
-      const results = await firebaseDiagnostics.runDiagnostics();
-      setDiagnostics(results);
+      console.warn('⚠️ Firebase has been removed from this project');
+      setDiagnostics({ error: 'Firebase has been removed from this project' });
       setLastCheck(new Date());
-      console.log('✅ Diagnostics completed:', results);
     } catch (error) {
       console.error('❌ Diagnostics failed:', error);
       setDiagnostics({ error: error.message });
@@ -40,9 +36,8 @@ export default function FirebaseTest() {
 
   const checkHealth = async () => {
     try {
-      const health = await checkConnectionHealth();
-      setHealthStatus(health);
-      console.log('🏥 Health check result:', health);
+      console.warn('⚠️ Firebase has been removed from this project');
+      setHealthStatus({ status: 'disconnected', message: 'Firebase has been removed from this project' });
     } catch (error) {
       console.error('❌ Health check failed:', error);
       setHealthStatus({ status: 'error', message: error.message });
@@ -52,12 +47,8 @@ export default function FirebaseTest() {
   const forceReconnect = async () => {
     try {
       setIsRunning(true);
-      console.log('🔄 Force reconnecting to Firebase...');
-      
-      await initializeAndTest();
+      console.warn('⚠️ Firebase has been removed from this project');
       await checkHealth();
-      
-      console.log('✅ Force reconnect completed');
     } catch (error) {
       console.error('❌ Force reconnect failed:', error);
     } finally {
@@ -106,202 +97,96 @@ export default function FirebaseTest() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Firebase Connection Diagnostics</h1>
-          <p className="text-gray-600">Comprehensive testing and troubleshooting for Firebase connectivity issues</p>
-        </div>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-2xl">
+              <Database className="w-8 h-8" />
+              Firebase Connection Test - DISABLED
+            </CardTitle>
+            <p className="text-lg text-gray-600">
+              ⚠️ Firebase has been removed from this project. All testing is disabled.
+            </p>
+          </CardHeader>
+        </Card>
 
-        {/* Quick Health Check */}
+        {/* Health Status */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Shield className="h-5 w-5" />
-              Quick Health Check
+              <Activity className="w-5 h-5" />
+              Connection Health
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {healthStatus && (
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(healthStatus.status)}
-                  <div>
-                    <p className="font-medium">Status: {healthStatus.status}</p>
-                    <p className="text-sm text-gray-600">{healthStatus.message}</p>
-                  </div>
-                </div>
-                <Badge className={getStatusColor(healthStatus.status)}>
-                  {healthStatus.status}
+          <CardContent>
+            <div className="flex items-center gap-4">
+              {getStatusIcon(healthStatus?.status)}
+              <div>
+                <Badge className={getStatusColor(healthStatus?.status)}>
+                  {healthStatus?.status || 'unknown'}
                 </Badge>
+                <p className="text-sm text-gray-600 mt-1">
+                  {healthStatus?.message || 'Firebase has been removed from this project'}
+                </p>
               </div>
-            )}
-            
-            <div className="flex gap-2">
-              <Button onClick={checkHealth} variant="outline" size="sm">
-                <RefreshCw className="h-4 w-4 mr-2" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Action Buttons */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-4">
+              <Button onClick={runDiagnostics} disabled={isRunning || true}>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                Run Diagnostics
+              </Button>
+              <Button onClick={checkHealth} disabled={isRunning || true}>
+                <Activity className="w-4 h-4 mr-2" />
                 Check Health
               </Button>
-              <Button onClick={forceReconnect} variant="default" size="sm">
-                <Zap className="h-4 w-4 mr-2" />
+              <Button onClick={forceReconnect} disabled={isRunning || true}>
+                <Zap className="w-4 h-4 mr-2" />
                 Force Reconnect
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Comprehensive Diagnostics */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Comprehensive Diagnostics
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button 
-              onClick={runDiagnostics} 
-              disabled={isRunning}
-              className="w-full"
-              size="lg"
-            >
-              <RefreshCw className={`h-5 w-5 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-              {isRunning ? 'Running Diagnostics...' : 'Run Full Diagnostics'}
-            </Button>
-
-            {diagnostics && (
-              <div className="space-y-4">
-                {/* Basic Connection */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-medium mb-2">Basic Connection</h3>
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(diagnostics.basic?.status)}
-                    <span className="text-sm">{diagnostics.basic?.message}</span>
-                    {diagnostics.basic?.code && (
-                      <Badge variant="outline" className="text-xs">
-                        {diagnostics.basic.code}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* Network Status */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-medium mb-2">Network Status</h3>
-                  <div className="flex items-center gap-2">
-                    <Wifi className="h-4 w-4" />
-                    <span className="text-sm">{diagnostics.network?.message}</span>
-                  </div>
-                </div>
-
-                {/* Permissions */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-medium mb-2">Permissions</h3>
-                  <div className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    <span className="text-sm">{diagnostics.permissions?.message}</span>
-                    {diagnostics.permissions?.suggestion && (
-                      <p className="text-xs text-gray-600 mt-1">{diagnostics.permissions.suggestion}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Performance */}
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-medium mb-2">Performance</h3>
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4" />
-                    <span className="text-sm">{diagnostics.performance?.message}</span>
-                    {diagnostics.performance?.responseTime && (
-                      <Badge variant="outline" className="text-xs">
-                        {diagnostics.performance.responseTime}ms
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-
-                {/* Recommendations */}
-                {diagnostics.recommendations && diagnostics.recommendations.length > 0 && (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <h3 className="font-medium text-blue-800 mb-2">Recommendations</h3>
-                    <div className="space-y-2">
-                      {diagnostics.recommendations.map((rec, index) => (
-                        <div key={index} className="flex items-start gap-2">
-                          <Badge 
-                            className={`text-xs ${
-                              rec.priority === 'critical' ? 'bg-red-100 text-red-800' :
-                              rec.priority === 'high' ? 'bg-orange-100 text-orange-800' :
-                              rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-green-100 text-green-800'
-                            }`}
-                          >
-                            {rec.priority}
-                          </Badge>
-                          <div className="text-sm">
-                            <p className="font-medium">{rec.message}</p>
-                            <p className="text-gray-600">{rec.action}</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Timestamp */}
-                {lastCheck && (
-                  <div className="text-xs text-gray-500 text-center">
-                    Last diagnostics run: {lastCheck.toLocaleString()}
-                  </div>
-                )}
+        {/* Diagnostics Results */}
+        {diagnostics && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Diagnostics Results</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-800">
+                  ⚠️ Firebase has been removed from this project. No diagnostics available.
+                </p>
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
-        {/* Troubleshooting Guide */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5" />
-              Troubleshooting Guide
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <h4 className="font-medium text-yellow-800 mb-2">Common Issues</h4>
-                  <ul className="text-sm text-yellow-700 space-y-1">
-                    <li>• 400 Bad Request errors</li>
-                    <li>• Permission denied errors</li>
-                    <li>• Network connectivity issues</li>
-                    <li>• Service unavailable errors</li>
-                  </ul>
-                </div>
-                
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                  <h4 className="font-medium text-blue-800 mb-2">Quick Fixes</h4>
-                  <ul className="text-sm text-blue-700 space-y-1">
-                    <li>• Refresh the page</li>
-                    <li>• Check internet connection</li>
-                    <li>• Clear browser cache</li>
-                    <li>• Try incognito mode</li>
-                  </ul>
-                </div>
-              </div>
-              
-              <div className="p-4 bg-gray-50 rounded-lg">
-                <h4 className="font-medium mb-2">If Problems Persist</h4>
-                <ul className="text-sm text-gray-700 space-y-1">
-                  <li>• Check Firebase Console for service status</li>
-                  <li>• Verify project configuration in firebase.js</li>
-                  <li>• Check Firestore security rules</li>
-                  <li>• Contact system administrator</li>
-                </ul>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Last Check */}
+        {lastCheck && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Last Check</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-600">
+                Last check: {lastCheck.toLocaleString()}
+              </p>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

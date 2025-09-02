@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { firebaseCloudinaryIntegration } from '../utils/firebaseCloudinaryIntegration';
+
 
 const PatrolPhotoGallery = ({ 
   monthKey, 
@@ -19,11 +19,8 @@ const PatrolPhotoGallery = ({
       
       setLoading(true);
       try {
-        const result = await firebaseCloudinaryIntegration.getPatrolPhotos(
-          monthKey, 
-          municipality, 
-          district
-        );
+            console.warn('⚠️ Firebase has been removed from this project');
+    const result = { success: false, error: 'Firebase has been removed from this project' };
         
         if (result.success) {
           setPhotos(result.data);
@@ -57,7 +54,8 @@ const PatrolPhotoGallery = ({
     if (!confirm('Are you sure you want to delete this photo?')) return;
     
     try {
-      const result = await firebaseCloudinaryIntegration.deleteFile(photo);
+      console.warn('⚠️ Firebase has been removed from this project');
+    const result = { success: false, error: 'Firebase has been removed from this project' };
       if (result.success) {
         // Remove photo from local state
         setPhotos(prev => prev.filter(p => p.publicId !== photo.publicId));

@@ -1,0 +1,25 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "actionReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "when",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "incidents",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "date",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}
