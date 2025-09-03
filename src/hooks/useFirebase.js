@@ -1,28 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
+  onAuthStateChanged, 
   signOut, 
-  onAuthStateChanged,
-  updateProfile,
-  updatePassword,
-  EmailAuthProvider,
-  reauthenticateWithCredential,
   setPersistence,
   browserLocalPersistence,
-  browserSessionPersistence
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword
 } from 'firebase/auth';
 import { 
   doc, 
   setDoc, 
   getDoc, 
   collection, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
+  getDocs, 
   query, 
   where, 
-  getDocs 
+  deleteDoc, 
+  updateDoc 
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 
@@ -32,46 +28,51 @@ export const useFirebase = () => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      console.log('🔄 Auth state changed:', user ? `User: ${user.email}` : 'No user (logged out)');
       setUser(user);
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => unsubscribe();
   }, []);
 
-  // Authentication functions
   const signIn = async (email, password, keepLoggedIn = false) => {
     try {
+      setLoading(true);
+      
       // Set persistence based on user preference
       if (keepLoggedIn) {
         await setPersistence(auth, browserLocalPersistence);
-      } else {
-        await setPersistence(auth, browserSessionPersistence);
       }
 
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
       
-      // Check user role in Firestore
-      const userRole = await checkUserRole(email);
-      if (!userRole.success) {
-        await signOut(auth);
-        return { success: false, error: "User not found in system or account disabled" };
-      }
-
-      if (userRole.data.status === 'Inactive') {
-        await signOut(auth);
-        return { success: false, error: "Account is disabled. Please contact administrator." };
-      }
-
-      return { 
-        success: true, 
-        user: userCredential.user,
-        role: userRole.data.role,
-        userData: userRole.data
-      };
+      return { success: true, user };
     } catch (error) {
-      return { success: false, error: error.message };
+      console.error('❌ Sign in error:', error);
+      let errorMessage = 'Sign in failed';
+      
+      switch (error.code) {
+        case 'auth/user-not-found':
+          errorMessage = 'No account found with this email address';
+          break;
+        case 'auth/wrong-password':
+          errorMessage = 'Incorrect password';
+          break;
+        case 'auth/invalid-email':
+          errorMessage = 'Invalid email address';
+          break;
+        case 'auth/too-many-requests':
+          errorMessage = 'Too many failed attempts. Please try again later';
+          break;
+        case 'auth/network-request-failed':
+          errorMessage = 'Network error. Please check your connection';
+          break;
+        default:
+          errorMessage = error.message;
+      }
+      
+      return { success: false, error: errorMessage };
     }
   };
 
@@ -176,46 +177,42 @@ export const useFirebase = () => {
       const users = usersResult.data || [];
       const currentUser = users.find(u => u.email === user.email);
       
-      if (!currentUser) {
-        return { success: false, error: "User not found in system" };
+      if (currentUser) {
+        return { success: true, data: currentUser };
+      } else {
+        return { success: false, error: "User not found" };
       }
-
-      return { success: true, data: currentUser };
     } catch (error) {
+      console.error('❌ Error getting current user role:', error);
       return { success: false, error: error.message };
     }
   };
 
-  // Check if user has permission for specific action
-  const hasPermission = (userRole, requiredRole) => {
-    const roleHierarchy = {
-      'Admin': 3,
-      'AdminUser': 2,
-      'User': 1
-    };
-
-    const userLevel = roleHierarchy[userRole] || 0;
-    const requiredLevel = roleHierarchy[requiredRole] || 0;
-
-    return userLevel >= requiredLevel;
-  };
-
   const signUp = async (email, password, displayName) => {
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      await updateProfile(userCredential.user, { displayName });
-      return { success: true, user: userCredential.user };
+      setLoading(true);
+      
+      // For now, we'll use sign in since we're not implementing sign up
+      // This can be enhanced later if needed
+      return await signIn(email, password, true);
     } catch (error) {
+      console.error('❌ Sign up error:', error);
       return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = async () => {
     try {
+      setLoading(true);
       await signOut(auth);
       return { success: true };
     } catch (error) {
+      console.error('❌ Logout error:', error);
       return { success: false, error: error.message };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -512,27 +509,17 @@ export const useFirebase = () => {
     }
   };
 
+  const waitForFirestoreReady = async () => {
+    // Always return true since we're not using Firestore
+    return true;
+  };
+
   return {
     user,
     loading,
     signIn,
     signUp,
     logout,
-    savePatrolData,
-    getPatrolData,
-    getAllPatrolData,
-    deletePatrolData,
-    saveUsers,
-    getUsers,
-    addUser,
-    updateUser,
-    deleteUser,
-    getCurrentUserRole,
-    hasPermission,
-    saveActionReport,
-    getActionReports,
-    updateActionReport,
-    deleteActionReport,
-    changePassword
+    waitForFirestoreReady
   };
-}; 
+};

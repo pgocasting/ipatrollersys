@@ -141,7 +141,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
                 handleNavigation(item.id); 
               }}
               variant={currentPage === item.id ? "default" : "ghost"}
-              className={`justify-start h-12 text-base font-medium transition-all duration-200 ${
+              className={`justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
                 currentPage === item.id 
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
                   : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
@@ -160,7 +160,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
               handleNavigation('settings'); 
             }}
             variant={currentPage === 'settings' ? "default" : "ghost"}
-            className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 ${
+            className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
               currentPage === 'settings' 
                 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
                 : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'

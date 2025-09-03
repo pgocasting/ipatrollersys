@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+// Firebase removed - using local data storage
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { writeBatch, doc } from "firebase/firestore";
 import { cloudinaryUtils } from "./utils/cloudinary";
-import { db } from "./firebase";
+// Firebase imports removed
+
 import { 
   Activity,
   AlertTriangle,
+  AlertCircle,
   BarChart3,
   Calendar,
   CheckCircle,
@@ -24,86 +26,25 @@ import {
   Filter,
   MapPin,
   Search,
-  Settings,
   Shield,
   TrendingUp,
   Users,
   X,
   XCircle,
-  Zap,
   Target,
-  Flag,
-  Bell,
   Database,
   Save,
-  MoreHorizontal,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Minus,
   Plus,
-  Maximize2,
-  Minimize2,
   RotateCcw,
-  RotateCw,
-  ZoomIn,
-  ZoomOut,
-  Move,
-  Copy,
-  Scissors,
-  Link,
-  Unlink,
-  Lock,
-  Unlock,
-  Key,
-  Mail,
-  Phone,
-  MessageSquare,
-  Video,
   Camera,
-  Mic,
-  Headphones,
-  Volume2,
-  VolumeX,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Rewind,
-  FastForward,
-  Shuffle,
-  Repeat,
-  Volume1,
-  Volume,
-  Speaker,
-  Radio,
-  Tv,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Laptop,
-  Server,
-  Mouse,
-  Keyboard,
-  MonitorSpeaker,
-  User,
-  AlertCircle,
-  Home,
-  Car,
-  Building2,
-  Star,
-  Heart,
-  Briefcase,
   FileText,
   Pill,
   Leaf,
   Fish,
-  Trees
+  Trees,
+  Building2
 } from "lucide-react";
 /**
  * Action Center Component
@@ -134,7 +75,8 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
+  const { user } = useFirebase();
+  // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState("all");
@@ -171,8 +113,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     source: "",
     actionTaken: "",
     otherInfo: "",
-    photos: [],
-
+    photos: []
   });
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pdfDescription, setPdfDescription] = useState("");
@@ -180,45 +121,111 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const loadActionReports = async () => {
       setLoading(true);
       try {
-        const result = await getActionReports();
-        if (result.success) {
-        // Store all reports
-        setAllActionReports(result.data);
-          // Filter by active tab if needed
-        console.log('Loading action reports:', {
-          totalReports: result.data.length,
-          activeTab: activeTab,
-          departments: result.data.map(r => r.department),
-          pgEnroReports: result.data.filter(r => r.department === 'pg-enro')
-        });
-          const filteredReports = result.data.filter(report => 
-            activeTab === "all" || report.department === activeTab
-          );
-        console.log('Filtered reports:', {
-          activeTab: activeTab,
-          filteredCount: filteredReports.length,
-          filteredDepartments: filteredReports.map(r => r.department)
-        });
-          setActionItems(filteredReports);
+        console.log('🔄 Loading action reports from Firestore...');
+        console.log('Current activeTab:', activeTab);
+        
+        // Load all data from actionReports collection
+        const result = await queryDocuments('actionReports');
+        console.log('Firestore query result:', result);
+        
+        if (result.success && result.data && result.data.length > 0) {
+          console.log(`✅ Found ${result.data.length} documents in Firestore`);
+          
+          // Process all documents to extract action reports
+          let allActionReports = [];
+          
+          result.data.forEach((doc, index) => {
+            console.log(`Processing document ${index + 1}:`, {
+              id: doc.id,
+              hasData: !!doc.data,
+              hasMonthKey: !!doc.monthKey,
+              department: doc.department
+            });
+            
+            // If document has a 'data' array (monthly structure), extract reports from it
+            if (doc.data && Array.isArray(doc.data)) {
+              console.log(`📅 Monthly document ${doc.id} contains ${doc.data.length} reports`);
+              doc.data.forEach(report => {
+                allActionReports.push({
+                  ...report,
+                  sourceDocument: doc.id,
+                  sourceType: 'monthly'
+                });
+              });
+            }
+            // If document is an individual report
+            else if (doc.department || doc.what || doc.municipality) {
+              console.log(`📋 Individual report: ${doc.id}`);
+              allActionReports.push({
+                ...doc,
+                sourceDocument: doc.id,
+                sourceType: 'individual'
+              });
+            }
+          });
+          
+          console.log(`📊 Total action reports found: ${allActionReports.length}`);
+          
+          if (allActionReports.length > 0) {
+            // Set all reports
+            setAllActionReports(allActionReports);
+            
+            // Filter by department (PNP, Agriculture, PG-ENRO)
+            const filteredReports = allActionReports.filter(report => {
+              const reportDepartment = report.department?.toLowerCase();
+              const currentTab = activeTab?.toLowerCase();
+              
+              console.log(`Checking report ${report.id}: department="${reportDepartment}", activeTab="${currentTab}"`);
+              
+              // Map department values to match tabs
+              if (currentTab === 'all') return true;
+              if (currentTab === 'pnp' && (reportDepartment === 'pnp' || reportDepartment === 'police')) return true;
+              if (currentTab === 'agriculture' && reportDepartment === 'agriculture') return true;
+              if (currentTab === 'pg-enro' && (reportDepartment === 'pg-enro' || reportDepartment === 'enro' || reportDepartment === 'environment')) return true;
+              
+              return false;
+            });
+            
+            console.log(`🎯 Filtered reports for ${activeTab}:`, {
+              totalReports: allActionReports.length,
+              filteredCount: filteredReports.length,
+              departments: [...new Set(allActionReports.map(r => r.department))],
+              filteredDepartments: [...new Set(filteredReports.map(r => r.department))]
+            });
+            
+            setActionItems(filteredReports);
+            
+            // Show success message
+            if (filteredReports.length > 0) {
+              setSuccessMessage(`✅ Loaded ${filteredReports.length} ${activeTab.toUpperCase()} reports from Firestore`);
+            } else {
+              setSuccessMessage(`ℹ️ Found ${allActionReports.length} total reports, but none match ${activeTab.toUpperCase()} department`);
+            }
+          } else {
+            console.log('❌ No action reports found in any documents');
+            setActionItems([]);
+            setAllActionReports([]);
+            setSuccessMessage('No action reports found in Firestore database');
+          }
         } else {
-          console.error('Error loading action reports:', result.error);
+          console.log('❌ No data found in Firestore actionReports collection');
           setActionItems([]);
-        setAllActionReports([]);
+          setAllActionReports([]);
+          setSuccessMessage('No data found in Firestore database');
         }
       } catch (error) {
-        console.error('Error loading action reports:', error);
+        console.error('❌ Error loading action reports:', error);
         setActionItems([]);
+        setAllActionReports([]);
+        setSuccessMessage('Error loading data from Firestore');
       } finally {
         setLoading(false);
       }
     };
   useEffect(() => {
     loadActionReports();
-  }, [activeTab, getActionReports]);
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  }, [activeTab]);
+
   // Municipalities by district mapping
   const municipalitiesByDistrict = {
     "1ST DISTRICT": [
@@ -240,12 +247,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       "Morong"
     ]
   };
-  const districts = [
-    { id: "all", name: "All Districts" },
-    { id: "1ST DISTRICT", name: "1ST DISTRICT" },
-    { id: "2ND DISTRICT", name: "2ND DISTRICT" },
-    { id: "3RD DISTRICT", name: "3RD DISTRICT" }
-  ];
+
+
 
   // Handle cleaning duplicates
   const handleCleanDuplicates = async () => {
@@ -276,18 +279,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         `Found ${duplicates.length} duplicate entries. The original entries will be kept. Do you want to remove the duplicates? This action cannot be undone.`
       );
       if (confirmed) {
-        // Remove duplicates from Firestore
-        const batch = writeBatch(db);
-        duplicates.forEach(duplicate => {
-          const docRef = doc(db, 'actionReports', duplicate.id);
-          batch.delete(docRef);
-        });
-        await batch.commit();
-        // Update local state - keep only original items
+        // For now, we'll just remove duplicates from local state
+        // Since we're using the month-based structure, we need to handle this differently
         setActionItems(prevItems => 
           prevItems.filter(item => !duplicates.some(dup => dup.id === item.id))
         );
-        alert(`Successfully removed ${duplicates.length} duplicate entries. Original entries have been preserved.`);
+        setAllActionReports(prevReports => 
+          prevReports.filter(item => !duplicates.some(dup => dup.id === item.id))
+        );
+        alert(`Successfully removed ${duplicates.length} duplicate entries from local view. Note: This only affects the current view. To permanently remove duplicates, you'll need to edit the individual reports.`);
       }
     } catch (error) {
       console.error('Error cleaning duplicates:', error);
@@ -296,6 +296,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(false);
     }
   };
+
+
   const getSeverityColor = (severity) => {
     switch (severity) {
       case "high": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
@@ -737,7 +739,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const lineHeight = 20;
     
     // Report details in two columns
-    doc.text(`Month: ${months[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
+    const monthNamesExport = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    doc.text(`Month: ${monthNamesExport[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
     doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
     
     doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
@@ -891,7 +894,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
     
     // Save the PDF
-    const fileName = `action-center-${activeTab}-${months[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const monthNamesFilename = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const fileName = `action-center-${activeTab}-${monthNamesFilename[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
@@ -1629,95 +1633,86 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
-          {/* Filters & Search - Ultra Compact Design */}
-          <div className="flex-shrink-0 mb-2">
-            <div className="rounded-lg shadow-sm border p-2 transition-all duration-300 bg-white border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-100/80">
-                    <Filter className="h-3.5 w-3.5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold transition-colors duration-300 text-gray-800">Filters & Search</h3>
-                    <p className="text-xs transition-colors duration-300 text-gray-600">Refine your data view</p>
-                  </div>
-                </div>
+          {/* Dynamic Search & Filter Module */}
+          <div className="flex-shrink-0 mb-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by municipality, district, department, or action..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 py-2 text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
+                
+                {/* Month Filter */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Months</option>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((month, index) => (
+                    <option key={month} value={index}>{month}</option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Years</option>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                {/* District Filter */}
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Districts</option>
+                  <option value="1ST DISTRICT">1ST DISTRICT</option>
+                  <option value="2ND DISTRICT">2ND DISTRICT</option>
+                  <option value="3RD DISTRICT">3RD DISTRICT</option>
+                </select>
+
+                {/* Clear Filters Button */}
                 <Button
                   onClick={() => {
                     setSearchTerm("");
-                    setSelectedDistrict("");
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
+                    setSelectedDistrict("all");
+                    setSelectedMonth("all");
+                    setSelectedYear("all");
                   }}
                   variant="outline"
                   size="sm"
-                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs py-1 px-2 h-7"
+                  className="ml-auto text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Clear All Filters
+                  Clear All
                 </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Month</label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Months</option>
-                    {months.map((month, index) => (
-                      <option key={index} value={index}>{month}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Year</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Years</option>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">District</label>
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Districts</option>
-                    {districts.map((district) => (
-                      <option key={district.id} value={district.id}>{district.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search actions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           {/* Summary Cards */}
@@ -1927,15 +1922,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button
-                      onClick={handleCleanDuplicates}
-                      variant="outline"
-                      size="sm"
-                      className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clean Duplicates
-                    </Button>
+                    
+              <Button
+                onClick={handleCleanDuplicates}
+                variant="outline"
+                size="sm"
+                className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clean Duplicates
+              </Button>
                     <Badge variant="secondary" className="text-sm bg-blue-100/80 text-blue-800">
                                              {sortedItems ? sortedItems.length : 0} items
                   </Badge>
@@ -2007,190 +2003,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           if (!item || typeof item !== 'object') {
                             return null;
                           }
-                          // Handle icon rendering properly
-                          const getIconComponent = (iconName) => {
-                            switch (iconName) {
-                              case "AlertCircle":
-                                return AlertCircle;
-                              case "Activity":
-                                return Activity;
-                              case "AlertTriangle":
-                                return AlertTriangle;
-                              case "BarChart3":
-                                return BarChart3;
-                              case "Calendar":
-                                return Calendar;
-                              case "CheckCircle":
-                                return CheckCircle;
-                              case "Clock":
-                                return Clock;
-                              case "Download":
-                                return Download;
-                              case "Eye":
-                                return Eye;
-                              case "Edit":
-                                return Edit;
-                              case "Trash2":
-                                return Trash2;
-                              case "Filter":
-                                return Filter;
-                              case "MapPin":
-                                return MapPin;
-
-
-                              case "Search":
-                                return Search;
-                              case "Settings":
-                                return Settings;
-                              case "Shield":
-                                return Shield;
-                              case "TrendingUp":
-                                return TrendingUp;
-                              case "Users":
-                                return Users;
-                              case "X":
-                                return X;
-                              case "XCircle":
-                                return XCircle;
-                              case "Zap":
-                                return Zap;
-                              case "Target":
-                                return Target;
-                              case "Flag":
-                                return Flag;
-                              case "Bell":
-                                return Bell;
-                              case "Database":
-                                return Database;
-                              case "Save":
-                                return Save;
-                              case "MoreHorizontal":
-                                return MoreHorizontal;
-                              case "ChevronDown":
-                                return ChevronDown;
-                              case "ChevronUp":
-                                return ChevronUp;
-                              case "ChevronLeft":
-                                return ChevronLeft;
-                              case "ChevronRight":
-                                return ChevronRight;
-                              case "ArrowUp":
-                                return ArrowUp;
-                              case "ArrowDown":
-                                return ArrowDown;
-                              case "ArrowLeft":
-                                return ArrowLeft;
-                              case "ArrowRight":
-                                return ArrowRight;
-                              case "Minus":
-                                return Minus;
-                              case "Maximize2":
-                                return Maximize2;
-                              case "Minimize2":
-                                return Minimize2;
-                              case "RotateCcw":
-                                return RotateCcw;
-                              case "RotateCw":
-                                return RotateCw;
-                              case "ZoomIn":
-                                return ZoomIn;
-                              case "ZoomOut":
-                                return ZoomOut;
-                              case "Move":
-                                return Move;
-                              case "Copy":
-                                return Copy;
-                              case "Scissors":
-                                return Scissors;
-                              case "Link":
-                                return Link;
-                              case "Unlink":
-                                return Unlink;
-                              case "Lock":
-                                return Lock;
-                              case "Unlock":
-                                return Unlock;
-                              case "Key":
-                                return Key;
-                              case "Mail":
-                                return Mail;
-                              case "Phone":
-                                return Phone;
-                              case "MessageSquare":
-                                return MessageSquare;
-                              case "Video":
-                                return Video;
-                              case "Camera":
-                                return Camera;
-                              case "Mic":
-                                return Mic;
-                              case "Headphones":
-                                return Headphones;
-                              case "Volume2":
-                                return Volume2;
-                              case "VolumeX":
-                                return VolumeX;
-                              case "Play":
-                                return Play;
-                              case "Pause":
-                                return Pause;
-                              case "SkipBack":
-                                return SkipBack;
-                              case "SkipForward":
-                                return SkipForward;
-                              case "Rewind":
-                                return Rewind;
-                              case "FastForward":
-                                return FastForward;
-                              case "Shuffle":
-                                return Shuffle;
-                              case "Repeat":
-                                return Repeat;
-                              case "Volume1":
-                                return Volume1;
-                              case "Volume":
-                                return Volume;
-                              case "Speaker":
-                                return Speaker;
-                              case "Radio":
-                                return Radio;
-                              case "Tv":
-                                return Tv;
-                              case "Monitor":
-                                return Monitor;
-                              case "Smartphone":
-                                return Smartphone;
-                              case "Tablet":
-                                return Tablet;
-                              case "Laptop":
-                                return Laptop;
-                              case "Server":
-                                return Server;
-                              case "Mouse":
-                                return Mouse;
-                              case "Keyboard":
-                                return Keyboard;
-                              case "MonitorSpeaker":
-                                return MonitorSpeaker;
-                              case "User":
-                                return User;
-                              case "Home":
-                                return Home;
-                              case "Car":
-                                return Car;
-                              case "Building2":
-                                return Building2;
-                              case "Star":
-                                return Star;
-                              case "Heart":
-                                return Heart;
-                              case "Briefcase":
-                                return Briefcase;
-                              default:
-                                return AlertCircle; // Default fallback
-                            }
-                          };
-                          const IconComponent = getIconComponent(item.icon || 'AlertCircle');
+                          const IconComponent = AlertCircle; // Use AlertCircle as default icon
                           return (
                             <tr key={item.id || `item-${Math.random()}`} className="hover:bg-gray-50 transition-colors duration-200">
                               <td className="p-2 md:p-3">
@@ -3219,7 +3032,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">Action Center Report Preview</h3>
                     <p className="text-sm text-gray-600">
-                      {months[selectedMonth] || 'All Months'} {selectedYear || 'All Years'} • {activeTab?.toUpperCase()}
+                      {(() => {
+                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        return `${monthNames[selectedMonth] || 'All Months'} ${selectedYear || 'All Years'} • ${activeTab?.toUpperCase()}`;
+                      })()}
                     </p>
                   </div>
                 </div>

@@ -482,3 +482,13 @@ export const DataProvider = ({ children }) => {
     </DataContext.Provider>
   );
 };
+    loadMonthData: () => {}, // No-op function
+    loadAvailableMonths: () => {} // No-op function
+  };
+
+  return (
+    <DataContext.Provider value={value}>
+      {children}
+    </DataContext.Provider>
+  );
+};

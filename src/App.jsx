@@ -6,18 +6,11 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
-import FirebaseTest from "./FirebaseTest";
-import FirebaseConnectionTest from "./FirebaseConnectionTest";
-import CloudinaryDemo from "./CloudinaryDemo";
-import FirebaseCloudinaryDemo from "./FirebaseCloudinaryDemo";
-import PhotoMigrationTool from "./components/PhotoMigrationTool";
-import UserManager from "./components/UserManager";
-import AuthDiagnostic from "./components/AuthDiagnostic";
+// Firebase-related components removed
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
-import DebugComponent from "./DebugComponent";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import { initializeUsers } from "./utils/initUsers";
 import "./utils/consoleHelpers"; // Load console helper functions
@@ -106,20 +99,7 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      case 'firebase-test':
-        return <FirebaseTest />;
-      case 'firebase-connection-test':
-        return <FirebaseConnectionTest />;
-      case 'cloudinary-demo':
-        return <CloudinaryDemo />;
-      case 'firebase-cloudinary-demo':
-        return <FirebaseCloudinaryDemo />;
-      case 'photo-migration':
-        return <PhotoMigrationTool />;
-      case 'user-manager':
-        return <UserManager />;
-      case 'auth-diagnostic':
-        return <AuthDiagnostic />;
+      // Firebase test routes removed
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }
@@ -138,14 +118,12 @@ export default function App() {
   }
 
   return (
-    <DebugComponent>
-        <PatrolDataProvider>
-          <DataProvider>
-            <div className="App">
-              {user ? renderPage() : <Login onLogin={() => {}} />}
-            </div>
-          </DataProvider>
-        </PatrolDataProvider>
-    </DebugComponent>
+    <PatrolDataProvider>
+      <DataProvider>
+        <div className="App">
+          {user ? renderPage() : <Login onLogin={() => {}} />}
+        </div>
+      </DataProvider>
+    </PatrolDataProvider>
   );
 }

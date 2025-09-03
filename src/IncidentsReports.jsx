@@ -6,22 +6,8 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
-import { db } from "./firebase";
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  query, 
-  where, 
-  orderBy,
-  onSnapshot,
-  writeBatch,
-  deleteDoc,
-  addDoc,
-  updateDoc
-} from "firebase/firestore";
+// Firebase removed - using local data storage
+
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
@@ -366,6 +352,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
     "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
   ];
+
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState('connecting');

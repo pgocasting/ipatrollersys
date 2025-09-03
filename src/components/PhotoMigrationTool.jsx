@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 
 const PhotoMigrationTool = () => {
-  const { user, db } = useFirebase();
+  const { user } = useFirebase();
   const [migrationStatus, setMigrationStatus] = useState('idle'); // idle, scanning, migrating, completed, error
   const [progress, setProgress] = useState(0);
   const [totalPhotos, setTotalPhotos] = useState(0);
@@ -46,79 +46,13 @@ const PhotoMigrationTool = () => {
     setMigrationStatus('scanning');
     addLog('🔍 Scanning for existing photos in Firebase...', 'info');
     
-    try {
-      const { collection, query, getDocs, where } = await import('firebase/firestore');
+          try {
+        console.warn('⚠️ Firebase has been removed from this project');
       
-      // Scan different collections for photos
-      const collectionsToScan = [
-        { name: 'actionReports', path: 'actionReports' },
-        { name: 'patrolData', path: 'patrolData' },
-        { name: 'incidents', path: 'incidents' },
-        { name: 'users', path: 'users' }
-      ];
-
-      let allPhotos = [];
-      
-      for (const collectionInfo of collectionsToScan) {
-        try {
-          addLog(`📂 Scanning ${collectionInfo.name} collection...`, 'info');
-          
-          const q = query(collection(db, collectionInfo.path));
-          const snapshot = await getDocs(q);
-          
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            
-            // Look for photos in different possible locations
-            const photos = [];
-            
-            // Check for photos array
-            if (data.photos && Array.isArray(data.photos)) {
-              photos.push(...data.photos);
-            }
-            
-            // Check for individual photo fields
-            if (data.photo && typeof data.photo === 'object') {
-              photos.push(data.photo);
-            }
-            
-            // Check for evidence files
-            if (data.evidence && Array.isArray(data.evidence)) {
-              photos.push(...data.evidence);
-            }
-            
-            // Check for profile pictures
-            if (data.profilePicture && typeof data.profilePicture === 'object') {
-              photos.push(data.profilePicture);
-            }
-            
-            // Filter for Firebase Storage URLs
-            const firebasePhotos = photos.filter(photo => 
-              photo && 
-              (photo.url || photo.storageUrl) && 
-              (photo.url?.includes('firebasestorage.googleapis.com') || 
-               photo.storageUrl?.includes('firebasestorage.googleapis.com'))
-            );
-            
-            if (firebasePhotos.length > 0) {
-              allPhotos.push({
-                collection: collectionInfo.name,
-                documentId: doc.id,
-                photos: firebasePhotos.map(photo => ({
-                  ...photo,
-                  originalUrl: photo.url || photo.storageUrl,
-                  documentPath: `${collectionInfo.path}/${doc.id}`
-                }))
-              });
-            }
-          });
-          
-          addLog(`✅ Found ${allPhotos.filter(item => item.collection === collectionInfo.name).flatMap(item => item.photos).length} photos in ${collectionInfo.name}`, 'success');
-          
-        } catch (error) {
-          addLog(`⚠️ Error scanning ${collectionInfo.name}: ${error.message}`, 'warning');
-        }
-      }
+              // Firebase has been removed - no scanning possible
+        addLog('⚠️ Firebase has been removed from this project - scanning disabled', 'warning');
+        
+        const allPhotos = [];
       
       setExistingPhotos(allPhotos);
       const totalCount = allPhotos.flatMap(item => item.photos).length;
@@ -217,24 +151,8 @@ const PhotoMigrationTool = () => {
         successCount++;
         setMigratedPhotos(successCount);
         
-        // Update Firebase document with new Cloudinary URL
-        try {
-          const { doc, updateDoc } = await import('firebase/firestore');
-          const documentRef = doc(db, result.documentPath);
-          
-          // This is a simplified update - you might need to adjust based on your data structure
-          await updateDoc(documentRef, {
-            // Update the photo URL from Firebase Storage to Cloudinary
-            // You might need to adjust this based on your specific data structure
-            [`photos.${i}.url`]: result.newUrl,
-            [`photos.${i}.cloudinaryId`]: result.cloudinaryId,
-            [`photos.${i}.migratedAt`]: new Date().toISOString()
-          });
-          
-          addLog(`💾 Updated Firebase document: ${result.documentPath}`, 'success');
-        } catch (error) {
-          addLog(`⚠️ Failed to update Firebase document: ${error.message}`, 'warning');
-        }
+        // Firebase has been removed - no document updates possible
+        addLog('⚠️ Firebase has been removed from this project - document updates disabled', 'warning');
         
       } else {
         failureCount++;
