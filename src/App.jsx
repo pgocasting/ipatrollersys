@@ -11,13 +11,17 @@ import FirebaseConnectionTest from "./FirebaseConnectionTest";
 import CloudinaryDemo from "./CloudinaryDemo";
 import FirebaseCloudinaryDemo from "./FirebaseCloudinaryDemo";
 import PhotoMigrationTool from "./components/PhotoMigrationTool";
+import UserManager from "./components/UserManager";
+import AuthDiagnostic from "./components/AuthDiagnostic";
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import DebugComponent from "./DebugComponent";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
+import { initializeUsers } from "./utils/initUsers";
 import "./utils/consoleHelpers"; // Load console helper functions
+import "./utils/authTest"; // Load authentication test functions
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 
@@ -27,6 +31,21 @@ export default function App() {
     return getCurrentPageFromURL();
   });
   const { user, loading, logout } = useFirebase();
+
+  // Initialize users collection when app starts
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        console.log('🚀 Initializing app...');
+        await initializeUsers();
+        console.log('✅ App initialization completed');
+      } catch (error) {
+        console.error('❌ App initialization failed:', error);
+      }
+    };
+    
+    initApp();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -97,6 +116,10 @@ export default function App() {
         return <FirebaseCloudinaryDemo />;
       case 'photo-migration':
         return <PhotoMigrationTool />;
+      case 'user-manager':
+        return <UserManager />;
+      case 'auth-diagnostic':
+        return <AuthDiagnostic />;
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }

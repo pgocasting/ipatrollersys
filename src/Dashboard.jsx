@@ -66,7 +66,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     incidents, 
     ipatrollerData, // Add IPatroller data
     summaryStats, 
-    loading: dataLoading 
+    loading: dataLoading,
+    refreshIPatrollerData,
+    createSampleData
   } = useData();
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -790,36 +792,35 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     "Bagac", "Dinalupihan", "Mariveles", "Morong"   // 3RD DISTRICT
   ];
 
-  // Calculate active and inactive municipalities using IPatroller data
-  // Ensure all municipalities are counted, even if they don't have data yet
-  const activeMunicipalitiesList = allMunicipalities.filter(municipality => {
-    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
-    if (!municipalityData || !municipalityData.data || !Array.isArray(municipalityData.data)) {
-      return false; // No data means inactive
-    }
-    const avgPatrols = municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length;
-    return avgPatrols >= 5;
-  }).map(municipality => {
-    // Return the full municipality data object instead of just the name
-    return ipatrollerData.find(row => row.municipality === municipality);
-  }).filter(Boolean); // Remove any undefined entries
+  // Use data from DataContext instead of calculating locally
+  const totalMunicipalities = 12; // Always 12 municipalities
+  const activeCount = summaryStats.activeMunicipalities || 0;
+  const inactiveCount = summaryStats.inactiveMunicipalities || 0;
+  const correctedInactiveCount = Math.max(inactiveCount, totalMunicipalities - activeCount);
 
-
-  
-  // Total municipalities is always 12 (3 districts × 4 municipalities each)
-  const totalMunicipalities = 12;
-  const activeCount = activeMunicipalitiesList.length;
-  const correctedInactiveCount = totalMunicipalities - activeCount;
+  // Calculate active municipalities list for modals
+  const activeMunicipalitiesList = ipatrollerData.filter(item => {
+    if (!item.data || !Array.isArray(item.data)) return false;
+    const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
+    return avgPatrols >= 5; // Active if average >= 5 patrols per day
+  });
   
   // Debug logging
   console.log('Dashboard Data:', {
     ipatrollerDataLength: ipatrollerData.length,
     allMunicipalitiesCount: allMunicipalities.length,
     activeCount,
+    inactiveCount,
     correctedInactiveCount,
     totalMunicipalities: 12,
     calculatedTotal: activeCount + correctedInactiveCount,
     activeMunicipalities: activeMunicipalitiesList,
+    summaryStats: {
+      activeMunicipalities: summaryStats.activeMunicipalities,
+      inactiveMunicipalities: summaryStats.inactiveMunicipalities,
+      totalDailyPatrols: summaryStats.totalDailyPatrols,
+      activeDistricts: summaryStats.activeDistricts
+    },
     sampleIPatrollerData: ipatrollerData[0] ? ipatrollerData[0].data : 'No IPatroller data'
   });
 
@@ -1329,9 +1330,31 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
         {/* Footer Section */}
         <div className="text-center py-6 md:py-8 border-t text-slate-500 border-slate-200">
-          <p className="text-xs md:text-sm">
-            Dashboard updated automatically • Data refreshes every 30 seconds
-          </p>
+          <div className="flex items-center justify-center gap-4">
+            <p className="text-xs md:text-sm">
+              Dashboard updated automatically • Data refreshes every 30 seconds
+            </p>
+            <button
+              onClick={() => {
+                console.log('🔄 Manually refreshing iPatroller data...');
+                refreshIPatrollerData();
+              }}
+              className="text-xs px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full transition-colors duration-200"
+              title="Refresh iPatroller data"
+            >
+              🔄 Refresh Data
+            </button>
+            <button
+              onClick={() => {
+                console.log('🧪 Creating sample data for testing...');
+                createSampleData();
+              }}
+              className="text-xs px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors duration-200"
+              title="Create sample data for testing"
+            >
+              🧪 Sample Data
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1347,7 +1370,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                  </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Active Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.activeMunicipalities} municipalities with ≥5 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{activeCount} municipalities with ≥5 average patrols per day</p>
                 </div>
               </div>
                              <button

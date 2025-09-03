@@ -103,10 +103,16 @@ export const DataProvider = ({ children }) => {
     // Load IPatroller Data
     const loadIPatrollerData = async () => {
       try {
+        console.log('🔍 Loading IPatroller data for dashboard...');
+        
+        // Get current month and year
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
         
+        console.log('📅 Loading data for month-year:', monthYearId);
+        
+        // Load from the same structure that iPatroller uses
         const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
         const querySnapshot = await getDocs(municipalitiesRef);
         const ipatrollerData = [];
@@ -120,18 +126,95 @@ export const DataProvider = ({ children }) => {
             });
           }
         });
+
+        // If no data found for current month, try to load from any available month
+        if (ipatrollerData.length === 0) {
+          console.log('⚠️ No data found for current month, checking other months...');
+          
+          // Get all month-year documents
+          const allMonthsRef = collection(db, 'patrolData');
+          const allMonthsSnapshot = await getDocs(allMonthsRef);
+          
+          if (allMonthsSnapshot.size > 0) {
+            // Get the most recent month with data
+            const months = [];
+            allMonthsSnapshot.forEach((doc) => {
+              const data = doc.data();
+              if (data && data.updatedAt) {
+                months.push({
+                  id: doc.id,
+                  updatedAt: data.updatedAt,
+                  ...data
+                });
+              }
+            });
+            
+            // Sort by updatedAt and get the most recent
+            months.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+            const mostRecentMonth = months[0];
+            
+            if (mostRecentMonth) {
+              console.log('📅 Loading data from most recent month:', mostRecentMonth.id);
+              const recentMunicipalitiesRef = collection(db, 'patrolData', mostRecentMonth.id, 'municipalities');
+              const recentSnapshot = await getDocs(recentMunicipalitiesRef);
+              
+              recentSnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data) {
+                  ipatrollerData.push({
+                    id: doc.id,
+                    ...data
+                  });
+                }
+              });
+            }
+          }
+        }
         
-        // Calculate IPatroller specific stats
+        console.log('📊 Loaded IPatroller data:', ipatrollerData.length, 'municipalities');
+        console.log('📋 Sample data:', ipatrollerData.slice(0, 2)); // Log first 2 items for debugging
+        
+        // Calculate statistics from the actual data
         const totalDailyPatrols = ipatrollerData.reduce((total, item) => 
           total + (item.totalPatrols || 0), 0
         );
         
         const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
         
+        // Calculate active and inactive municipalities based on actual data
+        const activeMunicipalities = ipatrollerData.filter(item => {
+          if (!item.data || !Array.isArray(item.data)) {
+            console.log('❌ No data for municipality:', item.municipality);
+            return false;
+          }
+          const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
+          const isActive = avgPatrols >= 5;
+          console.log(`📊 ${item.municipality}: avg=${avgPatrols.toFixed(2)}, active=${isActive}`);
+          return isActive; // Active if average >= 5 patrols per day
+        });
+        
+        const inactiveMunicipalities = ipatrollerData.filter(item => {
+          if (!item.data || !Array.isArray(item.data)) {
+            console.log('❌ No data for municipality (inactive):', item.municipality);
+            return true; // No data = inactive
+          }
+          const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
+          return avgPatrols < 5; // Inactive if average < 5 patrols per day
+        });
+        
+        // Calculate monthly patrol trend (placeholder for now)
         const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => {
           const month = i;
           const year = currentYear;
           return { month, year, count: Math.floor(Math.random() * 100) + 20 }; // Placeholder data
+        });
+        
+        console.log('📈 Calculated stats:', {
+          totalDailyPatrols,
+          activeDistricts,
+          activeMunicipalities: activeMunicipalities.length,
+          inactiveMunicipalities: inactiveMunicipalities.length,
+          totalMunicipalities: ipatrollerData.length
         });
         
         setDashboardData(prev => ({
@@ -141,14 +224,99 @@ export const DataProvider = ({ children }) => {
             ...prev.summaryStats,
             totalDailyPatrols,
             activeDistricts,
+            activeMunicipalities: activeMunicipalities.length,
+            inactiveMunicipalities: inactiveMunicipalities.length,
             monthlyPatrolTrend
           }
         }));
         
-        console.log('✅ IPatroller data loaded:', ipatrollerData.length, 'municipalities');
+        console.log('✅ IPatroller data loaded and stats calculated');
       } catch (error) {
-        console.error('Error loading IPatroller data:', error);
+        console.error('❌ Error loading IPatroller data:', error);
+        // Set empty data on error
+        setDashboardData(prev => ({
+          ...prev,
+          ipatrollerData: [],
+          summaryStats: {
+            ...prev.summaryStats,
+            totalDailyPatrols: 0,
+            activeDistricts: 0,
+            activeMunicipalities: 0,
+            inactiveMunicipalities: 0
+          }
+        }));
       }
+    };
+
+    // Function to create sample data for testing
+    const createSampleData = () => {
+      console.log('🧪 Creating sample data for testing...');
+      
+      const sampleData = [
+        {
+          id: '1ST DISTRICT-Abucay',
+          municipality: 'Abucay',
+          district: '1ST DISTRICT',
+          data: [8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9],
+          totalPatrols: 240,
+          activeDays: 31,
+          inactiveDays: 0,
+          activePercentage: 100
+        },
+        {
+          id: '1ST DISTRICT-Orani',
+          municipality: 'Orani',
+          district: '1ST DISTRICT',
+          data: [5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5],
+          totalPatrols: 186,
+          activeDays: 31,
+          inactiveDays: 0,
+          activePercentage: 100
+        },
+        {
+          id: '2ND DISTRICT-Balanga City',
+          municipality: 'Balanga City',
+          district: '2ND DISTRICT',
+          data: [3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3],
+          totalPatrols: 93,
+          activeDays: 31,
+          inactiveDays: 0,
+          activePercentage: 100
+        }
+      ];
+
+      // Calculate stats from sample data
+      const totalDailyPatrols = sampleData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
+      const activeDistricts = new Set(sampleData.map(item => item.district)).size;
+      const activeMunicipalities = sampleData.filter(item => {
+        if (!item.data || !Array.isArray(item.data)) return false;
+        const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
+        return avgPatrols >= 5;
+      });
+      const inactiveMunicipalities = sampleData.filter(item => {
+        if (!item.data || !Array.isArray(item.data)) return true;
+        const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
+        return avgPatrols < 5;
+      });
+
+      setDashboardData(prev => ({
+        ...prev,
+        ipatrollerData: sampleData,
+        summaryStats: {
+          ...prev.summaryStats,
+          totalDailyPatrols,
+          activeDistricts,
+          activeMunicipalities: activeMunicipalities.length,
+          inactiveMunicipalities: inactiveMunicipalities.length
+        }
+      }));
+
+      console.log('✅ Sample data created:', {
+        totalDailyPatrols,
+        activeDistricts,
+        activeMunicipalities: activeMunicipalities.length,
+        inactiveMunicipalities: inactiveMunicipalities.length
+      });
     };
 
     // Load Action Reports
@@ -217,9 +385,16 @@ export const DataProvider = ({ children }) => {
       setLoading(false);
     });
 
+    // Set up periodic refresh for IPatroller data (every 30 seconds)
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing iPatroller data...');
+      loadIPatrollerData();
+    }, 30000); // 30 seconds
+
     // Cleanup function
     return () => {
       unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      clearInterval(refreshInterval);
     };
   }, [user]);
 
@@ -290,6 +465,14 @@ export const DataProvider = ({ children }) => {
     refreshData: () => {
       setLoading(true);
       // This will trigger the useEffect to reload all data
+    },
+    refreshIPatrollerData: () => {
+      // Manually trigger IPatroller data reload
+      loadIPatrollerData();
+    },
+    createSampleData: () => {
+      // Create sample data for testing
+      createSampleData();
     }
   };
 
