@@ -5,6 +5,21 @@ import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { Label } from "./components/ui/label";
+import { toast } from "sonner";
+import { 
+  collection, 
+  query, 
+  getDocs, 
+  doc, 
+  setDoc, 
+  updateDoc, 
+  orderBy, 
+  limit,
+  where,
+  onSnapshot,
+  serverTimestamp
+} from 'firebase/firestore';
+import { db } from './firebase';
 import {
   Plus,
   Save,
@@ -38,12 +53,16 @@ import {
   Sun,
   Moon,
   Camera,
-  MoreVertical
+  MoreVertical,
+  Database,
+  Wifi,
+  WifiOff
 } from "lucide-react";
 
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [patrolData, setPatrolData] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [firestoreStatus, setFirestoreStatus] = useState('connecting');
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -55,6 +74,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     "3RD DISTRICT": true,
   });
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  // Remove unused state
   const moreOptionsRef = useRef(null);
 
   // Handle click outside for more options dropdown
@@ -104,39 +124,197 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"],
   };
 
-  // Initialize patrol data
+  // Load patrol data from Firestore
   useEffect(() => {
-    initializePatrolData();
+    loadPatrolDataFromFirestore();
   }, [selectedMonth, selectedYear]);
 
-  const initializePatrolData = () => {
-    const initialData = [];
-    Object.entries(municipalitiesByDistrict).forEach(
-      ([district, municipalities]) => {
+  const loadPatrolDataFromFirestore = async () => {
+    setLoading(true);
+    setFirestoreStatus('connecting');
+    
+    try {
+      // Create month-year ID for the selected month
+      const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
+      
+      // Try to get data from Firestore
+      const monthDocRef = doc(db, 'patrolData', monthYearId);
+      const municipalitiesRef = collection(monthDocRef, 'municipalities');
+      
+          // Use onSnapshot for real-time updates but with limit to avoid excessive reads
+      // Only subscribe to changes for the current month to minimize reads
+      const unsubscribe = onSnapshot(municipalitiesRef, (snapshot) => {
+        const firestoreData = [];
+        
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            firestoreData.push({
+              id: doc.id,
+              ...data
+            });
+          }
+        });
+
+        // If we have data from Firestore, use it
+        if (firestoreData.length > 0) {
+          console.log('📊 Loaded data from Firestore:', firestoreData.length, 'municipalities');
+          setPatrolData(firestoreData);
+          setFirestoreStatus('connected');
+        } else {
+          // If no data exists, don't create initial structure
+          // Only show municipalities that actually have data
+          console.log('📝 No data found for this month, showing empty state');
+          setPatrolData([]);
+          setFirestoreStatus('connected');
+        }
+      }, (error) => {
+        console.error('❌ Firestore error:', error);
+        setFirestoreStatus('error');
+        // Fallback to local data if Firestore fails
+        createLocalFallbackData();
+      });
+
+      // Cleanup subscription
+      return () => unsubscribe();
+      
+    } catch (error) {
+      console.error('❌ Error loading from Firestore:', error);
+      setFirestoreStatus('error');
+      // Fallback to local data
+      createLocalFallbackData();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const createInitialFirestoreStructure = async (monthYearId) => {
+    try {
+      const initialData = [];
+      
+      Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
         municipalities.forEach((municipality) => {
-          const dailyData = selectedDates.map(() => null); // Initialize with null (no entry)
-          initialData.push({
+          const dailyData = selectedDates.map(() => 0); // Initialize with 0
+          const totalPatrols = dailyData.reduce((sum, val) => sum + (val || 0), 0);
+          const activeDays = dailyData.filter((val) => val > 0).length;
+          const inactiveDays = dailyData.filter((val) => val === 0).length;
+          const activePercentage = Math.round((activeDays / dailyData.length) * 100);
+          
+          const itemData = {
             id: `${district}-${municipality}`,
             municipality,
             district,
             data: dailyData,
-            totalPatrols: 0,
-            activeDays: 0,
-            inactiveDays: 0,
-            activePercentage: 0,
-          });
+            totalPatrols,
+            activeDays,
+            inactiveDays,
+            activePercentage,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          };
+          
+          initialData.push(itemData);
         });
-      },
-    );
-    setPatrolData(initialData);
+      });
+
+      // Save to Firestore
+      const batch = [];
+      initialData.forEach((item) => {
+        const docRef = doc(db, 'patrolData', monthYearId, 'municipalities', item.id);
+        batch.push(setDoc(docRef, item));
+      });
+
+      // Execute batch write
+      await Promise.all(batch);
+      console.log('✅ Initial Firestore structure created');
+      
+      // Update local state
+      setPatrolData(initialData);
+      setFirestoreStatus('connected');
+      
+    } catch (error) {
+      console.error('❌ Error creating Firestore structure:', error);
+      setFirestoreStatus('error');
+      // Fallback to local data
+      createLocalFallbackData();
+    }
   };
 
-  const handleAddPatrolData = async (
-    municipality,
-    district,
-    dayIndex,
-    value,
-  ) => {
+  const createLocalFallbackData = () => {
+    console.log('🔄 Creating local fallback data...');
+    // Don't create fallback data for all municipalities
+    // Only show municipalities that actually have data in Firestore
+    setPatrolData([]);
+    setFirestoreStatus('offline');
+  };
+
+  const syncToFirestore = async () => {
+    if (firestoreStatus !== 'connected') {
+      console.log('❌ Cannot sync: Firestore not connected');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
+      
+      // Find municipalities that have actual data (not all zeros or nulls)
+      const municipalitiesWithData = patrolData.filter(item => 
+        item.data.some(value => value > 0)
+      );
+
+      if (municipalitiesWithData.length === 0) {
+        toast.info('No changes to save', {
+          description: 'No patrol data has been entered yet',
+          duration: 3000,
+          position: 'top-right',
+          style: { background: 'white' },
+        });
+        setLoading(false);
+        return;
+      }
+
+      // Save only municipalities with data
+      const batch = [];
+      municipalitiesWithData.forEach((item) => {
+        const docRef = doc(db, 'patrolData', monthYearId, 'municipalities', item.id);
+        batch.push(setDoc(docRef, {
+          ...item,
+          updatedAt: serverTimestamp()
+        }));
+      });
+
+      await Promise.all(batch);
+      console.log('✅ Data synced to Firestore for municipalities with data');
+      setFirestoreStatus('connected');
+      
+      // Show success toast with details about actually updated municipalities
+      const municipalityNames = municipalitiesWithData.map(item => item.municipality).join(', ');
+      toast.success('Changes saved successfully', {
+        description: municipalitiesWithData.length === 1
+          ? `Updated patrol data for ${municipalityNames}`
+          : `Updated patrol data for ${municipalitiesWithData.length} municipalities: ${municipalityNames}`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+    } catch (error) {
+      console.error('❌ Error syncing to Firestore:', error);
+      setFirestoreStatus('error');
+      // Show error toast with more details
+      toast.error('Failed to save changes', {
+        description: `Error: ${error.message || 'Failed to sync with Firestore'}`,
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddPatrolData = (municipality, district, dayIndex, value) => {
+    // Only update local state, don't save to Firestore
     const updatedData = patrolData.map((item) => {
       if (item.municipality === municipality && item.district === district) {
         const newData = [...item.data];
@@ -144,9 +322,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         const totalPatrols = newData.reduce((sum, val) => sum + (val || 0), 0);
         const activeDays = newData.filter((val) => val > 0).length;
         const inactiveDays = newData.filter((val) => val === 0).length;
-        const activePercentage = Math.round(
-          (activeDays / newData.length) * 100,
-        );
+        const activePercentage = Math.round((activeDays / newData.length) * 100);
+        
         return {
           ...item,
           data: newData,
@@ -158,6 +335,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       }
       return item;
     });
+    
     setPatrolData(updatedData);
   };
 
@@ -250,15 +428,33 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     };
   };
 
+  // Calculate active and inactive days
+  const { activeDays, inactiveDays } = patrolData.reduce((acc, municipality) => {
+    municipality.data.forEach((patrols) => {
+      // If there's an actual patrol count (not null/undefined)
+      if (patrols !== null && patrols !== undefined && patrols !== '') {
+        // Count as active if >= 5 patrols
+        if (patrols >= 5) {
+          acc.activeDays++;
+        }
+        // Count as inactive only if there's a value but it's < 5
+        else {
+          acc.inactiveDays++;
+        }
+      }
+      // Don't count "No Entry" days in either active or inactive
+    });
+    return acc;
+  }, { activeDays: 0, inactiveDays: 0 });
+
   const overallSummary = {
     totalPatrols: patrolData.reduce((sum, item) => sum + item.totalPatrols, 0),
-    totalActive: patrolData.reduce((sum, item) => sum + item.activeDays, 0),
-    totalInactive: patrolData.reduce((sum, item) => sum + item.inactiveDays, 0),
+    totalActive: activeDays, // Total number of active days across all municipalities
+    totalInactive: inactiveDays, // Total number of inactive days (only counting days with patrols < 5)
     avgActivePercentage:
       patrolData.length > 0
         ? Math.round(
-            patrolData.reduce((sum, item) => sum + item.activePercentage, 0) /
-              patrolData.length,
+            (activeDays / (activeDays + inactiveDays)) * 100
           )
         : 0,
     municipalityCount: patrolData.length,
@@ -280,15 +476,33 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               )} • Patrol Activity Dashboard
             </p>
             <div className="flex items-center gap-2 mt-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
+              <div className={`w-2 h-2 rounded-full ${
+                firestoreStatus === 'connected' ? 'bg-green-500' : 
+                firestoreStatus === 'connecting' ? 'bg-yellow-500' : 
+                firestoreStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
+              }`}></div>
               <span className="text-xs md:text-sm font-medium text-gray-600">
-                Local Data Storage
+                {firestoreStatus === 'connected' ? 'Firestore Connected' :
+                 firestoreStatus === 'connecting' ? 'Connecting to Firestore...' :
+                 firestoreStatus === 'error' ? 'Firestore Error - Using Local' :
+                 'Offline Mode - Local Storage'}
               </span>
+              {firestoreStatus === 'error' && (
+                <Button
+                  onClick={loadPatrolDataFromFirestore}
+                  size="sm"
+                  variant="outline"
+                  className="ml-2 h-6 px-2 text-xs"
+                >
+                  <Wifi className="w-3 h-3 mr-1" />
+                  Retry
+                </Button>
+              )}
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={() => console.log('Save data locally')}
+              onClick={syncToFirestore}
               disabled={loading}
               className="bg-green-600 hover:bg-green-700 text-white p-2.5 h-12 w-12 rounded-full"
               title="Save Data"
@@ -296,6 +510,47 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <Save className="w-6 h-6" />
             </Button>
           </div>
+        </div>
+
+        {/* Connection Status */}
+        <div className="mb-4">
+          <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {firestoreStatus === 'connected' ? (
+                    <Database className="h-5 w-5 text-green-600" />
+                  ) : firestoreStatus === 'connecting' ? (
+                    <Database className="h-5 w-5 text-yellow-600 animate-pulse" />
+                  ) : (
+                    <WifiOff className="h-5 w-5 text-red-600" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">
+                      {firestoreStatus === 'connected' ? 'Firestore Connected' :
+                       firestoreStatus === 'connecting' ? 'Connecting...' :
+                       'Offline Mode'}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {firestoreStatus === 'connected' ? 'Real-time data sync active' :
+                       firestoreStatus === 'connecting' ? 'Establishing connection...' :
+                       'Data stored locally only'}
+                    </p>
+                  </div>
+                </div>
+                {firestoreStatus === 'error' && (
+                  <Button
+                    onClick={loadPatrolDataFromFirestore}
+                    size="sm"
+                    variant="outline"
+                  >
+                    <Wifi className="w-4 h-4 mr-2" />
+                    Reconnect
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Stats Cards */}
@@ -318,12 +573,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Active Days</p>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                    {overallSummary.totalActive.toLocaleString()}
-                  </p>
-                </div>
+                                 <div>
+                   <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Active Days</p>
+                   <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                     {overallSummary.totalActive.toLocaleString()}
+                   </p>
+                 </div>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
                   <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
@@ -333,12 +588,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Days</p>
-                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                    {overallSummary.totalInactive.toLocaleString()}
-                  </p>
-                </div>
+                                 <div>
+                   <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Days</p>
+                   <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                     {overallSummary.totalInactive.toLocaleString()}
+                   </p>
+                 </div>
                 <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
                   <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
                 </div>
@@ -665,6 +920,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Removed custom modal in favor of Sonner toast */}
     </Layout>
   );
 }

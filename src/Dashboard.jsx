@@ -800,9 +800,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Calculate active municipalities list for modals
   const activeMunicipalitiesList = ipatrollerData.filter(item => {
-    if (!item.data || !Array.isArray(item.data)) return false;
-    const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-    return avgPatrols >= 5; // Active if average >= 5 patrols per day
+    // Use totalPatrols field to determine if municipality is active
+    if (item.totalPatrols !== undefined) {
+      return item.totalPatrols >= 5; // Municipality is active if totalPatrols >= 5
+    } else if (item.data && Array.isArray(item.data)) {
+      // Fallback to calculating from data array
+      const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
+      return totalPatrols >= 5; // Municipality is active if totalPatrols >= 5
+    }
+    return false;
   });
   
   // Debug logging
@@ -823,6 +829,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     },
     sampleIPatrollerData: ipatrollerData[0] ? ipatrollerData[0].data : 'No IPatroller data'
   });
+  
+  // Debug: Log what data is actually being used for calculations
+  console.log('🔍 Dashboard Calculation Debug:');
+  console.log('  summaryStats.activeMunicipalities:', summaryStats.activeMunicipalities);
+  console.log('  summaryStats.inactiveMunicipalities:', summaryStats.inactiveMunicipalities);
+  console.log('  ipatrollerData.length:', ipatrollerData.length);
+  console.log('  activeMunicipalitiesList.length:', activeMunicipalitiesList.length);
 
   // Validation: Ensure counts add up to total municipalities
   if (activeCount + correctedInactiveCount !== totalMunicipalities) {
@@ -1053,7 +1066,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div>
                   <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Municipalities</p>
                   <p className="text-2xl md:text-3xl font-bold text-red-600">
-                    {(totalMunicipalities - activeCount).toLocaleString()}
+                    {inactiveCount.toLocaleString()}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
@@ -1386,9 +1399,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               {activeMunicipalitiesList.length > 0 ? (
                 <div className="space-y-4">
                   {activeMunicipalitiesList
-                    .filter(municipality => municipality && municipality.data && Array.isArray(municipality.data))
+                    .filter(municipality => municipality && (municipality.totalPatrols !== undefined || (municipality.data && Array.isArray(municipality.data))))
                     .map((municipality, index) => {
-                      const avgPatrols = municipality.data.reduce((a, b) => a + (b || 0), 0) / municipality.data.length;
+                      // Use totalPatrols field if available, otherwise calculate from data array
+                      let totalPatrols = 0;
+                      if (municipality.totalPatrols !== undefined) {
+                        totalPatrols = municipality.totalPatrols;
+                      } else if (municipality.data && Array.isArray(municipality.data)) {
+                        totalPatrols = municipality.data.reduce((sum, val) => sum + (val || 0), 0);
+                      }
                       return (
                         <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                           <div className="flex items-center justify-between mb-2">
@@ -1398,7 +1417,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                             </span>
                           </div>
                           <div className="text-sm transition-colors duration-300 text-gray-600">
-                            Average Patrols: <span className="font-semibold text-green-600">{avgPatrols.toFixed(1)}</span> per day
+                            Total Patrols: <span className="font-semibold text-green-600">{totalPatrols}</span> patrols
                           </div>
                         </div>
                       );
@@ -1408,7 +1427,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                                  <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                    <p className="text-lg font-medium">No Active Municipalities</p>
-                   <p className="text-sm">No municipalities meet the active criteria (≥5 average patrols per day)</p>
+                   <p className="text-sm">No municipalities meet the active criteria (≥5 total patrols)</p>
                  </div>
               )}
             </div>
@@ -1428,7 +1447,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Inactive Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with &lt;5 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with &lt;5 total patrols</p>
                 </div>
               </div>
               <button
@@ -1445,16 +1464,28 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-4">
                   {allMunicipalities.filter(municipality => {
                     const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
-                    if (!municipalityData || !municipalityData.data || !Array.isArray(municipalityData.data)) {
+                    if (!municipalityData) {
                       return true; // No data means inactive
                     }
-                    const avgPatrols = municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length;
-                    return avgPatrols < 5;
+                    // Use totalPatrols field to determine if municipality is inactive
+                    if (municipalityData.totalPatrols !== undefined) {
+                      return municipalityData.totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
+                    } else if (municipalityData.data && Array.isArray(municipalityData.data)) {
+                      // Fallback to calculating from data array
+                      const totalPatrols = municipalityData.data.reduce((sum, val) => sum + (val || 0), 0);
+                      return totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
+                    }
+                    return true; // No data means inactive
                   }).map((municipality, index) => {
                     const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
-                    const avgPatrols = municipalityData && municipalityData.data && Array.isArray(municipalityData.data) 
-                      ? municipalityData.data.reduce((a, b) => a + (b || 0), 0) / municipalityData.data.length 
-                      : 0;
+                    let totalPatrols = 0;
+                    if (municipalityData) {
+                      if (municipalityData.totalPatrols !== undefined) {
+                        totalPatrols = municipalityData.totalPatrols;
+                      } else if (municipalityData.data && Array.isArray(municipalityData.data)) {
+                        totalPatrols = municipalityData.data.reduce((sum, val) => sum + (val || 0), 0);
+                      }
+                    }
                     const district = municipalityData?.district || 'Unknown District';
                     
                     return (
@@ -1466,7 +1497,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           </span>
                         </div>
                         <div className="text-sm transition-colors duration-300 text-gray-600">
-                          Average Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{avgPatrols.toFixed(1)}</span> per day
+                          Total Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{totalPatrols}</span> patrols
                         </div>
                       </div>
                     );
@@ -1476,7 +1507,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-lg font-medium">No Inactive Municipalities</p>
-                  <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
+                  <p className="text-sm">All municipalities meet the active criteria (≥5 total patrols)</p>
                 </div>
               )}
             </div>

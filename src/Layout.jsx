@@ -79,6 +79,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" /> },
     { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" /> },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" /> },
+    { id: 'firestoretest', label: 'Firestore Test', icon: <Activity className="h-5 w-5" /> },
   ];
 
   const handleNavigation = (pageId) => {

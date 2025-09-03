@@ -75,7 +75,7 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { user } = useFirebase();
+  const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments } = useFirebase();
   // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -1330,6 +1330,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       otherInfo: "",
       photos: []
     });
+  };
+
+  // Save action report to Firestore
+  const saveActionReport = async (reportData) => {
+    try {
+      const result = await addActionReport(reportData);
+      return result;
+    } catch (error) {
+      console.error('Error saving action report:', error);
+      return { success: false, error: error.message };
+    }
   };
   const handleEditActionReport = async () => {
     try {

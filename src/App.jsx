@@ -6,6 +6,7 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import Settings from "./Settings";
+import FirestoreTest from "./FirestoreTest";
 // Firebase-related components removed
 
 import { PatrolDataProvider } from "./PatrolDataContext";
@@ -17,6 +18,7 @@ import "./utils/consoleHelpers"; // Load console helper functions
 import "./utils/authTest"; // Load authentication test functions
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
+import { Toaster } from "sonner";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState(() => {
@@ -99,6 +101,8 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'firestoretest':
+        return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       // Firebase test routes removed
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -122,6 +126,7 @@ export default function App() {
       <DataProvider>
         <div className="App">
           {user ? renderPage() : <Login onLogin={() => {}} />}
+          <Toaster position="top-right" richColors closeButton />
         </div>
       </DataProvider>
     </PatrolDataProvider>

@@ -6,7 +6,23 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
-// Firebase removed - using local data storage
+import { 
+  collection, 
+  getDocs, 
+  getDoc,
+  doc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc,
+  writeBatch,
+  query, 
+  where, 
+  orderBy, 
+  limit,
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db } from './firebase';
 
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
@@ -5557,9 +5573,7 @@ Check browser console for detailed debug information.`);
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t ${
-              border-gray-200
-            }">
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowPdfPreviewModal(false)}

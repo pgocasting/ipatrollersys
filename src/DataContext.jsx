@@ -56,7 +56,7 @@ export const DataProvider = ({ children }) => {
     setLoading(true);
     const unsubscribeFunctions = [];
 
-    // Load Patrol Data
+        // Load Patrol Data - Only for totalPatrols calculation, not for active/inactive counts
     const loadPatrolData = async () => {
       try {
         const patrolQuery = query(collection(db, 'patrolData'), orderBy('updatedAt', 'desc'));
@@ -80,17 +80,8 @@ export const DataProvider = ({ children }) => {
               ...prev.summaryStats,
               totalPatrols: patrolData.reduce((total, row) => 
                 total + (row.data ? row.data.reduce((sum, val) => sum + (val || 0), 0) : 0), 0
-              ),
-              activeMunicipalities: patrolData.filter(row => {
-                if (!row.data || !Array.isArray(row.data)) return false;
-                const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
-                return avgPatrols >= 5;
-              }).length,
-              inactiveMunicipalities: patrolData.filter(row => {
-                if (!row.data || !Array.isArray(row.data)) return false;
-                const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0);
-                return avgPatrols <= 4;
-              }).length
+              )
+              // activeMunicipalities and inactiveMunicipalities will be set by loadIPatrollerData
             }
           }));
         });
@@ -181,25 +172,38 @@ export const DataProvider = ({ children }) => {
         
         const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
         
-        // Calculate active and inactive municipalities based on actual data
+        // Calculate active and inactive municipalities based on totalPatrols
         const activeMunicipalities = ipatrollerData.filter(item => {
-          if (!item.data || !Array.isArray(item.data)) {
+          // Use totalPatrols field to determine if municipality is active
+          if (item.totalPatrols !== undefined) {
+            const isActive = item.totalPatrols >= 5;
+            console.log(`📊 ${item.municipality}: totalPatrols=${item.totalPatrols}, active=${isActive}`);
+            return isActive;
+          } else if (item.data && Array.isArray(item.data)) {
+            // Fallback to calculating from data array
+            const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
+            const isActive = totalPatrols >= 5;
+            console.log(`📊 ${item.municipality}: calculated totalPatrols=${totalPatrols}, active=${isActive}`);
+            return isActive;
+          } else {
             console.log('❌ No data for municipality:', item.municipality);
             return false;
           }
-          const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-          const isActive = avgPatrols >= 5;
-          console.log(`📊 ${item.municipality}: avg=${avgPatrols.toFixed(2)}, active=${isActive}`);
-          return isActive; // Active if average >= 5 patrols per day
         });
         
         const inactiveMunicipalities = ipatrollerData.filter(item => {
-          if (!item.data || !Array.isArray(item.data)) {
+          // Use totalPatrols field to determine if municipality is inactive
+          if (item.totalPatrols !== undefined) {
+            const isActive = item.totalPatrols >= 5;
+            return !isActive; // Inactive if totalPatrols < 5
+          } else if (item.data && Array.isArray(item.data)) {
+            // Fallback to calculating from data array
+            const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
+            return totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
+          } else {
             console.log('❌ No data for municipality (inactive):', item.municipality);
             return true; // No data = inactive
           }
-          const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-          return avgPatrols < 5; // Inactive if average < 5 patrols per day
         });
         
         // Calculate monthly patrol trend (placeholder for now)
@@ -215,6 +219,13 @@ export const DataProvider = ({ children }) => {
           activeMunicipalities: activeMunicipalities.length,
           inactiveMunicipalities: inactiveMunicipalities.length,
           totalMunicipalities: ipatrollerData.length
+        });
+        
+        // Debug: Log each municipality's status
+        console.log('🔍 Municipality Status Breakdown:');
+        ipatrollerData.forEach(item => {
+          const status = item.totalPatrols >= 5 ? 'ACTIVE' : 'INACTIVE';
+          console.log(`  ${item.municipality}: ${item.totalPatrols} patrols → ${status}`);
         });
         
         setDashboardData(prev => ({

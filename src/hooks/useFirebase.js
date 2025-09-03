@@ -479,6 +479,72 @@ export const useFirebase = () => {
     }
   }, []);
 
+  // Generic function to query documents from any collection
+  const queryDocuments = useCallback(async (collectionName, constraints = []) => {
+    try {
+      if (!db) {
+        throw new Error('Firestore database is not available');
+      }
+      
+      let q = collection(db, collectionName);
+      
+      // Apply constraints if provided
+      if (constraints.length > 0) {
+        q = query(q, ...constraints);
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const documents = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        // Convert Firestore Timestamps to JavaScript Date objects
+        if (data.when && typeof data.when === 'object' && data.when.seconds) {
+          data.when = new Date(data.when.seconds * 1000);
+        }
+        if (data.createdAt && typeof data.createdAt === 'object' && data.createdAt.seconds) {
+          data.createdAt = new Date(data.createdAt.seconds * 1000);
+        }
+        if (data.updatedAt && typeof data.updatedAt === 'object' && data.updatedAt.seconds) {
+          data.updatedAt = new Date(data.updatedAt.seconds * 1000);
+        }
+        documents.push({ id: doc.id, ...data });
+      });
+      
+      return { success: true, data: documents };
+    } catch (error) {
+      console.error(`❌ Error querying ${collectionName}:`, error);
+      return { success: false, error: error.message };
+    }
+  }, []);
+
+  // Add action report to Firestore
+  const addActionReport = useCallback(async (reportData) => {
+    try {
+      if (!db) {
+        throw new Error('Firestore database is not available');
+      }
+      
+      // Add timestamps
+      const reportWithTimestamps = {
+        ...reportData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        createdBy: user?.uid || user?.email,
+        updatedBy: user?.uid || user?.email
+      };
+      
+      // Add to actionReports collection
+      const docRef = doc(collection(db, 'actionReports'));
+      await setDoc(docRef, reportWithTimestamps);
+      
+      return { success: true, id: docRef.id };
+    } catch (error) {
+      console.error('❌ Error adding action report:', error);
+      return { success: false, error: error.message };
+    }
+  }, [user]);
+
   // Change password function
   const changePassword = async (currentPassword, newPassword) => {
     try {
@@ -520,6 +586,11 @@ export const useFirebase = () => {
     signIn,
     signUp,
     logout,
-    waitForFirestoreReady
+    waitForFirestoreReady,
+    queryDocuments,
+    getActionReports,
+    addActionReport,
+    updateActionReport,
+    deleteActionReport
   };
 };
