@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -794,19 +793,85 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Use data from DataContext instead of calculating locally
   const totalMunicipalities = 12; // Always 12 municipalities
-  const activeCount = summaryStats.activeMunicipalities || 0;
-  const inactiveCount = summaryStats.inactiveMunicipalities || 0;
-  const correctedInactiveCount = Math.max(inactiveCount, totalMunicipalities - activeCount);
+  
+  // Calculate active municipalities for YESTERDAY (previous day of the month)
+  const getYesterdayActiveCount = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+    
+    console.log('🔍 getYesterdayActiveCount Debug:');
+    console.log('  Today:', today.toLocaleDateString());
+    console.log('  Today full date:', today.toString());
+    console.log('  Yesterday:', yesterday.toLocaleDateString());
+    console.log('  Yesterday full date:', yesterday.toString());
+    console.log('  Yesterday day of month:', yesterday.getDate());
+    console.log('  Calculated array index:', currentDay);
+    console.log('  IPatroller data length:', ipatrollerData.length);
+    
+    if (ipatrollerData.length === 0) return 0;
+    
+    let activeYesterday = 0;
+    let debugDetails = [];
+    
+    // Log the first few municipalities' data structure to understand the format
+    console.log('🔍 Sample data structure:');
+    ipatrollerData.forEach((item, index) => {
+      console.log(`  ${item.municipality}:`, {
+        dataLength: item.data ? item.data.length : 'No data',
+        sampleData: item.data ? item.data.slice(0, 10) : 'No data',
+        totalPatrols: item.totalPatrols,
+        month: item.month,
+        year: item.year,
+        patrolsForYesterday: item.data ? item.data[currentDay] : 'No data',
+        isActiveYesterday: item.data ? item.data[currentDay] >= 5 : false
+      });
+    });
+    
+    ipatrollerData.forEach((item, index) => {
+      if (item.data && Array.isArray(item.data) && item.data[currentDay] !== undefined) {
+        const patrols = item.data[currentDay];
+        const isActive = patrols >= 5; // Municipality is active only if it has 5 or more patrols
+        
+        debugDetails.push({
+          municipality: item.municipality,
+          dayIndex: currentDay,
+          patrols: patrols,
+          isActive: isActive,
+          dataArray: item.data.slice(0, 10) // Show first 10 elements for debugging
+        });
+        
+        // Check if municipality has patrols for yesterday
+        if (isActive) {
+          activeYesterday++;
+        }
+      } else {
+        console.log(`⚠️ Municipality ${item.municipality} has no data for day ${currentDay}`);
+        console.log(`  Data structure:`, item.data);
+      }
+    });
+    
+    console.log('  Debug details for each municipality:', debugDetails);
+    console.log('  Final active count:', activeYesterday);
+    
+    return activeYesterday;
+  };
+  
+  const activeCount = getYesterdayActiveCount();
+  const inactiveCount = totalMunicipalities - activeCount;
+  const correctedInactiveCount = inactiveCount;
 
-  // Calculate active municipalities list for modals
+  // Calculate active municipalities list for modals (for YESTERDAY only)
   const activeMunicipalitiesList = ipatrollerData.filter(item => {
-    // Use totalPatrols field to determine if municipality is active
-    if (item.totalPatrols !== undefined) {
-      return item.totalPatrols >= 5; // Municipality is active if totalPatrols >= 5
-    } else if (item.data && Array.isArray(item.data)) {
-      // Fallback to calculating from data array
-      const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
-      return totalPatrols >= 5; // Municipality is active if totalPatrols >= 5
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+    
+    if (item.data && Array.isArray(item.data) && item.data[currentDay] !== undefined) {
+      // Municipality is active YESTERDAY if it has 5 or more patrols for yesterday
+      return item.data[currentDay] >= 5;
     }
     return false;
   });
@@ -836,6 +901,16 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   console.log('  summaryStats.inactiveMunicipalities:', summaryStats.inactiveMunicipalities);
   console.log('  ipatrollerData.length:', ipatrollerData.length);
   console.log('  activeMunicipalitiesList.length:', activeMunicipalitiesList.length);
+  
+  // Debug: Log yesterday's data calculations
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+  console.log('📅 Yesterday\'s date:', yesterday.toLocaleDateString());
+  console.log('📊 Current day index for yesterday:', currentDay);
+  console.log('📊 Calculated activeCount for yesterday:', activeCount);
+  console.log('📊 Calculated inactiveCount for yesterday:', correctedInactiveCount);
 
   // Validation: Ensure counts add up to total municipalities
   if (activeCount + correctedInactiveCount !== totalMunicipalities) {
@@ -1025,6 +1100,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
+
+        {/* Yesterday's Data Header */}
+        <div className="mb-4 p-3 md:p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+          <p className="text-sm transition-colors duration-300 text-yellow-700 text-center">
+            📅 Showing data for yesterday ({new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })})
+          </p>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -1383,7 +1465,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                  </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Active Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{activeCount} municipalities with ≥5 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{activeCount} municipalities with patrols yesterday</p>
                 </div>
               </div>
                              <button
@@ -1398,36 +1480,38 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="p-6 overflow-y-auto max-h-[60vh]">
               {activeMunicipalitiesList.length > 0 ? (
                 <div className="space-y-4">
-                  {activeMunicipalitiesList
-                    .filter(municipality => municipality && (municipality.totalPatrols !== undefined || (municipality.data && Array.isArray(municipality.data))))
-                    .map((municipality, index) => {
-                      // Use totalPatrols field if available, otherwise calculate from data array
-                      let totalPatrols = 0;
-                      if (municipality.totalPatrols !== undefined) {
-                        totalPatrols = municipality.totalPatrols;
-                      } else if (municipality.data && Array.isArray(municipality.data)) {
-                        totalPatrols = municipality.data.reduce((sum, val) => sum + (val || 0), 0);
-                      }
-                      return (
-                        <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                          <div className="flex items-center justify-between mb-2">
-                            <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                              {municipality.district}
-                            </span>
-                          </div>
-                          <div className="text-sm transition-colors duration-300 text-gray-600">
-                            Total Patrols: <span className="font-semibold text-green-600">{totalPatrols}</span> patrols
-                          </div>
+                  {activeMunicipalitiesList.map((municipality, index) => {
+                    // Get yesterday's patrol count
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    let yesterdayPatrols = 0;
+                    
+                    if (municipality.data && Array.isArray(municipality.data)) {
+                      yesterdayPatrols = municipality.data[currentDay] || 0;
+                    }
+                    
+                    return (
+                      <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            {municipality.district}
+                          </span>
                         </div>
-                      );
-                    })}
+                        <div className="text-sm transition-colors duration-300 text-gray-600">
+                          Yesterday's Patrols: <span className="font-semibold text-green-600">{yesterdayPatrols}</span> patrols
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                                  <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                    <p className="text-lg font-medium">No Active Municipalities</p>
-                   <p className="text-sm">No municipalities meet the active criteria (≥5 total patrols)</p>
+                   <p className="text-sm">No municipalities have patrols yesterday</p>
                  </div>
               )}
             </div>
@@ -1447,7 +1531,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Inactive Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with &lt;5 total patrols</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with no patrols yesterday</p>
                 </div>
               </div>
               <button
@@ -1467,24 +1551,29 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                     if (!municipalityData) {
                       return true; // No data means inactive
                     }
-                    // Use totalPatrols field to determine if municipality is inactive
-                    if (municipalityData.totalPatrols !== undefined) {
-                      return municipalityData.totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
-                    } else if (municipalityData.data && Array.isArray(municipalityData.data)) {
-                      // Fallback to calculating from data array
-                      const totalPatrols = municipalityData.data.reduce((sum, val) => sum + (val || 0), 0);
-                      return totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
+                    
+                    // Check if municipality is inactive YESTERDAY
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    
+                    if (municipalityData.data && Array.isArray(municipalityData.data) && municipalityData.data[currentDay] !== undefined) {
+                            // Municipality is inactive YESTERDAY if it has less than 5 patrols for yesterday
+      return municipalityData.data[currentDay] < 5;
                     }
                     return true; // No data means inactive
                   }).map((municipality, index) => {
                     const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
-                    let totalPatrols = 0;
-                    if (municipalityData) {
-                      if (municipalityData.totalPatrols !== undefined) {
-                        totalPatrols = municipalityData.totalPatrols;
-                      } else if (municipalityData.data && Array.isArray(municipalityData.data)) {
-                        totalPatrols = municipalityData.data.reduce((sum, val) => sum + (val || 0), 0);
-                      }
+                    // Get yesterday's patrol count
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    let yesterdayPatrols = 0;
+                    
+                    if (municipalityData && municipalityData.data && Array.isArray(municipalityData.data)) {
+                      yesterdayPatrols = municipalityData.data[currentDay] || 0;
                     }
                     const district = municipalityData?.district || 'Unknown District';
                     
@@ -1497,7 +1586,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           </span>
                         </div>
                         <div className="text-sm transition-colors duration-300 text-gray-600">
-                          Total Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{totalPatrols}</span> patrols
+                          Yesterday's Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{yesterdayPatrols}</span> patrols
                         </div>
                       </div>
                     );
@@ -1507,7 +1596,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p className="text-lg font-medium">No Inactive Municipalities</p>
-                  <p className="text-sm">All municipalities meet the active criteria (≥5 total patrols)</p>
+                  <p className="text-sm">All municipalities have patrols yesterday</p>
                 </div>
               )}
             </div>
@@ -2237,6 +2326,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
       )}
+
+
     </Layout>
   );
 } 

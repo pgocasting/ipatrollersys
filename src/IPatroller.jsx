@@ -512,46 +512,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
-        {/* Connection Status */}
-        <div className="mb-4">
-          <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {firestoreStatus === 'connected' ? (
-                    <Database className="h-5 w-5 text-green-600" />
-                  ) : firestoreStatus === 'connecting' ? (
-                    <Database className="h-5 w-5 text-yellow-600 animate-pulse" />
-                  ) : (
-                    <WifiOff className="h-5 w-5 text-red-600" />
-                  )}
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">
-                      {firestoreStatus === 'connected' ? 'Firestore Connected' :
-                       firestoreStatus === 'connecting' ? 'Connecting...' :
-                       'Offline Mode'}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {firestoreStatus === 'connected' ? 'Real-time data sync active' :
-                       firestoreStatus === 'connecting' ? 'Establishing connection...' :
-                       'Data stored locally only'}
-                    </p>
-                  </div>
-                </div>
-                {firestoreStatus === 'error' && (
-                  <Button
-                    onClick={loadPatrolDataFromFirestore}
-                    size="sm"
-                    variant="outline"
-                  >
-                    <Wifi className="w-4 h-4 mr-2" />
-                    Reconnect
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">

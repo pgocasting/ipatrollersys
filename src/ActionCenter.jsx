@@ -1549,15 +1549,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
             </div>
           </div>
-        {/* Success Message */}
-        {successMessage && (
-          <div className="p-3 md:p-4 rounded-lg border transition-all duration-300 bg-green-50 border-green-300 text-green-700">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="font-medium text-sm md:text-base">{successMessage}</span>
-        </div>
-          </div>
-        )}
+
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <Card 
