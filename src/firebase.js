@@ -1,15 +1,16 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
+import { getFirestore } from 'firebase/firestore';
 
 // Your Firebase configuration
-// Replace these values with your actual Firebase project configuration
 const firebaseConfig = {
-  apiKey: "AIzaSyBXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  authDomain: "your-project-id.firebaseapp.com",
-  projectId: "your-project-id",
-  storageBucket: "your-project-id.appspot.com",
-  messagingSenderId: "123456789012",
-  appId: "1:123456789012:web:abcdefghijklmnopqrstuvwxyz"
+  apiKey: "AIzaSyBeRQNGiuTIqFHIF7m1Z4DMhtlo9BlMQNo",
+  authDomain: "ipatrollersys.firebaseapp.com",
+  projectId: "ipatrollersys",
+  storageBucket: "ipatrollersys.firebasestorage.app",
+  messagingSenderId: "773272104147",
+  appId: "1:773272104147:web:7e3266144ed23de1e6f826",
+  measurementId: "G-HPK93S27LM"
 };
 
 // Initialize Firebase
@@ -17,5 +18,8 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
+
+// Initialize Cloud Firestore and get a reference to the service
+export const db = getFirestore(app);
 
 export default app;
