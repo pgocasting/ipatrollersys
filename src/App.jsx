@@ -5,6 +5,7 @@ import IPatroller from "./IPatroller";
 import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
+import CommandCenter from "./CommandCenter";
 import Settings from "./Settings";
 import FirestoreTest from "./FirestoreTest";
 // Firebase-related components removed
@@ -93,6 +94,8 @@ export default function App() {
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'ipatroller':
         return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'commandcenter':
+        return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'reports':
         return <Reports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'incidents':

@@ -15,7 +15,8 @@ import {
   Bell,
   User,
   LogOut,
-  Activity
+  Activity,
+  Command
 } from "lucide-react";
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
@@ -76,6 +77,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
     { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" /> },
+    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" /> },
     { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" /> },
     { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" /> },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" /> },

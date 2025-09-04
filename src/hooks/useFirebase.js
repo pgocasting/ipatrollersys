@@ -575,6 +575,188 @@ export const useFirebase = () => {
     }
   };
 
+  // Command Center - Barangay Management Functions
+  const saveBarangays = async (barangays) => {
+    try {
+      console.log('💾 Saving barangays to Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'barangays');
+      await setDoc(docRef, {
+        barangays: barangays,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.uid || user?.email || "system"
+      });
+      
+      console.log('✅ Barangays saved to Firestore successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving barangays to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getBarangays = async () => {
+    try {
+      console.log('🔍 Fetching barangays from Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'barangays');
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const barangays = docSnap.data().barangays || [];
+        console.log('✅ Found barangays in Firestore:', barangays.length);
+        return { success: true, data: barangays };
+      } else {
+        console.log('📝 No barangays document found in Firestore, returning empty array');
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('❌ Error fetching barangays from Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Command Center - Concern Type Management Functions
+  const saveConcernTypes = async (concernTypes) => {
+    try {
+      console.log('💾 Saving concern types to Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'concernTypes');
+      await setDoc(docRef, {
+        concernTypes: concernTypes,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.uid || user?.email || "system"
+      });
+      
+      console.log('✅ Concern types saved to Firestore successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving concern types to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getConcernTypes = async () => {
+    try {
+      console.log('🔍 Fetching concern types from Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'concernTypes');
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const concernTypes = docSnap.data().concernTypes || [];
+        console.log('✅ Found concern types in Firestore:', concernTypes.length);
+        return { success: true, data: concernTypes };
+      } else {
+        console.log('📝 No concern types document found in Firestore, returning empty array');
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('❌ Error fetching concern types from Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Command Center - Weekly Reports Functions
+  const saveWeeklyReport = async (monthYear, reportData) => {
+    try {
+      console.log('💾 Saving weekly report to Firestore for:', monthYear);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', `weeklyReports_${monthYear}`);
+      await setDoc(docRef, {
+        monthYear: monthYear,
+        data: reportData,
+        updatedAt: new Date().toISOString(),
+        updatedBy: user?.uid || user?.email || "system"
+      });
+      
+      console.log('✅ Weekly report saved to Firestore successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving weekly report to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getWeeklyReport = async (monthYear) => {
+    try {
+      console.log('🔍 Fetching weekly report from Firestore for:', monthYear);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', `weeklyReports_${monthYear}`);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists()) {
+        const reportData = docSnap.data().data || {};
+        console.log('✅ Found weekly report in Firestore for:', monthYear);
+        return { success: true, data: reportData };
+      } else {
+        console.log('📝 No weekly report found in Firestore for:', monthYear);
+        return { success: true, data: {} };
+      }
+    } catch (error) {
+      console.error('❌ Error fetching weekly report from Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getAllWeeklyReports = async () => {
+    try {
+      console.log('🔍 Fetching all weekly reports from Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const q = query(collection(db, 'commandCenter'), where('monthYear', '!=', null));
+      const querySnapshot = await getDocs(q);
+      const reports = {};
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.monthYear) {
+          reports[data.monthYear] = data.data || {};
+        }
+      });
+      
+      console.log('✅ Found weekly reports in Firestore:', Object.keys(reports).length);
+      return { success: true, data: reports };
+    } catch (error) {
+      console.error('❌ Error fetching all weekly reports from Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const waitForFirestoreReady = async () => {
     // Always return true since we're not using Firestore
     return true;
@@ -591,6 +773,14 @@ export const useFirebase = () => {
     getActionReports,
     addActionReport,
     updateActionReport,
-    deleteActionReport
+    deleteActionReport,
+    // Command Center functions
+    saveBarangays,
+    getBarangays,
+    saveConcernTypes,
+    getConcernTypes,
+    saveWeeklyReport,
+    getWeeklyReport,
+    getAllWeeklyReports
   };
 };

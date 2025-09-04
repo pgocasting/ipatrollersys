@@ -20,6 +20,8 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import {
   Plus,
   Save,
@@ -74,6 +76,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     "3RD DISTRICT": true,
   });
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
+  const [previewData, setPreviewData] = useState(null);
   // Remove unused state
   const moreOptionsRef = useRef(null);
 
@@ -460,6 +465,330 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     municipalityCount: patrolData.length,
   };
 
+  // Generate preview data for the report
+  const generatePreviewData = () => {
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    const previewData = {
+      title: "I-Patroller Monthly Summary Report",
+      generatedDate: new Date().toLocaleDateString(),
+      month: months[selectedMonth],
+      year: selectedYear,
+      reportPeriod: new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      overallSummary: overallSummary,
+      districtSummary: Object.keys(groupedData).map(district => ({
+        district,
+        ...getDistrictSummary(district)
+      })),
+      municipalityPerformance: patrolData.map(item => ({
+        municipality: item.municipality,
+        district: item.district,
+        totalPatrols: item.totalPatrols,
+        activeDays: item.activeDays,
+        inactiveDays: item.inactiveDays,
+        activePercentage: item.activePercentage
+      }))
+    };
+
+    setPreviewData(previewData);
+    setShowPrintPreview(true);
+  };
+
+  // Generate Monthly Summary Report
+  const generateMonthlySummaryReport = () => {
+    setIsGeneratingReport(true);
+    
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const months = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      
+      // Header - Centered like preview
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      const pageWidth = doc.internal.pageSize.width;
+      const titleWidth = doc.getTextWidth('I-Patroller Monthly Summary Report');
+      doc.text('I-Patroller Monthly Summary Report', (pageWidth - titleWidth) / 2, 30);
+      
+      // Report details - centered and spaced like preview
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
+      const monthText = `Month: ${months[selectedMonth]} ${selectedYear}`;
+      const periodText = `Report Period: ${new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+      
+      const generatedWidth = doc.getTextWidth(generatedText);
+      const monthWidth = doc.getTextWidth(monthText);
+      const periodWidth = doc.getTextWidth(periodText);
+      
+      doc.text(generatedText, (pageWidth - generatedWidth) / 2, 45);
+      doc.text(monthText, (pageWidth - monthWidth) / 2, 52);
+      doc.text(periodText, (pageWidth - periodWidth) / 2, 59);
+      
+      // District Summary Table - matching preview format
+      if (Object.keys(groupedData).length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('District Summary', 20, 75);
+        
+        const districtTableData = Object.keys(groupedData).map(district => {
+          const summary = getDistrictSummary(district);
+          return [
+            district,
+            summary.municipalityCount.toString(),
+            summary.totalPatrols.toLocaleString(),
+            summary.totalActive.toString(),
+            summary.totalInactive.toString(),
+            `${summary.avgActivePercentage}%`
+          ];
+        });
+        
+        autoTable(doc, {
+          head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
+          body: districtTableData,
+          startY: 82,
+          styles: { 
+            fontSize: 9, 
+            cellPadding: 2,
+            overflow: 'linebreak',
+            halign: 'left',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: { 
+            fillColor: [59, 130, 246], // Blue background like preview
+            fontStyle: 'bold',
+            textColor: [255, 255, 255],
+            fontSize: 10,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252] // Light gray alternating rows like preview
+          },
+          columnStyles: {
+            0: { cellWidth: 40, halign: 'left' },
+            1: { cellWidth: 25, halign: 'center' },
+            2: { cellWidth: 25, halign: 'center' },
+            3: { cellWidth: 25, halign: 'center' },
+            4: { cellWidth: 25, halign: 'center' },
+            5: { cellWidth: 25, halign: 'center' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          showHead: 'everyPage',
+          pageBreak: 'auto',
+          didDrawPage: function (data) {
+            // Add page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            doc.setFontSize(8);
+            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
+          }
+        });
+      }
+      
+      // Municipality Performance Table - matching preview format
+      if (patrolData.length > 0) {
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Municipality Performance', 20, finalY);
+        
+        const municipalityTableData = patrolData.map(item => [
+          item.municipality,
+          item.district,
+          item.totalPatrols.toLocaleString(),
+          item.activeDays.toString(),
+          item.inactiveDays.toString(),
+          `${item.activePercentage}%`
+        ]);
+        
+        autoTable(doc, {
+          head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
+          body: municipalityTableData,
+          startY: finalY + 7,
+          styles: { 
+            fontSize: 8, 
+            cellPadding: 2,
+            overflow: 'linebreak',
+            halign: 'left',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: { 
+            fillColor: [34, 197, 94], // Green background like preview
+            fontStyle: 'bold',
+            textColor: [255, 255, 255],
+            fontSize: 9,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252] // Light gray alternating rows like preview
+          },
+          columnStyles: {
+            0: { cellWidth: 35, halign: 'left' },
+            1: { cellWidth: 30, halign: 'left' },
+            2: { cellWidth: 25, halign: 'center' },
+            3: { cellWidth: 25, halign: 'center' },
+            4: { cellWidth: 25, halign: 'center' },
+            5: { cellWidth: 20, halign: 'center' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          showHead: 'everyPage',
+          pageBreak: 'auto',
+          didDrawPage: function (data) {
+            // Add page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            doc.setFontSize(8);
+            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
+          }
+        });
+        
+        // Overall Summary Statistics - matching preview format with two-column layout
+        const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        
+        // Draw border line like preview
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(20, summaryY, pageWidth - 20, summaryY);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Overall Summary Statistics', 20, summaryY + 10);
+        
+        // Two-column layout like preview
+        const leftColumnX = 20;
+        const rightColumnX = pageWidth / 2 + 10;
+        const lineHeight = 10;
+        let currentY = summaryY + 22;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        // Left column
+        doc.text(`Total Patrols:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalPatrols.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Active Days:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalActive.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Inactive Days:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalInactive.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        // Right column
+        currentY = summaryY + 30;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Average Active Percentage:`, rightColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.avgActivePercentage}%`, rightColumnX + 80, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Municipalities:`, rightColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.municipalityCount}`, rightColumnX + 80, currentY);
+        
+      } else {
+        // No data message
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'italic');
+        doc.text('No patrol data available for the selected period.', 20, finalY);
+        
+        // Overall Summary Statistics - even when no data, show at bottom with same format
+        const summaryY = finalY + 10;
+        
+        // Draw border line like preview
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(20, summaryY, pageWidth - 20, summaryY);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Overall Summary Statistics', 20, summaryY + 10);
+        
+        // Two-column layout like preview
+        const leftColumnX = 20;
+        const rightColumnX = pageWidth / 2 + 10;
+        const lineHeight = 10;
+        let currentY = summaryY + 22;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        // Left column
+        doc.text(`Total Patrols:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalPatrols.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Active Days:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalActive.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Inactive Days:`, leftColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.totalInactive.toLocaleString()}`, leftColumnX + 60, currentY);
+        
+        // Right column
+        currentY = summaryY + 30;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Average Active Percentage:`, rightColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.avgActivePercentage}%`, rightColumnX + 80, currentY);
+        
+        currentY += lineHeight;
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Municipalities:`, rightColumnX, currentY);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`${overallSummary.municipalityCount}`, rightColumnX + 80, currentY);
+      }
+      
+      // Save the PDF
+      const fileName = `ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`;
+      doc.save(fileName);
+      
+      // Show success toast
+      toast.success('Monthly Summary Report Generated', {
+        description: `Report saved as ${fileName}`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      
+    } catch (error) {
+      console.error('Error generating report:', error);
+      toast.error('Failed to generate report', {
+        description: error.message || 'An error occurred while generating the report',
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  };
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
@@ -501,6 +830,26 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={generatePreviewData}
+              disabled={isGeneratingReport || loading}
+              className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 h-12 w-12 rounded-full"
+              title="Preview Monthly Summary Report"
+            >
+              <Eye className="w-6 h-6" />
+            </Button>
+            <Button
+              onClick={generateMonthlySummaryReport}
+              disabled={isGeneratingReport || loading}
+              className="bg-purple-600 hover:bg-purple-700 text-white p-2.5 h-12 w-12 rounded-full"
+              title="Generate and Download PDF"
+            >
+              {isGeneratingReport ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              ) : (
+                <FileText className="w-6 h-6" />
+              )}
+            </Button>
             <Button
               onClick={syncToFirestore}
               disabled={loading}
@@ -881,6 +1230,162 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Print Preview Modal */}
+      {showPrintPreview && previewData && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Eye className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Monthly Report Preview</h3>
+                  <p className="text-sm text-gray-600">Review before printing or downloading</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setShowPrintPreview(false);
+                    setPreviewData(null);
+                  }}
+                  variant="outline"
+                  size="sm"
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowPrintPreview(false);
+                    setPreviewData(null);
+                    generateMonthlySummaryReport();
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Content - Print Preview */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+                {/* Report Header */}
+                <div className="text-center mb-8">
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">{previewData.title}</h1>
+                  <div className="text-sm text-gray-600 space-y-1">
+                    <p>Generated: {previewData.generatedDate}</p>
+                    <p>Month: {previewData.month} {previewData.year}</p>
+                    <p>Report Period: {previewData.reportPeriod}</p>
+                  </div>
+                </div>
+
+                {/* District Summary */}
+                {previewData.districtSummary.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4">District Summary</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-blue-50">
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">District</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Municipalities</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Total Patrols</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active Days</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Inactive Days</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Avg Active %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewData.districtSummary.map((district, index) => (
+                            <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                              <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900">{district.district}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-gray-700">{district.municipalityCount}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-gray-700">{district.totalPatrols.toLocaleString()}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-green-600 font-semibold">{district.totalActive}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-red-600 font-semibold">{district.totalInactive}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-purple-600 font-semibold">{district.avgActivePercentage}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Municipality Performance */}
+                {previewData.municipalityPerformance.length > 0 && (
+                  <div className="mb-8">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4">Municipality Performance</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border-collapse border border-gray-300">
+                        <thead>
+                          <tr className="bg-green-50">
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">Municipality</th>
+                            <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">District</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Total Patrols</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active Days</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Inactive Days</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active %</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previewData.municipalityPerformance.map((municipality, index) => (
+                            <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                              <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900">{municipality.municipality}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-gray-700">{municipality.district}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-gray-700">{municipality.totalPatrols.toLocaleString()}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-green-600 font-semibold">{municipality.activeDays}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-red-600 font-semibold">{municipality.inactiveDays}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-purple-600 font-semibold">{municipality.activePercentage}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Overall Summary Statistics */}
+                <div className="border-t border-gray-200 pt-6">
+                  <h2 className="text-lg font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Patrols:</span>
+                        <span className="font-semibold text-gray-900">{previewData.overallSummary.totalPatrols.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Active Days:</span>
+                        <span className="font-semibold text-green-600">{previewData.overallSummary.totalActive.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Inactive Days:</span>
+                        <span className="font-semibold text-red-600">{previewData.overallSummary.totalInactive.toLocaleString()}</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Average Active Percentage:</span>
+                        <span className="font-semibold text-purple-600">{previewData.overallSummary.avgActivePercentage}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Total Municipalities:</span>
+                        <span className="font-semibold text-gray-900">{previewData.overallSummary.municipalityCount}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Removed custom modal in favor of Sonner toast */}
     </Layout>

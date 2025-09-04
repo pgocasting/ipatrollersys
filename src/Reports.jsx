@@ -32,7 +32,9 @@ import {
   Database,
   PieChart,
   LineChart,
-  Printer
+  Printer,
+  XCircle,
+  CheckCircle2
 } from "lucide-react";
 
 export default function Reports({ onLogout, onNavigate, currentPage }) {
@@ -49,6 +51,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [paperSize, setPaperSize] = useState("short"); // "short" for Letter, "long" for Legal
+
+  // Municipalities by district mapping (matching I-Patroller structure)
+  const municipalitiesByDistrict = {
+    "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
+    "2ND DISTRICT": ["Balanga City", "Pilar", "Orion", "Limay"],
+    "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"]
+  };
 
   const handleLogout = async () => {
     try {
@@ -65,852 +75,574 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   const districts = ["all", "1ST DISTRICT", "2ND DISTRICT", "3RD DISTRICT"];
 
-  // Report generation functions
-  const generateTopPerformersReport = () => {
-    const doc = new jsPDF();
+  // Paper size configuration
+  const getPaperConfig = (size) => {
+    switch (size) {
+      case "short":
+        return {
+          format: 'letter',
+          width: 216, // mm
+          height: 279, // mm
+          margin: 20,
+          name: 'Letter (Short Bond)'
+        };
+      case "long":
+        return {
+          format: 'legal',
+          width: 216, // mm
+          height: 356, // mm
+          margin: 20,
+          name: 'Legal (Long Bond)'
+        };
+      default:
+        return {
+          format: 'a4',
+          width: 210, // mm
+          height: 297, // mm
+          margin: 20,
+          name: 'A4'
+        };
+    }
+  };
+
+  // Get optimized column widths based on paper size
+  const getColumnWidths = (paperType, tableType) => {
+    const config = getPaperConfig(paperType);
+    const availableWidth = config.width - (config.margin * 2);
     
-    // Header
+    switch (tableType) {
+      case 'ipatroller':
+        if (paperType === 'long') {
+          return {
+            0: { cellWidth: 40, halign: 'left' },    // Municipality
+            1: { cellWidth: 35, halign: 'left' },    // District
+            2: { cellWidth: 30, halign: 'center' },  // Total Patrols
+            3: { cellWidth: 25, halign: 'center' },  // Active Days
+            4: { cellWidth: 25, halign: 'center' },  // Inactive Days
+            5: { cellWidth: 25, halign: 'center' }   // Active %
+          };
+        } else {
+          return {
+            0: { cellWidth: 35, halign: 'left' },    // Municipality
+            1: { cellWidth: 30, halign: 'left' },    // District
+            2: { cellWidth: 25, halign: 'center' },  // Total Patrols
+            3: { cellWidth: 25, halign: 'center' },  // Active Days
+            4: { cellWidth: 25, halign: 'center' },  // Inactive Days
+            5: { cellWidth: 20, halign: 'center' }   // Active %
+          };
+        }
+      case 'action':
+        if (paperType === 'long') {
+          return {
+            0: { cellWidth: 45, halign: 'left' },    // Department
+            1: { cellWidth: 35, halign: 'center' },  // Total Reports
+            2: { cellWidth: 30, halign: 'center' },  // Pending
+            3: { cellWidth: 30, halign: 'center' },  // Resolved
+            4: { cellWidth: 35, halign: 'center' }   // Resolution Rate
+          };
+        } else {
+          return {
+            0: { cellWidth: 40, halign: 'left' },    // Department
+            1: { cellWidth: 30, halign: 'center' },  // Total Reports
+            2: { cellWidth: 25, halign: 'center' },  // Pending
+            3: { cellWidth: 25, halign: 'center' },  // Resolved
+            4: { cellWidth: 30, halign: 'center' }   // Resolution Rate
+          };
+        }
+      case 'incidents':
+        if (paperType === 'long') {
+          return {
+            0: { cellWidth: 55, halign: 'left' },    // Incident Type
+            1: { cellWidth: 30, halign: 'center' },  // Total
+            2: { cellWidth: 30, halign: 'center' },  // Active
+            3: { cellWidth: 30, halign: 'center' },  // Resolved
+            4: { cellWidth: 35, halign: 'center' }   // Resolution Rate
+          };
+        } else {
+          return {
+            0: { cellWidth: 50, halign: 'left' },    // Incident Type
+            1: { cellWidth: 25, halign: 'center' },  // Total
+            2: { cellWidth: 25, halign: 'center' },  // Active
+            3: { cellWidth: 25, halign: 'center' },  // Resolved
+            4: { cellWidth: 30, halign: 'center' }   // Resolution Rate
+          };
+        }
+      default:
+        return {};
+    }
+  };
+
+  // Helper function to calculate patrol statistics (matching I-Patroller logic exactly)
+  const calculatePatrolStats = (data) => {
+    if (!data || !Array.isArray(data)) return { activeDays: 0, inactiveDays: 0, totalPatrols: 0 };
+    
+    // Match I-Patroller logic: active if >= 5 patrols, inactive if < 5 but > 0
+    let activeDays = 0;
+    let inactiveDays = 0;
+    let totalPatrols = 0;
+    
+    data.forEach((patrols) => {
+      if (patrols !== null && patrols !== undefined && patrols !== '') {
+        totalPatrols += patrols;
+        if (patrols >= 5) {
+          activeDays++;
+        } else {
+          inactiveDays++;
+        }
+      }
+    });
+    
+    return { activeDays, inactiveDays, totalPatrols };
+  };
+
+  // Calculate overall summary (matching I-Patroller exactly)
+  const calculateOverallSummary = () => {
+    if (!ipatrollerData || ipatrollerData.length === 0) {
+      return {
+        totalPatrols: 0,
+        totalActive: 0,
+        totalInactive: 0,
+        avgActivePercentage: 0,
+        municipalityCount: 0
+      };
+    }
+
+    // Calculate active and inactive days (matching I-Patroller logic)
+    const { activeDays, inactiveDays } = ipatrollerData.reduce((acc, municipality) => {
+      municipality.data.forEach((patrols) => {
+        if (patrols !== null && patrols !== undefined && patrols !== '') {
+          if (patrols >= 5) {
+            acc.activeDays++;
+          } else {
+            acc.inactiveDays++;
+          }
+        }
+      });
+      return acc;
+    }, { activeDays: 0, inactiveDays: 0 });
+
+    const totalPatrols = ipatrollerData.reduce((sum, item) => sum + item.totalPatrols, 0);
+    const avgActivePercentage = (activeDays + inactiveDays) > 0 
+      ? Math.round((activeDays / (activeDays + inactiveDays)) * 100)
+      : 0;
+
+    return {
+      totalPatrols,
+      totalActive: activeDays,
+      totalInactive: inactiveDays,
+      avgActivePercentage,
+      municipalityCount: ipatrollerData.length
+    };
+  };
+
+  // Report generation functions (matching exact data structures)
+  const generateIPatrollerSummaryReport = () => {
+    const paperConfig = getPaperConfig(paperSize);
+    const doc = new jsPDF('p', 'mm', paperConfig.format);
+    
+    // Header with better formatting
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('Top Performers Ranking Report', 20, 30);
+    doc.text('I-Patroller Summary Report', paperConfig.margin, 30);
     
-    // Date and filters
-    doc.setFontSize(12);
+    // Paper size indicator
+    doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
+    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
     
-    // Performance Analysis
+    // Date and filters with better spacing
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    
+    // Overall Summary (matching I-Patroller exactly)
+    const overallSummary = calculateOverallSummary();
+    
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('Top 12 Performers Analysis', 20, 95);
+    doc.text('Overall Summary Statistics', paperConfig.margin, 100);
     
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`• Total Patrols: ${overallSummary.totalPatrols.toLocaleString()}`, paperConfig.margin, 115);
+    doc.text(`• Total Active Days: ${overallSummary.totalActive.toLocaleString()}`, paperConfig.margin, 125);
+    doc.text(`• Total Inactive Days: ${overallSummary.totalInactive.toLocaleString()}`, paperConfig.margin, 135);
+    doc.text(`• Average Active Percentage: ${overallSummary.avgActivePercentage}%`, paperConfig.margin, 145);
+    doc.text(`• Total Municipalities: ${overallSummary.municipalityCount}`, paperConfig.margin, 155);
+    
+    // Municipality Performance Table with autofit
     if (ipatrollerData && ipatrollerData.length > 0) {
       let filteredData = selectedDistrict === 'all' 
         ? ipatrollerData 
         : ipatrollerData.filter(item => item.district === selectedDistrict);
       
-      // Sort by total active days and get top 12
-      const topPerformers = [...filteredData]
-        .sort((a, b) => (b.activeDays || 0) - (a.activeDays || 0))
-        .slice(0, 12);
-      
-      const tableData = topPerformers.map((item, index) => {
-        const totalActive = item.activeDays || 0;
-        const totalInactive = item.inactiveDays || 0;
-        const activePercentage = totalActive + totalInactive > 0 
-          ? ((totalActive / (totalActive + totalInactive)) * 100).toFixed(1)
-          : '0.0';
-        
-        let status = 'Needs Improvement';
-        if (parseFloat(activePercentage) === 100) status = 'Very Satisfactory';
-        else if (parseFloat(activePercentage) >= 75) status = 'Very Good';
-        else if (parseFloat(activePercentage) >= 50) status = 'Good';
-        
-        return [
-          index + 1,
-          item.municipality || 'N/A',
-          item.district || 'N/A',
-          totalActive,
-          totalInactive,
-          `${activePercentage}%`,
-          status
-        ];
-      });
-      
-      autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', 'Total Active', 'Total Inactive', 'Active %', 'Status']],
-        body: tableData,
-        startY: 110,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [59, 130, 246], fontStyle: 'bold' },
-        columnStyles: {
-          0: { halign: 'center' },
-          3: { halign: 'center' },
-          4: { halign: 'center' },
-          5: { halign: 'center' },
-          6: { halign: 'center' }
-        }
-      });
-      
-      // Summary statistics
-      const finalY = doc.lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Summary Statistics', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      const totalMunicipalities = topPerformers.length;
-      const avgActive = topPerformers.reduce((sum, item) => sum + (item.activeDays || 0), 0) / totalMunicipalities;
-      const topPerformer = topPerformers[0];
-      
-      doc.text(`• Total Municipalities Analyzed: ${totalMunicipalities}`, 20, finalY + 15);
-      doc.text(`• Average Active Days: ${avgActive.toFixed(1)}`, 20, finalY + 25);
-      doc.text(`• Top Performer: ${topPerformer?.municipality || 'N/A'} (${topPerformer?.activeDays || 0} active days)`, 20, finalY + 35);
-      doc.text(`• Report Period: ${months[selectedMonth]} ${selectedYear}`, 20, finalY + 45);
-    }
-    
-    doc.save(`top-performers-ranking-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateSystemOverviewReport = () => {
-    const doc = new jsPDF();
-    
-    // Header
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('System Overview Report', 20, 30);
-    
-    // Date and filters
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    // System Statistics
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Complete System Statistics', 20, 95);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Total Municipalities: ${ipatrollerData?.length || 0}`, 20, 110);
-    doc.text(`Total Incidents Recorded: ${incidents?.length || 0}`, 20, 120);
-    doc.text(`Total Actions Taken: ${actionReports?.length || 0}`, 20, 130);
-    
-    // Districts breakdown
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      const districtStats = {};
-      ipatrollerData.forEach(item => {
-        if (!districtStats[item.district]) {
-          districtStats[item.district] = { count: 0, totalActive: 0, totalPatrols: 0 };
-        }
-        districtStats[item.district].count++;
-        districtStats[item.district].totalActive += item.activeDays || 0;
-        districtStats[item.district].totalPatrols += item.totalPatrols || 0;
-      });
-      
-      const tableData = Object.entries(districtStats).map(([district, stats]) => [
-        district || 'N/A',
-        stats.count,
-        stats.totalActive,
-        stats.totalPatrols,
-        `${((stats.totalActive / stats.count) || 0).toFixed(1)}`
-      ]);
-      
-      autoTable(doc, {
-        head: [['District', 'Municipalities', 'Total Active Days', 'Total Patrols', 'Avg Active/Municipality']],
-        body: tableData,
-        startY: 150,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [59, 130, 246], fontStyle: 'bold' }
-      });
-    }
-    
-    doc.save(`system-overview-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateDailyPatrolSummary = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Daily Patrol Summary Report', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Daily Patrol Counts by Municipality', 20, 95);
-    
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      const filteredData = selectedDistrict === 'all' 
-        ? ipatrollerData 
-        : ipatrollerData.filter(item => item.district === selectedDistrict);
-      
-      const tableData = filteredData.map(item => [
-        item.municipality || 'N/A',
-        item.district || 'N/A',
-        item.activeDays || 0,
-        item.inactiveDays || 0,
-        (item.activeDays || 0) + (item.inactiveDays || 0),
-        `${((item.activeDays / 31) * 100).toFixed(1)}%`
-      ]);
-      
-      autoTable(doc, {
-        head: [['Municipality', 'District', 'Active Days', 'Inactive Days', 'Total Days', 'Activity Rate']],
-        body: tableData,
-        startY: 110,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [34, 197, 94], fontStyle: 'bold' }
-      });
-      
-      // Summary
-      const finalY = doc.lastAutoTable.finalY + 20;
-      const totalActive = filteredData.reduce((sum, item) => sum + (item.activeDays || 0), 0);
-      const totalInactive = filteredData.reduce((sum, item) => sum + (item.inactiveDays || 0), 0);
-      const avgActivity = filteredData.length > 0 ? (totalActive / (totalActive + totalInactive) * 100).toFixed(1) : 0;
-      
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Summary', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`• Total Active Days: ${totalActive}`, 20, finalY + 15);
-      doc.text(`• Total Inactive Days: ${totalInactive}`, 20, finalY + 25);
-      doc.text(`• Overall Activity Rate: ${avgActivity}%`, 20, finalY + 35);
-    }
-    
-    doc.save(`daily-patrol-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateMonthlyPerformance = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Monthly Performance Analysis', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Analysis Period: ${months[selectedMonth]} ${selectedYear}`, 20, 55);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 65);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Performance Metrics', 20, 85);
-    
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      const filteredData = selectedDistrict === 'all' 
-        ? ipatrollerData 
-        : ipatrollerData.filter(item => item.district === selectedDistrict);
-      
       const tableData = filteredData.map(item => {
-        const totalActive = item.activeDays || 0;
-        const totalInactive = item.inactiveDays || 0;
-        const totalDays = totalActive + totalInactive;
-        const efficiency = totalDays > 0 ? ((totalActive / totalDays) * 100).toFixed(1) : '0.0';
-        
-        let performance = 'Poor';
-        if (parseFloat(efficiency) >= 80) performance = 'Excellent';
-        else if (parseFloat(efficiency) >= 65) performance = 'Good';
-        else if (parseFloat(efficiency) >= 50) performance = 'Average';
+        const stats = calculatePatrolStats(item.data);
+        const totalDays = stats.activeDays + stats.inactiveDays;
+        const activePercentage = totalDays > 0 ? Math.round((stats.activeDays / totalDays) * 100) : 0;
         
         return [
           item.municipality || 'N/A',
           item.district || 'N/A',
-          totalActive,
-          totalDays,
-          `${efficiency}%`,
-          performance
+          stats.totalPatrols.toString(),
+          stats.activeDays.toString(),
+          stats.inactiveDays.toString(),
+          `${activePercentage}%`
         ];
       });
       
       autoTable(doc, {
-        head: [['Municipality', 'District', 'Active Days', 'Total Days', 'Efficiency', 'Performance']],
+        head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
         body: tableData,
-        startY: 100,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [34, 197, 94], fontStyle: 'bold' }
-      });
-    }
-    
-    doc.save(`monthly-performance-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateDistrictComparison = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('District Performance Comparison', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Cross-District Performance Analysis', 20, 85);
-    
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      const districtStats = {};
-      ipatrollerData.forEach(item => {
-        if (!districtStats[item.district]) {
-          districtStats[item.district] = { 
-            municipalities: 0, 
-            totalActive: 0, 
-            totalInactive: 0,
-            totalPatrols: 0 
-          };
+        startY: 175,
+        styles: { 
+          fontSize: paperSize === 'long' ? 10 : 9, 
+          cellPadding: 4,
+          overflow: 'linebreak',
+          halign: 'left'
+        },
+        headStyles: { 
+          fillColor: [59, 130, 246], 
+          fontStyle: 'bold',
+          textColor: [255, 255, 255],
+          fontSize: paperSize === 'long' ? 11 : 10
+        },
+        columnStyles: getColumnWidths(paperSize, 'ipatroller'),
+        margin: { left: paperConfig.margin, right: paperConfig.margin },
+        tableWidth: 'auto',
+        showHead: 'everyPage',
+        pageBreak: 'auto',
+        didDrawPage: function (data) {
+          // Add page numbers
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.setFontSize(8);
+          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
         }
-        districtStats[item.district].municipalities++;
-        districtStats[item.district].totalActive += item.activeDays || 0;
-        districtStats[item.district].totalInactive += item.inactiveDays || 0;
-        districtStats[item.district].totalPatrols += item.totalPatrols || 0;
       });
-      
-      const tableData = Object.entries(districtStats).map(([district, stats]) => {
-        const totalDays = stats.totalActive + stats.totalInactive;
-        const avgEfficiency = totalDays > 0 ? ((stats.totalActive / totalDays) * 100).toFixed(1) : '0.0';
-        const avgActivePerMunicipality = (stats.totalActive / stats.municipalities).toFixed(1);
-        
-        return [
-          district || 'N/A',
-          stats.municipalities,
-          stats.totalActive,
-          stats.totalInactive,
-          `${avgEfficiency}%`,
-          avgActivePerMunicipality
-        ];
-      });
-      
-      autoTable(doc, {
-        head: [['District', 'Municipalities', 'Total Active', 'Total Inactive', 'Efficiency', 'Avg Active/Municipality']],
-        body: tableData,
-        startY: 100,
-        styles: { fontSize: 8, cellPadding: 4 },
-        headStyles: { fillColor: [34, 197, 94], fontStyle: 'bold' }
-      });
+    } else {
+      // No data message
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'italic');
+      doc.text('No patrol data available for the selected period.', paperConfig.margin, 175);
     }
     
-    doc.save(`district-comparison-${months[selectedMonth]}-${selectedYear}.pdf`);
+    doc.save(`ipatroller-summary-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  const generateCrimeAnalysis = () => {
-    const doc = new jsPDF();
+  // Action Center Report (matching Action Center data structure)
+  const generateActionCenterReport = () => {
+    const paperConfig = getPaperConfig(paperSize);
+    const doc = new jsPDF('p', 'mm', paperConfig.format);
     
+    // Header with better formatting
     doc.setFontSize(20);
     doc.setFont('helvetica', 'bold');
-    doc.text('Crime Analysis Report', 20, 30);
+    doc.text('Action Center Report', paperConfig.margin, 30);
     
+    // Paper size indicator
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
+    
+    // Date and filters with better spacing
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Analysis Period: ${months[selectedMonth]} ${selectedYear}`, 20, 55);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 65);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    
+    // Filter action reports by date and district
+    let filteredActions = actionReports || [];
+    if (selectedMonth !== 'all' && selectedYear !== 'all') {
+      filteredActions = filteredActions.filter(action => {
+        const actionDate = new Date(action.when);
+        return actionDate.getMonth() === selectedMonth && actionDate.getFullYear() === selectedYear;
+      });
+    }
+    if (selectedDistrict !== 'all') {
+      filteredActions = filteredActions.filter(action => action.district === selectedDistrict);
+    }
+    
+    // Department breakdown
+    const departmentStats = {};
+    filteredActions.forEach(action => {
+      const dept = action.department || 'Unknown';
+      if (!departmentStats[dept]) {
+        departmentStats[dept] = { count: 0, pending: 0, resolved: 0 };
+      }
+      departmentStats[dept].count++;
+      if (action.status === 'pending') departmentStats[dept].pending++;
+      if (action.status === 'resolved') departmentStats[dept].resolved++;
+    });
     
     doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Crime Statistics and Patterns', 20, 85);
+      doc.setFont('helvetica', 'bold');
+    doc.text('Department Statistics', paperConfig.margin, 100);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+    doc.text(`Total Action Reports: ${filteredActions.length}`, paperConfig.margin, 115);
     
-    if (incidents && incidents.length > 0) {
-      let filteredIncidents = incidents.filter(incident => {
+    // Department breakdown table with autofit
+    if (Object.keys(departmentStats).length > 0) {
+      const tableData = Object.entries(departmentStats).map(([dept, stats]) => [
+        dept.toUpperCase(),
+        stats.count.toString(),
+        stats.pending.toString(),
+        stats.resolved.toString(),
+        `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
+      ]);
+      
+      autoTable(doc, {
+        head: [['Department', 'Total Reports', 'Pending', 'Resolved', 'Resolution Rate']],
+        body: tableData,
+        startY: 135,
+        styles: { 
+          fontSize: paperSize === 'long' ? 10 : 9, 
+          cellPadding: 4,
+          overflow: 'linebreak',
+          halign: 'left'
+        },
+        headStyles: { 
+          fillColor: [147, 51, 234], 
+          fontStyle: 'bold',
+          textColor: [255, 255, 255],
+          fontSize: paperSize === 'long' ? 11 : 10
+        },
+        columnStyles: getColumnWidths(paperSize, 'action'),
+        margin: { left: paperConfig.margin, right: paperConfig.margin },
+        tableWidth: 'auto',
+        showHead: 'everyPage',
+        pageBreak: 'auto',
+        didDrawPage: function (data) {
+          // Add page numbers
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.setFontSize(8);
+          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+        }
+      });
+    } else {
+      // No data message
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'italic');
+      doc.text('No action reports available for the selected period.', paperConfig.margin, 135);
+    }
+    
+    doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+  };
+
+  // Incidents Report (matching Incidents Reports data structure)
+  const generateIncidentsReport = () => {
+    const paperConfig = getPaperConfig(paperSize);
+    const doc = new jsPDF('p', 'mm', paperConfig.format);
+    
+    // Header with better formatting
+    doc.setFontSize(20);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Incidents Report', paperConfig.margin, 30);
+    
+    // Paper size indicator
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
+    
+    // Date and filters with better spacing
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    
+    // Filter incidents by date and district
+    let filteredIncidents = incidents || [];
+    if (selectedMonth !== 'all' && selectedYear !== 'all') {
+      filteredIncidents = filteredIncidents.filter(incident => {
         const incidentDate = new Date(incident.date);
-        const matchesMonth = incidentDate.getMonth() === selectedMonth && incidentDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || incident.district === selectedDistrict;
-        return matchesMonth && matchesDistrict;
+        return incidentDate.getMonth() === selectedMonth && incidentDate.getFullYear() === selectedYear;
       });
+    }
+    if (selectedDistrict !== 'all') {
+      filteredIncidents = filteredIncidents.filter(incident => incident.district === selectedDistrict);
+    }
       
-      // Crime type analysis
-      const crimeTypes = {};
+    // Incident type breakdown
+    const incidentTypeStats = {};
       filteredIncidents.forEach(incident => {
-        const type = incident.incidentType || 'Unknown';
-        crimeTypes[type] = (crimeTypes[type] || 0) + 1;
-      });
+      const type = incident.incidentType || 'Unknown';
+      if (!incidentTypeStats[type]) {
+        incidentTypeStats[type] = { count: 0, active: 0, resolved: 0 };
+      }
+      incidentTypeStats[type].count++;
+      if (incident.status === 'Active') incidentTypeStats[type].active++;
+      if (incident.status === 'Resolved') incidentTypeStats[type].resolved++;
+    });
+    
+    doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+    doc.text('Incident Statistics', paperConfig.margin, 100);
       
-      const crimeTableData = Object.entries(crimeTypes)
-        .sort(([,a], [,b]) => b - a)
-        .map(([type, count]) => [
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+    doc.text(`Total Incidents: ${filteredIncidents.length}`, paperConfig.margin, 115);
+    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, paperConfig.margin, 125);
+    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, paperConfig.margin, 135);
+    
+    // Incident type breakdown table with autofit
+    if (Object.keys(incidentTypeStats).length > 0) {
+      const tableData = Object.entries(incidentTypeStats)
+        .sort(([,a], [,b]) => b.count - a.count)
+        .map(([type, stats]) => [
           type,
-          count,
-          `${((count / filteredIncidents.length) * 100).toFixed(1)}%`
-        ]);
-      
-      autoTable(doc, {
-        head: [['Crime Type', 'Count', 'Percentage']],
-        body: crimeTableData,
-        startY: 100,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [239, 68, 68], fontStyle: 'bold' }
-      });
-      
-      // Summary statistics
-      const finalY = doc.lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Analysis Summary', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      const activeIncidents = filteredIncidents.filter(i => i.status === 'Active').length;
-      const resolvedIncidents = filteredIncidents.filter(i => i.status === 'Resolved').length;
-      const mostCommonCrime = Object.entries(crimeTypes).sort(([,a], [,b]) => b - a)[0];
-      
-      doc.text(`• Total Incidents: ${filteredIncidents.length}`, 20, finalY + 15);
-      doc.text(`• Active Cases: ${activeIncidents}`, 20, finalY + 25);
-      doc.text(`• Resolved Cases: ${resolvedIncidents}`, 20, finalY + 35);
-      doc.text(`• Most Common: ${mostCommonCrime ? mostCommonCrime[0] : 'N/A'} (${mostCommonCrime ? mostCommonCrime[1] : 0} cases)`, 20, finalY + 45);
-    }
-    
-    doc.save(`crime-analysis-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateIncidentSummary = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Incident Summary Report', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Detailed Incident Logs and Status', 20, 95);
-    
-    if (incidents && incidents.length > 0) {
-      let filteredIncidents = incidents.filter(incident => {
-        const incidentDate = new Date(incident.date);
-        const matchesMonth = incidentDate.getMonth() === selectedMonth && incidentDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || incident.district === selectedDistrict;
-        return matchesMonth && matchesDistrict;
-      });
-      
-      const tableData = filteredIncidents.map(incident => [
-        incident.incidentType || 'N/A',
-        incident.date || 'N/A',
-        incident.time || 'N/A',
-        incident.location || 'N/A',
-        incident.municipality || 'N/A',
-        incident.status || 'N/A',
-        incident.officer || 'N/A'
+          stats.count.toString(),
+          stats.active.toString(),
+          stats.resolved.toString(),
+          `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
       ]);
       
       autoTable(doc, {
-        head: [['Type', 'Date', 'Time', 'Location', 'Municipality', 'Status', 'Officer']],
+        head: [['Incident Type', 'Total', 'Active', 'Resolved', 'Resolution Rate']],
         body: tableData,
-        startY: 110,
-        styles: { fontSize: 7, cellPadding: 2 },
-        headStyles: { fillColor: [239, 68, 68], fontStyle: 'bold' },
-        columnStyles: {
-          0: { cellWidth: 25 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 15 },
-          3: { cellWidth: 30 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 20 },
-          6: { cellWidth: 25 }
+        startY: 155,
+        styles: { 
+          fontSize: paperSize === 'long' ? 10 : 9, 
+          cellPadding: 4,
+          overflow: 'linebreak',
+          halign: 'left'
+        },
+        headStyles: { 
+          fillColor: [239, 68, 68], 
+          fontStyle: 'bold',
+          textColor: [255, 255, 255],
+          fontSize: paperSize === 'long' ? 11 : 10
+        },
+        columnStyles: getColumnWidths(paperSize, 'incidents'),
+        margin: { left: paperConfig.margin, right: paperConfig.margin },
+        tableWidth: 'auto',
+        showHead: 'everyPage',
+        pageBreak: 'auto',
+        didDrawPage: function (data) {
+          // Add page numbers
+          const pageCount = doc.internal.getNumberOfPages();
+          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+          doc.setFontSize(8);
+          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
         }
       });
-    }
-    
-    doc.save(`incident-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
-
-  const generateMonthlyTrends = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Monthly Incident Trends Analysis', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Analysis Month: ${months[selectedMonth]} ${selectedYear}`, 20, 55);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 65);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Incident Type Trends and Patterns', 20, 85);
-    
-    if (incidents && incidents.length > 0) {
-      let filteredIncidents = incidents.filter(incident => {
-        const incidentDate = new Date(incident.date);
-        const matchesMonth = incidentDate.getMonth() === selectedMonth && incidentDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || incident.district === selectedDistrict;
-        return matchesMonth && matchesDistrict;
-      });
-      
-      // District breakdown
-      const districtBreakdown = {};
-      filteredIncidents.forEach(incident => {
-        const district = incident.district || 'Unknown';
-        if (!districtBreakdown[district]) {
-          districtBreakdown[district] = { total: 0, active: 0, resolved: 0 };
-        }
-        districtBreakdown[district].total++;
-        if (incident.status === 'Active') districtBreakdown[district].active++;
-        if (incident.status === 'Resolved') districtBreakdown[district].resolved++;
-      });
-      
-      const trendTableData = Object.entries(districtBreakdown).map(([district, stats]) => [
-        district,
-        stats.total,
-        stats.active,
-        stats.resolved,
-        `${((stats.resolved / stats.total) * 100).toFixed(1)}%`
-      ]);
-      
-      autoTable(doc, {
-        head: [['District', 'Total Incidents', 'Active', 'Resolved', 'Resolution Rate']],
-        body: trendTableData,
-        startY: 100,
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [239, 68, 68], fontStyle: 'bold' }
-      });
-      
-      // Trend analysis
-      const finalY = doc.lastAutoTable.finalY + 20;
+    } else {
+      // No data message
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Trend Analysis', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      const totalIncidents = filteredIncidents.length;
-      const resolutionRate = filteredIncidents.length > 0 ? 
-        ((filteredIncidents.filter(i => i.status === 'Resolved').length / totalIncidents) * 100).toFixed(1) : '0.0';
-      
-      doc.text(`• Total Monthly Incidents: ${totalIncidents}`, 20, finalY + 15);
-      doc.text(`• Overall Resolution Rate: ${resolutionRate}%`, 20, finalY + 25);
-      doc.text(`• Peak Activity Period: ${months[selectedMonth]} ${selectedYear}`, 20, finalY + 35);
+      doc.setFont('helvetica', 'italic');
+      doc.text('No incidents available for the selected period.', paperConfig.margin, 155);
     }
     
-    doc.save(`monthly-trends-${months[selectedMonth]}-${selectedYear}.pdf`);
+    doc.save(`incidents-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  const generatePNPActions = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PNP Action Reports', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Police Enforcement and Action Activities', 20, 95);
-    
-    if (actionReports && actionReports.length > 0) {
-      let filteredActions = actionReports.filter(action => {
-        const actionDate = new Date(action.when);
-        const matchesMonth = actionDate.getMonth() === selectedMonth && actionDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || action.district === selectedDistrict;
-        const isPNP = action.department === 'pnp';
-        return matchesMonth && matchesDistrict && isPNP;
-      });
-      
-      const tableData = filteredActions.map(action => [
-        action.municipality || 'N/A',
-        action.district || 'N/A',
-        action.what || 'N/A',
-        action.where || 'N/A',
-        action.actionTaken || 'N/A',
-        action.status || 'N/A'
-      ]);
-      
-      autoTable(doc, {
-        head: [['Municipality', 'District', 'What', 'Where', 'Action Taken', 'Status']],
-        body: tableData,
-        startY: 110,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [147, 51, 234], fontStyle: 'bold' }
-      });
-      
-      // Summary
-      const finalY = doc.lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PNP Summary', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`• Total PNP Actions: ${filteredActions.length}`, 20, finalY + 15);
-      doc.text(`• Active Cases: ${filteredActions.filter(a => a.status === 'Active').length}`, 20, finalY + 25);
-      doc.text(`• Resolved Cases: ${filteredActions.filter(a => a.status === 'Resolved').length}`, 20, finalY + 35);
-    }
-    
-    doc.save(`pnp-actions-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
 
-  const generateAgricultureActions = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Agriculture Department Reports', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Agricultural Enforcement Reports', 20, 95);
-    
-    if (actionReports && actionReports.length > 0) {
-      let filteredActions = actionReports.filter(action => {
-        const actionDate = new Date(action.when);
-        const matchesMonth = actionDate.getMonth() === selectedMonth && actionDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || action.district === selectedDistrict;
-        const isAgriculture = action.department === 'agriculture';
-        return matchesMonth && matchesDistrict && isAgriculture;
-      });
-      
-      const tableData = filteredActions.map(action => [
-        action.municipality || 'N/A',
-        action.district || 'N/A',
-        action.what || 'N/A',
-        action.where || 'N/A',
-        action.actionTaken || 'N/A',
-        action.status || 'N/A'
-      ]);
-      
-      autoTable(doc, {
-        head: [['Municipality', 'District', 'What', 'Where', 'Action Taken', 'Status']],
-        body: tableData,
-        startY: 110,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [147, 51, 234], fontStyle: 'bold' }
-      });
-      
-      // Summary
-      const finalY = doc.lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Agriculture Department Summary', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`• Total Agriculture Actions: ${filteredActions.length}`, 20, finalY + 15);
-      doc.text(`• Active Cases: ${filteredActions.filter(a => a.status === 'Active').length}`, 20, finalY + 25);
-      doc.text(`• Resolved Cases: ${filteredActions.filter(a => a.status === 'Resolved').length}`, 20, finalY + 35);
-    }
-    
-    doc.save(`agriculture-actions-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
 
-  const generateENROActions = () => {
-    const doc = new jsPDF();
-    
-    doc.setFontSize(20);
-    doc.setFont('helvetica', 'bold');
-    doc.text('PG-ENRO Action Reports', 20, 30);
-    
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 20, 45);
-    doc.text(`Month: ${months[selectedMonth]}`, 20, 55);
-    doc.text(`Year: ${selectedYear}`, 20, 65);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, 20, 75);
-    
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Environmental Regulation Actions', 20, 95);
-    
-    if (actionReports && actionReports.length > 0) {
-      let filteredActions = actionReports.filter(action => {
-        const actionDate = new Date(action.when);
-        const matchesMonth = actionDate.getMonth() === selectedMonth && actionDate.getFullYear() === selectedYear;
-        const matchesDistrict = selectedDistrict === 'all' || action.district === selectedDistrict;
-        const isENRO = action.department === 'pg-enro';
-        return matchesMonth && matchesDistrict && isENRO;
-      });
-      
-      const tableData = filteredActions.map(action => [
-        action.municipality || 'N/A',
-        action.district || 'N/A',
-        action.what || 'N/A',
-        action.where || 'N/A',
-        action.actionTaken || 'N/A',
-        action.status || 'N/A'
-      ]);
-      
-      autoTable(doc, {
-        head: [['Municipality', 'District', 'What', 'Where', 'Action Taken', 'Status']],
-        body: tableData,
-        startY: 110,
-        styles: { fontSize: 8, cellPadding: 3 },
-        headStyles: { fillColor: [147, 51, 234], fontStyle: 'bold' }
-      });
-      
-      // Summary
-      const finalY = doc.lastAutoTable.finalY + 20;
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('PG-ENRO Summary', 20, finalY);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`• Total ENRO Actions: ${filteredActions.length}`, 20, finalY + 15);
-      doc.text(`• Active Cases: ${filteredActions.filter(a => a.status === 'Active').length}`, 20, finalY + 25);
-      doc.text(`• Resolved Cases: ${filteredActions.filter(a => a.status === 'Resolved').length}`, 20, finalY + 35);
-    }
-    
-    doc.save(`enro-actions-${months[selectedMonth]}-${selectedYear}.pdf`);
-  };
 
-  const generateAllReports = () => {
+
+
+
+
+
+
+
+
+
+  const generateAllReports = async () => {
     setIsGenerating(true);
     
     try {
-      // Generate all specific reports with a slight delay between each
-      setTimeout(() => generateTopPerformersReport(), 100);
-      setTimeout(() => generateSystemOverviewReport(), 200);
-      setTimeout(() => generateDailyPatrolSummary(), 300);
-      setTimeout(() => generateMonthlyPerformance(), 400);
-      setTimeout(() => generateDistrictComparison(), 500);
-      setTimeout(() => generateCrimeAnalysis(), 600);
-      setTimeout(() => generateIncidentSummary(), 700);
-      setTimeout(() => generateMonthlyTrends(), 800);
-      setTimeout(() => generatePNPActions(), 900);
-      setTimeout(() => generateAgricultureActions(), 1000);
-      setTimeout(() => generateENROActions(), 1100);
+      // Generate all specific reports with proper error handling
+      const reportFunctions = [
+        { name: 'I-Patroller Summary', func: generateIPatrollerSummaryReport },
+        { name: 'Action Center Report', func: generateActionCenterReport },
+        { name: 'Incidents Report', func: generateIncidentsReport }
+      ];
+
+      let successCount = 0;
+      let errorCount = 0;
+
+      for (let i = 0; i < reportFunctions.length; i++) {
+        try {
+          await new Promise(resolve => setTimeout(resolve, 200)); // Small delay between reports
+          reportFunctions[i].func();
+          successCount++;
+        } catch (error) {
+          console.error(`Error generating ${reportFunctions[i].name}:`, error);
+          errorCount++;
+        }
+      }
       
-      // Show success message
-      setTimeout(() => {
-        alert('All 11 reports generated successfully! Check your downloads folder.');
-        setIsGenerating(false);
-      }, 1500);
+      // Show success message with details
+      if (errorCount === 0) {
+        alert(`All ${successCount} reports generated successfully! Check your downloads folder.`);
+      } else {
+        alert(`${successCount} reports generated successfully, ${errorCount} failed. Check console for details.`);
+      }
     } catch (error) {
       console.error('Error generating reports:', error);
       alert('Error generating reports. Please try again.');
+    } finally {
       setIsGenerating(false);
     }
   };
 
-  // Main report sections
+  // Main report sections (matching exact data from each page)
   const reportSections = [
     {
-      id: "dashboard",
-      title: "Dashboard Reports",
-      description: "Analytics and performance reports",
-      icon: <BarChart3 className="w-6 h-6" />,
+      id: "ipatroller",
+      title: "I-Patroller Reports",
+      description: "Patrol data and performance reports matching I-Patroller page",
+      icon: <Shield className="w-6 h-6" />,
       color: "from-blue-500 to-blue-600",
       reports: [
         {
-          name: "Top Performers Ranking",
-          description: "Municipality performance rankings with metrics",
-          action: generateTopPerformersReport,
+          name: "I-Patroller Summary",
+          description: "Complete patrol statistics matching I-Patroller page exactly",
+          action: generateIPatrollerSummaryReport,
           formats: ["PDF"],
           priority: "high"
-        },
-        {
-          name: "System Overview",
-          description: "Complete system statistics and trends",
-          action: generateSystemOverviewReport,
-          formats: ["PDF"],
-          priority: "medium"
         }
       ]
     },
     {
-      id: "patrol",
-      title: "Patrol Reports",
-      description: "Daily and monthly patrol data reports",
-      icon: <Shield className="w-6 h-6" />,
-      color: "from-emerald-500 to-emerald-600",
+      id: "actioncenter",
+      title: "Action Center Reports",
+      description: "Department action reports matching Action Center page",
+      icon: <Target className="w-6 h-6" />,
+      color: "from-purple-500 to-purple-600",
       reports: [
         {
-          name: "Daily Patrol Summary",
-          description: "Daily patrol counts by municipality",
-          action: generateDailyPatrolSummary,
+          name: "Action Center Report",
+          description: "Department statistics and action reports matching Action Center page",
+          action: generateActionCenterReport,
           formats: ["PDF"],
           priority: "high"
-        },
-        {
-          name: "Monthly Performance",
-          description: "Monthly patrol performance analysis",
-          action: generateMonthlyPerformance,
-          formats: ["PDF"],
-          priority: "medium"
-        },
-        {
-          name: "District Comparison",
-          description: "Compare performance across districts",
-          action: generateDistrictComparison,
-          formats: ["PDF"],
-          priority: "low"
         }
       ]
     },
     {
       id: "incidents",
-      title: "Incident Reports",
-      description: "Crime and incident analysis reports",
+      title: "Incidents Reports",
+      description: "Incident analysis reports matching Incidents Reports page",
       icon: <AlertTriangle className="w-6 h-6" />,
       color: "from-red-500 to-red-600",
       reports: [
         {
-          name: "Crime Analysis",
-          description: "Comprehensive crime statistics and patterns",
-          action: generateCrimeAnalysis,
+          name: "Incidents Report",
+          description: "Incident statistics and analysis matching Incidents Reports page",
+          action: generateIncidentsReport,
           formats: ["PDF"],
           priority: "high"
-        },
-        {
-          name: "Incident Summary",
-          description: "Detailed incident logs and status",
-          action: generateIncidentSummary,
-          formats: ["PDF"],
-          priority: "high"
-        },
-        {
-          name: "Monthly Trends",
-          description: "Monthly incident type analysis",
-          action: generateMonthlyTrends,
-          formats: ["PDF"],
-          priority: "medium"
-        }
-      ]
-    },
-    {
-      id: "actions",
-      title: "Action Center Reports",
-      description: "Department action and enforcement reports",
-      icon: <Target className="w-6 h-6" />,
-      color: "from-purple-500 to-purple-600",
-      reports: [
-        {
-          name: "PNP Actions",
-          description: "Police enforcement and action reports",
-          action: generatePNPActions,
-          formats: ["PDF"],
-          priority: "high"
-        },
-        {
-          name: "Agriculture Actions",
-          description: "Agricultural enforcement reports",
-          action: generateAgricultureActions,
-          formats: ["PDF"],
-          priority: "medium"
-        },
-        {
-          name: "ENRO Actions",
-          description: "Environmental regulation actions",
-          action: generateENROActions,
-          formats: ["PDF"],
-          priority: "medium"
         }
       ]
     }
@@ -944,6 +676,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
            );
   });
 
+  // Show loading state while data is being fetched
+  if (dataLoading) {
+    return (
+      <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600 text-lg">Loading report data...</p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
+
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
@@ -958,10 +704,37 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               Generate comprehensive reports across all system modules. Select your report type, apply filters, and export in your preferred format.
             </p>
             
+            {/* Paper Size Indicator */}
+            <div className="bg-white rounded-lg shadow-md p-4 mb-6 max-w-md mx-auto">
+              <div className="flex items-center justify-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-medium text-gray-700">Paper Size</p>
+                  <p className="text-lg font-bold text-blue-600">
+                    {paperSize === 'short' ? 'Short Bond (Letter)' : 'Long Bond (Legal)'}
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Data availability warning */}
+            {(!ipatrollerData || ipatrollerData.length === 0) && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
+                <div className="flex items-center">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+                  <p className="text-yellow-800 text-sm">
+                    <strong>Note:</strong> No patrol data found for the current period. Some reports may show limited information.
+                  </p>
+                </div>
+              </div>
+            )}
+            
             <Button
               onClick={generateAllReports}
               disabled={isGenerating}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl"
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50"
             >
               {isGenerating ? (
                 <>
@@ -977,19 +750,19 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </Button>
           </div>
 
-          {/* Quick Stats */}
+          {/* Quick Stats - Matching exact data from each page */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Total Reports</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {reportSections.reduce((sum, section) => sum + section.reports.length, 0)}
+                    <p className="text-sm font-medium text-gray-500 mb-1">Total Patrols</p>
+                    <p className="text-3xl font-bold text-blue-600">
+                      {calculateOverallSummary().totalPatrols.toLocaleString()}
                     </p>
                   </div>
                   <div className="p-3 bg-blue-100 rounded-xl">
-                    <FileText className="w-8 h-8 text-blue-600" />
+                    <Shield className="w-8 h-8 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
@@ -999,13 +772,64 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Patrol Data</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {ipatrollerData?.length || 0}
+                    <p className="text-sm font-medium text-gray-500 mb-1">Active Days</p>
+                    <p className="text-3xl font-bold text-green-600">
+                      {calculateOverallSummary().totalActive.toLocaleString()}
                     </p>
                   </div>
                   <div className="p-3 bg-green-100 rounded-xl">
-                    <Shield className="w-8 h-8 text-green-600" />
+                    <CheckCircle2 className="w-8 h-8 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Inactive Days</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {calculateOverallSummary().totalInactive.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-red-100 rounded-xl">
+                    <XCircle className="w-8 h-8 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Avg Active %</p>
+                    <p className="text-3xl font-bold text-purple-600">
+                      {calculateOverallSummary().avgActivePercentage}%
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <Target className="w-8 h-8 text-purple-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Additional Stats Row */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Action Reports</p>
+                    <p className="text-3xl font-bold text-gray-900">
+                      {actionReports?.length || 0}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <Target className="w-8 h-8 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
@@ -1031,13 +855,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Actions</p>
+                    <p className="text-sm font-medium text-gray-500 mb-1">Municipalities</p>
                     <p className="text-3xl font-bold text-gray-900">
-                      {actionReports?.length || 0}
+                      {calculateOverallSummary().municipalityCount}
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <Target className="w-8 h-8 text-purple-600" />
+                  <div className="p-3 bg-blue-100 rounded-xl">
+                    <Building2 className="w-8 h-8 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
@@ -1097,6 +921,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                           {district === "all" ? "All Districts" : district}
                         </option>
                       ))}
+                    </select>
+                  </div>
+                  
+                  <div className="flex flex-col gap-1">
+                    <label className="text-xs font-medium text-gray-600">Paper Size</label>
+                    <select
+                      value={paperSize}
+                      onChange={(e) => setPaperSize(e.target.value)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                    >
+                      <option value="short">Short Bond (Letter)</option>
+                      <option value="long">Long Bond (Legal)</option>
                     </select>
                   </div>
                 </div>
