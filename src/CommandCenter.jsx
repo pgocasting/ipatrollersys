@@ -1944,69 +1944,69 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               )}
               
               <div className="p-4 md:p-6 pt-0">
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="w-full">
+                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+                  <table className="w-full min-w-[1200px]">
                     <thead>
-                      <tr className="bg-gradient-to-r from-green-50 to-blue-50 border-b border-gray-200">
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-white/50">DATE</th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-white/50">
+                      <tr className="bg-white border-b-2 border-gray-300">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
                           <div className="flex items-center gap-2">
                             <MapPinIcon className="h-4 w-4 text-blue-500" />
                             BARANGAY
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-white/50">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
                             CONCERN TYPE
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 bg-white/50" colSpan="4">
+                        <th className="px-4 py-4 text-center text-sm font-bold text-gray-800 border-r border-gray-200" colSpan="4">
                           <div className="flex items-center justify-center gap-2">
                             <BarChart3 className="h-4 w-4 text-purple-500" />
                             WEEKLY REPORT
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-white/50">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             ACTION TAKEN
                           </div>
                         </th>
-                        <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 bg-white/50">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800">
                           <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4 text-gray-500" />
                             REMARKS
                           </div>
                         </th>
                       </tr>
-                      <tr className="bg-gray-50/50 border-b border-gray-200">
-                        <th className="px-4 py-2"></th>
-                        <th className="px-4 py-2"></th>
-                        <th className="px-4 py-2"></th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-white bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-t-lg">
+                      <tr className="bg-gray-100 border-b border-gray-300">
+                        <th className="px-4 py-3 border-r border-gray-200"></th>
+                        <th className="px-4 py-3 border-r border-gray-200"></th>
+                        <th className="px-4 py-3 border-r border-gray-200"></th>
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200">
                           <div className="font-bold">Week 1</div>
-                          <div className="text-xs opacity-90">Jan 1-7</div>
+                          <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
                         </th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-white bg-gradient-to-r from-green-400 to-green-500 rounded-t-lg">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200">
                           <div className="font-bold">Week 2</div>
-                          <div className="text-xs opacity-90">Jan 8-14</div>
+                          <div className="text-xs opacity-90">{selectedMonth} 8-14</div>
                         </th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-white bg-gradient-to-r from-blue-400 to-blue-500 rounded-t-lg">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200">
                           <div className="font-bold">Week 3</div>
-                          <div className="text-xs opacity-90">Jan 15-21</div>
+                          <div className="text-xs opacity-90">{selectedMonth} 15-21</div>
                         </th>
-                        <th className="px-4 py-2 text-center text-xs font-medium text-white bg-gradient-to-r from-purple-400 to-purple-500 rounded-t-lg">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200">
                           <div className="font-bold">Week 4</div>
-                          <div className="text-xs opacity-90">Jan 22-31</div>
+                          <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
                         </th>
-                        <th className="px-4 py-2"></th>
-                        <th className="px-4 py-2"></th>
+                        <th className="px-4 py-3 border-r border-gray-200"></th>
+                        <th className="px-4 py-3"></th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-200 bg-white">
                       {currentDates.map((date, index) => {
                         const weekNumber = getWeekNumber(date);
                         const isWeekend = index % 7 >= 5; // Saturday and Sunday
@@ -2016,7 +2016,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           <React.Fragment key={index}>
                             {dateEntries.length === 0 ? (
                               // Empty row when no entries
-                              <tr className={`hover:bg-gray-50/50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50/30' : ''}`}>
+                              <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
                                 <td className="px-4 py-3 text-sm font-medium text-gray-700 bg-white/30">
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-3 w-3 text-gray-400" />
@@ -2025,7 +2025,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 </td>
                                 <td className="px-4 py-3">
                                   <select 
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -2048,7 +2048,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 </td>
                                 <td className="px-4 py-3">
                                   <select 
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -2079,7 +2079,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -2095,7 +2095,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -2111,7 +2111,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -2127,7 +2127,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -2141,7 +2141,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 <td className="px-4 py-3">
                                   <input 
                                     type="text" 
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
                                     placeholder="Action taken..."
                                     value=""
                                     onChange={(e) => {
@@ -2155,7 +2155,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 <td className="px-4 py-3">
                                   <input 
                                     type="text" 
-                                    className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
                                     placeholder="Add remarks..."
                                     value=""
                                     onChange={(e) => {
@@ -2170,7 +2170,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                             ) : (
                               // Render existing entries
                               dateEntries.map((entry, entryIndex) => (
-                                <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50/50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50/30' : ''}`}>
+                                <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
                                   {entryIndex === 0 && (
                                     <td className="px-4 py-3 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
                                       <div className="flex items-center gap-2">
@@ -2182,7 +2182,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <select 
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                                         value={entry.barangay}
                                         onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
                                       >
@@ -2208,7 +2208,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                   </td>
                                   <td className="px-4 py-3">
                                     <select 
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
                                       value={entry.concernType}
                                       onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
                                     >
@@ -2245,7 +2245,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium"
                                       placeholder="0"
                                       value={entry.week2}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
@@ -2256,7 +2256,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium"
                                       placeholder="0"
                                       value={entry.week3}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
@@ -2267,7 +2267,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium"
                                       placeholder="0"
                                       value={entry.week4}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
@@ -2276,7 +2276,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                   <td className="px-4 py-3">
                                     <input 
                                       type="text" 
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
                                       placeholder="Action taken..."
                                       value={entry.actionTaken}
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
@@ -2285,7 +2285,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                   <td className="px-4 py-3">
                                     <input 
                                       type="text" 
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-transparent bg-white shadow-sm transition-all duration-200"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
                                       placeholder="Add remarks..."
                                       value={entry.remarks}
                                       onChange={(e) => updateDateData(date, entryIndex, 'remarks', e.target.value)}
@@ -2295,14 +2295,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                               ))
                             )}
                             {/* Add new entry button */}
-                            <tr className={`${isWeekend ? 'bg-blue-50/30' : 'bg-gray-50/50'}`}>
-                              <td colSpan="9" className="px-4 py-2 text-center">
+                            <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
+                              <td colSpan="9" className="px-4 py-3 text-center">
                                 <button
                                   onClick={() => addDateEntry(date)}
-                                  className="px-3 py-1 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors duration-200 flex items-center gap-1 mx-auto"
+                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
                                 >
                                   <Plus className="h-4 w-4" />
-                                  Add Entry for {date}
+                                  + Add Entry for {date}
                                 </button>
                               </td>
                             </tr>
