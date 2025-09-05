@@ -110,7 +110,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [actionTaken, setActionTaken] = useState("");
   const [remarks, setRemarks] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleDateString("en-US", { month: "long" }));
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedYear, setSelectedYear] = useState("2025");
   const [selectedReportMunicipality, setSelectedReportMunicipality] = useState("");
   const [importedConcernTypes, setImportedConcernTypes] = useState([]);
   const [concernTypeData, setConcernTypeData] = useState("");
@@ -496,7 +496,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         dateEntries.forEach(entry => {
           csvRows.push([
             date,
-            entry.barangay,
+            entry.barangay, // This will be "Barangay, Municipality" format
             entry.concernType,
             entry.week1 || '0',
             entry.week2 || '0',
@@ -1114,7 +1114,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
         // Process data rows (skip header) - based on photo structure
         const processedData = jsonData.slice(1).map((row, index) => {
-          // Extract municipality from barangay field (format: "Barangay, Municipality")
+          // Keep barangay field as-is (format: "Barangay, Municipality")
           const barangayField = row[1] || '';
           const barangayParts = barangayField.split(',').map(part => part.trim());
           const barangay = barangayParts[0] || '';
@@ -1124,7 +1124,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             id: `excel-${Date.now()}-${index}`,
             date: row[0] || '',
             municipality: municipality,
-            barangay: barangay,
+            barangay: barangayField, // Keep full "Barangay, Municipality" format
             concernType: row[2] || '',
             week1: row[3] || '',
             week2: row[4] || '',
@@ -1236,7 +1236,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 // Create new entry for this date
                 const newEntry = {
                   id: `imported-${Date.now()}-${Math.random()}`,
-                  barangay: row.barangay || "",
+                  barangay: row.barangay || "", // This will be "Barangay, Municipality" format
                   concernType: row.concernType || "",
                   week1: row.week1 ? String(row.week1) : "",
                   week2: row.week2 ? String(row.week2) : "",
@@ -1264,7 +1264,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               // Create new entry for this date
               const newEntry = {
                 id: `imported-${Date.now()}-${Math.random()}`,
-                barangay: row.barangay || "",
+                barangay: row.barangay || "", // This will be "Barangay, Municipality" format
                 concernType: row.concernType || "",
                 week1: row.week1 ? String(row.week1) : "",
                 week2: row.week2 ? String(row.week2) : "",
@@ -1918,7 +1918,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           ).map((row, index) => (
                             <tr key={row.id} className="hover:bg-white/30">
                               <td className="px-3 py-2 text-gray-700">{row.date}</td>
-                              <td className="px-3 py-2 text-gray-700 font-medium">{row.barangay}{row.municipality ? `, ${row.municipality}` : ''}</td>
+                              <td className="px-3 py-2 text-gray-700 font-medium">{row.barangay}</td>
                               <td className="px-3 py-2 text-gray-700">{row.concernType}</td>
                               <td className="px-3 py-2 text-center text-gray-700">{row.week1 || '0'}</td>
                               <td className="px-3 py-2 text-center text-gray-700">{row.week2 || '0'}</td>
@@ -2040,7 +2040,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                         !activeMunicipalityTab || barangay.municipality === activeMunicipalityTab
                                       )
                                       .map((barangay) => (
-                                        <option key={barangay.id} value={barangay.name}>
+                                        <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
                                           {barangay.name} ({barangay.municipality})
                                         </option>
                                       ))}
@@ -2192,7 +2192,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                             !activeMunicipalityTab || barangay.municipality === activeMunicipalityTab
                                           )
                                           .map((barangay) => (
-                                            <option key={barangay.id} value={barangay.name}>
+                                            <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
                                               {barangay.name} ({barangay.municipality})
                                             </option>
                                           ))}
