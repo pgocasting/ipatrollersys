@@ -43,7 +43,8 @@ import {
   Trophy,
   Calendar,
   Eye,
-  Image
+  Image,
+  Menu
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 
@@ -77,6 +78,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const [showTopPerformersPreview, setShowTopPerformersPreview] = useState(false);
   const [selectedTopPerformersMonth, setSelectedTopPerformersMonth] = useState(new Date().getMonth());
   const [selectedTopPerformersYear, setSelectedTopPerformersYear] = useState(new Date().getFullYear());
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('dashboard-menu-dropdown');
+        const button = document.getElementById('dashboard-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
 
   const handleLogout = async () => {
     try {
@@ -1050,42 +1068,90 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-3">
-
-            <Button
-              onClick={() => setShowActiveModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              title="View Active Municipalities"
-            >
-              <CheckCircle className="w-6 h-6" />
-            </Button>
-            <Button
-              onClick={() => setShowInactiveModal(true)}
-              className="bg-red-600 hover:bg-red-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              title="View Inactive Municipalities"
-            >
-              <XCircle className="w-6 h-6" />
-            </Button>
-            <Button
-              onClick={() => setShowTotalIncidentsModal(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              title="View Total Incidents"
-            >
-              <AlertTriangle className="w-6 h-6" />
-            </Button>
-            <Button
-              onClick={() => setShowTotalActionsModal(true)}
-              className="bg-indigo-700 hover:bg-indigo-800 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              title="View Total Actions"
-            >
-              <Activity className="w-6 h-6" />
-            </Button>
-            <Button
-              onClick={() => setShowTopPerformersModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
-              title="View Top Performers"
-            >
-              <Target className="w-6 h-6" />
-            </Button>
+            {/* 3-Dots Menu */}
+            <div className="relative">
+              <Button
+                id="dashboard-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="Dashboard Actions & Options"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </Button>
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="dashboard-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                  <div className="py-1">
+                    {/* View Options */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">View Options</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setShowActiveModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200"
+                    >
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span>Active Municipalities</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowInactiveModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-200"
+                    >
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span>Inactive Municipalities</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTotalIncidentsModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200"
+                    >
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                      <span>Total Incidents</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTotalActionsModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200"
+                    >
+                      <Activity className="w-4 h-4 text-indigo-600" />
+                      <span>Total Actions</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTopPerformersModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors duration-200"
+                    >
+                      <Target className="w-4 h-4 text-emerald-600" />
+                      <span>Top Performers</span>
+                    </button>
+                    
+                    
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

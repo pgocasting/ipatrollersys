@@ -37,6 +37,7 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
+  Menu,
   RotateCcw,
   Camera,
   FileText,
@@ -87,6 +88,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [allActionReports, setAllActionReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("pnp");
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('actioncenter-menu-dropdown');
+        const button = document.getElementById('actioncenter-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
   const [activeMunicipality, setActiveMunicipality] = useState("all");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -1531,23 +1549,56 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
           <div className="flex flex-wrap gap-2">
-              <Button 
-                onClick={handleAddActionReport}
-                className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 h-12 w-12 rounded-full"
-                title="Add Action Report"
-              >
-                <Plus className="w-6 h-6" />
-              </Button>
-
+            {/* 3-Lines Menu */}
+            <div className="relative">
               <Button
-                onClick={openPreviewModal}
-                className="bg-indigo-600 hover:bg-indigo-700 text-white p-2.5 h-12 w-12 rounded-full"
-                title="Preview Report"
+                id="actioncenter-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="Action Center Options"
               >
-                <Eye className="w-6 h-6" />
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
               </Button>
-
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="actioncenter-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                  <div className="py-1">
+                    {/* Action Options */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        handleAddActionReport();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
+                    >
+                      <Plus className="w-4 h-4 text-blue-600" />
+                      <span>Add Action Report</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        openPreviewModal();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200"
+                    >
+                      <Eye className="w-4 h-4 text-indigo-600" />
+                      <span>Preview Report</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
+          </div>
           </div>
 
         {/* Department Navigation Cards */}

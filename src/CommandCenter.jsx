@@ -24,7 +24,8 @@ import {
   BarChart3,
   FileSpreadsheet,
   Plus,
-  X
+  X,
+  Menu
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
@@ -101,6 +102,23 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Active Tab State
   const [activeTab, setActiveTab] = useState("overview");
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('commandcenter-menu-dropdown');
+        const button = document.getElementById('commandcenter-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
 
   // Weekly Report State
   const [weeklyReports, setWeeklyReports] = useState([]);
@@ -1615,52 +1633,92 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           
-          {/* Navigation Buttons */}
-          <div className="flex gap-3">
+          {/* 3-Lines Menu */}
+          <div className="relative">
             <button
-              onClick={() => setActiveTab("overview")}
-              className={`h-12 w-12 rounded-full transition-all duration-200 flex items-center justify-center shadow-lg ${
-                activeTab === "overview"
-                  ? "bg-blue-600 text-white"
-                  : "bg-white/80 text-gray-600 hover:bg-blue-50 hover:text-blue-600"
-              }`}
-              title="Overview"
+              id="commandcenter-menu-button"
+              onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+              title="Command Center Options"
             >
-              <BarChart3 className="h-6 w-6" />
+              <Menu className="w-5 h-5" />
+              <span className="text-sm font-medium">View Options</span>
             </button>
-            <button
-              onClick={() => setActiveTab("weekly-report")}
-              className={`h-12 w-12 rounded-full transition-all duration-200 flex items-center justify-center shadow-lg ${
-                activeTab === "weekly-report"
-                  ? "bg-green-600 text-white"
-                  : "bg-white/80 text-gray-600 hover:bg-green-50 hover:text-green-600"
-              }`}
-              title="Weekly Report"
-            >
-              <FileText className="h-6 w-6" />
-            </button>
-            <button
-              onClick={() => setActiveTab("barangays")}
-              className={`h-12 w-12 rounded-full transition-all duration-200 flex items-center justify-center shadow-lg ${
-                activeTab === "barangays"
-                  ? "bg-purple-600 text-white"
-                  : "bg-white/80 text-gray-600 hover:bg-purple-50 hover:text-purple-600"
-              }`}
-              title="Barangay Management"
-            >
-              <Building2 className="h-6 w-6" />
-            </button>
-            <button
-              onClick={() => setActiveTab("concern-types")}
-              className={`h-12 w-12 rounded-full transition-all duration-200 flex items-center justify-center shadow-lg ${
-                activeTab === "concern-types"
-                  ? "bg-orange-600 text-white"
-                  : "bg-white/80 text-gray-600 hover:bg-orange-50 hover:text-orange-600"
-              }`}
-              title="Type of Concern Management"
-            >
-              <AlertTriangle className="h-6 w-6" />
-            </button>
+            
+            {/* Dropdown Menu */}
+            {showMenuDropdown && (
+              <div 
+                id="commandcenter-menu-dropdown"
+                className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+              >
+                <div className="py-1">
+                  {/* Navigation Options */}
+                  <div className="px-3 py-2">
+                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                  </div>
+                  
+                  <button
+                    onClick={() => {
+                      setActiveTab("overview");
+                      setShowMenuDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                      activeTab === "overview"
+                        ? "bg-blue-50 text-blue-700"
+                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                    }`}
+                  >
+                    <BarChart3 className="w-4 h-4 text-blue-600" />
+                    <span>Overview</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setActiveTab("weekly-report");
+                      setShowMenuDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                      activeTab === "weekly-report"
+                        ? "bg-green-50 text-green-700"
+                        : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                    }`}
+                  >
+                    <FileText className="w-4 h-4 text-green-600" />
+                    <span>Weekly Report</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setActiveTab("barangays");
+                      setShowMenuDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                      activeTab === "barangays"
+                        ? "bg-purple-50 text-purple-700"
+                        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 text-purple-600" />
+                    <span>Barangay Management</span>
+                  </button>
+                  
+                  <button
+                    onClick={() => {
+                      setActiveTab("concern-types");
+                      setShowMenuDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                      activeTab === "concern-types"
+                        ? "bg-orange-50 text-orange-700"
+                        : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                    }`}
+                  >
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span>Concern Types</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

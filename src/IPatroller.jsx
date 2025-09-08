@@ -58,7 +58,8 @@ import {
   MoreVertical,
   Database,
   Wifi,
-  WifiOff
+  WifiOff,
+  Menu
 } from "lucide-react";
 
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
@@ -79,6 +80,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   // Remove unused state
   const moreOptionsRef = useRef(null);
 
@@ -94,6 +96,22 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('ipatroller-menu-dropdown');
+        const button = document.getElementById('ipatroller-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -886,34 +904,80 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={generatePreviewData}
-              disabled={isGeneratingReport || loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white p-2.5 h-12 w-12 rounded-full"
-              title="Preview Monthly Summary Report"
-            >
-              <Eye className="w-6 h-6" />
-            </Button>
-            <Button
-              onClick={generateMonthlySummaryReport}
-              disabled={isGeneratingReport || loading}
-              className="bg-purple-600 hover:bg-purple-700 text-white p-2.5 h-12 w-12 rounded-full"
-              title="Generate and Download PDF"
-            >
-              {isGeneratingReport ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-              ) : (
-                <FileText className="w-6 h-6" />
+            {/* 3-Lines Menu */}
+            <div className="relative">
+              <Button
+                id="ipatroller-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="I-Patroller Options"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </Button>
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="ipatroller-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                  <div className="py-1">
+                    {/* Report Options */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Report Options</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        generatePreviewData();
+                        setShowMenuDropdown(false);
+                      }}
+                      disabled={isGeneratingReport || loading}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Eye className="w-4 h-4 text-blue-600" />
+                      <span>Preview Report</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        generateMonthlySummaryReport();
+                        setShowMenuDropdown(false);
+                      }}
+                      disabled={isGeneratingReport || loading}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGeneratingReport ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                      ) : (
+                        <FileText className="w-4 h-4 text-purple-600" />
+                      )}
+                      <span>Generate PDF</span>
+                    </button>
+                    
+                    <div className="border-t border-gray-200 my-1"></div>
+                    
+                    {/* Data Management */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Management</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        syncToFirestore();
+                        setShowMenuDropdown(false);
+                      }}
+                      disabled={loading}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Save className="w-4 h-4 text-green-600" />
+                      <span>Save Data</span>
+                    </button>
+                  </div>
+                </div>
               )}
-            </Button>
-            <Button
-              onClick={syncToFirestore}
-              disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white p-2.5 h-12 w-12 rounded-full"
-              title="Save Data"
-            >
-              <Save className="w-6 h-6" />
-            </Button>
+            </div>
           </div>
         </div>
 
