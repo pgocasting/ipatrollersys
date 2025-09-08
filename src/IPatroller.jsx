@@ -122,11 +122,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   const selectedDates = generateDates(selectedMonth, selectedYear);
 
-  // Municipalities by district
+  // Municipalities by district with barangay counts
   const municipalitiesByDistrict = {
     "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
     "2ND DISTRICT": ["Balanga City", "Pilar", "Orion", "Limay"],
     "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"],
+  };
+
+  // Barangay counts per municipality
+  const barangayCounts = {
+    "Abucay": 9,
+    "Orani": 29,
+    "Samal": 14,
+    "Hermosa": 23,
+    "Balanga City": 25,
+    "Pilar": 19,
+    "Orion": 23,
+    "Limay": 12,
+    "Bagac": 14,
+    "Dinalupihan": 46,
+    "Mariveles": 18,
+    "Morong": 5
   };
 
   // Load patrol data from Firestore
@@ -201,8 +217,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         municipalities.forEach((municipality) => {
           const dailyData = selectedDates.map(() => 0); // Initialize with 0
           const totalPatrols = dailyData.reduce((sum, val) => sum + (val || 0), 0);
-          const activeDays = dailyData.filter((val) => val > 0).length;
-          const inactiveDays = dailyData.filter((val) => val === 0).length;
+          
+          // Calculate active/inactive days based on barangay count for this municipality
+          const requiredBarangays = barangayCounts[municipality] || 0;
+          const activeDays = dailyData.filter((val) => val >= requiredBarangays).length;
+          const inactiveDays = dailyData.filter((val) => val > 0 && val < requiredBarangays).length;
           const activePercentage = Math.round((activeDays / dailyData.length) * 100);
           
           const itemData = {
@@ -325,8 +344,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         const newData = [...item.data];
         newData[dayIndex] = parseInt(value) || 0;
         const totalPatrols = newData.reduce((sum, val) => sum + (val || 0), 0);
-        const activeDays = newData.filter((val) => val > 0).length;
-        const inactiveDays = newData.filter((val) => val === 0).length;
+        
+        // Calculate active/inactive days based on barangay count for this municipality
+        const requiredBarangays = barangayCounts[municipality] || 0;
+        const activeDays = newData.filter((val) => val >= requiredBarangays).length;
+        const inactiveDays = newData.filter((val) => val > 0 && val < requiredBarangays).length;
         const activePercentage = Math.round((activeDays / newData.length) * 100);
         
         return {
@@ -351,20 +373,24 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     }));
   };
 
-  const getStatusColor = (value) => {
+  const getStatusColor = (value, municipality) => {
     if (value === null || value === undefined)
       return "bg-gray-100 text-gray-800";
     if (value === 0)
       return "bg-red-600 text-white";
-    if (value >= 5)
+    
+    const requiredBarangays = barangayCounts[municipality] || 0;
+    if (value >= requiredBarangays)
       return "bg-green-600 text-white";
     return "bg-red-600 text-white";
   };
 
-  const getStatusText = (value) => {
+  const getStatusText = (value, municipality) => {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
-    if (value >= 5) return "Active";
+    
+    const requiredBarangays = barangayCounts[municipality] || 0;
+    if (value >= requiredBarangays) return "Active";
     return "Inactive";
   };
 
@@ -433,16 +459,18 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     };
   };
 
-  // Calculate active and inactive days
+  // Calculate active and inactive days based on barangay counts
   const { activeDays, inactiveDays } = patrolData.reduce((acc, municipality) => {
+    const requiredBarangays = barangayCounts[municipality.municipality] || 0;
+    
     municipality.data.forEach((patrols) => {
       // If there's an actual patrol count (not null/undefined)
       if (patrols !== null && patrols !== undefined && patrols !== '') {
-        // Count as active if >= 5 patrols
-        if (patrols >= 5) {
+        // Count as active if >= required barangays for this municipality
+        if (patrols >= requiredBarangays) {
           acc.activeDays++;
         }
-        // Count as inactive only if there's a value but it's < 5
+        // Count as inactive only if there's a value but it's < required barangays
         else {
           acc.inactiveDays++;
         }
@@ -455,7 +483,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const overallSummary = {
     totalPatrols: patrolData.reduce((sum, item) => sum + item.totalPatrols, 0),
     totalActive: activeDays, // Total number of active days across all municipalities
-    totalInactive: inactiveDays, // Total number of inactive days (only counting days with patrols < 5)
+    totalInactive: inactiveDays, // Total number of inactive days (only counting days with patrols < required barangays)
     avgActivePercentage:
       patrolData.length > 0
         ? Math.round(
@@ -465,12 +493,19 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     municipalityCount: patrolData.length,
   };
 
-  // Generate preview data for the report
+  // Generate preview data for the report based on IPatroller daily counts
   const generatePreviewData = () => {
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
+
+    // Calculate additional statistics based on daily counts
+    const totalDaysInMonth = selectedDates.length;
+    const totalPossibleDays = patrolData.length * totalDaysInMonth;
+    const daysWithData = patrolData.reduce((acc, municipality) => {
+      return acc + municipality.data.filter(day => day !== null && day !== undefined && day !== '').length;
+    }, 0);
 
     const previewData = {
       title: "I-Patroller Monthly Summary Report",
@@ -478,6 +513,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       month: months[selectedMonth],
       year: selectedYear,
       reportPeriod: new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      dataSource: "Based on IPatroller Daily Counts",
+      totalDaysInMonth,
+      totalPossibleDays,
+      daysWithData,
+      dataCompleteness: totalPossibleDays > 0 ? Math.round((daysWithData / totalPossibleDays) * 100) : 0,
       overallSummary: overallSummary,
       districtSummary: Object.keys(groupedData).map(district => ({
         district,
@@ -486,12 +526,23 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       municipalityPerformance: patrolData.map(item => ({
         municipality: item.municipality,
         district: item.district,
+        requiredBarangays: barangayCounts[item.municipality] || 0,
         totalPatrols: item.totalPatrols,
         activeDays: item.activeDays,
         inactiveDays: item.inactiveDays,
-        activePercentage: item.activePercentage
+        activePercentage: item.activePercentage,
+        dailyData: item.data // Include daily data for reference
       }))
     };
+
+    // Log to verify data source
+    console.log('📊 Generating summary report based on IPatroller daily counts:', {
+      totalMunicipalities: patrolData.length,
+      totalDaysInMonth: totalDaysInMonth,
+      daysWithData: daysWithData,
+      dataCompleteness: previewData.dataCompleteness + '%',
+      overallSummary: overallSummary
+    });
 
     setPreviewData(previewData);
     setShowPrintPreview(true);
@@ -521,14 +572,17 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
       const monthText = `Month: ${months[selectedMonth]} ${selectedYear}`;
       const periodText = `Report Period: ${new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+      const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
       
       const generatedWidth = doc.getTextWidth(generatedText);
       const monthWidth = doc.getTextWidth(monthText);
       const periodWidth = doc.getTextWidth(periodText);
+      const dataSourceWidth = doc.getTextWidth(dataSourceText);
       
       doc.text(generatedText, (pageWidth - generatedWidth) / 2, 45);
       doc.text(monthText, (pageWidth - monthWidth) / 2, 52);
       doc.text(periodText, (pageWidth - periodWidth) / 2, 59);
+      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 66);
       
       // District Summary Table - matching preview format
       if (Object.keys(groupedData).length > 0) {
@@ -604,6 +658,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         const municipalityTableData = patrolData.map(item => [
           item.municipality,
           item.district,
+          (barangayCounts[item.municipality] || 0).toString(),
           item.totalPatrols.toLocaleString(),
           item.activeDays.toString(),
           item.inactiveDays.toString(),
@@ -611,7 +666,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         ]);
         
         autoTable(doc, {
-          head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
+          head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
           body: municipalityTableData,
           startY: finalY + 7,
           styles: { 
@@ -634,12 +689,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             fillColor: [248, 250, 252] // Light gray alternating rows like preview
           },
           columnStyles: {
-            0: { cellWidth: 35, halign: 'left' },
-            1: { cellWidth: 30, halign: 'left' },
-            2: { cellWidth: 25, halign: 'center' },
-            3: { cellWidth: 25, halign: 'center' },
-            4: { cellWidth: 25, halign: 'center' },
-            5: { cellWidth: 20, halign: 'center' }
+            0: { cellWidth: 30, halign: 'left' },
+            1: { cellWidth: 25, halign: 'left' },
+            2: { cellWidth: 20, halign: 'center' },
+            3: { cellWidth: 20, halign: 'center' },
+            4: { cellWidth: 20, halign: 'center' },
+            5: { cellWidth: 20, halign: 'center' },
+            6: { cellWidth: 15, halign: 'center' }
           },
           margin: { left: 20, right: 20 },
           tableWidth: 'auto',
@@ -1160,9 +1216,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             <td className="px-6 py-4">
                               <div className="flex items-center gap-3">
                                 <MapPin className="w-4 h-4 text-gray-600" />
-                                <span className="font-medium transition-colors duration-300 text-gray-900">
-                                  {item.municipality}
-                                </span>
+                                <div>
+                                  <span className="font-medium transition-colors duration-300 text-gray-900">
+                                    {item.municipality}
+                                  </span>
+                                  <div className="text-xs text-gray-500">
+                                    Requires: {barangayCounts[item.municipality] || 0} barangays
+                                  </div>
+                                </div>
                               </div>
                             </td>
                             <td className="px-6 py-4">
@@ -1189,8 +1250,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       }
                                       className="w-16 h-8 text-center text-xs border transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300 bg-white text-gray-900"
                                     />
-                                    <Badge className={getStatusColor(item.data[index])}>
-                                      {getStatusText(item.data[index])}
+                                    <Badge className={getStatusColor(item.data[index], item.municipality)}>
+                                      {getStatusText(item.data[index], item.municipality)}
                                     </Badge>
                                   </div>
                                 </td>
@@ -1282,6 +1343,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     <p>Generated: {previewData.generatedDate}</p>
                     <p>Month: {previewData.month} {previewData.year}</p>
                     <p>Report Period: {previewData.reportPeriod}</p>
+                    <p className="font-semibold text-blue-600">{previewData.dataSource}</p>
+                    <p>Data Completeness: {previewData.dataCompleteness}% ({previewData.daysWithData} of {previewData.totalPossibleDays} possible days)</p>
                   </div>
                 </div>
 
@@ -1328,6 +1391,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           <tr className="bg-green-50">
                             <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">Municipality</th>
                             <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">District</th>
+                            <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Required Barangays</th>
                             <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Total Patrols</th>
                             <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active Days</th>
                             <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Inactive Days</th>
@@ -1339,6 +1403,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                               <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900">{municipality.municipality}</td>
                               <td className="border border-gray-300 px-4 py-2 text-gray-700">{municipality.district}</td>
+                              <td className="border border-gray-300 px-4 py-2 text-center text-blue-600 font-semibold">{municipality.requiredBarangays}</td>
                               <td className="border border-gray-300 px-4 py-2 text-center text-gray-700">{municipality.totalPatrols.toLocaleString()}</td>
                               <td className="border border-gray-300 px-4 py-2 text-center text-green-600 font-semibold">{municipality.activeDays}</td>
                               <td className="border border-gray-300 px-4 py-2 text-center text-red-600 font-semibold">{municipality.inactiveDays}</td>

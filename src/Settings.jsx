@@ -309,7 +309,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {/* Firebase Testing */}
                   <Button
                     onClick={() => onNavigate('firebase-test')}
@@ -320,6 +320,19 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     <div className="text-center">
                       <div className="font-semibold">Firebase Testing</div>
                       <div className="text-xs text-blue-600">Connection diagnostics & health checks</div>
+                    </div>
+                  </Button>
+
+                  {/* Firestore Test */}
+                  <Button
+                    onClick={() => onNavigate('firestoretest')}
+                    variant="outline"
+                    className="h-auto p-4 flex flex-col items-center gap-2 border-indigo-300 text-indigo-700 hover:bg-indigo-100 hover:border-indigo-400 transition-all duration-200"
+                  >
+                    <TestTube className="w-8 h-8" />
+                    <div className="text-center">
+                      <div className="font-semibold">Firestore Test</div>
+                      <div className="text-xs text-indigo-600">Database connection & data testing</div>
                     </div>
                   </Button>
 
