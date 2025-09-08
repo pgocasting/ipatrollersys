@@ -5,23 +5,43 @@ import IPatroller from "./IPatroller";
 import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
+import CommandCenter from "./CommandCenter";
 import Settings from "./Settings";
+import FirestoreTest from "./FirestoreTest";
+// Firebase-related components removed
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
-import DebugComponent from "./DebugComponent";
+import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
+import { initializeUsers } from "./utils/initUsers";
+import "./utils/consoleHelpers"; // Load console helper functions
+import "./utils/authTest"; // Load authentication test functions
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
+import { Toaster } from "sonner";
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState(() => {
-    // Get the current page from URL on initial load
-    const path = window.location.pathname.replace('/', '');
-    const validPages = ['dashboard', 'ipatroller', 'reports', 'incidents', 'actioncenter', 'settings'];
-    return validPages.includes(path) ? path : 'dashboard';
+    // Get the current page from URL on initial load using utility function
+    return getCurrentPageFromURL();
   });
   const { user, loading, logout } = useFirebase();
+
+  // Initialize users collection when app starts
+  useEffect(() => {
+    const initApp = async () => {
+      try {
+        console.log('🚀 Initializing app...');
+        await initializeUsers();
+        console.log('✅ App initialization completed');
+      } catch (error) {
+        console.error('❌ App initialization failed:', error);
+      }
+    };
+    
+    initApp();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -53,19 +73,20 @@ export default function App() {
 
   const handleNavigate = (page) => {
     setCurrentPage(page);
-    window.history.pushState({}, '', `/${page}`);
+    // Use utility function to update URL
+    window.history.replaceState({}, '', `/${page}`);
   };
 
-  // Listen for browser back/forward buttons
+  // Listen for browser back/forward buttons and URL changes using utility function
   useEffect(() => {
-    const handlePopState = () => {
-      const path = window.location.pathname.replace('/', '');
-      setCurrentPage(path || 'dashboard');
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
+    const cleanup = handleBrowserNavigation(setCurrentPage);
+    return cleanup;
   }, []);
+
+  // Ensure URL is always in sync with current page
+  useEffect(() => {
+    syncURLWithPage(currentPage);
+  }, [currentPage]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -73,6 +94,8 @@ export default function App() {
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'ipatroller':
         return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'commandcenter':
+        return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'reports':
         return <Reports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'incidents':
@@ -81,6 +104,9 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'firestoretest':
+        return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      // Firebase test routes removed
       default:
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }
@@ -99,14 +125,13 @@ export default function App() {
   }
 
   return (
-    <DebugComponent>
-        <PatrolDataProvider>
-          <DataProvider>
-            <div className="App">
-              {user ? renderPage() : <Login onLogin={() => {}} />}
-            </div>
-          </DataProvider>
-        </PatrolDataProvider>
-    </DebugComponent>
+    <PatrolDataProvider>
+      <DataProvider>
+        <div className="App">
+          {user ? renderPage() : <Login onLogin={() => {}} />}
+          <Toaster position="top-right" richColors closeButton />
+        </div>
+      </DataProvider>
+    </PatrolDataProvider>
   );
 }

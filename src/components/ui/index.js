@@ -7,4 +7,4 @@ export { Select, SelectOption } from './select.jsx';
 export { Badge } from './badge.jsx';
 export { Alert, AlertTitle, AlertDescription } from './alert.jsx';
 export { Separator } from './separator.jsx';
-export { ThemeToggle } from './theme-toggle.jsx'; 
+export { Tabs, TabsContent, TabsList, TabsTrigger } from './tabs.jsx'; 

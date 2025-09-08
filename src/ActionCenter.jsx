@@ -1,17 +1,20 @@
 import React, { useState, useEffect } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+// Firebase removed - using local data storage
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { writeBatch, doc } from "firebase/firestore";
-import { db } from "./firebase";
+import { cloudinaryUtils } from "./utils/cloudinary";
+// Firebase imports removed
+
 import { 
   Activity,
   AlertTriangle,
+  AlertCircle,
   BarChart3,
   Calendar,
   CheckCircle,
@@ -22,84 +25,27 @@ import {
   Trash2,
   Filter,
   MapPin,
-  RefreshCw,
   Search,
-  Settings,
   Shield,
   TrendingUp,
   Users,
   X,
   XCircle,
-  Zap,
   Target,
-  Flag,
-  Bell,
   Database,
   Save,
-  MoreHorizontal,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  ArrowUp,
-  ArrowDown,
-  ArrowLeft,
-  ArrowRight,
-  Minus,
   Plus,
-  Maximize2,
-  Minimize2,
+  Menu,
   RotateCcw,
-  RotateCw,
-  ZoomIn,
-  ZoomOut,
-  Move,
-  Copy,
-  Scissors,
-  Link,
-  Unlink,
-  Lock,
-  Unlock,
-  Key,
-  Mail,
-  Phone,
-  MessageSquare,
-  Video,
   Camera,
-  Mic,
-  Headphones,
-  Volume2,
-  VolumeX,
-  Play,
-  Pause,
-  SkipBack,
-  SkipForward,
-  Rewind,
-  FastForward,
-  Shuffle,
-  Repeat,
-  Volume1,
-  Volume,
-  Speaker,
-  Radio,
-  Tv,
-  Monitor,
-  Smartphone,
-  Tablet,
-  Laptop,
-  Server,
-  Mouse,
-  Keyboard,
-  MonitorSpeaker,
-  User,
-  AlertCircle,
-  Home,
-  Car,
-  Building2,
-  Star,
-  Heart,
-  Briefcase,
-  FileText
+  FileText,
+  Pill,
+  Leaf,
+  Fish,
+  Trees,
+  Building2
 } from "lucide-react";
 /**
  * Action Center Component
@@ -130,7 +76,8 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { user, saveActionReport, getActionReports, updateActionReport, deleteActionReport } = useFirebase();
+  const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments } = useFirebase();
+  // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState("all");
@@ -141,6 +88,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [allActionReports, setAllActionReports] = useState([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("pnp");
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('actioncenter-menu-dropdown');
+        const button = document.getElementById('actioncenter-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
   const [activeMunicipality, setActiveMunicipality] = useState("all");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
@@ -151,13 +115,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [editingItem, setEditingItem] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageModalData, setImageModalData] = useState({ imageSource: '', fileName: '' });
-  const [showAddIllegalTypeModal, setShowAddIllegalTypeModal] = useState(false);
-  const [newIllegalType, setNewIllegalType] = useState("");
-  const [customIllegalTypes, setCustomIllegalTypes] = useState({
-    pnp: [],
-    agriculture: [],
-    "pg-enro": []
-  });
+
   const [successMessage, setSuccessMessage] = useState("");
   const [newActionReport, setNewActionReport] = useState({
     department: "",
@@ -173,9 +131,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     source: "",
     actionTaken: "",
     otherInfo: "",
-    photos: [],
-    illegalType: "",
-    otherIllegalType: ""
+    photos: []
   });
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pdfDescription, setPdfDescription] = useState("");
@@ -183,45 +139,111 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const loadActionReports = async () => {
       setLoading(true);
       try {
-        const result = await getActionReports();
-        if (result.success) {
-        // Store all reports
-        setAllActionReports(result.data);
-          // Filter by active tab if needed
-        console.log('Loading action reports:', {
-          totalReports: result.data.length,
-          activeTab: activeTab,
-          departments: result.data.map(r => r.department),
-          pgEnroReports: result.data.filter(r => r.department === 'pg-enro')
-        });
-          const filteredReports = result.data.filter(report => 
-            activeTab === "all" || report.department === activeTab
-          );
-        console.log('Filtered reports:', {
-          activeTab: activeTab,
-          filteredCount: filteredReports.length,
-          filteredDepartments: filteredReports.map(r => r.department)
-        });
-          setActionItems(filteredReports);
+        console.log('🔄 Loading action reports from Firestore...');
+        console.log('Current activeTab:', activeTab);
+        
+        // Load all data from actionReports collection
+        const result = await queryDocuments('actionReports');
+        console.log('Firestore query result:', result);
+        
+        if (result.success && result.data && result.data.length > 0) {
+          console.log(`✅ Found ${result.data.length} documents in Firestore`);
+          
+          // Process all documents to extract action reports
+          let allActionReports = [];
+          
+          result.data.forEach((doc, index) => {
+            console.log(`Processing document ${index + 1}:`, {
+              id: doc.id,
+              hasData: !!doc.data,
+              hasMonthKey: !!doc.monthKey,
+              department: doc.department
+            });
+            
+            // If document has a 'data' array (monthly structure), extract reports from it
+            if (doc.data && Array.isArray(doc.data)) {
+              console.log(`📅 Monthly document ${doc.id} contains ${doc.data.length} reports`);
+              doc.data.forEach(report => {
+                allActionReports.push({
+                  ...report,
+                  sourceDocument: doc.id,
+                  sourceType: 'monthly'
+                });
+              });
+            }
+            // If document is an individual report
+            else if (doc.department || doc.what || doc.municipality) {
+              console.log(`📋 Individual report: ${doc.id}`);
+              allActionReports.push({
+                ...doc,
+                sourceDocument: doc.id,
+                sourceType: 'individual'
+              });
+            }
+          });
+          
+          console.log(`📊 Total action reports found: ${allActionReports.length}`);
+          
+          if (allActionReports.length > 0) {
+            // Set all reports
+            setAllActionReports(allActionReports);
+            
+            // Filter by department (PNP, Agriculture, PG-ENRO)
+            const filteredReports = allActionReports.filter(report => {
+              const reportDepartment = report.department?.toLowerCase();
+              const currentTab = activeTab?.toLowerCase();
+              
+              console.log(`Checking report ${report.id}: department="${reportDepartment}", activeTab="${currentTab}"`);
+              
+              // Map department values to match tabs
+              if (currentTab === 'all') return true;
+              if (currentTab === 'pnp' && (reportDepartment === 'pnp' || reportDepartment === 'police')) return true;
+              if (currentTab === 'agriculture' && reportDepartment === 'agriculture') return true;
+              if (currentTab === 'pg-enro' && (reportDepartment === 'pg-enro' || reportDepartment === 'enro' || reportDepartment === 'environment')) return true;
+              
+              return false;
+            });
+            
+            console.log(`🎯 Filtered reports for ${activeTab}:`, {
+              totalReports: allActionReports.length,
+              filteredCount: filteredReports.length,
+              departments: [...new Set(allActionReports.map(r => r.department))],
+              filteredDepartments: [...new Set(filteredReports.map(r => r.department))]
+            });
+            
+            setActionItems(filteredReports);
+            
+            // Show success message
+            if (filteredReports.length > 0) {
+              setSuccessMessage(`✅ Loaded ${filteredReports.length} ${activeTab.toUpperCase()} reports from Firestore`);
+            } else {
+              setSuccessMessage(`ℹ️ Found ${allActionReports.length} total reports, but none match ${activeTab.toUpperCase()} department`);
+            }
+          } else {
+            console.log('❌ No action reports found in any documents');
+            setActionItems([]);
+            setAllActionReports([]);
+            setSuccessMessage('No action reports found in Firestore database');
+          }
         } else {
-          console.error('Error loading action reports:', result.error);
+          console.log('❌ No data found in Firestore actionReports collection');
           setActionItems([]);
-        setAllActionReports([]);
+          setAllActionReports([]);
+          setSuccessMessage('No data found in Firestore database');
         }
       } catch (error) {
-        console.error('Error loading action reports:', error);
+        console.error('❌ Error loading action reports:', error);
         setActionItems([]);
+        setAllActionReports([]);
+        setSuccessMessage('Error loading data from Firestore');
       } finally {
         setLoading(false);
       }
     };
   useEffect(() => {
     loadActionReports();
-  }, [activeTab, getActionReports]);
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  }, [activeTab]);
+
   // Municipalities by district mapping
   const municipalitiesByDistrict = {
     "1ST DISTRICT": [
@@ -243,31 +265,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       "Morong"
     ]
   };
-  const districts = [
-    { id: "all", name: "All Districts" },
-    { id: "1ST DISTRICT", name: "1ST DISTRICT" },
-    { id: "2ND DISTRICT", name: "2ND DISTRICT" },
-    { id: "3RD DISTRICT", name: "3RD DISTRICT" }
-  ];
-  // Handle adding new illegal types
-  const handleAddIllegalType = () => {
-    if (newIllegalType.trim()) {
-      const currentDepartment = newActionReport.department || editingItem?.department;
-      if (currentDepartment) {
-        setCustomIllegalTypes(prev => ({
-          ...prev,
-          [currentDepartment]: [...(prev[currentDepartment] || []), newIllegalType.trim()]
-        }));
-        setSuccessMessage(`New illegal type "${newIllegalType}" added to ${currentDepartment} successfully!`);
-        setNewIllegalType("");
-        setShowAddIllegalTypeModal(false);
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccessMessage(""), 3000);
-      }
-    } else {
-      alert("Please enter a valid illegal type.");
-    }
-  };
+
+
+
   // Handle cleaning duplicates
   const handleCleanDuplicates = async () => {
     try {
@@ -297,18 +297,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         `Found ${duplicates.length} duplicate entries. The original entries will be kept. Do you want to remove the duplicates? This action cannot be undone.`
       );
       if (confirmed) {
-        // Remove duplicates from Firestore
-        const batch = writeBatch(db);
-        duplicates.forEach(duplicate => {
-          const docRef = doc(db, 'actionReports', duplicate.id);
-          batch.delete(docRef);
-        });
-        await batch.commit();
-        // Update local state - keep only original items
+        // For now, we'll just remove duplicates from local state
+        // Since we're using the month-based structure, we need to handle this differently
         setActionItems(prevItems => 
           prevItems.filter(item => !duplicates.some(dup => dup.id === item.id))
         );
-        alert(`Successfully removed ${duplicates.length} duplicate entries. Original entries have been preserved.`);
+        setAllActionReports(prevReports => 
+          prevReports.filter(item => !duplicates.some(dup => dup.id === item.id))
+        );
+        alert(`Successfully removed ${duplicates.length} duplicate entries from local view. Note: This only affects the current view. To permanently remove duplicates, you'll need to edit the individual reports.`);
       }
     } catch (error) {
       console.error('Error cleaning duplicates:', error);
@@ -317,6 +314,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(false);
     }
   };
+
+
   const getSeverityColor = (severity) => {
     switch (severity) {
       case "high": return "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400";
@@ -484,7 +483,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     'Traffic Violations': ['traffic violation', 'reckless driving', 'illegal parking', 'no license']
   };
   const isIllegal = (item) => {
-    const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.illegalType, item.where, item.source]
+    // For Agriculture and PG-ENRO, use otherInfo instead of source
+    const sourceField = (activeTab === "agriculture" || activeTab === "pg-enro") ? item.otherInfo : item.source;
+    const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, sourceField]
       .map(v => normalize(v))
       .join(' ');
     return ILLEGAL_KEYWORDS.some(kw => text.includes(kw));
@@ -496,10 +497,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     if (!sortedItems || !Array.isArray(sortedItems)) {
       return { illegalCategoryCounts: counts, totalIllegals: total };
     }
-    sortedItems.forEach(item => {
-      const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.illegalType, item.where, item.source]
-        .map(v => normalize(v))
-        .join(' ');
+          sortedItems.forEach(item => {
+        // For Agriculture and PG-ENRO, use otherInfo instead of source
+        const sourceField = (activeTab === "agriculture" || activeTab === "pg-enro") ? item.otherInfo : item.source;
+        const text = [item.what, item.why, item.how, item.otherInfo, item.actionTaken, item.where, sourceField]
+          .map(v => normalize(v))
+          .join(' ');
       // Check predefined illegal categories first
       let matched = false;
       for (const [cat, keys] of Object.entries(ILLEGAL_CATEGORIES)) {
@@ -754,7 +757,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const lineHeight = 20;
     
     // Report details in two columns
-    doc.text(`Month: ${months[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
+    const monthNamesExport = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    doc.text(`Month: ${monthNamesExport[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
     doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
     
     doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
@@ -843,11 +847,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         formatDate(item.when),
         item.where || 'N/A',
         item.actionTaken || 'N/A',
-        item.illegalType || 'N/A',
+
         item.otherInfo || 'N/A'
       ]);
     } else if (activeTab === "pg-enro") {
-      tableHeaders.push('Source', 'Other Information');
+      tableHeaders.push('Other Information');
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -855,7 +859,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         formatDate(item.when),
         item.where || 'N/A',
         item.actionTaken || 'N/A',
-        item.source || 'N/A',
         item.otherInfo || 'N/A'
       ]);
     }
@@ -897,8 +900,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         3: { cellWidth: 'auto' }, // When
         4: { cellWidth: 'auto' }, // Where
         5: { cellWidth: 'auto' }, // Action Taken
-        6: { cellWidth: 'auto' }, // Source/Illegal Type
-        7: { cellWidth: 'auto' }  // Other Information
+        6: { cellWidth: 'auto' }  // Source/Illegal Type/Other Information
       }
     });
     
@@ -910,7 +912,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
     
     // Save the PDF
-    const fileName = `action-center-${activeTab}-${months[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+    const monthNamesFilename = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    const fileName = `action-center-${activeTab}-${monthNamesFilename[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
@@ -1039,9 +1042,63 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
     return photo;
   };
+
+  // Function to upload photos to Cloudinary
+  const uploadPhotosToCloudinary = async (photos) => {
+    if (!photos || !Array.isArray(photos) || photos.length === 0) {
+      return [];
+    }
+    
+    const uploadPromises = photos.map(async (photo) => {
+      if (!photo.blob) {
+        console.warn('Photo missing blob data:', photo);
+        return null;
+      }
+      
+      try {
+        // Convert blob to File object for Cloudinary upload
+        const file = new File([photo.blob], photo.fileName, { type: photo.fileType });
+        
+        // Upload to Cloudinary
+        const result = await cloudinaryUtils.uploadImage(file, {
+          folder: 'ipatroller/action-reports',
+          publicId: `action-report-${Date.now()}-${Math.random().toString(36).substring(2)}`
+        });
+        
+        if (result.success) {
+          return {
+            id: photo.id,
+            fileName: photo.fileName,
+            fileSize: photo.fileSize,
+            fileType: photo.fileType,
+            lastModified: photo.lastModified,
+            uploadDate: photo.uploadDate,
+            storageUrl: result.data.url,
+            cloudinaryId: result.data.publicId
+          };
+        } else {
+          console.error('Cloudinary upload failed:', result.error);
+          return null;
+        }
+      } catch (error) {
+        console.error('Error uploading photo to Cloudinary:', error);
+        return null;
+      }
+    });
+    
+    const results = await Promise.all(uploadPromises);
+    return results.filter(result => result !== null);
+  };
+
   // Function to get the best available image source
   const getImageSource = (photo) => {
-    // Priority: base64 data > legacy URL > placeholder
+    // Priority: storage URL > preview URL > base64 data > legacy URL > placeholder
+    if (photo.storageUrl && typeof photo.storageUrl === 'string') {
+      return photo.storageUrl;
+    }
+    if (photo.preview && typeof photo.preview === 'string') {
+      return photo.preview;
+    }
     if (photo.imageData && typeof photo.imageData === 'string' && photo.imageData.startsWith('data:image')) {
       return photo.imageData;
     }
@@ -1053,7 +1110,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return photo;
     }
     // Return a placeholder for legacy Firebase Storage URLs or invalid photos
-    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
+    return 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZGRkIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE0IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+TGVnYWN5IFBob3RvPC90ZXh0Pjwvc3ZnPg==';
   };
   // Function to handle photo loading errors
   const handlePhotoError = (event, photo) => {
@@ -1090,46 +1147,65 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert('Maximum 10 images allowed.');
       return;
     }
-    // Convert images to base64 and store in state
+    
+    // Process images with compression and store file objects
     if (validFiles && Array.isArray(validFiles)) {
       validFiles.forEach(file => {
-        if (!file || typeof file !== 'object' || !(file instanceof File)) return; // Skip undefined, invalid, or non-File objects
-      const reader = new FileReader();
-      if (!reader) {
-        console.error('Failed to create FileReader');
-        return;
-      }
-      reader.onload = (e) => {
-        if (!e || !e.target) {
-          console.error('Invalid event object in reader.onload');
-          return;
-        }
-        const base64String = e.target?.result;
-        if (!base64String || typeof base64String !== 'string') return; // Skip if no result or not a string
-        const newPhoto = {
-          id: Date.now() + Math.random(),
-          fileName: (file.name && typeof file.name === 'string') ? file.name : 'Unknown',
-          fileSize: (file.size && typeof file.size === 'number') ? file.size : 0,
-          fileType: (file.type && typeof file.type === 'string') ? file.type : 'image/*',
-          lastModified: (file.lastModified && typeof file.lastModified === 'number') ? file.lastModified : Date.now(),
-          // Store only the base64 image data - no blob URLs
-          imageData: base64String,
-          uploadDate: new Date().toISOString()
+        if (!file || typeof file !== 'object' || !(file instanceof File)) return;
+        
+        // Create a compressed version of the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+          // Calculate new dimensions (max 800x800 to reduce size)
+          const maxSize = 800;
+          let { width, height } = img;
+          
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          // Draw and compress image
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to blob with compression
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const newPhoto = {
+                id: Date.now() + Math.random(),
+                fileName: file.name || 'Unknown',
+                fileSize: blob.size,
+                fileType: file.type || 'image/jpeg',
+                lastModified: file.lastModified || Date.now(),
+                uploadDate: new Date().toISOString(),
+                // Store the compressed blob instead of base64
+                blob: blob,
+                // Create a preview URL for display
+                preview: URL.createObjectURL(blob)
+              };
+              
+              setReport(prevReport => ({
+                ...(prevReport || {}),
+                photos: [...(prevReport?.photos || []), newPhoto]
+              }));
+            }
+          }, 'image/jpeg', 0.8); // Compress to JPEG with 80% quality
         };
-        setReport(prevReport => ({
-          ...(prevReport || {}),
-          photos: [...(prevReport?.photos || []), newPhoto]
-        }));
-      };
-      try {
-        if (file && file instanceof File) {
-          reader.readAsDataURL(file);
-        } else {
-          console.error('Invalid file object');
-        }
-              } catch (error) {
-          console.error('Error reading file as data URL:', error);
-        }
+        
+        img.src = URL.createObjectURL(file);
       });
     }
   };
@@ -1171,22 +1247,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // For Agriculture, only basic fields are required
         // Source field is not shown for Agriculture
       }
-      // Additional validation for all departments - Illegal Type is required
-      if (newActionReport.department) {
-        if (!newActionReport.illegalType) {
-          alert("Please select the Type of Illegals for your report.");
-          return;
-        }
-        if (newActionReport.illegalType === "other" && !newActionReport.otherIllegalType) {
-          alert("Please specify the other type of illegals.");
+
+              // Upload photos to Cloudinary and get URLs
+      let photoUrls = [];
+      if (newActionReport.photos && newActionReport.photos.length > 0) {
+        try {
+          photoUrls = await uploadPhotosToCloudinary(newActionReport.photos);
+        } catch (error) {
+          console.error('Error uploading photos:', error);
+          alert('Error uploading photos. Please try again.');
           return;
         }
       }
-      // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = newActionReport.photos ? newActionReport.photos
-        .map(validateAndCleanPhoto) // Use the validation function
-        .filter(photo => photo !== null) // Remove any invalid photos
-        : [];
+      
+      // Clean photos data - only store URLs and metadata, not the actual image data
+      const cleanPhotos = photoUrls.map(url => ({
+        id: url.id,
+        fileName: url.fileName,
+        fileSize: url.fileSize,
+        fileType: url.fileType,
+        lastModified: url.lastModified,
+        uploadDate: url.uploadDate,
+        storageUrl: url.storageUrl
+      }));
       
       const reportToSave = {
         ...newActionReport,
@@ -1206,9 +1289,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       );
       console.log('Submitting action report:', {
         department: cleanReport.department,
-        what: cleanReport.what,
-        illegalType: cleanReport.illegalType,
-        otherIllegalType: cleanReport.otherIllegalType
+        what: cleanReport.what
       });
       const result = await saveActionReport(cleanReport);
       if (result.success) {
@@ -1237,9 +1318,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           source: "",
           actionTaken: "",
           otherInfo: "",
-          photos: [],
-          illegalType: "",
-          otherIllegalType: ""
+          photos: []
         });
         alert("Action report added successfully!");
       } else {
@@ -1267,18 +1346,51 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       source: "",
       actionTaken: "",
       otherInfo: "",
-      photos: [],
-      illegalType: "",
-      otherIllegalType: ""
+      photos: []
     });
+  };
+
+  // Save action report to Firestore
+  const saveActionReport = async (reportData) => {
+    try {
+      const result = await addActionReport(reportData);
+      return result;
+    } catch (error) {
+      console.error('Error saving action report:', error);
+      return { success: false, error: error.message };
+    }
   };
   const handleEditActionReport = async () => {
     try {
-      // Clean photos data before saving to Firestore (include base64 image data)
-      const cleanPhotos = editingItem.photos ? editingItem.photos
-        .map(validateAndCleanPhoto) // Use the validation function
-        .filter(photo => photo !== null) // Remove any invalid photos
-        : [];
+      // Handle photo updates - upload new photos and keep existing ones
+      let cleanPhotos = [];
+      
+      // Keep existing photos that already have storage URLs
+      const existingPhotos = editingItem.photos ? editingItem.photos.filter(photo => photo.storageUrl) : [];
+      
+      // Upload new photos (those with blob data)
+      const newPhotos = editingItem.photos ? editingItem.photos.filter(photo => photo.blob) : [];
+      if (newPhotos.length > 0) {
+        try {
+          const newPhotoUrls = await uploadPhotosToCloudinary(newPhotos);
+          const newCleanPhotos = newPhotoUrls.map(url => ({
+            id: url.id,
+            fileName: url.fileName,
+            fileSize: url.fileSize,
+            fileType: url.fileType,
+            lastModified: url.lastModified,
+            uploadDate: url.uploadDate,
+            storageUrl: url.storageUrl
+          }));
+          cleanPhotos = [...existingPhotos, ...newCleanPhotos];
+        } catch (error) {
+          console.error('Error uploading new photos:', error);
+          alert('Error uploading new photos. Please try again.');
+          return;
+        }
+      } else {
+        cleanPhotos = existingPhotos;
+      }
       
       const updatedReport = {
         ...editingItem,
@@ -1336,6 +1448,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         ...prev,
         [field]: value
       };
+      
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
@@ -1346,6 +1459,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
       }
+      
       return updated;
     });
   };
@@ -1355,6 +1469,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         ...prev,
         [field]: value
       };
+      
       // If municipality is being changed, automatically set the corresponding district
       if (field === 'municipality') {
         // Find which district this municipality belongs to
@@ -1365,6 +1480,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
       }
+      
+
+      
       return updated;
     });
   };
@@ -1406,6 +1524,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       alert('Error removing photo. Please try again.');
     }
   };
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
@@ -1430,46 +1549,58 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
           <div className="flex flex-wrap gap-2">
-              <Button 
-                onClick={handleAddActionReport}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Add Action Report"
+            {/* 3-Lines Menu */}
+            <div className="relative">
+              <Button
+                id="actioncenter-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="Action Center Options"
               >
-              <Plus className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Add Report</span>
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
               </Button>
-              <Button 
-                onClick={() => {
-                  setLoading(true);
-                  setTimeout(() => setLoading(false), 500);
-                }} 
-                disabled={loading}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Refresh Data"
-              >
-              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-              </Button>
-            <Button
-              onClick={openPreviewModal}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Preview Report"
-            >
-              <Eye className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Preview</span>
-              </Button>
-
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="actioncenter-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                  <div className="py-1">
+                    {/* Action Options */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        handleAddActionReport();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
+                    >
+                      <Plus className="w-4 h-4 text-blue-600" />
+                      <span>Add Action Report</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        openPreviewModal();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200"
+                    >
+                      <Eye className="w-4 h-4 text-indigo-600" />
+                      <span>Preview Report</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-        {/* Success Message */}
-        {successMessage && (
-          <div className="p-3 md:p-4 rounded-lg border transition-all duration-300 bg-green-50 border-green-300 text-green-700">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="font-medium text-sm md:text-base">{successMessage}</span>
-        </div>
           </div>
-        )}
+
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           <Card 
@@ -1556,95 +1687,86 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
-          {/* Filters & Search - Ultra Compact Design */}
-          <div className="flex-shrink-0 mb-2">
-            <div className="rounded-lg shadow-sm border p-2 transition-all duration-300 bg-white border-gray-200">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-1.5 rounded-lg bg-blue-100/80">
-                    <Filter className="h-3.5 w-3.5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold transition-colors duration-300 text-gray-800">Filters & Search</h3>
-                    <p className="text-xs transition-colors duration-300 text-gray-600">Refine your data view</p>
-                  </div>
-                </div>
+          {/* Dynamic Search & Filter Module */}
+          <div className="flex-shrink-0 mb-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by municipality, district, department, or action..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 py-2 text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
+                
+                {/* Month Filter */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Months</option>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((month, index) => (
+                    <option key={month} value={index}>{month}</option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Years</option>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                {/* District Filter */}
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Districts</option>
+                  <option value="1ST DISTRICT">1ST DISTRICT</option>
+                  <option value="2ND DISTRICT">2ND DISTRICT</option>
+                  <option value="3RD DISTRICT">3RD DISTRICT</option>
+                </select>
+
+                {/* Clear Filters Button */}
                 <Button
                   onClick={() => {
                     setSearchTerm("");
-                    setSelectedDistrict("");
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
+                    setSelectedDistrict("all");
+                    setSelectedMonth("all");
+                    setSelectedYear("all");
                   }}
                   variant="outline"
                   size="sm"
-                  className="bg-gray-800 text-white border-gray-600 hover:bg-gray-700 text-xs py-1 px-2 h-7"
+                  className="ml-auto text-xs"
                 >
                   <RotateCcw className="h-3 w-3 mr-1" />
-                  Clear All Filters
+                  Clear All
                 </Button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1.5">
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Month</label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Months</option>
-                    {months.map((month, index) => (
-                      <option key={index} value={index}>{month}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Year</label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Years</option>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">District</label>
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className="w-full p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                  >
-                    <option value="all">All Districts</option>
-                    {districts.map((district) => (
-                      <option key={district.id} value={district.id}>{district.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-0.5">
-                  <label className="text-xs font-medium transition-colors duration-300 text-gray-700">Search</label>
-                  <div className="relative">
-                    <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search actions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-8 p-1 rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-xs border-gray-200 bg-white text-gray-900"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    )}
-                  </div>
-                </div>
               </div>
             </div>
           {/* Summary Cards */}
@@ -1775,6 +1897,68 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
                 </>
               )}
+              {/* PG-ENRO Tab - Environment Stats */}
+              {activeTab === "pg-enro" && (
+                <>
+                  {/* Total Entries Card */}
+                  <div className="bg-purple-600 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-purple-100 text-xs font-medium">Total Entries</p>
+                        <p className="text-lg font-bold">{sortedItems ? sortedItems.length : 0}</p>
+                        <p className="text-purple-200 text-xs">All environment records</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Database className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Illegals Card */}
+                  <div className="bg-red-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-red-100 text-xs font-medium mb-1">Illegals (Auto-Detected)</p>
+                        <p className="text-lg font-bold mb-1">{totalIllegals}</p>
+                        <p className="text-red-200 text-xs leading-tight">
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts)
+                            .slice(0, 3) // Show only first 3 categories to fit better
+                            .map(([k, v]) => `${k}: ${v}`)
+                            .join(' • ')}
+                          {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 3 && '...'}
+                        </p>
+                        {illegalCategoryCounts && Object.entries(illegalCategoryCounts).length > 0 && (
+                          <p className="text-red-200 text-xs mt-1">
+                            {Object.entries(illegalCategoryCounts).length} categories detected
+                            {Object.entries(illegalCategoryCounts).length > 3 && (
+                              <span className="ml-1 cursor-help" title={Object.entries(illegalCategoryCounts)
+                                .map(([k, v]) => `${k}: ${v}`)
+                                .join('\n')}>
+                                (Hover for details)
+                              </span>
+                            )}
+                          </p>
+                        )}
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full ml-2 flex-shrink-0">
+                        <AlertTriangle className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                  {/* Action Taken Card */}
+                  <div className="bg-blue-500 rounded-lg p-4 text-white shadow-lg min-h-[100px]">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-blue-100 text-xs font-medium">Action Taken</p>
+                        <p className="text-lg font-bold">{totalActions}</p>
+                        <p className="text-blue-200 text-xs">Actions with status</p>
+                      </div>
+                      <div className="p-1.5 bg-white/20 rounded-full">
+                        <Activity className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
           {/* Action Items Table */}
@@ -1792,15 +1976,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button
-                      onClick={handleCleanDuplicates}
-                      variant="outline"
-                      size="sm"
-                      className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clean Duplicates
-                    </Button>
+                    
+              <Button
+                onClick={handleCleanDuplicates}
+                variant="outline"
+                size="sm"
+                className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clean Duplicates
+              </Button>
                     <Badge variant="secondary" className="text-sm bg-blue-100/80 text-blue-800">
                                              {sortedItems ? sortedItems.length : 0} items
                   </Badge>
@@ -1811,66 +1996,59 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 {loading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="flex items-center gap-3">
-                      <RefreshCw className="h-8 w-8 animate-spin text-blue-500" />
+                      <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
                       <span className="text-base transition-colors duration-300 text-gray-600">Loading action items...</span>
                     </div>
                   </div>
                 ) : (
                   <div className="overflow-x-auto">
-                    <table className="w-full table-fixed">
-                      <thead>
+                    <table className="w-full min-w-[800px]">
+                      <thead className="sticky top-0 bg-white z-10">
                         <tr className="border-b transition-all duration-300 border-gray-200">
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("municipality")}
-                              className="flex items-center gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
                             >
                               Municipality
                               {sortBy === "municipality" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-28 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("district")}
-                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               District
                               {sortBy === "district" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-32 md:w-40 transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[200px] max-w-[300px] transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("when")}
-                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               When
                               {sortBy === "when" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
-                          {/* Temporarily hidden columns */}
-                          {false && (
-                            <>
-                              <th className="text-left p-4 font-semibold w-28 transition-colors duration-300 text-gray-700">Who</th>
-                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Why</th>
-                              <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">How</th>
-                            </>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[180px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
+                          {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                          {activeTab === "pnp" && (
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
                           )}
-                          <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
-                          {/* Hide Source column for Agriculture tab */}
-                          {activeTab !== "agriculture" && (
-                            <th className="text-left p-2 md:p-4 font-semibold w-24 md:w-32 transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
+                          {(activeTab === "agriculture" || activeTab === "pg-enro") && (
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Other Information</th>
                           )}
-                                                     {/* Other Information column hidden */}
-                           {/* <th className="text-left p-4 font-semibold w-40 transition-colors duration-300 text-gray-700">Other Information</th> */}
-                          <th className="text-left p-2 md:p-4 font-semibold w-20 md:w-24 transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1879,218 +2057,38 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           if (!item || typeof item !== 'object') {
                             return null;
                           }
-                          // Handle icon rendering properly
-                          const getIconComponent = (iconName) => {
-                            switch (iconName) {
-                              case "AlertCircle":
-                                return AlertCircle;
-                              case "Activity":
-                                return Activity;
-                              case "AlertTriangle":
-                                return AlertTriangle;
-                              case "BarChart3":
-                                return BarChart3;
-                              case "Calendar":
-                                return Calendar;
-                              case "CheckCircle":
-                                return CheckCircle;
-                              case "Clock":
-                                return Clock;
-                              case "Download":
-                                return Download;
-                              case "Eye":
-                                return Eye;
-                              case "Edit":
-                                return Edit;
-                              case "Trash2":
-                                return Trash2;
-                              case "Filter":
-                                return Filter;
-                              case "MapPin":
-                                return MapPin;
-
-                              case "RefreshCw":
-                                return RefreshCw;
-                              case "Search":
-                                return Search;
-                              case "Settings":
-                                return Settings;
-                              case "Shield":
-                                return Shield;
-                              case "TrendingUp":
-                                return TrendingUp;
-                              case "Users":
-                                return Users;
-                              case "X":
-                                return X;
-                              case "XCircle":
-                                return XCircle;
-                              case "Zap":
-                                return Zap;
-                              case "Target":
-                                return Target;
-                              case "Flag":
-                                return Flag;
-                              case "Bell":
-                                return Bell;
-                              case "Database":
-                                return Database;
-                              case "Save":
-                                return Save;
-                              case "MoreHorizontal":
-                                return MoreHorizontal;
-                              case "ChevronDown":
-                                return ChevronDown;
-                              case "ChevronUp":
-                                return ChevronUp;
-                              case "ChevronLeft":
-                                return ChevronLeft;
-                              case "ChevronRight":
-                                return ChevronRight;
-                              case "ArrowUp":
-                                return ArrowUp;
-                              case "ArrowDown":
-                                return ArrowDown;
-                              case "ArrowLeft":
-                                return ArrowLeft;
-                              case "ArrowRight":
-                                return ArrowRight;
-                              case "Minus":
-                                return Minus;
-                              case "Maximize2":
-                                return Maximize2;
-                              case "Minimize2":
-                                return Minimize2;
-                              case "RotateCcw":
-                                return RotateCcw;
-                              case "RotateCw":
-                                return RotateCw;
-                              case "ZoomIn":
-                                return ZoomIn;
-                              case "ZoomOut":
-                                return ZoomOut;
-                              case "Move":
-                                return Move;
-                              case "Copy":
-                                return Copy;
-                              case "Scissors":
-                                return Scissors;
-                              case "Link":
-                                return Link;
-                              case "Unlink":
-                                return Unlink;
-                              case "Lock":
-                                return Lock;
-                              case "Unlock":
-                                return Unlock;
-                              case "Key":
-                                return Key;
-                              case "Mail":
-                                return Mail;
-                              case "Phone":
-                                return Phone;
-                              case "MessageSquare":
-                                return MessageSquare;
-                              case "Video":
-                                return Video;
-                              case "Camera":
-                                return Camera;
-                              case "Mic":
-                                return Mic;
-                              case "Headphones":
-                                return Headphones;
-                              case "Volume2":
-                                return Volume2;
-                              case "VolumeX":
-                                return VolumeX;
-                              case "Play":
-                                return Play;
-                              case "Pause":
-                                return Pause;
-                              case "SkipBack":
-                                return SkipBack;
-                              case "SkipForward":
-                                return SkipForward;
-                              case "Rewind":
-                                return Rewind;
-                              case "FastForward":
-                                return FastForward;
-                              case "Shuffle":
-                                return Shuffle;
-                              case "Repeat":
-                                return Repeat;
-                              case "Volume1":
-                                return Volume1;
-                              case "Volume":
-                                return Volume;
-                              case "Speaker":
-                                return Speaker;
-                              case "Radio":
-                                return Radio;
-                              case "Tv":
-                                return Tv;
-                              case "Monitor":
-                                return Monitor;
-                              case "Smartphone":
-                                return Smartphone;
-                              case "Tablet":
-                                return Tablet;
-                              case "Laptop":
-                                return Laptop;
-                              case "Server":
-                                return Server;
-                              case "Mouse":
-                                return Mouse;
-                              case "Keyboard":
-                                return Keyboard;
-                              case "MonitorSpeaker":
-                                return MonitorSpeaker;
-                              case "User":
-                                return User;
-                              case "Home":
-                                return Home;
-                              case "Car":
-                                return Car;
-                              case "Building2":
-                                return Building2;
-                              case "Star":
-                                return Star;
-                              case "Heart":
-                                return Heart;
-                              case "Briefcase":
-                                return Briefcase;
-                              default:
-                                return AlertCircle; // Default fallback
-                            }
-                          };
-                          const IconComponent = getIconComponent(item.icon || 'AlertCircle');
+                          const IconComponent = AlertCircle; // Use AlertCircle as default icon
                           return (
-                            <tr key={item.id || `item-${Math.random()}`}>
-                              <td className="p-2 md:p-4">
-                                <div className="flex items-center gap-2 md:gap-3">
-                                  <div className="p-1.5 md:p-2 rounded-lg bg-blue-100">
-                                    <IconComponent className="h-3 w-3 md:h-4 md:w-4 text-blue-600" />
+                            <tr key={item.id || `item-${Math.random()}`} className="hover:bg-gray-50 transition-colors duration-200">
+                              <td className="p-2 md:p-3">
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 rounded-lg bg-blue-100 flex-shrink-0">
+                                    <IconComponent className="h-3 w-3 text-blue-600" />
                                   </div>
-                                  <span className="font-medium transition-colors duration-300 text-xs md:text-sm text-gray-900">{item.municipality}</span>
+                                  <span className="font-medium text-xs md:text-sm text-gray-900 truncate" title={item.municipality}>
+                                    {item.municipality}
+                                  </span>
                                 </div>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <Badge variant="outline" className="text-xs md:text-sm bg-gray-100 text-gray-700 border-gray-300">
+                              <td className="p-2 md:p-3">
+                                <Badge variant="outline" className="text-xs bg-gray-100 text-gray-700 border-gray-300">
                                   {item.district}
                                 </Badge>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.what}>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[280px] block" title={item.what}>
                                   {typeof item.what === 'string' ? item.what : 'N/A'}
                                 </span>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm transition-colors duration-300 text-gray-600">
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
                                   {formatDate(item.when)}
                                 </span>
                               </td>
-                              <td className="p-2 md:p-4">
-                                <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700">{typeof item.where === 'string' ? item.where : 'N/A'}</span>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[160px] block" title={item.where}>
+                                  {typeof item.where === 'string' ? item.where : 'N/A'}
+                                </span>
                               </td>
                               {false && (
                               <td className="p-4">
@@ -2111,8 +2109,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </td>
                                 </>
                               )}
-                              <td className="p-2 md:p-4">
-                                <Badge className={`rounded-none text-xs md:text-sm ${
+                              <td className="p-2 md:p-3">
+                                <Badge className={`rounded-none text-xs ${
                                   item.actionTaken === "Resolved" 
                                     ? "bg-green-100 text-green-800"
                                     : "bg-gray-100 text-gray-800"
@@ -2120,13 +2118,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                   {typeof item.actionTaken === 'string' ? item.actionTaken : 'N/A'}
                                 </Badge>
                               </td>
-                              {/* Hide Source column data for Agriculture tab */}
-                              {activeTab !== "agriculture" && (
-                                <td className="p-2 md:p-4">
-                                  <span className="text-xs md:text-sm break-words leading-relaxed transition-colors duration-300 text-gray-700" title={item.source}>
+                              {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                              {activeTab === "pnp" && (
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.source}>
                                     {typeof item.source === 'string' ? item.source : 'N/A'}
-                                </span>
-                              </td>
+                                  </span>
+                                </td>
+                              )}
+                              {(activeTab === "agriculture" || activeTab === "pg-enro") && (
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.otherInfo}>
+                                    {typeof item.otherInfo === 'string' ? item.otherInfo : 'N/A'}
+                                  </span>
+                                </td>
                               )}
                                                              {/* Other Information column data hidden */}
                                {/* <td className="p-4">
@@ -2134,34 +2139,34 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                                    {item.otherInfo}
                                  </span>
                                </td> */}
-                              <td className="p-2 md:p-4">
-                                <div className="flex items-center gap-1 md:gap-2">
+                              <td className="p-2 md:p-3">
+                                <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "view")}
                                     title="View Details"
-                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-400 p-1 md:p-2"
+                                    className="bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100 p-1"
                                   >
-                                    <Eye className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Eye className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "edit")}
                                     title="Edit"
-                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 dark:bg-green-900/30 dark:border-green-800 dark:text-green-400 p-1 md:p-2"
+                                    className="bg-green-50 border-green-200 text-green-700 hover:bg-green-100 p-1"
                                   >
-                                    <Edit className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Edit className="h-3 w-3" />
                                   </Button>
                                   <Button
                                     size="sm"
                                     variant="outline"
                                     onClick={() => handleAction(item.id || 'unknown', "delete")}
                                     title="Delete"
-                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:border-red-800 dark:text-red-400 p-1 md:p-2"
+                                    className="bg-red-50 border-red-200 text-red-700 hover:bg-red-100 p-1"
                                   >
-                                    <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
+                                    <Trash2 className="h-3 w-3" />
                                   </Button>
                                 </div>
                               </td>
@@ -2272,95 +2277,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     required
                   />
                 </div>
-                {/* Type of Illegals - Visible for all departments */}
-                {newActionReport.department && (
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      Type of Illegals <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={newActionReport.illegalType || ""}
-                        onChange={(e) => handleInputChange('illegalType', e.target.value)}
-                        className="flex-1 p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      >
-                        <option value="">Select Type of Illegals</option>
-                        {/* PNP Illegal Types */}
-                        {newActionReport.department === "pnp" && (
-                          <>
-                            <option value="illegal-possession">Illegal Possession</option>
-                            <option value="illegal-trafficking">Illegal Trafficking</option>
-                            <option value="illegal-gambling">Illegal Gambling</option>
-                            <option value="illegal-prostitution">Illegal Prostitution</option>
-                            <option value="illegal-cybercrime">Illegal Cybercrime</option>
-                            <option value="illegal-vehicles">Illegal Vehicles</option>
-                            <option value="illegal-weapons">Illegal Weapons</option>
-                            <option value="illegal-drugs">Illegal Drugs</option>
-                            <option value="illegal-alcohol">Illegal Alcohol</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* Agriculture / Bantay Dagat Illegal Types */}
-                        {newActionReport.department === "agriculture" && (
-                          <>
-                            <option value="illegal-fishing">Illegal Fishing</option>
-                            <option value="illegal-fishing-gear">Illegal Fishing Gear</option>
-                            <option value="illegal-fish-size">Illegal Fish Size</option>
-                            <option value="illegal-fishing-season">Illegal Fishing Season</option>
-                            <option value="illegal-fishing-zone">Illegal Fishing Zone</option>
-                            <option value="illegal-fish-species">Illegal Fish Species</option>
-                            <option value="illegal-fish-transport">Illegal Fish Transport</option>
-                            <option value="illegal-fish-sale">Illegal Fish Sale</option>
-                            <option value="illegal-fish-processing">Illegal Fish Processing</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* PG-ENRO / AGRICULTURE Illegal Types */}
-                        {newActionReport.department === "pg-enro" && (
-                          <>
-                            <option value="illegal-fishing">Illegal Fishing</option>
-                            <option value="illegal-logging">Illegal Logging</option>
-                            <option value="illegal-mining">Illegal Mining</option>
-                            <option value="illegal-quarrying">Illegal Quarrying</option>
-                            <option value="illegal-dumping">Illegal Dumping</option>
-                            <option value="illegal-construction">Illegal Construction</option>
-                            <option value="illegal-encroachment">Illegal Encroachment</option>
-                            <option value="illegal-harvesting">Illegal Harvesting</option>
-                            <option value="illegal-waste">Illegal Waste Disposal</option>
-                            <option value="illegal-pollution">Illegal Pollution</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* Custom Illegal Types */}
-                        {newActionReport.department && customIllegalTypes[newActionReport.department]?.map((customType, index) => (
-                          <option key={index} value={customType}>
-                            {customType} (Custom)
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        type="button"
-                        onClick={() => setShowAddIllegalTypeModal(true)}
-                        variant="outline"
-                        className="p-3 border-2 border-dashed transition-all duration-200 border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600"
-                        title="Add New Type of Illegals"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {newActionReport.illegalType === "other" && (
-                      <Input
-                        type="text"
-                        placeholder="Specify other type of illegals..."
-                        value={newActionReport.otherIllegalType || ""}
-                        onChange={(e) => handleInputChange('otherIllegalType', e.target.value)}
-                        className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    )}
-                  </div>
-                )}
+
                 {/* When - Always visible */}
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-700">
@@ -2575,63 +2492,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
-        {/* Add New Illegal Type Modal */}
-        {showAddIllegalTypeModal && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="p-6 rounded-xl shadow-2xl max-w-md w-full border bg-white/95 text-gray-900 border-gray-300 shadow-gray-900/20">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-xl bg-green-100">
-                    <Plus className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold">Add New Illegal Type</h3>
-                    <p className="text-sm text-gray-600">Add a new type of illegals to the system</p>
-                  </div>
-                </div>
-                <Button
-                  onClick={() => setShowAddIllegalTypeModal(false)}
-                  variant="ghost"
-                  size="sm"
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              <div className="space-y-4 mb-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-semibold text-gray-700">
-                    New Illegal Type <span className="text-red-500">*</span>
-                  </label>
-                  <Input
-                    type="text"
-                    placeholder="Enter new type of illegals..."
-                    value={newIllegalType}
-                    onChange={(e) => setNewIllegalType(e.target.value)}
-                    className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex gap-3 justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                <Button 
-                  onClick={() => setShowAddIllegalTypeModal(false)} 
-                  variant="outline"
-                  className="border-gray-300 text-gray-700 hover:bg-gray-50"
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleAddIllegalType}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Type
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+
         {/* Edit Action Report Modal */}
         {showEditModal && editingItem && (
              <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50 p-4">
@@ -2717,95 +2578,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     required
                   />
                 </div>
-                {/* Type of Illegals - Visible for all departments */}
-                {editingItem.department && (
-                <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700">
-                      Type of Illegals <span className="text-red-500">*</span>
-                    </label>
-                    <div className="flex gap-2">
-                      <select
-                        value={editingItem.illegalType || ""}
-                        onChange={(e) => handleEditInputChange('illegalType', e.target.value)}
-                        className="flex-1 p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      >
-                        <option value="">Select Type of Illegals</option>
-                        {/* PNP Illegal Types */}
-                        {editingItem.department === "pnp" && (
-                          <>
-                            <option value="illegal-possession">Illegal Possession</option>
-                            <option value="illegal-trafficking">Illegal Trafficking</option>
-                            <option value="illegal-gambling">Illegal Gambling</option>
-                            <option value="illegal-prostitution">Illegal Prostitution</option>
-                            <option value="illegal-cybercrime">Illegal Cybercrime</option>
-                            <option value="illegal-vehicles">Illegal Vehicles</option>
-                            <option value="illegal-weapons">Illegal Weapons</option>
-                            <option value="illegal-drugs">Illegal Drugs</option>
-                            <option value="illegal-alcohol">Illegal Alcohol</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* Agriculture / Bantay Dagat Illegal Types */}
-                        {editingItem.department === "agriculture" && (
-                          <>
-                            <option value="illegal-fishing">Illegal Fishing</option>
-                            <option value="illegal-fishing-gear">Illegal Fishing Gear</option>
-                            <option value="illegal-fish-size">Illegal Fish Size</option>
-                            <option value="illegal-fishing-season">Illegal Fishing Season</option>
-                            <option value="illegal-fishing-zone">Illegal Fishing Zone</option>
-                            <option value="illegal-fish-species">Illegal Fish Species</option>
-                            <option value="illegal-fish-transport">Illegal Fish Transport</option>
-                            <option value="illegal-fish-sale">Illegal Fish Sale</option>
-                            <option value="illegal-fish-processing">Illegal Fish Processing</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* PG-ENRO / AGRICULTURE Illegal Types */}
-                        {editingItem.department === "pg-enro" && (
-                          <>
-                            <option value="illegal-fishing">Illegal Fishing</option>
-                            <option value="illegal-logging">Illegal Logging</option>
-                            <option value="illegal-mining">Illegal Mining</option>
-                            <option value="illegal-quarrying">Illegal Quarrying</option>
-                            <option value="illegal-dumping">Illegal Dumping</option>
-                            <option value="illegal-construction">Illegal Construction</option>
-                            <option value="illegal-encroachment">Illegal Encroachment</option>
-                            <option value="illegal-harvesting">Illegal Harvesting</option>
-                            <option value="illegal-waste">Illegal Waste Disposal</option>
-                            <option value="illegal-pollution">Illegal Pollution</option>
-                            <option value="other">Other</option>
-                          </>
-                        )}
-                        {/* Custom Illegal Types */}
-                        {editingItem.department && customIllegalTypes[editingItem.department]?.map((customType, index) => (
-                          <option key={index} value={customType}>
-                            {customType} (Custom)
-                          </option>
-                        ))}
-                      </select>
-                      <Button
-                        type="button"
-                        onClick={() => setShowAddIllegalTypeModal(true)}
-                        variant="outline"
-                        className="p-3 border-2 border-dashed transition-all duration-200 border-gray-300 text-gray-600 hover:border-blue-500 hover:text-blue-600"
-                        title="Add New Type of Illegals"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {editingItem.illegalType === "other" && (
-                      <Input
-                        type="text"
-                        placeholder="Specify other type of illegals..."
-                        value={editingItem.otherIllegalType || ""}
-                        onChange={(e) => handleEditInputChange('otherIllegalType', e.target.value)}
-                        className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    )}
-                  </div>
-                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-700">
                     When <span className="text-red-500">*</span>
@@ -2848,6 +2621,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 )}
+                {/* Gender - Only visible for PNP */}
+                {editingItem.department === "pnp" && (
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-gray-700">
                     Gender
@@ -2862,6 +2637,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <option value="female">Female</option>
                   </select>
                 </div>
+                )}
                 {/* Hidden: Why */}
                 {false && (
                   <div className="space-y-2">
@@ -2877,7 +2653,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   />
                 </div>
                 )}
-                {/* Source */}
+                {/* Source - Only visible for PNP */}
+                {editingItem.department === "pnp" && (
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-semibold text-gray-700">
                     Source
@@ -2890,6 +2667,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     className="w-full p-3 rounded-lg border transition-all duration-200 border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   />
                 </div>
+                )}
                 {/* Hidden: How */}
                 {false && (
                 <div className="space-y-2">
@@ -3091,7 +2869,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                             size="sm"
                             className="text-yellow-600 border-yellow-600 hover:bg-yellow-50"
                           >
-                            <RefreshCw className="h-4 w-4 mr-2" />
+                            <RotateCw className="h-4 w-4 mr-2" />
                             Migrate Legacy Photos
                           </Button>
                         )}
@@ -3178,9 +2956,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <div className="space-y-2">
                             <span className="text-sm font-medium text-gray-600">Type of Illegals</span>
                             <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">
-                              {viewingItem.illegalType === "other" 
-                                ? viewingItem.otherIllegalType || 'N/A'
-                                : viewingItem.illegalType || 'N/A'}
+                                                  N/A
                             </p>
                           </div>
                         )}
@@ -3192,10 +2968,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <span className="text-sm font-medium text-gray-600">Reason</span>
                           <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.why || 'N/A'}</p>
                         </div>
-                        <div className="space-y-2">
-                          <span className="text-sm font-medium text-gray-600">Source</span>
-                          <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.source || 'N/A'}</p>
-                        </div>
+                        {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
+                        {viewingItem.department === "pnp" && (
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium text-gray-600">Source</span>
+                            <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.source || 'N/A'}</p>
+                          </div>
+                        )}
+                        {(viewingItem.department === "agriculture" || viewingItem.department === "pg-enro") && (
+                          <div className="space-y-2">
+                            <span className="text-sm font-medium text-gray-600">Other Information</span>
+                            <p className="text-sm p-3 rounded-lg bg-gray-100 text-gray-700">{viewingItem.otherInfo || 'N/A'}</p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3301,7 +3086,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">Action Center Report Preview</h3>
                     <p className="text-sm text-gray-600">
-                      {months[selectedMonth] || 'All Months'} {selectedYear || 'All Years'} • {activeTab?.toUpperCase()}
+                      {(() => {
+                        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        return `${monthNames[selectedMonth] || 'All Months'} ${selectedYear || 'All Years'} • ${activeTab?.toUpperCase()}`;
+                      })()}
                     </p>
                   </div>
                 </div>
@@ -3336,91 +3124,131 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               
               {/* Preview Content */}
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-                                 {/* Report Header */}
-                 <div className="text-center mb-8 p-6 bg-blue-50 rounded-xl border border-blue-200">
-                   <h1 className="text-3xl font-bold text-blue-900 mb-2">Action Center Report</h1>
-                   {pdfDescription && pdfDescription.trim() && (
-                     <p className="text-sm italic text-blue-700 mb-4 max-w-2xl mx-auto">
-                       {pdfDescription}
-                     </p>
-                   )}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                      <span className="font-semibold text-blue-700">Month:</span>
-                      <p className="text-blue-900">{months[selectedMonth] || 'All Months'}</p>
+                {/* Report Header */}
+                <div className="mb-8">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+                    <div className="mb-4 md:mb-0">
+                      <h1 className="text-3xl font-bold mb-2">Action Center Report</h1>
+                      {pdfDescription && pdfDescription.trim() && (
+                        <p className="text-sm text-blue-100 max-w-2xl">
+                          {pdfDescription}
+                        </p>
+                      )}
                     </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">Year:</span>
-                      <p className="text-blue-900">{selectedYear || 'All Years'}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">District:</span>
-                      <p className="text-blue-900">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
-                    </div>
-                    <div>
-                      <span className="font-semibold text-blue-700">Department:</span>
-                      <p className="text-blue-900">{(activeTab || 'unknown').toUpperCase()}</p>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Month</p>
+                        <p className="font-semibold">{months[selectedMonth] || 'All Months'}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Year</p>
+                        <p className="font-semibold">{selectedYear || 'All Years'}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">District</p>
+                        <p className="font-semibold">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Department</p>
+                        <p className="font-semibold">{(activeTab || 'unknown').toUpperCase()}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Summary Statistics */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Summary Statistics</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Total Actions</p>
-                      <p className="text-2xl font-bold text-blue-600">{totalActions}</p>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                    Summary Statistics
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-blue-600">Total Actions</p>
+                        <p className="text-3xl font-bold text-blue-700">{totalActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Activity className="w-16 h-16 text-blue-600" />
+                      </div>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Pending Actions</p>
-                      <p className="text-2xl font-bold text-orange-600">{pendingActions}</p>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-orange-600">Pending Actions</p>
+                        <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Clock className="w-16 h-16 text-orange-600" />
+                      </div>
                     </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">Resolved Actions</p>
-                      <p className="text-2xl font-bold text-green-600">{resolvedActions}</p>
-                    </div>
-                    <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <p className="text-sm font-medium text-gray-600">High Priority</p>
-                      <p className="text-2xl font-bold text-red-600">{highPriorityActions}</p>
-                    </div>
+
                     
                     {/* Tab-specific statistics */}
                     {activeTab === "pnp" && (
                       <>
-                        <div className="p-4 bg-red-50 rounded-lg border border-red-200">
-                          <p className="text-sm font-medium text-red-600">Total Drugs</p>
-                          <p className="text-2xl font-bold text-red-600">{totalDrugs}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-red-600">Total Drugs</p>
+                            <p className="text-3xl font-bold text-red-700">{totalDrugs}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Pill className="w-16 h-16 text-red-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                          <p className="text-sm font-medium text-purple-600">Total Illegals</p>
-                          <p className="text-2xl font-bold text-purple-600">{totalIllegals}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-purple-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-purple-700">{totalIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Shield className="w-16 h-16 text-purple-600" />
+                          </div>
                         </div>
                       </>
                     )}
                     
                     {activeTab === "agriculture" && (
                       <>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-medium text-green-600">Total Illegals</p>
-                          <p className="text-2xl font-bold text-green-600">{totalAgricultureIllegals}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-green-700">{totalAgricultureIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Leaf className="w-16 h-16 text-green-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
-                          <p className="text-2xl font-bold text-blue-600">{totalFishingViolations}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalFishingViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Fish className="w-16 h-16 text-blue-600" />
+                          </div>
                         </div>
                       </>
                     )}
                     
                     {activeTab === "pg-enro" && (
                       <>
-                        <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                          <p className="text-sm font-medium text-green-600">Environmental</p>
-                          <p className="text-2xl font-bold text-green-600">{totalEnvironmentalViolations}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Environmental</p>
+                            <p className="text-3xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trees className="w-16 h-16 text-green-600" />
+                          </div>
                         </div>
-                        <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                          <p className="text-sm font-medium text-blue-600">Waste Management</p>
-                          <p className="text-2xl font-bold text-blue-600">{totalWasteManagement}</p>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Waste Management</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalWasteManagement}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trash2 className="w-16 h-16 text-blue-600" />
+                          </div>
                         </div>
                       </>
                     )}
@@ -3429,58 +3257,130 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                 {/* Action Items Table */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Action Items Details</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-200 rounded-lg">
-                      <thead className="bg-blue-600 text-white">
-                        <tr>
-                          <th className="p-3 text-left text-sm font-semibold">Municipality</th>
-                          <th className="p-3 text-left text-sm font-semibold">District</th>
-                          <th className="p-3 text-left text-sm font-semibold">What</th>
-                          <th className="p-3 text-left text-sm font-semibold">When</th>
-                          <th className="p-3 text-left text-sm font-semibold">Where</th>
-                          <th className="p-3 text-left text-sm font-semibold">Action Taken</th>
-                          {activeTab === "pnp" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
-                          {activeTab === "agriculture" && <th className="p-3 text-left text-sm font-semibold">Illegal Type</th>}
-                          {activeTab === "pg-enro" && <th className="p-3 text-left text-sm font-semibold">Source</th>}
-                          <th className="p-3 text-left text-sm font-semibold">Other Info</th>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                    Action Items Details
+                  </h2>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Municipality</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">District</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">What</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">When</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Where</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Taken</div>
+                          </th>
+                          {activeTab === "pnp" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                            </th>
+                          )}
+                          {activeTab === "agriculture" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
+                            </th>
+                          )}
+                          {activeTab === "pg-enro" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
+                            </th>
+                          )}
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Info</div>
+                          </th>
                         </tr>
                       </thead>
-                      <tbody>
+                      <tbody className="divide-y divide-gray-200">
                         {(sortedItems || []).slice(0, 20).map((item, index) => (
-                          <tr key={item.id || index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                            <td className="p-3 text-sm border-b border-gray-200">{item.municipality || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">{item.district || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.what}>{item.what || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">{formatDate(item.when)}</td>
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.where}>{item.where || 'N/A'}</td>
-                            <td className="p-3 text-sm border-b border-gray-200">
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                item.actionTaken === "Resolved" 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : 'bg-gray-100 text-gray-800'
-                              }`}>
-                                {item.actionTaken || 'N/A'}
-                              </span>
+                          <tr 
+                            key={item.id || index} 
+                            className="hover:bg-gray-50 transition-colors duration-150"
+                          >
+                            <td className="p-4">
+                              <div className="flex items-center">
+                                <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                                <span className="text-sm font-medium text-gray-900">{item.municipality || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className="font-medium">
+                                {item.district || 'N/A'}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.what}>
+                                {item.what || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="text-sm text-gray-700">{formatDate(item.when)}</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.where}>
+                                {item.where || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge 
+                                className={`${
+                                  item.actionTaken === "Resolved"
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                }`}
+                              >
+                                {item.actionTaken || 'Pending'}
+                              </Badge>
                             </td>
                             {activeTab === "pnp" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
+                                  {item.source || 'N/A'}
+                                </div>
+                              </td>
                             )}
                             {activeTab === "agriculture" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.illegalType}>{item.illegalType || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
+                                </div>
+                              </td>
                             )}
                             {activeTab === "pg-enro" && (
-                              <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.source}>{item.source || 'N/A'}</td>
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
+                                </div>
+                              </td>
                             )}
-                            <td className="p-3 text-sm border-b border-gray-200 max-w-xs truncate" title={item.otherInfo}>{item.otherInfo || 'N/A'}</td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                {item.otherInfo || 'N/A'}
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                     {sortedItems && sortedItems.length > 20 && (
-                      <p className="text-sm text-gray-600 mt-2 text-center">
-                        Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
-                      </p>
+                      <div className="p-4 border-t border-gray-200 bg-gray-50">
+                        <p className="text-sm text-gray-600 text-center flex items-center justify-center">
+                          <AlertCircle className="w-4 h-4 mr-2 text-blue-500" />
+                          Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>

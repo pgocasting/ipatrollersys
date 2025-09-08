@@ -10,13 +10,13 @@ import {
   AlertTriangle, 
   BarChart3, 
   Settings,
-  Shield,
   Menu,
   X,
   Bell,
   User,
   LogOut,
-  Activity
+  Activity,
+  Command
 } from "lucide-react";
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
@@ -52,6 +52,13 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [sidebarOpen]);
+
+  // Close sidebar when navigating to a new page on mobile
+  useEffect(() => {
+    if (sidebarOpen && window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, [currentPage, sidebarOpen]);
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
@@ -70,10 +77,24 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   const navigationItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
     { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" /> },
+    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" /> },
     { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" /> },
     { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" /> },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" /> },
   ];
+
+  const handleNavigation = (pageId) => {
+    // Close mobile sidebar
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+    
+    // Navigate to page
+    onNavigate(pageId);
+    
+    // Update browser history without adding to back stack
+    window.history.replaceState({ page: pageId }, '', `/${pageId}`);
+  };
 
   return (
     <div className="min-h-screen transition-all duration-300 max-w-full bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -88,16 +109,18 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       {/* Responsive Sidebar */}
       <aside 
         id="sidebar"
-        className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-4 flex flex-col transition-all duration-300 overflow-y-auto ${
+        className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-1 flex flex-col transition-all duration-300 overflow-y-auto ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         } bg-white/95 border-gray-200`}
       >        
         {/* Sidebar Header */}
-        <div className="flex items-center justify-between mb-8">
-                      <div className="text-xl md:text-2xl font-bold tracking-tight flex items-center gap-2 transition-colors duration-300 text-blue-700">
-            <Shield className="h-8 w-8" />
-            <span className="hidden md:inline">Dashboard</span>
-            <span className="md:hidden">IPatroller</span>
+        <div className="flex items-center justify-center mb-2">
+          <div className="flex items-center justify-center transition-colors duration-300">
+            <img 
+              src="/images/Ipatroller_Logo.png" 
+              alt="IPatroller Logo" 
+              className="h-32 w-auto"
+            />
           </div>
           
           {/* Close button for mobile */}
@@ -117,11 +140,10 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             <Button
               key={item.id}
               onClick={() => { 
-                setSidebarOpen(false); 
-                onNavigate(item.id); 
+                handleNavigation(item.id); 
               }}
               variant={currentPage === item.id ? "default" : "ghost"}
-              className={`justify-start h-12 text-base font-medium transition-all duration-200 ${
+              className={`justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
                 currentPage === item.id 
                   ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
                   : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
@@ -137,11 +159,10 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         <div className="mt-auto pt-4 border-t transition-colors duration-300 border-gray-200">
           <Button
             onClick={() => { 
-              setSidebarOpen(false); 
-              onNavigate('settings'); 
+              handleNavigation('settings'); 
             }}
             variant={currentPage === 'settings' ? "default" : "ghost"}
-            className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 ${
+            className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
               currentPage === 'settings' 
                 ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
                 : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
@@ -168,9 +189,16 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
         </Button>
 
         {/* Page Title */}
-        <h1 className="text-lg md:text-2xl font-bold capitalize flex-1 truncate transition-colors duration-300 text-gray-900">
-          {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
-        </h1>
+        <div className="flex items-center gap-3 flex-1">
+          <img 
+            src="/images/Ipatroller_Logo.png" 
+            alt="IPatroller Logo" 
+            className="h-44 w-auto md:hidden"
+          />
+          <h1 className="text-lg md:text-2xl font-bold capitalize truncate transition-colors duration-300 text-gray-900">
+            {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
+          </h1>
+        </div>
 
         {/* Right side controls */}
         <div className="flex items-center gap-2 md:gap-3">

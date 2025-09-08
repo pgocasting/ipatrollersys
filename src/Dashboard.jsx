@@ -40,12 +40,12 @@ import {
   TrendingUp,
   AlertCircle,
   X,
-  RefreshCw,
   Target,
   Trophy,
   Calendar,
   Eye,
-  Image
+  Image,
+  Menu
 } from "lucide-react";
 import { Button } from "./components/ui/button";
 
@@ -67,7 +67,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     incidents, 
     ipatrollerData, // Add IPatroller data
     summaryStats, 
-    loading: dataLoading 
+    loading: dataLoading,
+    refreshIPatrollerData,
+    createSampleData
   } = useData();
   const [showActiveModal, setShowActiveModal] = useState(false);
   const [showInactiveModal, setShowInactiveModal] = useState(false);
@@ -77,6 +79,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const [showTopPerformersPreview, setShowTopPerformersPreview] = useState(false);
   const [selectedTopPerformersMonth, setSelectedTopPerformersMonth] = useState(new Date().getMonth());
   const [selectedTopPerformersYear, setSelectedTopPerformersYear] = useState(new Date().getFullYear());
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('dashboard-menu-dropdown');
+        const button = document.getElementById('dashboard-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
 
   const handleLogout = async () => {
     try {
@@ -752,8 +771,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
    const districtTotals = {};
    ipatrollerData.forEach(row => {
      const district = row.district;
-     const totalPatrols = row.data.reduce((sum, val) => sum + val, 0);
-     districtTotals[district] = (districtTotals[district] || 0) + totalPatrols;
+     // Safety check before calling reduce
+     if (row.data && Array.isArray(row.data)) {
+       const totalPatrols = row.data.reduce((sum, val) => sum + (val || 0), 0);
+       districtTotals[district] = (districtTotals[district] || 0) + totalPatrols;
+     }
    });
 
    // Calculate total patrols across all districts
@@ -781,31 +803,138 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
      ],
    };
 
-  // Calculate active and inactive municipalities using IPatroller data
-  const activeMunicipalitiesList = ipatrollerData.filter(row => {
-    if (!row.data || !Array.isArray(row.data)) return false;
-    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
-    return avgPatrols >= 5;
-  });
-  const inactiveMunicipalitiesList = ipatrollerData.filter(row => {
-    if (!row.data || !Array.isArray(row.data)) return false;
-    const avgPatrols = row.data.reduce((a, b) => a + (b || 0), 0) / row.data.length;
-    return avgPatrols <= 4;
-  });
+  // Define all 12 municipalities (3 districts × 4 municipalities each)
+  const allMunicipalities = [
+    "Abucay", "Orani", "Samal", "Hermosa",           // 1ST DISTRICT
+    "Balanga City", "Pilar", "Orion", "Limay",       // 2ND DISTRICT
+    "Bagac", "Dinalupihan", "Mariveles", "Morong"   // 3RD DISTRICT
+  ];
+
+  // Use data from DataContext instead of calculating locally
+  const totalMunicipalities = 12; // Always 12 municipalities
   
-  // Total municipalities is always 12 (3 districts × 4 municipalities each)
-  const totalMunicipalities = 12;
-  const activeCount = activeMunicipalitiesList.length;
-  const inactiveCount = inactiveMunicipalitiesList.length;
+  // Calculate active municipalities for YESTERDAY (previous day of the month)
+  const getYesterdayActiveCount = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+    
+    console.log('🔍 getYesterdayActiveCount Debug:');
+    console.log('  Today:', today.toLocaleDateString());
+    console.log('  Today full date:', today.toString());
+    console.log('  Yesterday:', yesterday.toLocaleDateString());
+    console.log('  Yesterday full date:', yesterday.toString());
+    console.log('  Yesterday day of month:', yesterday.getDate());
+    console.log('  Calculated array index:', currentDay);
+    console.log('  IPatroller data length:', ipatrollerData.length);
+    
+    if (ipatrollerData.length === 0) return 0;
+    
+    let activeYesterday = 0;
+    let debugDetails = [];
+    
+    // Log the first few municipalities' data structure to understand the format
+    console.log('🔍 Sample data structure:');
+    ipatrollerData.forEach((item, index) => {
+      console.log(`  ${item.municipality}:`, {
+        dataLength: item.data ? item.data.length : 'No data',
+        sampleData: item.data ? item.data.slice(0, 10) : 'No data',
+        totalPatrols: item.totalPatrols,
+        month: item.month,
+        year: item.year,
+        patrolsForYesterday: item.data ? item.data[currentDay] : 'No data',
+        isActiveYesterday: item.data ? item.data[currentDay] >= 5 : false
+      });
+    });
+    
+    ipatrollerData.forEach((item, index) => {
+      if (item.data && Array.isArray(item.data) && item.data[currentDay] !== undefined) {
+        const patrols = item.data[currentDay];
+        const isActive = patrols >= 5; // Municipality is active only if it has 5 or more patrols
+        
+        debugDetails.push({
+          municipality: item.municipality,
+          dayIndex: currentDay,
+          patrols: patrols,
+          isActive: isActive,
+          dataArray: item.data.slice(0, 10) // Show first 10 elements for debugging
+        });
+        
+        // Check if municipality has patrols for yesterday
+        if (isActive) {
+          activeYesterday++;
+        }
+      } else {
+        console.log(`⚠️ Municipality ${item.municipality} has no data for day ${currentDay}`);
+        console.log(`  Data structure:`, item.data);
+      }
+    });
+    
+    console.log('  Debug details for each municipality:', debugDetails);
+    console.log('  Final active count:', activeYesterday);
+    
+    return activeYesterday;
+  };
+  
+  const activeCount = getYesterdayActiveCount();
+  const inactiveCount = totalMunicipalities - activeCount;
+  const correctedInactiveCount = inactiveCount;
+
+  // Calculate active municipalities list for modals (for YESTERDAY only)
+  const activeMunicipalitiesList = ipatrollerData.filter(item => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+    
+    if (item.data && Array.isArray(item.data) && item.data[currentDay] !== undefined) {
+      // Municipality is active YESTERDAY if it has 5 or more patrols for yesterday
+      return item.data[currentDay] >= 5;
+    }
+    return false;
+  });
   
   // Debug logging
   console.log('Dashboard Data:', {
     ipatrollerDataLength: ipatrollerData.length,
+    allMunicipalitiesCount: allMunicipalities.length,
     activeCount,
     inactiveCount,
+    correctedInactiveCount,
     totalMunicipalities: 12,
+    calculatedTotal: activeCount + correctedInactiveCount,
+    activeMunicipalities: activeMunicipalitiesList,
+    summaryStats: {
+      activeMunicipalities: summaryStats.activeMunicipalities,
+      inactiveMunicipalities: summaryStats.inactiveMunicipalities,
+      totalDailyPatrols: summaryStats.totalDailyPatrols,
+      activeDistricts: summaryStats.activeDistricts
+    },
     sampleIPatrollerData: ipatrollerData[0] ? ipatrollerData[0].data : 'No IPatroller data'
   });
+  
+  // Debug: Log what data is actually being used for calculations
+  console.log('🔍 Dashboard Calculation Debug:');
+  console.log('  summaryStats.activeMunicipalities:', summaryStats.activeMunicipalities);
+  console.log('  summaryStats.inactiveMunicipalities:', summaryStats.inactiveMunicipalities);
+  console.log('  ipatrollerData.length:', ipatrollerData.length);
+  console.log('  activeMunicipalitiesList.length:', activeMunicipalitiesList.length);
+  
+  // Debug: Log yesterday's data calculations
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+  const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+  console.log('📅 Yesterday\'s date:', yesterday.toLocaleDateString());
+  console.log('📊 Current day index for yesterday:', currentDay);
+  console.log('📊 Calculated activeCount for yesterday:', activeCount);
+  console.log('📊 Calculated inactiveCount for yesterday:', correctedInactiveCount);
+
+  // Validation: Ensure counts add up to total municipalities
+  if (activeCount + correctedInactiveCount !== totalMunicipalities) {
+    console.warn(`⚠️ Municipality count mismatch: Active (${activeCount}) + Corrected Inactive (${correctedInactiveCount}) = ${activeCount + correctedInactiveCount}, Expected: ${totalMunicipalities}`);
+  }
 
   const chartOptions = {
     responsive: true,
@@ -939,56 +1068,91 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </span>
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => window.location.reload()}
-              disabled={dataLoading}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base"
-              title="Refresh Data"
-            >
-              <RefreshCw className={`w-4 h-4 md:w-5 md:h-5 ${dataLoading ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-            </Button>
-            <Button
-              onClick={() => setShowActiveModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base"
-              title="View Active Municipalities"
-            >
-              <CheckCircle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Active</span>
-            </Button>
-            <Button
-              onClick={() => setShowInactiveModal(true)}
-              className="bg-red-600 hover:bg-red-700 text-white text-sm md:text-base"
-              title="View Inactive Municipalities"
-            >
-              <XCircle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Inactive</span>
-            </Button>
-            <Button
-              onClick={() => setShowTotalIncidentsModal(true)}
-              className="bg-orange-600 hover:bg-orange-700 text-white text-sm md:text-base"
-              title="View Total Incidents"
-            >
-              <AlertTriangle className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Incidents</span>
-            </Button>
-            <Button
-              onClick={() => setShowTotalActionsModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white text-sm md:text-base"
-              title="View Total Actions"
-            >
-              <Activity className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Actions</span>
-            </Button>
-            <Button
-              onClick={() => setShowTopPerformersModal(true)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-sm md:text-base"
-              title="View Top Performers"
-            >
-              <Target className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Top Performers</span>
-            </Button>
+          <div className="flex flex-wrap gap-3">
+            {/* 3-Dots Menu */}
+            <div className="relative">
+              <Button
+                id="dashboard-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="Dashboard Actions & Options"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </Button>
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="dashboard-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                  <div className="py-1">
+                    {/* View Options */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">View Options</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setShowActiveModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200"
+                    >
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      <span>Active Municipalities</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowInactiveModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-red-50 hover:text-red-700 transition-colors duration-200"
+                    >
+                      <XCircle className="w-4 h-4 text-red-600" />
+                      <span>Inactive Municipalities</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTotalIncidentsModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200"
+                    >
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                      <span>Total Incidents</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTotalActionsModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200"
+                    >
+                      <Activity className="w-4 h-4 text-indigo-600" />
+                      <span>Total Actions</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowTopPerformersModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors duration-200"
+                    >
+                      <Target className="w-4 h-4 text-emerald-600" />
+                      <span>Top Performers</span>
+                    </button>
+                    
+                    
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -1003,6 +1167,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
         )}
+
+        {/* Yesterday's Data Header */}
+        <div className="mb-4 p-3 md:p-4 rounded-lg bg-yellow-50 border border-yellow-200">
+          <p className="text-sm transition-colors duration-300 text-yellow-700 text-center">
+            📅 Showing data for yesterday ({new Date(Date.now() - 24 * 60 * 60 * 1000).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })})
+          </p>
+        </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
@@ -1278,40 +1449,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <div className="space-y-4 max-h-96 overflow-y-auto">
                 {incidents.length > 0 ? (
                   incidents.slice(0, 5).map((incident, index) => {
-                    const getStatusColor = (status) => {
-                      switch (status) {
-                        case "Completed":
-                          return {
-                            bg: 'bg-green-50 border-green-200',
-                            icon: 'bg-green-100',
-                            iconColor: 'text-green-600',
-                            svg: <CheckCircle className="h-4 w-4 text-green-600" />
-                          };
-                        case "Under Investigation":
-                          return {
-                            bg: 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-100',
-                            iconColor: 'text-blue-600',
-                            svg: <Search className="h-4 w-4 text-blue-600" />
-                          };
-                        default: // Active
-                          return {
-                            bg: 'bg-blue-50 border-blue-200',
-                            icon: 'bg-blue-100',
-                            iconColor: 'text-blue-600',
-                            svg: <Clock className="h-4 w-4 text-blue-600" />
-                          };
-                      }
+                    const getIncidentStyle = () => {
+                      return {
+                        bg: 'bg-blue-50 border-blue-200',
+                        icon: 'bg-blue-100',
+                        iconColor: 'text-blue-600',
+                        svg: <AlertTriangle className="h-4 w-4 text-blue-600" />
+                      };
                     };
 
-                    const statusColors = getStatusColor(incident.status);
+                    const incidentStyle = getIncidentStyle();
                     const timeAgo = incident.date ? new Date(incident.date).toLocaleDateString() : 'No date';
 
                     return (
-                      <div key={incident.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 hover:scale-105 ${statusColors.bg}`}>
+                      <div key={incident.id} className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 hover:scale-105 ${incidentStyle.bg}`}>
                         <div className="flex items-center gap-3">
-                          <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${statusColors.icon}`}>
-                            {statusColors.svg}
+                          <div className={`h-8 w-8 rounded-xl flex items-center justify-center transition-colors duration-300 ${incidentStyle.icon}`}>
+                            {incidentStyle.svg}
                           </div>
                           <div>
                             <p className="font-semibold transition-colors duration-300 text-gray-900">{incident.title || 'Incident Report'}</p>
@@ -1320,11 +1474,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                         </div>
                         <div className="text-right">
                           <span className="text-xs font-medium px-3 py-1 rounded-full transition-colors duration-300 bg-gray-100 text-gray-600">{timeAgo}</span>
-                          <div className={`text-xs font-medium mt-1 px-2 py-1 rounded-full transition-colors duration-300 ${
-                            statusColors.bg.replace('bg-', 'bg-').replace('/20', '/30').replace('/30', '/40')
-                          }`}>
-                            {incident.status || 'Active'}
-                          </div>
                         </div>
                       </div>
                     );
@@ -1343,9 +1492,31 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
         {/* Footer Section */}
         <div className="text-center py-6 md:py-8 border-t text-slate-500 border-slate-200">
-          <p className="text-xs md:text-sm">
-            Dashboard updated automatically • Data refreshes every 30 seconds
-          </p>
+          <div className="flex items-center justify-center gap-4">
+            <p className="text-xs md:text-sm">
+              Dashboard updated automatically • Data refreshes every 30 seconds
+            </p>
+            <button
+              onClick={() => {
+                console.log('🔄 Manually refreshing iPatroller data...');
+                refreshIPatrollerData();
+              }}
+              className="text-xs px-3 py-1 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-full transition-colors duration-200"
+              title="Refresh iPatroller data"
+            >
+              🔄 Refresh Data
+            </button>
+            <button
+              onClick={() => {
+                console.log('🧪 Creating sample data for testing...');
+                createSampleData();
+              }}
+              className="text-xs px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 rounded-full transition-colors duration-200"
+              title="Create sample data for testing"
+            >
+              🧪 Sample Data
+            </button>
+          </div>
         </div>
       </section>
 
@@ -1361,7 +1532,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                  </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Active Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.activeMunicipalities} municipalities with ≥5 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{activeCount} municipalities with patrols yesterday</p>
                 </div>
               </div>
                              <button
@@ -1377,7 +1548,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               {activeMunicipalitiesList.length > 0 ? (
                 <div className="space-y-4">
                   {activeMunicipalitiesList.map((municipality, index) => {
-                    const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
+                    // Get yesterday's patrol count
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    let yesterdayPatrols = 0;
+                    
+                    if (municipality.data && Array.isArray(municipality.data)) {
+                      yesterdayPatrols = municipality.data[currentDay] || 0;
+                    }
+                    
                     return (
                       <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
@@ -1387,7 +1568,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           </span>
                         </div>
                         <div className="text-sm transition-colors duration-300 text-gray-600">
-                          Average Patrols: <span className="font-semibold text-green-600">{avgPatrols.toFixed(1)}</span> per day
+                          Yesterday's Patrols: <span className="font-semibold text-green-600">{yesterdayPatrols}</span> patrols
                         </div>
                       </div>
                     );
@@ -1397,7 +1578,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                                  <div className="text-center py-8 transition-colors duration-300 text-gray-500">
                    <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                    <p className="text-lg font-medium">No Active Municipalities</p>
-                   <p className="text-sm">No municipalities meet the active criteria (≥5 average patrols per day)</p>
+                   <p className="text-sm">No municipalities have patrols yesterday</p>
                  </div>
               )}
             </div>
@@ -1412,49 +1593,78 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
-                                 <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
-                   <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                 </div>
+                <div className="h-10 w-10 rounded-full flex items-center justify-center bg-red-100">
+                  <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
+                </div>
                 <div>
                   <h3 className="text-xl font-bold transition-colors duration-300 text-gray-900">Inactive Municipalities</h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">{summaryStats.inactiveMunicipalities} municipalities with ≤4 average patrols per day</p>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">{correctedInactiveCount} municipalities with no patrols yesterday</p>
                 </div>
               </div>
-                             <button
-                 onClick={() => setShowInactiveModal(false)}
-                 className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
-               >
-                 <X className="h-6 w-6" />
-               </button>
+              <button
+                onClick={() => setShowInactiveModal(false)}
+                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-6 w-6" />
+              </button>
             </div>
 
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {inactiveMunicipalitiesList.length > 0 ? (
+              {correctedInactiveCount > 0 ? (
                 <div className="space-y-4">
-                  {inactiveMunicipalitiesList.map((municipality, index) => {
-                    const avgPatrols = municipality.data.reduce((a, b) => a + b, 0) / municipality.data.length;
+                  {allMunicipalities.filter(municipality => {
+                    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
+                    if (!municipalityData) {
+                      return true; // No data means inactive
+                    }
+                    
+                    // Check if municipality is inactive YESTERDAY
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    
+                    if (municipalityData.data && Array.isArray(municipalityData.data) && municipalityData.data[currentDay] !== undefined) {
+                            // Municipality is inactive YESTERDAY if it has less than 5 patrols for yesterday
+      return municipalityData.data[currentDay] < 5;
+                    }
+                    return true; // No data means inactive
+                  }).map((municipality, index) => {
+                    const municipalityData = ipatrollerData.find(row => row.municipality === municipality);
+                    // Get yesterday's patrol count
+                    const today = new Date();
+                    const yesterday = new Date(today);
+                    yesterday.setDate(today.getDate() - 1);
+                    const currentDay = yesterday.getDate() - 1; // Array index (0-based) for yesterday
+                    let yesterdayPatrols = 0;
+                    
+                    if (municipalityData && municipalityData.data && Array.isArray(municipalityData.data)) {
+                      yesterdayPatrols = municipalityData.data[currentDay] || 0;
+                    }
+                    const district = municipalityData?.district || 'Unknown District';
+                    
                     return (
                       <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality.municipality}</h4>
+                          <h4 className="font-semibold transition-colors duration-300 text-gray-900">{municipality}</h4>
                           <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-700">
-                            {municipality.district}
+                            {district}
                           </span>
                         </div>
                         <div className="text-sm transition-colors duration-300 text-gray-600">
-                          Average Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{avgPatrols.toFixed(1)}</span> per day
+                          Yesterday's Patrols: <span className="font-semibold text-red-600 dark:text-red-400">{yesterdayPatrols}</span> patrols
                         </div>
                       </div>
                     );
                   })}
                 </div>
               ) : (
-                                 <div className="text-center py-8 transition-colors duration-300 text-gray-500">
-                   <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                   <p className="text-lg font-medium">No Inactive Municipalities</p>
-                   <p className="text-sm">All municipalities meet the active criteria (≥5 average patrols per day)</p>
-                 </div>
+                <div className="text-center py-8 transition-colors duration-300 text-gray-500">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium">No Inactive Municipalities</p>
+                  <p className="text-sm">All municipalities have patrols yesterday</p>
+                </div>
               )}
             </div>
           </div>
@@ -1492,15 +1702,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-4">
                   {incidents.map((incident, index) => (
                     <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2">
                         <h4 className="font-semibold transition-colors duration-300 text-gray-900">{incident.incidentType || 'Unknown Type'}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          incident.status === 'Completed' || incident.actionType
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {incident.status === 'Completed' || incident.actionType ? 'Completed' : 'Active'}
-                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="transition-colors duration-300 text-gray-600">
@@ -1559,15 +1762,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-4">
                   {actionReports.map((report, index) => (
                     <div key={index} className="p-4 rounded-lg border transition-all duration-300 border-gray-200 bg-gray-50">
-                      <div className="flex items-center justify-between mb-2">
+                      <div className="mb-2">
                         <h4 className="font-semibold transition-colors duration-300 text-gray-900">{report.what || 'Action Report'}</h4>
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          report.status === 'Completed' || report.actionTaken === 'Completed'
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {report.status === 'Completed' || report.actionTaken === 'Completed' ? 'Completed' : 'Active'}
-                        </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                         <div className="transition-colors duration-300 text-gray-600">
@@ -2197,6 +2393,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
       )}
+
+
     </Layout>
   );
 } 

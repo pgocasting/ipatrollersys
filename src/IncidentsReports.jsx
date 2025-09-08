@@ -6,22 +6,24 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
-import { db } from "./firebase";
 import { 
   collection, 
+  getDocs, 
+  getDoc,
   doc, 
   setDoc, 
-  getDoc, 
-  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  addDoc,
+  writeBatch,
   query, 
   where, 
-  orderBy,
-  onSnapshot,
-  writeBatch,
-  deleteDoc,
-  addDoc,
-  updateDoc
-} from "firebase/firestore";
+  orderBy, 
+  limit,
+  serverTimestamp 
+} from 'firebase/firestore';
+import { db } from './firebase';
+
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
@@ -40,6 +42,7 @@ import {
   AlertTriangle,
   Eye,
   Edit,
+  Eraser,
   Download,
   Printer,
   Filter,
@@ -128,7 +131,8 @@ import {
   Server as ServerIcon,
   Mouse as MouseIcon,
   Keyboard as KeyboardIcon,
-  MonitorSpeaker as MonitorSpeakerIcon
+  MonitorSpeaker as MonitorSpeakerIcon,
+  Menu
 } from "lucide-react";
 // Enhanced Tailwind utility classes for modern styling
 const enhancedClasses = {
@@ -364,6 +368,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     "Balanga City", "Pilar", "Orion", "Limay", // 2ND DISTRICT
     "Bagac", "Dinalupihan", "Mariveles", "Morong" // 3RD DISTRICT
   ];
+
   const [incidents, setIncidents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState('connecting');
@@ -375,6 +380,23 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [editingIncident, setEditingIncident] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showMenuDropdown) {
+        const dropdown = document.getElementById('incidents-menu-dropdown');
+        const button = document.getElementById('incidents-menu-button');
+        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
+          setShowMenuDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMenuDropdown]);
   const [selectedMonth, setSelectedMonth] = useState("all");
   // PDF Edit Interface State
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
@@ -3182,106 +3204,143 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={handleImportExcel}
-              className="bg-green-600 hover:bg-green-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Import Excel/CSV"
-              disabled={loading}
-            >
-              <Upload className="w-4 h-4 md:w-5 md:h-5" />
-              <span className="hidden sm:inline ml-2">Import</span>
-            </Button>
-            <Button
-              onClick={loadIncidents}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base px-3 md:px-4 py-2 md:py-2"
-              title="Refresh Data"
-            >
-              <RefreshCw className="w-4 h-4 md:w-5 md:h-5 ${loading ? 'animate-spin' : ''}" />
-              <span className="hidden sm:inline ml-2">Refresh</span>
-            </Button>
+            {/* 3-Lines Menu */}
             <div className="relative">
-            <Button
-                onClick={() => setShowCleanupDropdown(!showCleanupDropdown)}
-                disabled={loading || cleanupLoading}
-              className="bg-orange-600 hover:bg-orange-700 text-white"
-                title="Cleanup Options"
-            >
-              <Trash2 className="w-5 h-5" />
-            </Button>
-              {/* Cleanup Dropdown Menu */}
-              {showCleanupDropdown && (
-                <div className="absolute top-full right-0 mt-2 w-48 rounded-lg shadow-lg border z-50 bg-white border-gray-200">
+              <Button
+                id="incidents-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                title="Incidents Reports Options"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </Button>
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="incidents-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
                   <div className="py-1">
+                    {/* Incident Management */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Incident Management</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        setShowAddModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      disabled={loading}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <Plus className="w-4 h-4 text-green-600" />
+                      <span>Add New Incident</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setShowSummaryModal(true);
+                        setShowMenuDropdown(false);
+                      }}
+                      disabled={loading}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <BarChart3 className="w-4 h-4 text-indigo-600" />
+                      <span>Summary Insights</span>
+                    </button>
+                    
+                    <div className="border-t border-gray-200 my-1"></div>
+                    
+                    {/* Data Management */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Management</h3>
+                    </div>
+                    
+                    <button
+                      onClick={() => {
+                        handleImportExcel();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
+                    >
+                      <Upload className="w-4 h-4 text-blue-600" />
+                      <span>Import Excel/CSV</span>
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        showPdfEditInterface();
+                        setShowMenuDropdown(false);
+                      }}
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-200"
+                    >
+                      <Printer className="w-4 h-4 text-purple-600" />
+                      <span>Export to PDF</span>
+                    </button>
+                    
+                    <div className="border-t border-gray-200 my-1"></div>
+                    
+                    {/* Data Cleanup */}
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Cleanup</h3>
+                    </div>
+                    
                     <button
                       onClick={() => {
                         identifyDuplicateIncidents();
-                        setShowCleanupDropdown(false);
+                        setShowMenuDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      🔍 Identify Duplicates
+                      <Search className="w-4 h-4 text-orange-600" />
+                      <span>Identify Duplicates</span>
                     </button>
+                    
                     <button
                       onClick={() => {
                         manualCleanupDuplicates();
-                        setShowCleanupDropdown(false);
+                        setShowMenuDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      🧹 Clean Duplicates
+                      <Eraser className="w-4 h-4 text-yellow-600" />
+                      <span>Clean Duplicates</span>
                     </button>
+                    
                     <button
                       onClick={() => {
                         clearCurrentMonthIncidents();
-                        setShowCleanupDropdown(false);
+                        setShowMenuDropdown(false);
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-gray-700 hover:bg-gray-100 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      📅 Clear Current Month
+                      <Calendar className="w-4 h-4 text-indigo-600" />
+                      <span>Clear Current Month</span>
                     </button>
+                    
                     <button
                       onClick={() => {
                         if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
                           clearAllIncidentsData();
-                          setShowCleanupDropdown(false);
+                          setShowMenuDropdown(false);
                         }
                       }}
                       disabled={cleanupLoading}
-                      className="w-full text-left px-4 py-2 text-sm transition-colors duration-300 text-red-600 hover:bg-gray-100 hover:text-red-700 ${cleanupLoading ? 'opacity-50 cursor-not-allowed' : ''}"
+                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      🗑️ Clear All Data
+                      <Trash2 className="w-4 h-4 text-red-600" />
+                      <span>Clear All Data</span>
                     </button>
                   </div>
                 </div>
               )}
             </div>
-            <Button
-              onClick={() => setShowAddModal(true)}
-              className="bg-green-600 hover:bg-green-700 text-white"
-              title="Add New Incident"
-              disabled={loading}
-            >
-              <Plus className="w-5 h-5" />
-            </Button>
-            <Button
-              onClick={() => setShowSummaryModal(true)}
-              className="bg-indigo-600 hover:bg-indigo-700 text-white"
-              title="Summary Insights"
-              disabled={loading}
-            >
-              <BarChart3 className="w-5 h-5" />
-            </Button>
-            <Button
-                              onClick={showPdfEditInterface}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-              title="Export to PDF"
-            >
-              <Printer className="w-5 h-5" />
-            </Button>
             <input
               id="incidents-file-input"
               name="incidents-file-input"
@@ -5549,9 +5608,7 @@ Check browser console for detailed debug information.`);
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t ${
-              border-gray-200
-            }">
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowPdfPreviewModal(false)}
