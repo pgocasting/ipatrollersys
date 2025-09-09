@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { useAuth } from "./contexts/AuthContext";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { 
   Command, 
   Terminal, 
@@ -57,6 +60,14 @@ ChartJS.register(
 );
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
+  const { user } = useFirebase();
+  const { isAdmin, userMunicipality } = useAuth();
+  
+  useEffect(() => {
+    if (userMunicipality) {
+      setActiveMunicipalityTab(userMunicipality);
+    }
+  }, [userMunicipality]);
   const { 
     saveBarangays, 
     getBarangays, 
@@ -101,7 +112,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [editingBarangay, setEditingBarangay] = useState(null);
   
   // Active Tab State
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : "weekly-report");
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
   // Close dropdown when clicking outside
@@ -1652,41 +1663,47 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
               >
                 <div className="py-1">
-                  {/* Navigation Options */}
-                  <div className="px-3 py-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
-                  </div>
-                  
-                  <button
-                    onClick={() => {
-                      setActiveTab("overview");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "overview"
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                    }`}
-                  >
-                    <BarChart3 className="w-4 h-4 text-blue-600" />
-                    <span>Overview</span>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setActiveTab("weekly-report");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "weekly-report"
-                        ? "bg-green-50 text-green-700"
-                        : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-green-600" />
-                    <span>Weekly Report</span>
-                  </button>
-                  
+                {/* Navigation Options */}
+                <div className="px-3 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                </div>
+
+                {/* Show Overview only for admin */}
+                {isAdmin && (
+                    <button
+                      onClick={() => {
+                        setActiveTab("overview");
+                        setShowMenuDropdown(false);
+                      }}
+                      className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                        activeTab === "overview"
+                          ? "bg-blue-50 text-blue-700"
+                          : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                      }`}
+                    >
+                      <BarChart3 className="w-4 h-4 text-blue-600" />
+                      <span>Overview</span>
+                    </button>
+                )}
+
+                {/* Weekly Report - available for all users */}
+                <button
+                  onClick={() => {
+                    setActiveTab("weekly-report");
+                    setShowMenuDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                    activeTab === "weekly-report"
+                      ? "bg-green-50 text-green-700"
+                      : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <span>Weekly Report</span>
+                </button>
+
+                {/* Show Barangay Management only for admin */}
+                {isAdmin && (
                   <button
                     onClick={() => {
                       setActiveTab("barangays");
@@ -1701,7 +1718,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <Building2 className="w-4 h-4 text-purple-600" />
                     <span>Barangay Management</span>
                   </button>
-                  
+                )}
+
+                {/* Show Concern Types only for admin */}
+                {isAdmin && (
                   <button
                     onClick={() => {
                       setActiveTab("concern-types");
@@ -1716,6 +1736,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <AlertTriangle className="w-4 h-4 text-orange-600" />
                     <span>Concern Types</span>
                   </button>
+                )}
                 </div>
               </div>
             )}
@@ -1726,17 +1747,19 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       <div className="space-y-4">
 
         {/* Barangay Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-1'} gap-4 md:gap-6`}>
           <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
             <div className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Barangays</p>
                   <p className="text-2xl md:text-3xl font-bold text-purple-600">
-                    {importedBarangays.length}
+                    {isAdmin 
+                      ? importedBarangays.length 
+                      : importedBarangays.filter(b => b.municipality === userMunicipality).length}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    All municipalities
+                    {isAdmin ? 'All municipalities' : userMunicipality}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
@@ -1746,68 +1769,72 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Districts</p>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-600">
-                    {new Set(importedBarangays.map(b => b.district)).size}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Active districts
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                  <MapPin className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+          {isAdmin && (
+            <>
+              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                <div className="p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Districts</p>
+                      <p className="text-2xl md:text-3xl font-bold text-blue-600">
+                        {new Set(importedBarangays.map(b => b.district)).size}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Active districts
+                      </p>
+                    </div>
+                    <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                      <MapPin className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-green-600">
-                    {new Set(importedBarangays.map(b => b.municipality)).size}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    With barangays
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
-                  <Users className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                <div className="p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Municipalities</p>
+                      <p className="text-2xl md:text-3xl font-bold text-green-600">
+                        {new Set(importedBarangays.map(b => b.municipality)).size}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        With barangays
+                      </p>
+                    </div>
+                    <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
+                      <Users className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Avg per Municipality</p>
-                  <p className="text-2xl md:text-3xl font-bold text-orange-600">
-                    {new Set(importedBarangays.map(b => b.municipality)).size > 0 
-                      ? Math.round(importedBarangays.length / new Set(importedBarangays.map(b => b.municipality)).size)
-                      : 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Barangays per municipality
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                  <Activity className="h-5 w-5 md:h-6 md:w-6 text-orange-600" />
+              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                <div className="p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Avg per Municipality</p>
+                      <p className="text-2xl md:text-3xl font-bold text-orange-600">
+                        {new Set(importedBarangays.map(b => b.municipality)).size > 0 
+                          ? Math.round(importedBarangays.length / new Set(importedBarangays.map(b => b.municipality)).size)
+                          : 0}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Barangays per municipality
+                      </p>
+                    </div>
+                    <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
+                      <Activity className="h-5 w-5 md:h-6 md:w-6 text-orange-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
-        {/* Overview Section */}
-        {activeTab === "overview" && (
+        {/* Overview Section - only for admin */}
+        {isAdmin && activeTab === "overview" && (
           <div className="space-y-6">
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2017,37 +2044,56 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
 
-                {/* Municipality Tabs */}
+                {/* Municipality Selection */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Select Municipality</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
                   <div className="flex flex-wrap gap-2">
-                    {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                      const isActive = activeMunicipalityTab === municipality;
-                      const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
-                      const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
-                      
-                      return (
+                    {isAdmin ? (
+                      // Show all municipalities for admin
+                      Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                        const isActive = activeMunicipalityTab === municipality;
+                        const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
+                        const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
+                        
+                        return (
+                          <button
+                            key={municipality}
+                            onClick={() => handleMunicipalityTabChange(municipality)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                              isActive
+                                ? 'bg-green-600 text-white shadow-lg'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300'
+                            }`}
+                          >
+                            <Building2 className="h-4 w-4" />
+                            <span>{municipality}</span>
+                            <div className={`text-xs px-2 py-1 rounded-full ${
+                              isActive 
+                                ? 'bg-green-500 text-white' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {barangaysCount} brgy • {concernTypesCount} types
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      // Show only user's municipality
+                      userMunicipality ? (
                         <button
-                          key={municipality}
-                          onClick={() => handleMunicipalityTabChange(municipality)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                            isActive
-                              ? 'bg-green-600 text-white shadow-lg'
-                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300'
-                          }`}
+                          onClick={() => handleMunicipalityTabChange(userMunicipality)}
+                          className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white shadow-lg flex items-center gap-2"
                         >
                           <Building2 className="h-4 w-4" />
-                          <span>{municipality}</span>
-                          <div className={`text-xs px-2 py-1 rounded-full ${
-                            isActive 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {barangaysCount} brgy • {concernTypesCount} types
+                          <span>{userMunicipality}</span>
+                          <div className="text-xs px-2 py-1 rounded-full bg-green-500 text-white">
+                            {importedBarangays.filter(b => b.municipality === userMunicipality).length} brgy • {getConcernTypesForMunicipality(userMunicipality).length} types
                           </div>
                         </button>
-                      );
-                    })}
+                      ) : (
+                        <div className="text-gray-500">No municipality assigned</div>
+                      )
+                    )}
                   </div>
                 </div>
               </div>

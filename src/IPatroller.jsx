@@ -80,6 +80,32 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
+  const [showDailySummary, setShowDailySummary] = useState(false);
+  const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(0);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Calculate daily summary data for a specific day
+  const getDailySummaryData = (dayIndex) => {
+    const summaryData = {};
+    
+    Object.keys(municipalitiesByDistrict).forEach(district => {
+      summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
+        const municipalityData = patrolData.find(item => item.municipality === municipality);
+        const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
+        const isActive = dailyCount >= 15;
+        
+        return {
+          municipality,
+          dailyCount,
+          isActive,
+          percentage: dailyCount >= 15 ? 100 : Math.round((dailyCount / 15) * 100)
+        };
+      });
+    });
+
+    return summaryData;
+  };
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   // Remove unused state
   const moreOptionsRef = useRef(null);
@@ -956,7 +982,19 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <span>Generate PDF</span>
                     </button>
                     
-                    <div className="border-t border-gray-200 my-1"></div>
+                     <button
+                       onClick={() => {
+                         setShowDailySummary(true);
+                         setShowMenuDropdown(false);
+                       }}
+                       disabled={isGeneratingReport || loading}
+                       className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       <BarChart3 className="w-4 h-4 text-orange-600" />
+                       <span>Daily Summary</span>
+                     </button>
+
+                     <div className="border-t border-gray-200 my-1"></div>
                     
                     {/* Data Management */}
                     <div className="px-3 py-2">
@@ -1510,6 +1548,321 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PDF Preview Modal */}
+      {showPdfPreview && (
+        <div className="fixed inset-0 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Daily Summary Report</h3>
+                  <p className="text-sm text-gray-600">
+                    {selectedDates[selectedDayIndex]?.fullDate}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={async () => {
+                    setIsGeneratingPdf(true);
+                    try {
+                      const doc = new jsPDF();
+                      const pageWidth = doc.internal.pageSize.width;
+                      const pageHeight = doc.internal.pageSize.height;
+                      const summaryData = getDailySummaryData(selectedDayIndex);
+                      
+                      // Simple header
+                      doc.setFontSize(18);
+                      doc.setFont('helvetica', 'bold');
+                      doc.setTextColor(0, 0, 0);
+                      doc.text('Daily Patrol Summary', 20, 30);
+                      
+                      doc.setFontSize(12);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Date: ${selectedDates[selectedDayIndex]?.fullDate}`, 20, 40);
+                      
+                      // Simple table
+                      const allMunicipalities = Object.values(summaryData).flat();
+                      const tableData = allMunicipalities.map(data => [
+                        data.municipality,
+                        data.dailyCount.toString(),
+                        { content: data.isActive ? 'Active' : 'Inactive', styles: { textColor: data.isActive ? [34, 197, 94] : [239, 68, 68] } },
+                        `${data.percentage}%`
+                      ]);
+                      
+                      // Calculate table width and center it
+                      const tableWidth = 60 + 30 + 30 + 30; // Sum of column widths
+                      const leftMargin = (pageWidth - tableWidth) / 2;
+                      
+                      autoTable(doc, {
+                        head: [['Municipality', 'Patrols', 'Status', 'Percentage']],
+                        body: tableData,
+                        startY: 50,
+                        margin: { left: leftMargin, right: leftMargin },
+                        styles: {
+                          fontSize: 9,
+                          cellPadding: 4,
+                          halign: 'center'
+                        },
+                        headStyles: {
+                          fillColor: [59, 130, 246],
+                          textColor: [255, 255, 255],
+                          fontStyle: 'bold'
+                        },
+                        columnStyles: {
+                          0: { cellWidth: 60 },
+                          1: { cellWidth: 30 },
+                          2: { cellWidth: 30 },
+                          3: { cellWidth: 30 }
+                        }
+                      });
+                      
+                      // Save PDF
+                      const fileName = `daily-summary-${selectedDates[selectedDayIndex]?.fullDate.replace(/,/g, '').replace(/ /g, '-')}.pdf`;
+                      doc.save(fileName);
+                      
+                      toast.success('PDF Generated Successfully', {
+                        description: `Saved as ${fileName}`,
+                        duration: 3000
+                      });
+                    } catch (error) {
+                      console.error('Error generating PDF:', error);
+                      toast.error('Failed to generate PDF', {
+                        description: error.message,
+                        duration: 3000
+                      });
+                    } finally {
+                      setIsGeneratingPdf(false);
+                      setShowPdfPreview(false);
+                    }
+                  }}
+                  disabled={isGeneratingPdf}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  {isGeneratingPdf ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => setShowPdfPreview(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+
+            {/* Preview Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="max-w-3xl mx-auto space-y-8 bg-white rounded-lg border border-gray-200 p-8">
+                {/* Report Header */}
+                <div className="text-center border-b border-gray-200 pb-6">
+                  <h1 className="text-2xl font-bold text-gray-900 mb-2">Daily Patrol Summary Report</h1>
+                  <p className="text-gray-600">Date: {selectedDates[selectedDayIndex]?.fullDate}</p>
+                  <p className="text-sm text-gray-500 mt-1">Generated: {new Date().toLocaleString()}</p>
+                </div>
+
+                {/* Report Content */}
+                <div className="space-y-6">
+                  {Object.entries(getDailySummaryData(selectedDayIndex)).map(([district, municipalities]) => (
+                    <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {municipalities.map((data) => (
+                              <tr key={data.municipality}>
+                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
+                                <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
+                                <td className="px-4 py-2 text-center">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {data.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          data.isActive ? 'bg-green-500' :
+                                          data.percentage >= 50 ? 'bg-yellow-500' :
+                                          'bg-red-500'
+                                        }`}
+                                        style={{ width: `${data.percentage}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Daily Summary Modal */}
+      {showDailySummary && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <BarChart3 className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
+                  <p className="text-sm text-gray-600">
+                    {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => setShowPdfPreview(true)}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
+                >
+                  <FileText className="w-4 h-4" />
+                  PDF Report
+                </Button>
+                <Button
+                  onClick={() => setShowDailySummary(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+
+            {/* Date Selector */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {selectedDates[selectedDayIndex]?.fullDate}
+                    </p>
+                  </div>
+                </div>
+                <div className="relative">
+                  <select
+                    id="date-select"
+                    value={selectedDayIndex}
+                    onChange={(e) => setSelectedDayIndex(parseInt(e.target.value))}
+                    className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
+                    text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
+                    focus:border-blue-500 transition-all duration-200 min-w-[200px]"
+                  >
+                    {selectedDates.map((date, index) => (
+                      <option key={index} value={index} className="py-2">
+                        {date.fullDate}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+              <div className="space-y-6">
+                {Object.entries(getDailySummaryData(selectedDayIndex)).map(([district, municipalities]) => (
+                  <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {municipalities.map((data) => (
+                            <tr key={data.municipality}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
+                              <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
+                              <td className="px-4 py-2 text-center">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                  ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                  {data.isActive ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full ${
+                                        data.isActive ? 'bg-green-500' :
+                                        data.percentage >= 50 ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                      }`}
+                                      style={{ width: `${data.percentage}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
