@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { doc, getDoc, collection, getDocs, query, where, deleteDoc, updateDoc, orderBy, limit } from 'firebase/firestore';
+import { db } from './firebase';
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
 // Firebase removed - using local data storage
@@ -140,106 +142,57 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(true);
       try {
         console.log('🔄 Loading action reports from Firestore...');
-        console.log('Current activeTab:', activeTab);
         
-        // Load all data from actionReports collection
-        const result = await queryDocuments('actionReports');
-        console.log('Firestore query result:', result);
+        // Create a query to get action reports, ordered by timestamp
+        const actionReportsRef = collection(db, 'actionReports');
+        const q = query(actionReportsRef, orderBy('timestamp', 'desc'));
+        const querySnapshot = await getDocs(q);
         
-        if (result.success && result.data && result.data.length > 0) {
-          console.log(`✅ Found ${result.data.length} documents in Firestore`);
+        if (!querySnapshot.empty) {
+          console.log(`✅ Found ${querySnapshot.size} documents in Firestore`);
           
           // Process all documents to extract action reports
-          let allActionReports = [];
+          const allActionReports = [];
           
-          result.data.forEach((doc, index) => {
-            console.log(`Processing document ${index + 1}:`, {
-              id: doc.id,
-              hasData: !!doc.data,
-              hasMonthKey: !!doc.monthKey,
-              department: doc.department
-            });
-            
-            // If document has a 'data' array (monthly structure), extract reports from it
-            if (doc.data && Array.isArray(doc.data)) {
-              console.log(`📅 Monthly document ${doc.id} contains ${doc.data.length} reports`);
-              doc.data.forEach(report => {
-                allActionReports.push({
-                  ...report,
-                  sourceDocument: doc.id,
-                  sourceType: 'monthly'
-                });
-              });
-            }
-            // If document is an individual report
-            else if (doc.department || doc.what || doc.municipality) {
-              console.log(`📋 Individual report: ${doc.id}`);
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data) {
               allActionReports.push({
-                ...doc,
-                sourceDocument: doc.id,
-                sourceType: 'individual'
+                id: doc.id,
+                ...data
               });
             }
           });
+
+          console.log('✅ Processed action reports:', allActionReports.length);
           
-          console.log(`📊 Total action reports found: ${allActionReports.length}`);
+          // Filter reports based on active tab if needed
+          const filteredReports = activeTab === 'all' 
+            ? allActionReports 
+            : allActionReports.filter(report => report.department?.toLowerCase() === activeTab?.toLowerCase());
           
-          if (allActionReports.length > 0) {
-            // Set all reports
-            setAllActionReports(allActionReports);
-            
-            // Filter by department (PNP, Agriculture, PG-ENRO)
-            const filteredReports = allActionReports.filter(report => {
-              const reportDepartment = report.department?.toLowerCase();
-              const currentTab = activeTab?.toLowerCase();
-              
-              console.log(`Checking report ${report.id}: department="${reportDepartment}", activeTab="${currentTab}"`);
-              
-              // Map department values to match tabs
-              if (currentTab === 'all') return true;
-              if (currentTab === 'pnp' && (reportDepartment === 'pnp' || reportDepartment === 'police')) return true;
-              if (currentTab === 'agriculture' && reportDepartment === 'agriculture') return true;
-              if (currentTab === 'pg-enro' && (reportDepartment === 'pg-enro' || reportDepartment === 'enro' || reportDepartment === 'environment')) return true;
-              
-              return false;
-            });
-            
-            console.log(`🎯 Filtered reports for ${activeTab}:`, {
-              totalReports: allActionReports.length,
-              filteredCount: filteredReports.length,
-              departments: [...new Set(allActionReports.map(r => r.department))],
-              filteredDepartments: [...new Set(filteredReports.map(r => r.department))]
-            });
-            
-            setActionItems(filteredReports);
-            
-            // Show success message
-            if (filteredReports.length > 0) {
-              setSuccessMessage(`✅ Loaded ${filteredReports.length} ${activeTab.toUpperCase()} reports from Firestore`);
-            } else {
-              setSuccessMessage(`ℹ️ Found ${allActionReports.length} total reports, but none match ${activeTab.toUpperCase()} department`);
-            }
-          } else {
-            console.log('❌ No action reports found in any documents');
-            setActionItems([]);
-            setAllActionReports([]);
-            setSuccessMessage('No action reports found in Firestore database');
+          setAllActionReports(allActionReports);
+          setActionItems(filteredReports);
+          
+          if (allActionReports.length === 0) {
+            setSuccessMessage('No action reports found');
           }
         } else {
-          console.log('❌ No data found in Firestore actionReports collection');
+          console.log('📭 No action reports found in Firestore');
           setActionItems([]);
           setAllActionReports([]);
-          setSuccessMessage('No data found in Firestore database');
+          setSuccessMessage('No action reports found');
         }
       } catch (error) {
         console.error('❌ Error loading action reports:', error);
         setActionItems([]);
         setAllActionReports([]);
-        setSuccessMessage('Error loading data from Firestore');
+        setSuccessMessage('Error loading action reports');
       } finally {
         setLoading(false);
       }
-    };
+      };
+  
   useEffect(() => {
     loadActionReports();
   }, [activeTab]);
