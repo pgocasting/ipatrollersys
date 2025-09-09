@@ -293,6 +293,66 @@ export const useFirebase = () => {
     }
   };
 
+  // Save barangays to Firestore
+  const saveBarangays = async (barangays) => {
+    try {
+      console.log('💾 Saving barangays to Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'barangays');
+      await setDoc(docRef, {
+        barangays: barangays,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      }, { merge: true });
+      
+      console.log('✅ Barangays saved successfully to Firestore:', barangays.length);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving barangays to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Save concern types to Firestore
+  const saveConcernTypes = async (concernTypes) => {
+    try {
+      console.log('💾 Saving concern types to Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', 'concernTypes');
+      await setDoc(docRef, {
+        concernTypes: concernTypes,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      }, { merge: true });
+      
+      console.log('✅ Concern types saved successfully to Firestore:', concernTypes.length);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving concern types to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   // Get users list from management document
   const getUsers = async () => {
     try {
@@ -392,7 +452,9 @@ export const useFirebase = () => {
     getCurrentUserRole,
     changePassword,
     getBarangays,
+    saveBarangays,
     getConcernTypes,
+    saveConcernTypes,
     getWeeklyReport,
     saveWeeklyReport,
     createUserByAdmin,
