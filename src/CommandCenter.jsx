@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { useAuth } from "./contexts/AuthContext";
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from './firebase';
 import { 
   Command, 
   Terminal, 
@@ -57,6 +60,14 @@ ChartJS.register(
 );
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
+  const { user } = useFirebase();
+  const { isAdmin, userMunicipality } = useAuth();
+  
+  useEffect(() => {
+    if (userMunicipality) {
+      setActiveMunicipalityTab(userMunicipality);
+    }
+  }, [userMunicipality]);
   const { 
     saveBarangays, 
     getBarangays, 
@@ -99,9 +110,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedBarangays, setSelectedBarangays] = useState([]);
   const [isEditingBarangays, setIsEditingBarangays] = useState(false);
   const [editingBarangay, setEditingBarangay] = useState(null);
+  const [barangaySortBy, setBarangaySortBy] = useState('name'); // 'name', 'municipality', 'district', 'importedAt'
+  const [barangaySortOrder, setBarangaySortOrder] = useState('asc'); // 'asc', 'desc'
+  const [barangayFilterMunicipality, setBarangayFilterMunicipality] = useState(''); // Filter by municipality
+  const [allMonthsData, setAllMonthsData] = useState({}); // Store data for all months from Excel
+  const [isImportingAllMonths, setIsImportingAllMonths] = useState(false);
+  const [importAllMonths, setImportAllMonths] = useState(false); // Checkbox state for import all months
   
   // Active Tab State
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : "weekly-report");
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
   // Close dropdown when clicking outside
@@ -147,23 +164,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Summary modal state
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [summarySelectedMunicipality, setSummarySelectedMunicipality] = useState("");
-
-  // Set default municipality when summary modal opens
-  useEffect(() => {
-    if (showSummaryModal && !summarySelectedMunicipality) {
-      setSummarySelectedMunicipality(activeMunicipalityTab || "");
-    }
-  }, [showSummaryModal, activeMunicipalityTab, summarySelectedMunicipality]);
   
   // Excel Import States
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
-  const [excelData, setExcelData] = useState([]);
-  const [excelPreview, setExcelPreview] = useState([]);
-  const [showExcelPreview, setShowExcelPreview] = useState(false);
-  const [excelMunicipalityData, setExcelMunicipalityData] = useState({});
-  const [selectedExcelMunicipality, setSelectedExcelMunicipality] = useState("");
 
   // Municipalities by district
   const municipalitiesByDistrict = {
@@ -229,6 +233,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     loadWeeklyReportData();
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
+  // Load all months data from local storage on component mount
+  useEffect(() => {
+    const storedData = localStorage.getItem('allMonthsWeeklyData');
+    if (storedData) {
+      try {
+        const parsedData = JSON.parse(storedData);
+        setAllMonthsData(parsedData);
+        console.log('📦 Loaded all months data from local storage:', Object.keys(parsedData));
+      } catch (error) {
+        console.error('❌ Error loading all months data from local storage:', error);
+      }
+    }
+  }, []);
+
   // Clear concern types when municipality changes
   useEffect(() => {
     if (activeMunicipalityTab) {
@@ -263,6 +281,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     
     setIsLoadingWeeklyReports(true);
     try {
+      // First check if we have data in local storage for this month
+      const monthKey = selectedMonth.toLowerCase();
+      if (allMonthsData[monthKey] && allMonthsData[monthKey].length > 0) {
+        console.log(`📦 Loading data from local storage for ${selectedMonth}`);
+        
+        // Convert the stored data to the format expected by weeklyReportData
+        const convertedData = {};
+        allMonthsData[monthKey].forEach(entry => {
+          const dateKey = entry.date;
+          if (!convertedData[dateKey]) {
+            convertedData[dateKey] = [];
+          }
+          convertedData[dateKey].push(entry);
+        });
+        
+        setWeeklyReportData(convertedData);
+        console.log(`✅ Loaded ${allMonthsData[monthKey].length} entries from local storage for ${selectedMonth}`);
+        
+        // Clear form fields
+        setSelectedBarangay("");
+        setSelectedConcernType("");
+        setActionTaken("");
+        setRemarks("");
+        return;
+      }
+      
+      // If no local storage data, load from Firestore
       const monthYear = `${selectedMonth}_${selectedYear}`;
       const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
       const reportKey = `${monthYear}${municipalityKey}`;
@@ -925,7 +970,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     // Simulate command processing
     switch (command.toLowerCase()) {
       case "help":
-        output = "Available commands: status, units, alerts, clear, patrol.active, incidents.pending, system.info, barangays.list, excel.help, excel.status";
+        output = "Available commands: status, units, alerts, clear, patrol.active, incidents.pending, system.info, barangays.list, excel.help";
         break;
       case "status":
         output = "Command Center Status: OPERATIONAL\nActive Units: 3\nPending Alerts: 1\nSystem Uptime: 24h 15m";
@@ -953,10 +998,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         output = `Imported Barangays: ${importedBarangays.length}\nDistricts: ${Object.keys(municipalitiesByDistrict).length}\nMunicipalities: ${Object.values(municipalitiesByDistrict).flat().length}`;
         break;
       case "excel.help":
-        output = "Excel Import Commands:\n- Use 'Import Excel' button in Weekly Report section\n- Supported formats: .xlsx, .xls, .csv\n- Required columns: Date, Municipality, Barangay, Concern Type, Week 1-4, Action Taken, Remarks\n- Data is grouped by municipality for selective import";
-        break;
-      case "excel.status":
-        output = `Excel Import Status:\nFile loaded: ${excelFile ? excelFile.name : 'None'}\nRows parsed: ${excelData.length}\nMunicipalities detected: ${Object.keys(excelMunicipalityData).length}\nSelected municipality: ${selectedExcelMunicipality || 'None'}\nPreview shown: ${showExcelPreview ? 'Yes' : 'No'}`;
+        output = "Excel Import Commands:\n- Use 'Import Excel' button in Weekly Report section\n- Supported formats: .xlsx, .xls, .csv\n- Required columns: Date, Municipality, Barangay, Concern Type, Week 1-4, Action Taken, Remarks\n- Data automatically imports to the weekly report table";
         break;
       default:
         output = `Command not found: ${command}. Type 'help' for available commands.`;
@@ -1054,6 +1096,61 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     window.URL.revokeObjectURL(url);
     
     toast.success("Barangays exported successfully");
+  };
+
+  // Barangay sorting functions
+  const handleBarangaySort = (sortBy) => {
+    if (barangaySortBy === sortBy) {
+      setBarangaySortOrder(barangaySortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setBarangaySortBy(sortBy);
+      setBarangaySortOrder('asc');
+    }
+  };
+
+  const getSortedBarangays = () => {
+    // First filter by municipality if filter is set
+    let filteredBarangays = importedBarangays;
+    if (barangayFilterMunicipality) {
+      filteredBarangays = importedBarangays.filter(barangay => 
+        barangay.municipality.toLowerCase() === barangayFilterMunicipality.toLowerCase()
+      );
+    }
+    
+    // Then sort the filtered results
+    return [...filteredBarangays].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (barangaySortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'municipality':
+          aValue = a.municipality.toLowerCase();
+          bValue = b.municipality.toLowerCase();
+          break;
+        case 'district':
+          aValue = a.district.toLowerCase();
+          bValue = b.district.toLowerCase();
+          break;
+        case 'importedAt':
+          aValue = new Date(a.importedAt);
+          bValue = new Date(b.importedAt);
+          break;
+        default:
+          return 0;
+      }
+      
+      if (aValue < bValue) return barangaySortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return barangaySortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  const getUniqueMunicipalities = () => {
+    const municipalities = [...new Set(importedBarangays.map(barangay => barangay.municipality))];
+    return municipalities.sort();
   };
 
   const handleClearBarangays = async () => {
@@ -1256,7 +1353,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
 
     setExcelFile(file);
+    
+    // Check if user wants to import all months
+    if (importAllMonths) {
+      handleImportAllMonths(file);
+    } else {
     parseExcelFile(file);
+    }
   };
 
   const parseExcelFile = (file) => {
@@ -1268,12 +1371,71 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const data = new Uint8Array(e.target.result);
         const workbook = XLSX.read(data, { type: 'array' });
         
-        // Get the first worksheet
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        // Get all worksheet names
+        const sheetNames = workbook.SheetNames;
+        console.log('Available worksheets:', sheetNames);
+        
+        // Find the worksheet that matches the selected month
+        let targetSheetName = null;
+        let targetWorksheet = null;
+        
+        // First, try to find exact month match
+        for (const sheetName of sheetNames) {
+          const sheetNameLower = sheetName.toLowerCase();
+          const selectedMonthLower = selectedMonth.toLowerCase();
+          
+          if (sheetNameLower.includes(selectedMonthLower)) {
+            targetSheetName = sheetName;
+            targetWorksheet = workbook.Sheets[sheetName];
+            console.log(`Found matching worksheet: ${sheetName} for month: ${selectedMonth}`);
+            break;
+          }
+        }
+        
+        // If no exact match, try to find by month number or abbreviation
+        if (!targetSheetName) {
+          const monthMappings = {
+            'january': ['jan', '01', '1'],
+            'february': ['feb', '02', '2'],
+            'march': ['mar', '03', '3'],
+            'april': ['apr', '04', '4'],
+            'may': ['may', '05', '5'],
+            'june': ['jun', '06', '6'],
+            'july': ['jul', '07', '7'],
+            'august': ['aug', '08', '8'],
+            'september': ['sep', '09', '9'],
+            'october': ['oct', '10'],
+            'november': ['nov', '11'],
+            'december': ['dec', '12']
+          };
+          
+          const selectedMonthLower = selectedMonth.toLowerCase();
+          const possibleMatches = monthMappings[selectedMonthLower] || [];
+          
+          for (const sheetName of sheetNames) {
+            const sheetNameLower = sheetName.toLowerCase();
+            for (const match of possibleMatches) {
+              if (sheetNameLower.includes(match)) {
+                targetSheetName = sheetName;
+                targetWorksheet = workbook.Sheets[sheetName];
+                console.log(`Found worksheet by abbreviation: ${sheetName} for month: ${selectedMonth}`);
+                break;
+              }
+            }
+            if (targetSheetName) break;
+          }
+        }
+        
+        // If still no match, use the first worksheet but show a warning
+        if (!targetSheetName) {
+          targetSheetName = sheetNames[0];
+          targetWorksheet = workbook.Sheets[targetSheetName];
+          console.log(`No matching worksheet found, using first worksheet: ${targetSheetName}`);
+          toast.warning(`No worksheet found for "${selectedMonth}". Using first worksheet "${targetSheetName}". Please ensure your Excel file has a worksheet named with the month.`);
+        }
         
         // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+        const jsonData = XLSX.utils.sheet_to_json(targetWorksheet, { header: 1 });
         
         if (jsonData.length === 0) {
           toast.error("The Excel file appears to be empty");
@@ -1289,6 +1451,76 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           toast.error("Invalid Excel format. Please ensure the file has the correct columns: DATE, BARANGAY, TYPE OF CONCERN, Week 1-4, STATUS, REMARKS");
           setIsImportingExcel(false);
           return;
+        }
+
+        // VERIFICATION 1: Check if current selected municipality exists in filename (more flexible matching)
+        const fileName = file.name.toLowerCase();
+        const currentMunicipality = activeMunicipalityTab?.toLowerCase();
+        
+        if (currentMunicipality) {
+          // Try multiple variations of the municipality name
+          const municipalityVariations = [
+            currentMunicipality,
+            currentMunicipality.replace(/\s+/g, ''), // Remove spaces
+            currentMunicipality.replace(/\s+/g, '-'), // Replace spaces with hyphens
+            currentMunicipality.replace(/\s+/g, '_'), // Replace spaces with underscores
+            currentMunicipality.substring(0, 3), // First 3 characters
+            currentMunicipality.substring(0, 4), // First 4 characters
+          ];
+          
+          const foundMatch = municipalityVariations.some(variation => 
+            fileName.includes(variation)
+          );
+          
+          if (!foundMatch) {
+            console.log('Filename:', fileName);
+            console.log('Looking for municipality:', currentMunicipality);
+            console.log('Tried variations:', municipalityVariations);
+            
+            // Ask user if they want to proceed anyway
+            const proceed = window.confirm(
+              `Municipality verification failed!\n\n` +
+              `File: "${file.name}"\n` +
+              `Selected Municipality: "${activeMunicipalityTab}"\n\n` +
+              `The filename doesn't contain the municipality name. Do you want to proceed with the import anyway?\n\n` +
+              `(The system will try to import data and match it to the selected municipality)`
+            );
+            
+            if (!proceed) {
+              setIsImportingExcel(false);
+              return;
+            } else {
+              console.log('User chose to proceed despite municipality verification failure');
+              toast.warning('Proceeding with import despite municipality verification failure. Please verify the data is correct.');
+            }
+          } else {
+            console.log('Municipality verification passed for:', currentMunicipality);
+          }
+        }
+
+        // VERIFICATION 2: Since we found the correct worksheet, month verification is already done
+        // The worksheet selection above ensures we're reading from the correct month tab
+        console.log(`Using worksheet "${targetSheetName}" for month "${selectedMonth}"`);
+        
+        // Optional: Double-check dates in the selected worksheet
+        const dataRows = jsonData.slice(1).filter(row => row[0]); // Get data rows with dates
+        if (dataRows.length > 0) {
+          const firstDate = dataRows[0][0];
+          if (firstDate) {
+            try {
+              const excelDate = new Date(firstDate);
+              const excelMonth = excelDate.toLocaleDateString("en-US", { month: "long" });
+              const selectedMonthName = selectedMonth;
+              
+              // Only warn if there's a mismatch, but don't block import since we selected the correct worksheet
+              if (excelMonth.toLowerCase() !== selectedMonthName.toLowerCase()) {
+                console.warn(`Date in worksheet doesn't match selected month: ${excelMonth} vs ${selectedMonthName}`);
+                toast.warning(`Note: Dates in the worksheet are from "${excelMonth}" but you selected "${selectedMonthName}". Proceeding with import from the correct worksheet.`);
+              }
+            } catch (error) {
+              console.warn('Could not parse date for verification:', firstDate);
+            }
+          }
         }
 
         // Check if required columns are present (flexible matching)
@@ -1313,9 +1545,37 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           const barangay = barangayParts[0] || '';
           const municipality = barangayParts[1] || '';
           
+          console.log(`Processing row ${index}:`, {
+            rawBarangay: row[1],
+            barangayField,
+            barangay,
+            municipality,
+            rawDate: row[0]
+          });
+          
+          // Handle Excel date properly
+          let processedDate = row[0] || '';
+          if (typeof processedDate === 'number') {
+            // Convert Excel serial date to proper date
+            try {
+              const excelEpoch = new Date(1900, 0, 1);
+              const daysSinceEpoch = processedDate - 2;
+              const dateObj = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
+              if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) {
+                processedDate = dateObj.toLocaleDateString("en-US", { 
+                  month: "long", 
+                  day: "numeric", 
+                  year: "numeric" 
+                });
+              }
+            } catch (error) {
+              console.warn('Error converting Excel date:', processedDate, error);
+            }
+          }
+          
           return {
             id: `excel-${Date.now()}-${index}`,
-            date: row[0] || '',
+            date: processedDate,
             municipality: municipality,
             barangay: barangayField, // Keep full "Barangay, Municipality" format
             concernType: row[2] || '',
@@ -1347,18 +1607,212 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           municipalityGroups[municipality].push(row);
         });
 
-        setExcelData(processedData);
-        setExcelMunicipalityData(municipalityGroups);
-        setExcelPreview(processedData.slice(0, 5)); // Show first 5 rows as preview
-        setShowExcelPreview(true);
+        // AUTO-IMPORT: Since verification passed, automatically import data to the table
+        let municipalityData = null;
         
-        // Set the first municipality as default selection
-        const firstMunicipality = Object.keys(municipalityGroups)[0];
-        if (firstMunicipality) {
-          setSelectedExcelMunicipality(firstMunicipality);
+        if (currentMunicipality && municipalityGroups[currentMunicipality]) {
+          municipalityData = municipalityGroups[currentMunicipality];
+        } else if (currentMunicipality && Object.keys(municipalityGroups).length > 0) {
+          // If exact municipality not found, try to find a close match or use the first available
+          const availableMunicipalities = Object.keys(municipalityGroups);
+          console.log('Available municipalities in Excel:', availableMunicipalities);
+          console.log('Looking for:', currentMunicipality);
+          
+          // Try to find a close match
+          const closeMatch = availableMunicipalities.find(mun => 
+            mun.toLowerCase().includes(currentMunicipality) || 
+            currentMunicipality.includes(mun.toLowerCase())
+          );
+          
+          if (closeMatch) {
+            console.log('Found close match:', closeMatch);
+            municipalityData = municipalityGroups[closeMatch];
+            toast.warning(`Using municipality "${closeMatch}" from Excel file (close match to "${currentMunicipality}")`);
+          } else {
+            // Use the first available municipality
+            const firstMunicipality = availableMunicipalities[0];
+            console.log('Using first available municipality:', firstMunicipality);
+            municipalityData = municipalityGroups[firstMunicipality];
+            toast.warning(`Using municipality "${firstMunicipality}" from Excel file (no match found for "${currentMunicipality}")`);
+          }
+        } else if (currentMunicipality) {
+          // No municipality data found at all
+          toast.error(`No data found for municipality "${currentMunicipality}" in the Excel file.`);
+          setIsImportingExcel(false);
+          return;
+        } else {
+          // No municipality selected
+          toast.error('No municipality selected. Please select a municipality first.');
+          setIsImportingExcel(false);
+          return;
         }
         
-        toast.success(`Successfully parsed ${processedData.length} rows from Excel file`);
+        if (municipalityData) {
+          
+          // Debug: Show available barangays for this municipality
+          const availableBarangays = importedBarangays.filter(b => b.municipality === currentMunicipality);
+          console.log(`Available barangays for ${currentMunicipality}:`, availableBarangays.map(b => `${b.name}, ${b.municipality}`));
+          
+          // Import data directly into weeklyReportData
+          const updatedWeeklyData = { ...weeklyReportData };
+          const currentDates = generateDates(selectedMonth, selectedYear);
+          
+          municipalityData.forEach(row => {
+            // Parse the date from Excel with better handling
+            const excelDate = row.date;
+            if (excelDate) {
+              try {
+                let parsedDate;
+                
+                // Handle different Excel date formats
+                if (typeof excelDate === 'number') {
+                  // Excel serial date number - convert from Excel's epoch (1900-01-01)
+                  // Excel incorrectly treats 1900 as a leap year, so we need to adjust
+                  const excelEpoch = new Date(1900, 0, 1); // January 1, 1900
+                  const daysSinceEpoch = excelDate - 2; // Subtract 2 to account for Excel's leap year bug
+                  parsedDate = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
+                } else if (typeof excelDate === 'string') {
+                  // Try parsing as string date
+                  parsedDate = new Date(excelDate);
+                } else {
+                  // Try direct conversion
+                  parsedDate = new Date(excelDate);
+                }
+                
+                // Validate the parsed date
+                if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 1900) {
+                  const formattedDate = parsedDate.toLocaleDateString("en-US", { 
+                    month: "long", 
+                    day: "numeric", 
+                    year: "numeric" 
+                  });
+                  
+                  console.log(`Excel date: ${excelDate} -> Parsed: ${formattedDate}`);
+                  console.log('Available dates to match:', currentDates.slice(0, 5)); // Show first 5 dates
+                  
+                  // Find matching date in current dates with better matching
+                  const matchingDate = currentDates.find(date => {
+                    // Exact match
+                    if (date === formattedDate) {
+                      console.log(`Exact match found: ${date} === ${formattedDate}`);
+                      return true;
+                    }
+                    
+                    // Check if the day numbers match
+                    const excelDay = parsedDate.getDate();
+                    const dateDay = parseInt(date.split(' ')[1].replace(',', ''));
+                    if (excelDay === dateDay) {
+                      console.log(`Day match found: ${excelDay} === ${dateDay} for date ${date}`);
+                      return true;
+                    }
+                    
+                    // Check if the month and day match
+                    const excelMonth = parsedDate.toLocaleDateString("en-US", { month: "long" });
+                    const dateMonth = date.split(' ')[0];
+                    if (excelMonth === dateMonth && excelDay === dateDay) {
+                      console.log(`Month and day match found: ${excelMonth} ${excelDay} === ${dateMonth} ${dateDay} for date ${date}`);
+                      return true;
+                    }
+                    
+                    return false;
+                  });
+                  
+                  if (matchingDate) {
+                    const dateKey = matchingDate;
+                    if (!updatedWeeklyData[dateKey]) {
+                      updatedWeeklyData[dateKey] = [];
+                    }
+                    
+                    // Find the correct barangay name from the imported barangays list
+                    let correctBarangayName = row.barangay || 'Unknown Barangay';
+                    
+                    // Try to match with imported barangays to get the correct format
+                    if (importedBarangays.length > 0) {
+                      const barangayMatch = importedBarangays.find(barangay => {
+                        // Extract just the barangay name without municipality
+                        const excelBarangayName = row.barangay?.split(',')[0]?.trim();
+                        const excelMunicipality = row.barangay?.split(',')[1]?.trim();
+                        
+                        // Check if this barangay matches (with or without Poblacion)
+                        const barangayName = barangay.name.split(' (')[0]; // Remove (Poblacion) part
+                        const municipality = barangay.municipality;
+                        
+                        return barangayName === excelBarangayName && municipality === excelMunicipality;
+                      });
+                      
+                      if (barangayMatch) {
+                        correctBarangayName = barangayMatch.name; // Use the full name with (Poblacion) if it exists
+                        console.log(`Matched barangay: ${row.barangay} -> ${correctBarangayName}`);
+                      } else {
+                        console.warn(`No match found for barangay: ${row.barangay}`);
+                      }
+                    }
+                    
+                    // Create entry for this barangay and concern type
+                    // Format barangay name to match what the dropdown expects: "Barangay Name, Municipality"
+                    const excelMunicipality = row.barangay?.split(',')[1]?.trim();
+                    const barangayValue = `${correctBarangayName}, ${excelMunicipality}`;
+                    
+                    const newEntry = {
+                      id: `excel-${Date.now()}-${Math.random()}`,
+                      barangay: barangayValue, // Use the format expected by the dropdown
+                      concernType: row.concernType || 'Unknown Concern',
+                      week1: parseInt(row.week1) || 0,
+                      week2: parseInt(row.week2) || 0,
+                      week3: parseInt(row.week3) || 0,
+                      week4: parseInt(row.week4) || 0,
+                      actionTaken: row.status || '',
+                      remarks: row.remarks || '',
+                      importedFromExcel: true
+                    };
+                    
+                    // Add the entry to the array for this date
+                    updatedWeeklyData[dateKey].push(newEntry);
+                    console.log(`Added entry for ${dateKey}:`, {
+                      barangay: newEntry.barangay,
+                      concernType: newEntry.concernType,
+                      week1: newEntry.week1,
+                      week2: newEntry.week2,
+                      week3: newEntry.week3,
+                      week4: newEntry.week4
+                    });
+                    console.log(`Barangay value format: "${barangayValue}" (should match dropdown format)`);
+                  } else {
+                    console.warn(`No matching date found for: ${formattedDate} in current dates:`, currentDates);
+                  }
+                } else {
+                  console.warn('Invalid date parsed:', excelDate, '->', parsedDate);
+                }
+              } catch (error) {
+                console.warn('Error parsing date:', excelDate, error);
+              }
+            }
+          });
+          
+          // Update the weekly report data
+          setWeeklyReportData(updatedWeeklyData);
+          
+          // Clear Excel data after successful import
+          setExcelFile(null);
+          
+          toast.success(`✅ Successfully imported ${municipalityData.length} rows for ${currentMunicipality} municipality from worksheet "${targetSheetName}"!`);
+          
+          // Add to terminal history
+          const newEntry = {
+            id: Date.now(),
+            command: "excel.auto.import",
+            output: `Auto-imported ${municipalityData.length} rows from Excel file for ${currentMunicipality} municipality`,
+            type: "success",
+            timestamp: new Date()
+          };
+          setTerminalHistory(prev => [...prev, newEntry]);
+          
+        } else {
+          // If municipality not found, show error and don't show preview
+          toast.error(`Municipality "${currentMunicipality}" not found in Excel file. Please ensure the Excel file contains data for the selected municipality.`);
+          setIsImportingExcel(false);
+          return;
+        }
         
       } catch (error) {
         console.error('Error parsing Excel file:', error);
@@ -1374,6 +1828,269 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     };
 
     reader.readAsArrayBuffer(file);
+  };
+
+  // Function to import all months from Excel
+  const handleImportAllMonths = async (file) => {
+    setIsImportingAllMonths(true);
+    
+    try {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          
+          console.log('📊 Excel file loaded for all months. Worksheets:', workbook.SheetNames);
+          
+          const allMonthsData = {};
+          const monthNames = [
+            'january', 'february', 'march', 'april', 'may', 'june',
+            'july', 'august', 'september', 'october', 'november', 'december'
+          ];
+          const monthAbbreviations = [
+            'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+            'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+          ];
+          const monthNumbers = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
+          
+          // Process each worksheet
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            if (jsonData.length === 0) return;
+            
+            // Try to determine which month this sheet represents
+            let detectedMonth = null;
+            const sheetLower = sheetName.toLowerCase();
+            
+            // Check for exact month name match
+            for (let i = 0; i < monthNames.length; i++) {
+              if (sheetLower.includes(monthNames[i])) {
+                detectedMonth = monthNames[i];
+                break;
+              }
+            }
+            
+            // Check for abbreviation match
+            if (!detectedMonth) {
+              for (let i = 0; i < monthAbbreviations.length; i++) {
+                if (sheetLower.includes(monthAbbreviations[i])) {
+                  detectedMonth = monthNames[i];
+                  break;
+                }
+              }
+            }
+            
+            // Check for number match
+            if (!detectedMonth) {
+              for (let i = 0; i < monthNumbers.length; i++) {
+                if (sheetLower.includes(monthNumbers[i])) {
+                  detectedMonth = monthNames[i];
+                  break;
+                }
+              }
+            }
+            
+            // If no month detected, try to get it from the data
+            if (!detectedMonth && jsonData.length > 1) {
+              const firstRow = jsonData[1];
+              const dateIndex = firstRow.findIndex(cell => 
+                cell && cell.toString().toLowerCase().includes('date')
+              );
+              if (dateIndex !== -1 && firstRow[dateIndex]) {
+                try {
+                  const dateValue = firstRow[dateIndex];
+                  let date;
+                  if (typeof dateValue === 'number') {
+                    date = new Date((dateValue - 25569) * 86400 * 1000);
+                  } else {
+                    date = new Date(dateValue);
+                  }
+                  if (!isNaN(date.getTime())) {
+                    detectedMonth = monthNames[date.getMonth()];
+                  }
+                } catch (error) {
+                  console.warn(`Could not detect month from date in sheet: ${sheetName}`);
+                }
+              }
+            }
+            
+            if (!detectedMonth) {
+              console.warn(`⚠️ Could not detect month for sheet: ${sheetName}. Skipping.`);
+              return;
+            }
+            
+            console.log(`📅 Processing sheet "${sheetName}" as month: ${detectedMonth}`);
+            
+            // Process the data for this month
+            const processedData = processSheetDataForAllMonths(jsonData, detectedMonth);
+            if (processedData.length > 0) {
+              allMonthsData[detectedMonth] = processedData;
+              console.log(`✅ Added ${processedData.length} entries for ${detectedMonth}`);
+            } else {
+              console.log(`⚠️ No data processed for ${detectedMonth} (sheet: ${sheetName})`);
+            }
+          });
+          
+          console.log(`✅ Processed data for months:`, Object.keys(allMonthsData));
+          
+          // Store in local storage
+          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(allMonthsData));
+          setAllMonthsData(allMonthsData);
+          
+          toast.success(`Successfully imported data for ${Object.keys(allMonthsData).length} months!`);
+          
+        } catch (error) {
+          console.error('❌ Error parsing all months from Excel:', error);
+          toast.error("Error parsing Excel file for all months");
+        } finally {
+          setIsImportingAllMonths(false);
+        }
+      };
+      
+      reader.onerror = () => {
+        toast.error("Error reading the file");
+        setIsImportingAllMonths(false);
+      };
+      
+      reader.readAsArrayBuffer(file);
+    } catch (error) {
+      console.error('Error importing all months:', error);
+      toast.error("Error importing all months from Excel");
+      setIsImportingAllMonths(false);
+    }
+  };
+
+  // Helper function to process sheet data for all months (using same logic as parseExcelFile)
+  const processSheetDataForAllMonths = (jsonData, monthName) => {
+    const headers = jsonData[0];
+    if (!headers) {
+      console.log(`❌ No headers found in sheet for ${monthName}`);
+      return [];
+    }
+    
+    console.log(`📋 Headers for ${monthName}:`, headers);
+    console.log(`📊 Total rows in ${monthName}:`, jsonData.length);
+    
+    // Use the same logic as parseExcelFile - expect specific column structure
+    const expectedHeaders = ['DATE', 'BARANGAY', 'TYPE OF CONCERN', 'Week 1', 'Week 2', 'Week 3', 'Week 4', 'STATUS', 'REMARKS'];
+    
+    if (!headers || headers.length < 6) {
+      console.log(`❌ Invalid Excel format for ${monthName}. Expected columns:`, expectedHeaders);
+      return [];
+    }
+    
+    // Use the same column indices as parseExcelFile
+    const dateIndex = 0;
+    const barangayIndex = 1;
+    const concernTypeIndex = 2;
+    const week1Index = 3;
+    const week2Index = 4;
+    const week3Index = 5;
+    const week4Index = 6;
+    const statusIndex = 7;
+    const remarksIndex = 8;
+    
+    console.log(`🔍 Using standard column indices for ${monthName}:`, {
+      date: dateIndex,
+      barangay: barangayIndex,
+      concernType: concernTypeIndex,
+      week1: week1Index,
+      week2: week2Index,
+      week3: week3Index,
+      week4: week4Index,
+      status: statusIndex,
+      remarks: remarksIndex
+    });
+    
+    const processedData = [];
+    const currentMunicipality = activeMunicipalityTab;
+    
+    console.log(`🔍 Processing ${jsonData.length - 1} data rows for ${monthName}`);
+    console.log(`📋 Available imported barangays:`, importedBarangays.map(b => `${b.name}, ${b.municipality}`));
+    
+    // Show first few rows of actual data to understand the structure
+    console.log(`📊 First 3 data rows for ${monthName}:`, jsonData.slice(1, 4));
+    
+    // Process data rows (skip header) - same logic as parseExcelFile
+    for (let i = 1; i < jsonData.length; i++) {
+      const row = jsonData[i];
+      if (!row || row.length === 0) continue;
+      
+      // Keep barangay field as-is (format: "Barangay, Municipality")
+      const barangayField = row[barangayIndex] || '';
+      const barangayParts = barangayField.split(',').map(part => part.trim());
+      const barangay = barangayParts[0] || '';
+      const municipality = barangayParts[1] || '';
+      
+      console.log(`🔍 Row ${i} for ${monthName}:`, {
+        rawBarangay: row[barangayIndex],
+        barangayField,
+        barangay,
+        municipality,
+        rawDate: row[dateIndex]
+      });
+      
+      // Handle Excel date properly (same as parseExcelFile)
+      let processedDate = row[dateIndex] || '';
+      if (typeof processedDate === 'number') {
+        // Convert Excel serial date to proper date
+        try {
+          const excelEpoch = new Date(1900, 0, 1);
+          const daysSinceEpoch = processedDate - 2;
+          const dateObj = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
+          if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) {
+            processedDate = dateObj.toLocaleDateString("en-US", { 
+              month: "long", 
+              day: "numeric", 
+              year: "numeric" 
+            });
+          }
+        } catch (error) {
+          console.warn('Error converting Excel date:', processedDate, error);
+        }
+      }
+      
+      // Create entry for each week that has data (same logic as parseExcelFile)
+      const weeks = [
+        { index: week1Index, week: 'week1' },
+        { index: week2Index, week: 'week2' },
+        { index: week3Index, week: 'week3' },
+        { index: week4Index, week: 'week4' }
+      ];
+      
+      weeks.forEach(({ index, week }) => {
+        if (index !== -1 && row[index] !== undefined && row[index] !== null && row[index] !== '') {
+          const weekValue = parseInt(row[index]) || 0;
+          if (weekValue > 0) {
+            const newEntry = {
+              id: `excel-${monthName}-${Date.now()}-${Math.random()}`,
+              date: processedDate,
+              municipality: municipality,
+              barangay: barangayField, // Keep full "Barangay, Municipality" format
+              concernType: row[concernTypeIndex] || '',
+              week1: week === 'week1' ? weekValue : 0,
+              week2: week === 'week2' ? weekValue : 0,
+              week3: week === 'week3' ? weekValue : 0,
+              week4: week === 'week4' ? weekValue : 0,
+              actionTaken: row[statusIndex] || '',
+              remarks: row[remarksIndex] || '',
+              importedFromExcel: true
+            };
+            
+            processedData.push(newEntry);
+          }
+        }
+      });
+    }
+    
+    console.log(`📊 Final processed data for ${monthName}:`, processedData.length, 'entries');
+    if (processedData.length > 0) {
+      console.log(`✅ Sample entry for ${monthName}:`, processedData[0]);
+    }
+    return processedData;
   };
 
   const handleImportExcelData = async () => {
@@ -1514,15 +2231,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  const handleClearExcelData = () => {
-    setExcelData([]);
-    setExcelPreview([]);
-    setShowExcelPreview(false);
-    setExcelFile(null);
-    setExcelMunicipalityData({});
-    setSelectedExcelMunicipality("");
-    toast.info("Excel data cleared");
-  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -1652,11 +2360,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
               >
                 <div className="py-1">
-                  {/* Navigation Options */}
-                  <div className="px-3 py-2">
-                    <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
-                  </div>
-                  
+                {/* Navigation Options */}
+                <div className="px-3 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                </div>
+
+                {/* Show Overview only for admin */}
+                {isAdmin && (
                   <button
                     onClick={() => {
                       setActiveTab("overview");
@@ -1671,22 +2381,26 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <BarChart3 className="w-4 h-4 text-blue-600" />
                     <span>Overview</span>
                   </button>
-                  
-                  <button
-                    onClick={() => {
-                      setActiveTab("weekly-report");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "weekly-report"
-                        ? "bg-green-50 text-green-700"
-                        : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                    }`}
-                  >
-                    <FileText className="w-4 h-4 text-green-600" />
-                    <span>Weekly Report</span>
-                  </button>
-                  
+                )}
+
+                {/* Weekly Report - available for all users */}
+                <button
+                  onClick={() => {
+                    setActiveTab("weekly-report");
+                    setShowMenuDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                    activeTab === "weekly-report"
+                      ? "bg-green-50 text-green-700"
+                      : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <span>Weekly Report</span>
+                </button>
+
+                {/* Show Barangay Management only for admin */}
+                {isAdmin && (
                   <button
                     onClick={() => {
                       setActiveTab("barangays");
@@ -1701,7 +2415,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <Building2 className="w-4 h-4 text-purple-600" />
                     <span>Barangay Management</span>
                   </button>
-                  
+                )}
+
+                {/* Show Concern Types only for admin */}
+                {isAdmin && (
                   <button
                     onClick={() => {
                       setActiveTab("concern-types");
@@ -1716,6 +2433,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <AlertTriangle className="w-4 h-4 text-orange-600" />
                     <span>Concern Types</span>
                   </button>
+                )}
                 </div>
               </div>
             )}
@@ -1726,17 +2444,19 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       <div className="space-y-4">
 
         {/* Barangay Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-1'} gap-4 md:gap-6`}>
           <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
             <div className="p-4 md:p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Barangays</p>
                   <p className="text-2xl md:text-3xl font-bold text-purple-600">
-                    {importedBarangays.length}
+                    {isAdmin 
+                      ? importedBarangays.length 
+                      : importedBarangays.filter(b => b.municipality === userMunicipality).length}
                   </p>
                   <p className="text-xs text-gray-500 mt-1">
-                    All municipalities
+                    {isAdmin ? 'All municipalities' : userMunicipality}
                   </p>
                 </div>
                 <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
@@ -1746,6 +2466,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
 
+          {isAdmin && (
+            <>
           <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
             <div className="p-4 md:p-6">
               <div className="flex items-center justify-between">
@@ -1804,10 +2526,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
           </div>
+            </>
+          )}
         </div>
 
-        {/* Overview Section */}
-        {activeTab === "overview" && (
+        {/* Overview Section - only for admin */}
+        {isAdmin && activeTab === "overview" && (
           <div className="space-y-6">
             {/* Charts Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1892,21 +2616,61 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       )}
                     </div>
                   </div>
+                  <div className="flex flex-col gap-3">
+                    {/* Import Options */}
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={importAllMonths}
+                          onChange={(e) => setImportAllMonths(e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <span>Import all months at once</span>
+                      </label>
+                    </div>
+                    
+                    {/* Action Buttons */}
                   <div className="flex gap-2">
                     <button 
                       onClick={() => setShowSummaryModal(true)}
-                      className="bg-blue-600 hover:bg-blue-700 text-white p-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                       title="View Summary"
                     >
                       <BarChart3 className="h-4 w-4" />
+                        <span className="text-sm font-medium">View Summary</span>
                     </button>
+                      <button 
+                        onClick={() => document.getElementById('excel-file-input').click()}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                        title={importAllMonths ? "Import All Months" : "Import Excel"}
+                        disabled={isImportingExcel || isImportingAllMonths}
+                      >
+                        {(isImportingExcel || isImportingAllMonths) ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <FileSpreadsheet className="h-4 w-4" />
+                        )}
+                        <span className="text-sm font-medium">
+                          {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
+                        </span>
+                      </button>
+                    </div>
+                    <input
+                      id="excel-file-input"
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleExcelFileSelect}
+                      className="hidden"
+                    />
                     <div className="relative clear-options-container">
                       <button 
                         onClick={() => setShowClearOptions(!showClearOptions)}
-                        className="bg-red-600 hover:bg-red-700 text-white p-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                         title="Clear Data"
                       >
                         <AlertTriangle className="h-4 w-4" />
+                        <span className="text-sm font-medium">Clear Data</span>
                       </button>
                       
                       {showClearOptions && (
@@ -1976,7 +2740,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <button 
                       onClick={handleSaveWeeklyReport}
                       disabled={isLoadingWeeklyReports}
-                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white p-2 rounded-lg transition-colors duration-200 flex items-center justify-center"
+                      className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
                       title="Save Data"
                     >
                       {isLoadingWeeklyReports ? (
@@ -1984,6 +2748,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       ) : (
                         <CheckCircle className="h-4 w-4" />
                       )}
+                      <span className="text-sm font-medium">Save Data</span>
                     </button>
                   </div>
                 </div>
@@ -2017,131 +2782,60 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
 
-                {/* Municipality Tabs */}
+                {/* Municipality Selection */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Select Municipality</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
                   <div className="flex flex-wrap gap-2">
-                    {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                      const isActive = activeMunicipalityTab === municipality;
-                      const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
-                      const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
-                      
-                      return (
+                    {isAdmin ? (
+                      // Show all municipalities for admin
+                      Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                        const isActive = activeMunicipalityTab === municipality;
+                        const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
+                        const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
+                        
+                        return (
+                          <button
+                            key={municipality}
+                            onClick={() => handleMunicipalityTabChange(municipality)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                              isActive
+                                ? 'bg-green-600 text-white shadow-lg'
+                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300'
+                            }`}
+                          >
+                            <Building2 className="h-4 w-4" />
+                            <span>{municipality}</span>
+                            <div className={`text-xs px-2 py-1 rounded-full ${
+                              isActive 
+                                ? 'bg-green-500 text-white' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {barangaysCount} brgy • {concernTypesCount} types
+                            </div>
+                          </button>
+                        );
+                      })
+                    ) : (
+                      // Show only user's municipality
+                      userMunicipality ? (
                         <button
-                          key={municipality}
-                          onClick={() => handleMunicipalityTabChange(municipality)}
-                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
-                            isActive
-                              ? 'bg-green-600 text-white shadow-lg'
-                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300'
-                          }`}
+                          onClick={() => handleMunicipalityTabChange(userMunicipality)}
+                          className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white shadow-lg flex items-center gap-2"
                         >
                           <Building2 className="h-4 w-4" />
-                          <span>{municipality}</span>
-                          <div className={`text-xs px-2 py-1 rounded-full ${
-                            isActive 
-                              ? 'bg-green-500 text-white' 
-                              : 'bg-gray-100 text-gray-600'
-                          }`}>
-                            {barangaysCount} brgy • {concernTypesCount} types
+                          <span>{userMunicipality}</span>
+                          <div className="text-xs px-2 py-1 rounded-full bg-green-500 text-white">
+                            {importedBarangays.filter(b => b.municipality === userMunicipality).length} brgy • {getConcernTypesForMunicipality(userMunicipality).length} types
                           </div>
                         </button>
-                      );
-                    })}
+                      ) : (
+                        <div className="text-gray-500">No municipality assigned</div>
+                      )
+                    )}
                   </div>
                 </div>
               </div>
               
-              {/* Excel Import Preview Section */}
-              {showExcelPreview && excelPreview.length > 0 && (
-                <div className="p-4 md:p-6 pt-0">
-                  <div className="bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-8 w-8 rounded-full flex items-center justify-center bg-purple-100">
-                          <FileSpreadsheet className="h-4 w-4 text-purple-600" />
-                        </div>
-                        <div>
-                          <h4 className="text-lg font-semibold text-gray-900">Excel Import Preview</h4>
-                          <p className="text-sm text-gray-600">
-                            {excelData.length} rows ready to import • {Object.keys(excelMunicipalityData).length} municipalities detected
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleClearExcelData}
-                          className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-2"
-                        >
-                          <AlertTriangle className="h-4 w-4" />
-                          Clear
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* Municipality Selection */}
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Select Municipality to Import</label>
-                      <select 
-                        value={selectedExcelMunicipality}
-                        onChange={(e) => setSelectedExcelMunicipality(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      >
-                        <option value="">Choose municipality...</option>
-                        {Object.keys(excelMunicipalityData).map((municipality) => (
-                          <option key={municipality} value={municipality}>
-                            {municipality} ({excelMunicipalityData[municipality].length} rows)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="bg-white/50 border-b border-purple-200">
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">DATE</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">BARANGAY</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">TYPE OF CONCERN</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-700">Week 1</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-700">Week 2</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-700">Week 3</th>
-                            <th className="px-3 py-2 text-center font-medium text-gray-700">Week 4</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">STATUS</th>
-                            <th className="px-3 py-2 text-left font-medium text-gray-700">REMARKS</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-purple-100">
-                          {(selectedExcelMunicipality && excelMunicipalityData[selectedExcelMunicipality] 
-                            ? excelMunicipalityData[selectedExcelMunicipality].slice(0, 5)
-                            : excelPreview
-                          ).map((row, index) => (
-                            <tr key={row.id} className="hover:bg-white/30">
-                              <td className="px-3 py-2 text-gray-700">{row.date}</td>
-                              <td className="px-3 py-2 text-gray-700 font-medium">{row.barangay}</td>
-                              <td className="px-3 py-2 text-gray-700">{row.concernType}</td>
-                              <td className="px-3 py-2 text-center text-gray-700">{row.week1 || '0'}</td>
-                              <td className="px-3 py-2 text-center text-gray-700">{row.week2 || '0'}</td>
-                              <td className="px-3 py-2 text-center text-gray-700">{row.week3 || '0'}</td>
-                              <td className="px-3 py-2 text-center text-gray-700">{row.week4 || '0'}</td>
-                              <td className="px-3 py-2 text-gray-700">{row.status}</td>
-                              <td className="px-3 py-2 text-gray-700">{row.remarks}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                    
-                    {selectedExcelMunicipality && excelMunicipalityData[selectedExcelMunicipality] && excelMunicipalityData[selectedExcelMunicipality].length > 5 && (
-                      <div className="mt-3 text-center">
-                        <span className="text-sm text-gray-600">
-                          ... and {excelMunicipalityData[selectedExcelMunicipality].length - 5} more rows for {selectedExcelMunicipality}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
               
               <div className="p-4 md:p-6 pt-0">
                 <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
@@ -2664,20 +3358,72 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             {/* Barangays List Section */}
             <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
               <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                {/* Header with title and count */}
+                <div className="flex items-center gap-3 mb-4">
                     <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
                       <Building2 className="h-4 w-4 text-purple-600" />
                     </div>
                     <div>
                       <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Barangays</h3>
                       <p className="text-sm text-gray-600">
-                        {importedBarangays.length} barangays imported
+                      {barangayFilterMunicipality 
+                        ? `${getSortedBarangays().length} of ${importedBarangays.length} barangays (${barangayFilterMunicipality})`
+                        : `${importedBarangays.length} barangays imported`
+                      }
                       </p>
                     </div>
                   </div>
+
+                {/* Controls and Actions */}
                                       {importedBarangays.length > 0 && (
-                      <div className="flex gap-2">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                    {/* Filter and Sort Controls */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Filter:</span>
+                        <select
+                          value={barangayFilterMunicipality}
+                          onChange={(e) => setBarangayFilterMunicipality(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="">All Municipalities</option>
+                          {getUniqueMunicipalities().map(municipality => (
+                            <option key={municipality} value={municipality}>{municipality}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-gray-600">Sort by:</span>
+                        <select
+                          value={barangaySortBy}
+                          onChange={(e) => handleBarangaySort(e.target.value)}
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                        >
+                          <option value="name">Name</option>
+                          <option value="municipality">Municipality</option>
+                          <option value="district">District</option>
+                          <option value="importedAt">Import Date</option>
+                        </select>
+                        <button
+                          onClick={() => setBarangaySortOrder(barangaySortOrder === 'asc' ? 'desc' : 'asc')}
+                          className="p-1 hover:bg-gray-100 rounded transition-colors duration-200"
+                          title={`Sort ${barangaySortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                        >
+                          {barangaySortOrder === 'asc' ? (
+                            <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                          ) : (
+                            <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex flex-wrap gap-2">
                         <button 
                           onClick={handleSelectAllBarangays}
                           className={`border font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm ${
@@ -2721,9 +3467,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           <AlertTriangle className="h-4 w-4 mr-2" />
                           Clear All
                         </button>
+                    </div>
                       </div>
                     )}
-                </div>
               </div>
               <div className="p-4 md:p-6 pt-0">
                 {isLoadingBarangays ? (
@@ -2739,7 +3485,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 ) : (
                                       <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {importedBarangays.map((barangay) => {
+                      {getSortedBarangays().map((barangay) => {
                         const isSelected = selectedBarangays.includes(barangay.id);
                         return (
                           <div 
@@ -3140,32 +3886,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-3">
+                <div className="flex items-center gap-3">
                   <BarChart3 className="h-6 w-6 text-blue-600" />
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
                   Weekly Report Summary
                 </h2>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={summarySelectedMunicipality}
-                    onChange={(e) => setSummarySelectedMunicipality(e.target.value)}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Municipalities</option>
-                    {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
-                      <option key={municipality} value={municipality}>{municipality}</option>
-                    ))}
-                  </select>
+                    {activeMunicipalityTab && (
+                      <p className="text-sm text-gray-600 mt-1">
+                        Municipality: <span className="font-medium text-blue-600">{activeMunicipalityTab}</span>
+                      </p>
+                    )}
+                  </div>
+                </div>
                   <button
                     onClick={() => setShowSummaryModal(false)}
                     className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
                   >
                     <X className="h-6 w-6" />
                   </button>
-                </div>
               </div>
 
               {(() => {
-                const summary = calculateWeeklyReportSummary(summarySelectedMunicipality);
+                const summary = calculateWeeklyReportSummary(activeMunicipalityTab);
                 return (
                   <div className="space-y-6">
                     {/* Overview Stats */}

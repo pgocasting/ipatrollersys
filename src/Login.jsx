@@ -12,7 +12,7 @@ import logoFallback from "/images/logo.svg";
 
 export default function Login({ onLogin }) {
   const [formData, setFormData] = useState({
-    email: "",
+    username: "",
     password: "",
     keepLoggedIn: false,
   });
@@ -27,8 +27,8 @@ export default function Login({ onLogin }) {
     setIsLoading(true);
 
     try {
-      console.log('🔐 Attempting login with:', formData.email);
-      const result = await signIn(formData.email, formData.password, formData.keepLoggedIn);
+      console.log('🔐 Attempting login with username:', formData.username);
+      const result = await signIn(formData.username, formData.password, formData.keepLoggedIn);
       
       if (result.success) {
         console.log('✅ Login successful:', result.user?.email);
@@ -143,20 +143,20 @@ export default function Login({ onLogin }) {
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Email Field */}
+            {/* Username Field */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-semibold text-gray-700">
-                Email *
+              <Label htmlFor="username" className="text-sm font-semibold text-gray-700">
+                Username *
               </Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                value={formData.email}
+                id="username"
+                name="username"
+                type="text"
+                value={formData.username}
                 onChange={handleChange}
                 required
                 className="w-full py-3 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
-                placeholder="name@example.com"
+                placeholder="Enter your username"
               />
             </div>
 

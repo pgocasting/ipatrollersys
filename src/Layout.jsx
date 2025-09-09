@@ -4,6 +4,8 @@ import { Badge } from "./components/ui/badge";
 import { Separator } from "./components/ui/separator";
 
 import { useFirebase } from "./hooks/useFirebase";
+import { useAuth } from "./contexts/AuthContext";
+import Sidebar from "./components/Sidebar";
 import { 
   Home, 
   Car, 
@@ -23,7 +25,18 @@ const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
 
 export default function Layout({ children, onNavigate, currentPage, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    // Get initial state from localStorage
+    const saved = localStorage.getItem('sidebarCollapsed');
+    return saved ? JSON.parse(saved) : false;
+  });
+
+  // Save collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
+  }, [isCollapsed]);
   const { user } = useFirebase();
+  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
   
   // Close sidebar when screen size changes to desktop
   useEffect(() => {
@@ -62,11 +75,13 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
-    name: user.displayName || "Administrator",
+    name: userFirstName && userLastName ? `${userFirstName} ${userLastName}` : (user.displayName || "Administrator"),
+    username: userUsername || "admin",
     email: user.email || "admin@ipatroller.gov.ph",
     avatar: user.photoURL || null
   } : {
     name: "Administrator",
+    username: "admin",
     email: "admin@ipatroller.gov.ph",
     avatar: null
   };
@@ -74,14 +89,35 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   const [showProfile, setShowProfile] = useState(false);
 
-  const navigationItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" /> },
-    { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" /> },
-    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" /> },
-    { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" /> },
-    { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" /> },
-    { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" /> },
-  ];
+  // Define all navigation items - moved outside component to prevent recreation
+  const allNavigationItems = React.useMemo(() => [
+    { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" />, showFor: 'all' },
+    { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" />, showFor: 'admin' },
+    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" />, showFor: 'command-center' },
+    { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" />, showFor: 'action-center' },
+    { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" />, showFor: 'admin' },
+    { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" />, showFor: 'admin' },
+    { id: 'users', label: 'Users', icon: <User className="h-5 w-5" />, showFor: 'admin' },
+  ], []);
+
+  // Filter navigation items based on user role and access level - memoized to prevent recalculation
+  const navigationItems = React.useMemo(() => 
+    allNavigationItems.filter(item => {
+      // Admin users can see everything
+      if (isAdmin) return true;
+      
+      // Show for all users
+      if (item.showFor === 'all') return true;
+      
+      // Show for specific access level users (non-admin)
+      if (item.showFor === 'action-center' || item.showFor === 'command-center') {
+        return userAccessLevel === item.showFor;
+      }
+      
+      return false;
+    }),
+    [allNavigationItems, isAdmin, userAccessLevel]
+  );
 
   const handleNavigation = (pageId) => {
     // Close mobile sidebar
@@ -107,75 +143,18 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       )}
 
       {/* Responsive Sidebar */}
-      <aside 
-        id="sidebar"
-        className={`fixed z-50 top-0 left-0 h-full w-64 md:w-56 backdrop-blur-xl border-r p-1 flex flex-col transition-all duration-300 overflow-y-auto ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
-        } bg-white/95 border-gray-200`}
-      >        
-        {/* Sidebar Header */}
-        <div className="flex items-center justify-center mb-2">
-          <div className="flex items-center justify-center transition-colors duration-300">
-            <img 
-              src="/images/Ipatroller_Logo.png" 
-              alt="IPatroller Logo" 
-              className="h-32 w-auto"
-            />
-          </div>
-          
-          {/* Close button for mobile */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="md:hidden p-1 h-8 w-8"
-            onClick={() => setSidebarOpen(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
-        
-        {/* Navigation */}
-        <nav className="flex flex-col gap-2 flex-1">
-          {navigationItems.map((item) => (
-            <Button
-              key={item.id}
-              onClick={() => { 
-                handleNavigation(item.id); 
-              }}
-              variant={currentPage === item.id ? "default" : "ghost"}
-              className={`justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
-                currentPage === item.id 
-                  ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
-                  : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-              }`}
-            >
-              <span className="mr-3">{item.icon}</span>
-              <span className="truncate">{item.label}</span>
-            </Button>
-          ))}
-        </nav>
-
-        {/* Settings at Bottom */}
-        <div className="mt-auto pt-4 border-t transition-colors duration-300 border-gray-200">
-          <Button
-            onClick={() => { 
-              handleNavigation('settings'); 
-            }}
-            variant={currentPage === 'settings' ? "default" : "ghost"}
-            className={`w-full justify-start h-12 text-base font-medium transition-all duration-200 shadow-sm hover:shadow-md ${
-              currentPage === 'settings' 
-                ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-md' 
-                : 'text-gray-700 hover:text-blue-600 hover:bg-blue-50'
-            }`}
-          >
-            <span className="mr-3"><Settings className="h-5 w-5" /></span>
-            <span className="truncate">Settings</span>
-          </Button>
-        </div>
-      </aside>
+      <Sidebar 
+        sidebarOpen={sidebarOpen}
+        setSidebarOpen={setSidebarOpen}
+        navigationItems={navigationItems}
+        currentPage={currentPage}
+        handleNavigation={handleNavigation}
+        isCollapsed={isCollapsed}
+        setIsCollapsed={setIsCollapsed}
+      />
 
       {/* Responsive Header */}
-      <header className="fixed z-30 top-0 left-0 w-full md:left-56 md:w-[calc(100%-224px)] px-3 md:px-6 py-3 md:py-6 backdrop-blur-xl border-b flex items-center justify-between gap-3 md:gap-4 transition-all duration-300 bg-white/80 border-gray-200">
+      <header className={`fixed z-30 top-0 left-0 w-full md:w-[calc(100%-${isCollapsed ? '64px' : '224px'})] md:left-${isCollapsed ? '16' : '56'} px-3 md:px-6 py-3 md:py-6 backdrop-blur-xl border-b flex items-center justify-between gap-3 md:gap-4 transition-all duration-300 bg-white/80 border-gray-200`}>
         {/* Hamburger for mobile */}
         <Button
           id="hamburger"
@@ -229,7 +208,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
                   </span>
                   <div>
                     <div className="font-semibold transition-colors duration-300 text-gray-900">{userInfo.name}</div>
-                    <div className="text-sm transition-colors duration-300 text-gray-600">{userInfo.email}</div>
+                    <div className="text-sm transition-colors duration-300 text-gray-600">@{userInfo.username}</div>
                   </div>
                 </div>
                 <Separator className="my-3" />
@@ -248,7 +227,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       {/* Main Content */}
       <main className="flex-1 min-h-screen max-w-full transition-all duration-300 bg-white" 
         style={{ 
-          marginLeft: window.innerWidth >= 768 ? SIDEBAR_WIDTH : 0, 
+          marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 64 : SIDEBAR_WIDTH) : 0, 
           paddingTop: 72 
         }}>
         <div className="flex-1 min-h-0 max-w-full overflow-auto p-3 md:p-6 mobile-content">

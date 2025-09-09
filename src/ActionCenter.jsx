@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from "react";
+import { doc, getDoc, collection, getDocs, query, where, deleteDoc, updateDoc, orderBy, limit } from 'firebase/firestore';
+import { db } from './firebase';
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { useAuth } from "./contexts/AuthContext";
 // Firebase removed - using local data storage
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./components/ui/pagination";
 import autoTable from 'jspdf-autotable';
 import { cloudinaryUtils } from "./utils/cloudinary";
 // Firebase imports removed
@@ -77,6 +89,7 @@ import {
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments } = useFirebase();
+  const { isAdmin, userDepartment, userMunicipality } = useAuth();
   // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -87,8 +100,38 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [actionItems, setActionItems] = useState([]);
   const [allActionReports, setAllActionReports] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("pnp");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Set default tab based on user department
+    if (userDepartment === "agriculture") return "agriculture";
+    if (userDepartment === "pg-enro") return "pg-enro";
+    return "pnp"; // Default for admin or other users
+  });
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Shared month names for display and exports
+  const MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ];
+
+  // Update active tab when user department changes
+  useEffect(() => {
+    if (userDepartment === "agriculture") {
+      setActiveTab("agriculture");
+    } else if (userDepartment === "pg-enro") {
+      setActiveTab("pg-enro");
+    }
+  }, [userDepartment]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -135,111 +178,70 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pdfDescription, setPdfDescription] = useState("");
-    // Load action items from Firestore
+  const [tablePage, setTablePage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setTablePage(page);
+  };
+
+  // Load action items from Firestore
     const loadActionReports = async () => {
       setLoading(true);
       try {
         console.log('🔄 Loading action reports from Firestore...');
-        console.log('Current activeTab:', activeTab);
         
-        // Load all data from actionReports collection
-        const result = await queryDocuments('actionReports');
-        console.log('Firestore query result:', result);
+        // Create a query to get action reports, ordered by timestamp
+        const actionReportsRef = collection(db, 'actionReports');
+        const q = query(actionReportsRef, orderBy('timestamp', 'desc'));
+        const querySnapshot = await getDocs(q);
         
-        if (result.success && result.data && result.data.length > 0) {
-          console.log(`✅ Found ${result.data.length} documents in Firestore`);
+        if (!querySnapshot.empty) {
+          console.log(`✅ Found ${querySnapshot.size} documents in Firestore`);
           
           // Process all documents to extract action reports
-          let allActionReports = [];
+          const allActionReports = [];
           
-          result.data.forEach((doc, index) => {
-            console.log(`Processing document ${index + 1}:`, {
-              id: doc.id,
-              hasData: !!doc.data,
-              hasMonthKey: !!doc.monthKey,
-              department: doc.department
-            });
-            
-            // If document has a 'data' array (monthly structure), extract reports from it
-            if (doc.data && Array.isArray(doc.data)) {
-              console.log(`📅 Monthly document ${doc.id} contains ${doc.data.length} reports`);
-              doc.data.forEach(report => {
-                allActionReports.push({
-                  ...report,
-                  sourceDocument: doc.id,
-                  sourceType: 'monthly'
-                });
-              });
-            }
-            // If document is an individual report
-            else if (doc.department || doc.what || doc.municipality) {
-              console.log(`📋 Individual report: ${doc.id}`);
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data) {
               allActionReports.push({
-                ...doc,
-                sourceDocument: doc.id,
-                sourceType: 'individual'
+                id: doc.id,
+                ...data
               });
             }
           });
+
+          console.log('✅ Processed action reports:', allActionReports.length);
           
-          console.log(`📊 Total action reports found: ${allActionReports.length}`);
+          // Filter reports based on active tab if needed
+          const filteredReports = activeTab === 'all' 
+            ? allActionReports 
+            : allActionReports.filter(report => report.department?.toLowerCase() === activeTab?.toLowerCase());
           
-          if (allActionReports.length > 0) {
-            // Set all reports
-            setAllActionReports(allActionReports);
-            
-            // Filter by department (PNP, Agriculture, PG-ENRO)
-            const filteredReports = allActionReports.filter(report => {
-              const reportDepartment = report.department?.toLowerCase();
-              const currentTab = activeTab?.toLowerCase();
-              
-              console.log(`Checking report ${report.id}: department="${reportDepartment}", activeTab="${currentTab}"`);
-              
-              // Map department values to match tabs
-              if (currentTab === 'all') return true;
-              if (currentTab === 'pnp' && (reportDepartment === 'pnp' || reportDepartment === 'police')) return true;
-              if (currentTab === 'agriculture' && reportDepartment === 'agriculture') return true;
-              if (currentTab === 'pg-enro' && (reportDepartment === 'pg-enro' || reportDepartment === 'enro' || reportDepartment === 'environment')) return true;
-              
-              return false;
-            });
-            
-            console.log(`🎯 Filtered reports for ${activeTab}:`, {
-              totalReports: allActionReports.length,
-              filteredCount: filteredReports.length,
-              departments: [...new Set(allActionReports.map(r => r.department))],
-              filteredDepartments: [...new Set(filteredReports.map(r => r.department))]
-            });
-            
-            setActionItems(filteredReports);
-            
-            // Show success message
-            if (filteredReports.length > 0) {
-              setSuccessMessage(`✅ Loaded ${filteredReports.length} ${activeTab.toUpperCase()} reports from Firestore`);
-            } else {
-              setSuccessMessage(`ℹ️ Found ${allActionReports.length} total reports, but none match ${activeTab.toUpperCase()} department`);
-            }
-          } else {
-            console.log('❌ No action reports found in any documents');
-            setActionItems([]);
-            setAllActionReports([]);
-            setSuccessMessage('No action reports found in Firestore database');
+          setAllActionReports(allActionReports);
+          setActionItems(filteredReports);
+          
+          if (allActionReports.length === 0) {
+            setSuccessMessage('No action reports found');
           }
         } else {
-          console.log('❌ No data found in Firestore actionReports collection');
+          console.log('📭 No action reports found in Firestore');
           setActionItems([]);
           setAllActionReports([]);
-          setSuccessMessage('No data found in Firestore database');
+          setSuccessMessage('No action reports found');
         }
       } catch (error) {
         console.error('❌ Error loading action reports:', error);
         setActionItems([]);
         setAllActionReports([]);
-        setSuccessMessage('Error loading data from Firestore');
+        setSuccessMessage('Error loading action reports');
       } finally {
         setLoading(false);
       }
-    };
+      };
+  
   useEffect(() => {
     loadActionReports();
   }, [activeTab]);
@@ -375,7 +377,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const matchesDepartment = item.department === activeTab;
     const matchesMunicipality = activeTab === "pnp" ? 
       (activeMunicipality === "all" || item.municipality === activeMunicipality) : true;
-    return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality;
+    
+    // Filter by user's municipality for non-admin users
+    const matchesUserMunicipality = isAdmin ? true : (item.municipality === userMunicipality);
+    
+    return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality && matchesUserMunicipality;
   });
   const sortedItems = [...filteredItems].sort((a, b) => {
     let aValue, bValue;
@@ -410,6 +416,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return aValue < bValue ? 1 : -1;
     }
   });
+
+  // Calculate pagination
+  const totalPages = Math.ceil((sortedItems?.length || 0) / itemsPerPage);
+  const startIndex = (tablePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = sortedItems?.slice(startIndex, endIndex) || [];
+
   // Calculate totals (normalized to match table display)
   const totalActions = (sortedItems || []).filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
@@ -722,112 +735,116 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
   const exportToPDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    
-    // Set page dimensions
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 40;
     const contentWidth = pageWidth - (2 * margin);
-    
-    // Add page border
-    doc.rect(margin, margin, contentWidth, pageHeight - (2 * margin));
-    
-    // Add header
-    doc.setFontSize(24);
+
+    // Header banner
+    const headerHeight = 80;
+    doc.setFillColor(37, 99, 235); // blue-600
+    doc.rect(0, 0, pageWidth, headerHeight, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Action Center Report', pageWidth / 2, 80, { align: 'center' });
-    
-    // Add description if provided
+    doc.setFontSize(20);
+    doc.text('Action Center Report', margin, 32);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    const subtitle = `${MONTH_NAMES[selectedMonth] || 'All Months'} • ${selectedYear || 'All Years'} • ${(activeTab || 'unknown').toUpperCase()}`;
+    doc.text(subtitle, margin, 52);
+    doc.setTextColor(0, 0, 0);
+
+    // Optional description
+    let cursorY = headerHeight + 20;
     if (pdfDescription && pdfDescription.trim()) {
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'italic');
-      const descriptionLines = doc.splitTextToSize(pdfDescription.trim(), contentWidth - 40);
-      let descriptionY = 105;
-      descriptionLines.forEach((line, index) => {
-        doc.text(line, pageWidth / 2, descriptionY + (index * 15), { align: 'center' });
-      });
-      var finalDescriptionY = descriptionY + (descriptionLines.length * 15) + 10;
+      const descriptionLines = doc.splitTextToSize(pdfDescription.trim(), contentWidth);
+      doc.text(descriptionLines, margin, cursorY);
+      cursorY += (descriptionLines.length * 14) + 10;
+      doc.setFont('helvetica', 'normal');
     }
-    
-    // Add report details section
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const detailsY = pdfDescription && pdfDescription.trim() ? (finalDescriptionY + 20) : 120;
-    const lineHeight = 20;
-    
-    // Report details in two columns
-    const monthNamesExport = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    doc.text(`Month: ${monthNamesExport[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
-    doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
-    
-    doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
-    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, pageWidth / 2 + 20, detailsY + lineHeight);
-    
-    doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, margin + 20, detailsY + (2 * lineHeight));
-    
-    // Add summary statistics
-    const statsY = detailsY + (4 * lineHeight);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Summary Statistics', margin + 20, statsY);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    // Statistics in a grid layout
-    const statsData = [
+
+    // Report meta grid
+    const lineHeight = 18;
+    const metaStartY = cursorY;
+    doc.setFontSize(11);
+    doc.text(`Month: ${MONTH_NAMES[selectedMonth] || 'All Months'}`, margin, metaStartY);
+    doc.text(`Year: ${selectedYear || 'All Years'}`, margin + (contentWidth / 2), metaStartY);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, margin, metaStartY + lineHeight);
+    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, margin + (contentWidth / 2), metaStartY + lineHeight);
+    doc.text(`Municipality: ${activeMunicipality === 'all' ? 'All Municipalities' : activeMunicipality}`, margin, metaStartY + (2 * lineHeight));
+
+    // Summary cards
+    let statsData = [
       { label: 'Total Actions', value: totalActions },
-      { label: 'Pending Actions', value: pendingActions },
-      { label: 'Resolved Actions', value: resolvedActions },
-      { label: 'High Priority Actions', value: highPriorityActions }
+      { label: 'Pending', value: pendingActions },
+      { label: 'Resolved', value: resolvedActions },
+      { label: 'High Priority', value: highPriorityActions }
     ];
-    
-    if (activeTab === "pnp") {
-      statsData.push(
+    if (activeTab === 'pnp') {
+      statsData = statsData.concat([
         { label: 'Total Drugs', value: totalDrugs },
         { label: 'Male Drugs', value: totalDrugsMale },
         { label: 'Female Drugs', value: totalDrugsFemale },
         { label: 'Total Illegals', value: totalIllegals }
-      );
-    } else if (activeTab === "agriculture") {
-      statsData.push(
+      ]);
+    } else if (activeTab === 'agriculture') {
+      statsData = statsData.concat([
         { label: 'Total Illegals', value: totalAgricultureIllegals },
         { label: 'Fishing Violations', value: totalFishingViolations },
         { label: 'Illegal Fishing', value: totalIllegalFishing }
-      );
-    } else if (activeTab === "pg-enro") {
-      statsData.push(
+      ]);
+    } else if (activeTab === 'pg-enro') {
+      statsData = statsData.concat([
         { label: 'Environmental Violations', value: totalEnvironmentalViolations },
         { label: 'Waste Management', value: totalWasteManagement },
         { label: 'Tree Planting', value: totalTreePlanting }
-      );
+      ]);
     }
-    
-    // Display statistics in a grid
-    const statsPerRow = 2;
-    let currentRow = 0;
-    let currentCol = 0;
-    
-    statsData.forEach((stat, index) => {
-      const x = margin + 20 + (currentCol * (contentWidth / statsPerRow));
-      const y = statsY + 30 + (currentRow * 25);
-      
-      doc.text(`${stat.label}: ${stat.value}`, x, y);
-      
-      currentCol++;
-      if (currentCol >= statsPerRow) {
-        currentCol = 0;
-        currentRow++;
+
+    const cardsTop = metaStartY + (3 * lineHeight) + 16;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Summary Statistics', margin, cardsTop - 10);
+    doc.setFont('helvetica', 'normal');
+
+    const cardWidth = (contentWidth - 20) / 2; // two columns
+    const cardHeight = 40;
+    let cardX = margin;
+    let cardY = cardsTop + 6;
+    doc.setDrawColor(226, 232, 240); // slate-200 border
+    statsData.forEach((stat, idx) => {
+      doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 4, 4);
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text(String(stat.label), cardX + 10, cardY + 16);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(String(stat.value ?? 0), cardX + 10, cardY + 32);
+      doc.setFont('helvetica', 'normal');
+
+      // advance position
+      if (cardX + cardWidth + 20 + cardWidth <= pageWidth - margin) {
+        cardX += cardWidth + 20;
+      } else {
+        cardX = margin;
+        cardY += cardHeight + 12;
       }
     });
-    
-    // Prepare table data based on active tab
+
+    const tableStartY = cardY + cardHeight + 24;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Action Items Details', margin, tableStartY - 10);
+    doc.setFont('helvetica', 'normal');
+
+    // Prepare table
     let tableHeaders = ['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken'];
     let tableData = [];
-    
-    if (activeTab === "pnp") {
-      tableHeaders.push('Source', 'Other Information');
+    if (activeTab === 'pnp') {
+      tableHeaders = tableHeaders.concat(['Source', 'Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -838,8 +855,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         item.source || 'N/A',
         item.otherInfo || 'N/A'
       ]);
-    } else if (activeTab === "agriculture") {
-      tableHeaders.push('Illegal Type', 'Other Information');
+    } else if (activeTab === 'agriculture') {
+      tableHeaders = tableHeaders.concat(['Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -847,11 +864,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         formatDate(item.when),
         item.where || 'N/A',
         item.actionTaken || 'N/A',
-
         item.otherInfo || 'N/A'
       ]);
-    } else if (activeTab === "pg-enro") {
-      tableHeaders.push('Other Information');
+    } else if (activeTab === 'pg-enro') {
+      tableHeaders = tableHeaders.concat(['Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -862,58 +878,40 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         item.otherInfo || 'N/A'
       ]);
     }
-    
-    // Calculate table start position
-    const tableStartY = statsY + (Math.ceil(statsData.length / statsPerRow) * 25) + 60;
-    
-    // Add table title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Action Items Details', margin + 20, tableStartY - 20);
-    
-    // Add table with auto table
+
     autoTable(doc, {
       head: [tableHeaders],
       body: tableData,
       startY: tableStartY,
       styles: {
-        fontSize: 8,
-        cellPadding: 4,
-        font: 'helvetica'
+        fontSize: 9,
+        cellPadding: 5,
+        overflow: 'linebreak',
+        lineColor: [226, 232, 240],
+        lineWidth: 0.5
       },
       headStyles: {
-        fillColor: [59, 130, 246],
+        fillColor: [37, 99, 235],
         textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 6
+        fontStyle: 'bold'
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252]
       },
-      margin: { top: tableStartY, left: margin, right: margin },
-      tableWidth: 'auto',
-      columnStyles: {
-        0: { cellWidth: 'auto' }, // Municipality
-        1: { cellWidth: 'auto' }, // District
-        2: { cellWidth: 'auto' }, // What
-        3: { cellWidth: 'auto' }, // When
-        4: { cellWidth: 'auto' }, // Where
-        5: { cellWidth: 'auto' }, // Action Taken
-        6: { cellWidth: 'auto' }  // Source/Illegal Type/Other Information
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      didDrawPage: (data) => {
+        // Footer with page numbers and meta
+        const footerTextLeft = `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+        const pageStr = `Page ${doc.internal.getNumberOfPages()}`;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(footerTextLeft, margin, pageHeight - 20);
+        doc.text(pageStr, pageWidth - margin, pageHeight - 20, { align: 'right' });
       }
     });
-    
-    // Add footer
-    const footerY = pageHeight - 60;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY, { align: 'center' });
-    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
-    
-    // Save the PDF
-    const monthNamesFilename = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const fileName = `action-center-${activeTab}-${monthNamesFilename[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    const fileName = `action-center-${activeTab}-${MONTH_NAMES[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
@@ -1603,87 +1601,154 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pnp" ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-50'
-            }`}
-                onClick={() => {
-                  setActiveTab("pnp");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "pnp" ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  <Shield className="h-5 w-5 md:h-6 md:w-6" />
+          {/* Show all cards for admin users */}
+          {isAdmin && (
+            <>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "pnp" ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-50'
+                }`}
+                    onClick={() => {
+                      setActiveTab("pnp");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "pnp" ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      <Shield className="h-5 w-5 md:h-6 md:w-6" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "pnp" ? 'text-blue-600' : 'text-gray-900'
+                      }`}>PNP</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "pnp" ? 'text-blue-500' : 'text-gray-600'
+                      }`}>Police Operations</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
+                }`}
+                    onClick={() => {
+                      setActiveTab("agriculture");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
+                    }`}>
+                      <Target className="h-5 w-5 md:h-6 md:w-6" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
+                      }`}>Agriculture</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
+                      }`}>Bantay Dagat</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
+                }`}
+                    onClick={() => {
+                  setActiveTab("pg-enro");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
+                    }`}>
+                      <Building2 className="h-5 w-5 md:h-6 md:w-5" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
+                      }`}>PG-Enro</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
+                      }`}>Environment</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+          
+          {/* Show only Agriculture card for Agriculture department users */}
+          {!isAdmin && userDepartment === "agriculture" && (
+            <Card 
+              className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
+              }`}
+                  onClick={() => {
+                    setActiveTab("agriculture");
+                    setActiveMunicipality("all");
+                  }}
+            >
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className={`p-2 md:p-3 rounded-lg ${
+                    activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
+                  }`}>
+                    <Target className="h-5 w-5 md:h-6 md:w-6" />
+                    </div>
+                    <div>
+                    <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                      activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
+                    }`}>Agriculture</h3>
+                    <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                      activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
+                    }`}>Bantay Dagat</p>
+                    </div>
                   </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "pnp" ? 'text-blue-600' : 'text-gray-900'
-                  }`}>PNP</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "pnp" ? 'text-blue-500' : 'text-gray-600'
-                  }`}>Police Operations</p>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Show only PG-ENRO card for PG-ENRO department users */}
+          {!isAdmin && userDepartment === "pg-enro" && (
+            <Card 
+              className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
+              }`}
+                  onClick={() => {
+                setActiveTab("pg-enro");
+                    setActiveMunicipality("all");
+                  }}
+            >
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className={`p-2 md:p-3 rounded-lg ${
+                    activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
+                  }`}>
+                    <Building2 className="h-5 w-5 md:h-6 md:w-5" />
+                    </div>
+                    <div>
+                    <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                      activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
+                    }`}>PG-Enro</h3>
+                    <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                      activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
+                    }`}>Environment</p>
+                    </div>
                   </div>
-                </div>
-            </CardContent>
-          </Card>
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
-            }`}
-                onClick={() => {
-                  setActiveTab("agriculture");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
-                }`}>
-                  <Target className="h-5 w-5 md:h-6 md:w-6" />
-                  </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
-                  }`}>Agriculture</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
-                  }`}>Bantay Dagat</p>
-                  </div>
-                </div>
-            </CardContent>
-          </Card>
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
-            }`}
-                onClick={() => {
-              setActiveTab("pg-enro");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
-                }`}>
-                  <Building2 className="h-5 w-5 md:h-6 md:w-5" />
-                  </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
-                  }`}>PG-Enro</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
-                  }`}>Environment</p>
-                  </div>
-                </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
             </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
@@ -1963,9 +2028,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
           {/* Action Items Table */}
           <div className="flex-1 min-h-0">
-                          <div className="rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-gray-200">
+            <div className="rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-gray-200">
               <div className="p-4 border-b transition-all duration-300 border-gray-200">
                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-sm">
+                      Showing {startIndex + 1}-{Math.min(endIndex, sortedItems?.length || 0)} of {sortedItems?.length || 0}
+                    </Badge>
+                  </div>
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-green-100/80">
                       <BarChart3 className="h-5 w-5 text-green-600" />
@@ -2052,7 +2122,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {(sortedItems || []).map((item) => {
+                        {currentItems.map((item) => {
                           // Safety check - ensure item is valid
                           if (!item || typeof item !== 'object') {
                             return null;
@@ -2181,6 +2251,38 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-gray-500" />
                         </div>
                         <p className="text-sm md:text-base transition-colors duration-300 text-gray-600">No action items found matching your criteria.</p>
+                      </div>
+                    )}
+                    {sortedItems && sortedItems.length > 0 && (
+                      <div className="p-4 border-t border-gray-200">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious 
+                                onClick={() => handlePageChange(tablePage - 1)}
+                                disabled={tablePage === 1}
+                              />
+                            </PaginationItem>
+                            
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  onClick={() => handlePageChange(page)}
+                                  isActive={tablePage === page}
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
+                            
+                            <PaginationItem>
+                              <PaginationNext 
+                                onClick={() => handlePageChange(tablePage + 1)}
+                                disabled={tablePage === totalPages}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
                       </div>
                     )}
                   </div>
@@ -3138,7 +3240,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex flex-wrap gap-4">
                       <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                         <p className="text-xs text-blue-100">Month</p>
-                        <p className="font-semibold">{months[selectedMonth] || 'All Months'}</p>
+                        <p className="font-semibold">{MONTH_NAMES[selectedMonth] || 'All Months'}</p>
                       </div>
                       <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                         <p className="text-xs text-blue-100">Year</p>

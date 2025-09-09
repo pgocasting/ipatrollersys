@@ -8,10 +8,12 @@ import ActionCenter from "./ActionCenter";
 import CommandCenter from "./CommandCenter";
 import Settings from "./Settings";
 import FirestoreTest from "./FirestoreTest";
+import Users from "./Users";
 // Firebase-related components removed
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
+import { AuthProvider } from "./contexts/AuthContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import { initializeUsers } from "./utils/initUsers";
@@ -104,6 +106,8 @@ export default function App() {
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'users':
+        return <Users onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'firestoretest':
         return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       // Firebase test routes removed
@@ -125,13 +129,15 @@ export default function App() {
   }
 
   return (
-    <PatrolDataProvider>
-      <DataProvider>
-        <div className="App">
-          {user ? renderPage() : <Login onLogin={() => {}} />}
-          <Toaster position="top-right" richColors closeButton />
-        </div>
-      </DataProvider>
-    </PatrolDataProvider>
+    <AuthProvider>
+      <PatrolDataProvider>
+        <DataProvider>
+          <div className="App">
+            {user ? renderPage() : <Login onLogin={() => {}} />}
+            <Toaster position="top-right" richColors closeButton />
+          </div>
+        </DataProvider>
+      </PatrolDataProvider>
+    </AuthProvider>
   );
 }

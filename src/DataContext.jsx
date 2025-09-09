@@ -56,7 +56,40 @@ export const DataProvider = ({ children }) => {
     setLoading(true);
     const unsubscribeFunctions = [];
 
-        // Load Patrol Data - Only for totalPatrols calculation, not for active/inactive counts
+    // Load essential data first
+    const loadEssentialData = async () => {
+      try {
+        // Load minimal data needed for initial render
+        const essentialDataQuery = query(
+          collection(db, 'patrolData'),
+          orderBy('timestamp', 'desc'),
+          limit(10)
+        );
+        const snapshot = await getDocs(essentialDataQuery);
+        const essentialData = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+
+        // Update state with essential data
+        setDashboardData(prev => ({
+          ...prev,
+          patrolData: essentialData,
+          summaryStats: {
+            ...prev.summaryStats,
+            totalPatrols: essentialData.length
+          }
+        }));
+
+        // Mark loading as false after essential data is loaded
+        setLoading(false);
+      } catch (error) {
+        console.error('Error loading essential data:', error);
+        setLoading(false);
+      }
+    };
+
+    // Load remaining data in the background
     const loadPatrolData = async () => {
       try {
         const patrolQuery = query(collection(db, 'patrolData'), orderBy('updatedAt', 'desc'));
@@ -386,14 +419,13 @@ export const DataProvider = ({ children }) => {
       }
     };
 
-    // Load all data
-    Promise.all([
-      loadPatrolData(),
-      loadIPatrollerData(), // Load IPatroller data
-      loadActionReports(),
-      loadIncidents()
-    ]).finally(() => {
-      setLoading(false);
+    // Load essential data first, then load the rest in the background
+    loadEssentialData().then(() => {
+      // Load remaining data in parallel in the background
+      loadPatrolData();
+      loadIPatrollerData();
+      loadActionReports();
+      loadIncidents();
     });
 
     // Set up periodic refresh for IPatroller data (every 30 seconds)
