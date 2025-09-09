@@ -3,12 +3,22 @@ import { doc, getDoc, collection, getDocs, query, where, deleteDoc, updateDoc, o
 import { db } from './firebase';
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
+import { useAuth } from "./contexts/AuthContext";
 // Firebase removed - using local data storage
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { jsPDF } from 'jspdf';
+import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "./components/ui/pagination";
 import autoTable from 'jspdf-autotable';
 import { cloudinaryUtils } from "./utils/cloudinary";
 // Firebase imports removed
@@ -79,6 +89,7 @@ import {
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments } = useFirebase();
+  const { isAdmin, userDepartment, userMunicipality } = useAuth();
   // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
@@ -89,8 +100,22 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [actionItems, setActionItems] = useState([]);
   const [allActionReports, setAllActionReports] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState("pnp");
+  const [activeTab, setActiveTab] = useState(() => {
+    // Set default tab based on user department
+    if (userDepartment === "agriculture") return "agriculture";
+    if (userDepartment === "pg-enro") return "pg-enro";
+    return "pnp"; // Default for admin or other users
+  });
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+
+  // Update active tab when user department changes
+  useEffect(() => {
+    if (userDepartment === "agriculture") {
+      setActiveTab("agriculture");
+    } else if (userDepartment === "pg-enro") {
+      setActiveTab("pg-enro");
+    }
+  }, [userDepartment]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -137,7 +162,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [pdfDescription, setPdfDescription] = useState("");
-    // Load action items from Firestore
+  const [tablePage, setTablePage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Handle page change
+  const handlePageChange = (page) => {
+    setTablePage(page);
+  };
+
+  // Load action items from Firestore
     const loadActionReports = async () => {
       setLoading(true);
       try {
@@ -328,7 +361,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     const matchesDepartment = item.department === activeTab;
     const matchesMunicipality = activeTab === "pnp" ? 
       (activeMunicipality === "all" || item.municipality === activeMunicipality) : true;
-    return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality;
+    
+    // Filter by user's municipality for non-admin users
+    const matchesUserMunicipality = isAdmin ? true : (item.municipality === userMunicipality);
+    
+    return matchesSearch && matchesMonthYear && matchesDistrict && matchesDepartment && matchesMunicipality && matchesUserMunicipality;
   });
   const sortedItems = [...filteredItems].sort((a, b) => {
     let aValue, bValue;
@@ -363,6 +400,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return aValue < bValue ? 1 : -1;
     }
   });
+
+  // Calculate pagination
+  const totalPages = Math.ceil((sortedItems?.length || 0) / itemsPerPage);
+  const startIndex = (tablePage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = sortedItems?.slice(startIndex, endIndex) || [];
+
   // Calculate totals (normalized to match table display)
   const totalActions = (sortedItems || []).filter(item => item.actionTaken && item.actionTaken.trim() !== '').length;
   const normalize = (value) => String(value ?? '').trim().toLowerCase();
@@ -1556,87 +1600,154 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pnp" ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-50'
-            }`}
-                onClick={() => {
-                  setActiveTab("pnp");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "pnp" ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
-                }`}>
-                  <Shield className="h-5 w-5 md:h-6 md:w-6" />
+          {/* Show all cards for admin users */}
+          {isAdmin && (
+            <>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "pnp" ? 'bg-blue-50 border-blue-300' : 'bg-white border-gray-200 hover:bg-blue-50'
+                }`}
+                    onClick={() => {
+                      setActiveTab("pnp");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "pnp" ? 'bg-blue-600 text-white' : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      <Shield className="h-5 w-5 md:h-6 md:w-6" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "pnp" ? 'text-blue-600' : 'text-gray-900'
+                      }`}>PNP</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "pnp" ? 'text-blue-500' : 'text-gray-600'
+                      }`}>Police Operations</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
+                }`}
+                    onClick={() => {
+                      setActiveTab("agriculture");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
+                    }`}>
+                      <Target className="h-5 w-5 md:h-6 md:w-6" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
+                      }`}>Agriculture</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
+                      }`}>Bantay Dagat</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+              <Card 
+                className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                  activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
+                }`}
+                    onClick={() => {
+                  setActiveTab("pg-enro");
+                      setActiveMunicipality("all");
+                    }}
+              >
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className={`p-2 md:p-3 rounded-lg ${
+                      activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
+                    }`}>
+                      <Building2 className="h-5 w-5 md:h-6 md:w-5" />
+                      </div>
+                      <div>
+                      <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                        activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
+                      }`}>PG-Enro</h3>
+                      <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                        activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
+                      }`}>Environment</p>
+                      </div>
+                    </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
+          
+          {/* Show only Agriculture card for Agriculture department users */}
+          {!isAdmin && userDepartment === "agriculture" && (
+            <Card 
+              className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
+              }`}
+                  onClick={() => {
+                    setActiveTab("agriculture");
+                    setActiveMunicipality("all");
+                  }}
+            >
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className={`p-2 md:p-3 rounded-lg ${
+                    activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
+                  }`}>
+                    <Target className="h-5 w-5 md:h-6 md:w-6" />
+                    </div>
+                    <div>
+                    <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                      activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
+                    }`}>Agriculture</h3>
+                    <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                      activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
+                    }`}>Bantay Dagat</p>
+                    </div>
                   </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "pnp" ? 'text-blue-600' : 'text-gray-900'
-                  }`}>PNP</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "pnp" ? 'text-blue-500' : 'text-gray-600'
-                  }`}>Police Operations</p>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Show only PG-ENRO card for PG-ENRO department users */}
+          {!isAdmin && userDepartment === "pg-enro" && (
+            <Card 
+              className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
+                activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
+              }`}
+                  onClick={() => {
+                setActiveTab("pg-enro");
+                    setActiveMunicipality("all");
+                  }}
+            >
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className={`p-2 md:p-3 rounded-lg ${
+                    activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
+                  }`}>
+                    <Building2 className="h-5 w-5 md:h-6 md:w-5" />
+                    </div>
+                    <div>
+                    <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
+                      activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
+                    }`}>PG-Enro</h3>
+                    <p className={`text-xs md:text-sm transition-colors duration-300 ${
+                      activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
+                    }`}>Environment</p>
+                    </div>
                   </div>
-                </div>
-            </CardContent>
-          </Card>
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "agriculture" ? 'bg-green-50 border-green-300' : 'bg-white border-gray-200 hover:bg-green-50'
-            }`}
-                onClick={() => {
-                  setActiveTab("agriculture");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "agriculture" ? 'bg-green-600 text-white' : 'bg-green-100 text-green-600'
-                }`}>
-                  <Target className="h-5 w-5 md:h-6 md:w-6" />
-                  </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "agriculture" ? 'text-green-600' : 'text-gray-900'
-                  }`}>Agriculture</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "agriculture" ? 'text-green-500' : 'text-gray-600'
-                  }`}>Bantay Dagat</p>
-                  </div>
-                </div>
-            </CardContent>
-          </Card>
-          <Card 
-            className={`cursor-pointer transition-all duration-300 hover:shadow-lg transform hover:-translate-y-1 ${
-              activeTab === "pg-enro" ? 'bg-purple-50 border-purple-300' : 'bg-white border-gray-200 hover:bg-purple-50'
-            }`}
-                onClick={() => {
-              setActiveTab("pg-enro");
-                  setActiveMunicipality("all");
-                }}
-          >
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className={`p-2 md:p-3 rounded-lg ${
-                  activeTab === "pg-enro" ? 'bg-purple-600 text-white' : 'bg-purple-100 text-purple-600'
-                }`}>
-                  <Building2 className="h-5 w-5 md:h-6 md:w-5" />
-                  </div>
-                  <div>
-                  <h3 className={`font-bold text-base md:text-lg transition-colors duration-300 ${
-                    activeTab === "pg-enro" ? 'text-purple-600' : 'text-gray-900'
-                  }`}>PG-Enro</h3>
-                  <p className={`text-xs md:text-sm transition-colors duration-300 ${
-                    activeTab === "pg-enro" ? 'text-purple-500' : 'text-gray-600'
-                  }`}>Environment</p>
-                  </div>
-                </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
             </div>
         {/* Main Content Area - Takes remaining space */}
         <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
@@ -1916,9 +2027,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
           {/* Action Items Table */}
           <div className="flex-1 min-h-0">
-                          <div className="rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-gray-200">
+            <div className="rounded-lg shadow-lg border overflow-hidden h-full flex flex-col transition-all duration-300 bg-white border-gray-200">
               <div className="p-4 border-b transition-all duration-300 border-gray-200">
                 <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="text-sm">
+                      Showing {startIndex + 1}-{Math.min(endIndex, sortedItems?.length || 0)} of {sortedItems?.length || 0}
+                    </Badge>
+                  </div>
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-green-100/80">
                       <BarChart3 className="h-5 w-5 text-green-600" />
@@ -2005,7 +2121,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         </tr>
                       </thead>
                       <tbody>
-                        {(sortedItems || []).map((item) => {
+                        {currentItems.map((item) => {
                           // Safety check - ensure item is valid
                           if (!item || typeof item !== 'object') {
                             return null;
@@ -2134,6 +2250,38 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <AlertTriangle className="h-6 w-6 md:h-8 md:w-8 text-gray-500" />
                         </div>
                         <p className="text-sm md:text-base transition-colors duration-300 text-gray-600">No action items found matching your criteria.</p>
+                      </div>
+                    )}
+                    {sortedItems && sortedItems.length > 0 && (
+                      <div className="p-4 border-t border-gray-200">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious 
+                                onClick={() => handlePageChange(tablePage - 1)}
+                                disabled={tablePage === 1}
+                              />
+                            </PaginationItem>
+                            
+                            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  onClick={() => handlePageChange(page)}
+                                  isActive={tablePage === page}
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            ))}
+                            
+                            <PaginationItem>
+                              <PaginationNext 
+                                onClick={() => handlePageChange(tablePage + 1)}
+                                disabled={tablePage === totalPages}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
                       </div>
                     )}
                   </div>

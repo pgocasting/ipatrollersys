@@ -36,7 +36,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
   }, [isCollapsed]);
   const { user } = useFirebase();
-  const { isAdmin } = useAuth();
+  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
   
   // Close sidebar when screen size changes to desktop
   useEffect(() => {
@@ -75,11 +75,13 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
-    name: user.displayName || "Administrator",
+    name: userFirstName && userLastName ? `${userFirstName} ${userLastName}` : (user.displayName || "Administrator"),
+    username: userUsername || "admin",
     email: user.email || "admin@ipatroller.gov.ph",
     avatar: user.photoURL || null
   } : {
     name: "Administrator",
+    username: "admin",
     email: "admin@ipatroller.gov.ph",
     avatar: null
   };
@@ -91,17 +93,30 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   const allNavigationItems = React.useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" />, showFor: 'all' },
     { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" />, showFor: 'admin' },
-    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" />, showFor: 'all' },
-    { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" />, showFor: 'admin' },
+    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" />, showFor: 'command-center' },
+    { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" />, showFor: 'action-center' },
     { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" />, showFor: 'admin' },
     { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" />, showFor: 'admin' },
     { id: 'users', label: 'Users', icon: <User className="h-5 w-5" />, showFor: 'admin' },
   ], []);
 
-  // Filter navigation items based on user role - memoized to prevent recalculation
+  // Filter navigation items based on user role and access level - memoized to prevent recalculation
   const navigationItems = React.useMemo(() => 
-    allNavigationItems.filter(item => item.showFor === 'all' || (isAdmin && item.showFor === 'admin')),
-    [allNavigationItems, isAdmin]
+    allNavigationItems.filter(item => {
+      // Admin users can see everything
+      if (isAdmin) return true;
+      
+      // Show for all users
+      if (item.showFor === 'all') return true;
+      
+      // Show for specific access level users (non-admin)
+      if (item.showFor === 'action-center' || item.showFor === 'command-center') {
+        return userAccessLevel === item.showFor;
+      }
+      
+      return false;
+    }),
+    [allNavigationItems, isAdmin, userAccessLevel]
   );
 
   const handleNavigation = (pageId) => {
@@ -193,7 +208,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
                   </span>
                   <div>
                     <div className="font-semibold transition-colors duration-300 text-gray-900">{userInfo.name}</div>
-                    <div className="text-sm transition-colors duration-300 text-gray-600">{userInfo.email}</div>
+                    <div className="text-sm transition-colors duration-300 text-gray-600">@{userInfo.username}</div>
                   </div>
                 </div>
                 <Separator className="my-3" />

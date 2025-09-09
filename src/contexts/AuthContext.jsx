@@ -13,6 +13,11 @@ export function AuthProvider({ children }) {
   const { user } = useFirebase();
   const [isAdmin, setIsAdmin] = useState(false);
   const [userMunicipality, setUserMunicipality] = useState("");
+  const [userAccessLevel, setUserAccessLevel] = useState("");
+  const [userDepartment, setUserDepartment] = useState("");
+  const [userFirstName, setUserFirstName] = useState("");
+  const [userLastName, setUserLastName] = useState("");
+  const [userUsername, setUserUsername] = useState("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -27,6 +32,11 @@ export function AuthProvider({ children }) {
           const currentUser = users.find(u => u.email === user.email);
           setIsAdmin(currentUser?.role === "Admin");
           setUserMunicipality(currentUser?.municipality || "");
+          setUserAccessLevel(currentUser?.accessLevel || "");
+          setUserDepartment(currentUser?.department || "");
+          setUserFirstName(currentUser?.firstName || "");
+          setUserLastName(currentUser?.lastName || "");
+          setUserUsername(currentUser?.username || "");
         }
       }
       setLoading(false);
@@ -37,6 +47,11 @@ export function AuthProvider({ children }) {
   const value = {
     isAdmin,
     userMunicipality,
+    userAccessLevel,
+    userDepartment,
+    userFirstName,
+    userLastName,
+    userUsername,
     loading
   };
 

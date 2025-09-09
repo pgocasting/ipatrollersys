@@ -45,6 +45,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     municipality: "",
     phoneNumber: "",
     role: "User",
+    accessLevel: "action-center",
+    department: "",
   });
 
   useEffect(() => {
@@ -124,6 +126,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         municipality: newUser.municipality,
         phoneNumber: newUser.phoneNumber,
         role: "User",
+        accessLevel: newUser.accessLevel,
+        department: newUser.department,
       });
 
       if (!response.success) {
@@ -143,6 +147,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         municipality: "",
         phoneNumber: "",
         role: "User",
+        accessLevel: "action-center",
+        department: "",
       });
 
       // Close dialog and reset form
@@ -157,6 +163,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         municipality: "",
         phoneNumber: "",
         role: "User",
+        accessLevel: "action-center",
+        department: "",
       });
       
       // Refresh user list
@@ -187,7 +195,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-blue-600 hover:bg-blue-700">
+                <Button className="bg-black hover:bg-black/90 text-white">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add New User
                 </Button>
@@ -228,6 +236,34 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         </SelectContent>
                       </Select>
                     </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="accessLevel">Access Level</Label>
+                      <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
+                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                          <SelectValue placeholder="Select access level" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-slate-200">
+                          <SelectItem value="action-center">Action Center</SelectItem>
+                          <SelectItem value="command-center">Command Center</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {newUser.accessLevel === "action-center" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="department">Department</Label>
+                        <Select value={newUser.department} onValueChange={(value) => setNewUser((prev) => ({ ...prev, department: value }))}>
+                          <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            <SelectItem value="agriculture">Agriculture</SelectItem>
+                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
@@ -292,16 +328,18 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   <TableHead className="border-gray-200">Email</TableHead>
                   <TableHead className="border-gray-200">Phone</TableHead>
                   <TableHead className="border-gray-200">Role</TableHead>
+                  <TableHead className="border-gray-200">Access Level</TableHead>
+                  <TableHead className="border-gray-200">Department</TableHead>
                   <TableHead className="text-right border-gray-200">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.length === 0 ? (
+                {users.filter(u => u.role !== "Admin").length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">No users found.</TableCell>
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">No users found.</TableCell>
                   </TableRow>
                 ) : (
-                  users.map((u) => (
+                  users.filter(u => u.role !== "Admin").map((u) => (
                     <TableRow key={u.id} className="border-gray-200">
                       <TableCell className="font-medium">{`${u.firstName || ""} ${u.lastName || ""}`.trim()}</TableCell>
                       <TableCell>{u.username}</TableCell>
@@ -309,6 +347,16 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <TableCell>{u.phoneNumber}</TableCell>
                       <TableCell>
                         <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">{u.role}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
+                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : 'N/A'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                          {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
+                        </span>
                       </TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm">Edit</Button>

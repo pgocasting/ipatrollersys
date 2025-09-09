@@ -240,44 +240,90 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
     
-    // Header with better formatting
-    doc.setFontSize(20);
+    // Calculate center position
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    
+    // Add logo/header section
+    doc.setFillColor(59, 130, 246); // Blue background
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Main title - centered
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('I-Patroller Summary Report', paperConfig.margin, 30);
+    doc.setTextColor(255, 255, 255);
+    doc.text('I-Patroller Summary Report', centerX, 25, { align: 'center' });
     
-    // Paper size indicator
-    doc.setFontSize(8);
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Report info section with better organization
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Information', centerX, 60, { align: 'center' });
+    
+    // Info box
+    const infoY = 70;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    
+    // Report details - organized in two columns
+    doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
     
-    // Date and filters with better spacing
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    // Paper size indicator - right aligned
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
     
     // Overall Summary (matching I-Patroller exactly)
     const overallSummary = calculateOverallSummary();
     
-    doc.setFontSize(14);
+    // Summary section with better design
+    doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('Overall Summary Statistics', paperConfig.margin, 100);
+    doc.text('Overall Summary Statistics', centerX, 130, { align: 'center' });
     
-    doc.setFontSize(10);
+    // Summary box - centered and properly sized
+    const summaryY = 140;
+    const boxWidth = pageWidth - (paperConfig.margin * 2);
+    const boxHeight = 60;
+    
+    doc.setFillColor(239, 246, 255);
+    doc.rect(paperConfig.margin, summaryY - 5, boxWidth, boxHeight, 'F');
+    doc.setDrawColor(59, 130, 246);
+    doc.rect(paperConfig.margin, summaryY - 5, boxWidth, boxHeight, 'S');
+    
+    // Summary stats in organized layout - centered
+    doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
-    doc.text(`• Total Patrols: ${overallSummary.totalPatrols.toLocaleString()}`, paperConfig.margin, 115);
-    doc.text(`• Total Active Days: ${overallSummary.totalActive.toLocaleString()}`, paperConfig.margin, 125);
-    doc.text(`• Total Inactive Days: ${overallSummary.totalInactive.toLocaleString()}`, paperConfig.margin, 135);
-    doc.text(`• Average Active Percentage: ${overallSummary.avgActivePercentage}%`, paperConfig.margin, 145);
-    doc.text(`• Total Municipalities: ${overallSummary.municipalityCount}`, paperConfig.margin, 155);
     
-    // Municipality Performance Table with autofit
+    // Center the text within the box
+    const textStartX = paperConfig.margin + 15;
+    const lineHeight = 12;
+    
+    doc.text(`• Total Patrols: ${overallSummary.totalPatrols.toLocaleString()}`, textStartX, summaryY + 10);
+    doc.text(`• Total Active Days: ${overallSummary.totalActive.toLocaleString()}`, textStartX, summaryY + 10 + lineHeight);
+    doc.text(`• Total Inactive Days: ${overallSummary.totalInactive.toLocaleString()}`, textStartX, summaryY + 10 + (lineHeight * 2));
+    doc.text(`• Average Active Percentage: ${overallSummary.avgActivePercentage}%`, textStartX, summaryY + 10 + (lineHeight * 3));
+    doc.text(`• Total Municipalities: ${overallSummary.municipalityCount}`, textStartX, summaryY + 10 + (lineHeight * 4));
+    
+    // Municipality Performance Table with better design
     if (ipatrollerData && ipatrollerData.length > 0) {
       let filteredData = selectedDistrict === 'all' 
         ? ipatrollerData 
         : ipatrollerData.filter(item => item.district === selectedDistrict);
+      
+      // Table title
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Municipality Performance Details', centerX, 210, { align: 'center' });
       
       const tableData = filteredData.map(item => {
         const stats = calculatePatrolStats(item.data);
@@ -297,7 +343,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       autoTable(doc, {
         head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
         body: tableData,
-        startY: 175,
+        startY: 220,
         styles: { 
           fontSize: paperSize === 'long' ? 10 : 9, 
           cellPadding: 4,
@@ -338,23 +384,47 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
     
-    // Header with better formatting
-    doc.setFontSize(20);
+    // Calculate center position
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    
+    // Add logo/header section
+    doc.setFillColor(147, 51, 234); // Purple background
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Main title - centered
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('Action Center Report', paperConfig.margin, 30);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Action Center Report', centerX, 25, { align: 'center' });
     
-    // Paper size indicator
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Report info section with better organization
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Information', centerX, 60, { align: 'center' });
+    
+    // Info box
+    const infoY = 70;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.setDrawColor(147, 51, 234);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    
+    // Report details - organized in two columns
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    
+    // Paper size indicator - right aligned
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
-    
-    // Date and filters with better spacing
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
     
     // Filter action reports by date and district
     let filteredActions = actionReports || [];
@@ -380,13 +450,31 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       if (action.status === 'resolved') departmentStats[dept].resolved++;
     });
     
-    doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-    doc.text('Department Statistics', paperConfig.margin, 100);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-    doc.text(`Total Action Reports: ${filteredActions.length}`, paperConfig.margin, 115);
+    // Department Statistics section with better design
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Department Statistics', centerX, 130, { align: 'center' });
+    
+    // Statistics box - centered and properly sized
+    const statsY = 140;
+    const boxWidth = pageWidth - (paperConfig.margin * 2);
+    const boxHeight = 40;
+    
+    doc.setFillColor(248, 250, 255);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
+    doc.setDrawColor(147, 51, 234);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
+    
+    // Statistics in organized layout - centered
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    
+    const textStartX = paperConfig.margin + 15;
+    const lineHeight = 12;
+    
+    doc.text(`Total Action Reports: ${filteredActions.length}`, textStartX, statsY + 10);
+    doc.text(`Pending: ${filteredActions.filter(a => a.status === 'pending').length}`, textStartX, statsY + 10 + lineHeight);
+    doc.text(`Resolved: ${filteredActions.filter(a => a.status === 'resolved').length}`, textStartX, statsY + 10 + (lineHeight * 2));
     
     // Department breakdown table with autofit
     if (Object.keys(departmentStats).length > 0) {
@@ -442,23 +530,47 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
     
-    // Header with better formatting
-    doc.setFontSize(20);
+    // Calculate center position
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    
+    // Add logo/header section
+    doc.setFillColor(239, 68, 68); // Red background
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Main title - centered
+    doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.text('Incidents Report', paperConfig.margin, 30);
+    doc.setTextColor(255, 255, 255);
+    doc.text('Incidents Report', centerX, 25, { align: 'center' });
     
-    // Paper size indicator
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Report info section with better organization
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Information', centerX, 60, { align: 'center' });
+    
+    // Info box
+    const infoY = 70;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.setDrawColor(239, 68, 68);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    
+    // Report details - organized in two columns
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    
+    // Paper size indicator - right aligned
     doc.setFontSize(8);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Paper: ${paperConfig.name}`, paperConfig.margin, 40);
-    
-    // Date and filters with better spacing
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, 50);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin, 60);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin, 70);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, 80);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
     
     // Filter incidents by date and district
     let filteredIncidents = incidents || [];
@@ -484,15 +596,31 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       if (incident.status === 'Resolved') incidentTypeStats[type].resolved++;
     });
     
-    doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-    doc.text('Incident Statistics', paperConfig.margin, 100);
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-    doc.text(`Total Incidents: ${filteredIncidents.length}`, paperConfig.margin, 115);
-    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, paperConfig.margin, 125);
-    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, paperConfig.margin, 135);
+    // Incident Statistics section with better design
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Incident Statistics', centerX, 130, { align: 'center' });
+    
+    // Statistics box - centered and properly sized
+    const statsY = 140;
+    const boxWidth = pageWidth - (paperConfig.margin * 2);
+    const boxHeight = 50;
+    
+    doc.setFillColor(254, 242, 242);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
+    doc.setDrawColor(239, 68, 68);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
+    
+    // Statistics in organized layout - centered
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    
+    const textStartX = paperConfig.margin + 15;
+    const lineHeight = 12;
+    
+    doc.text(`Total Incidents: ${filteredIncidents.length}`, textStartX, statsY + 10);
+    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, textStartX, statsY + 10 + lineHeight);
+    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, textStartX, statsY + 10 + (lineHeight * 2));
     
     // Incident type breakdown table with autofit
     if (Object.keys(incidentTypeStats).length > 0) {

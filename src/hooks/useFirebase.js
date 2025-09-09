@@ -264,6 +264,35 @@ export const useFirebase = () => {
     }
   };
 
+  const saveWeeklyReport = async (reportKey, reportData) => {
+    try {
+      console.log('💾 Saving weekly report to Firestore for:', reportKey);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+      
+      const docRef = doc(db, 'commandCenter', `weeklyReports_${reportKey}`);
+      await setDoc(docRef, {
+        data: reportData,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      }, { merge: true });
+      
+      console.log('✅ Weekly report saved successfully to Firestore for:', reportKey);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error saving weekly report to Firestore:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   // Get users list from management document
   const getUsers = async () => {
     try {
@@ -365,6 +394,7 @@ export const useFirebase = () => {
     getBarangays,
     getConcernTypes,
     getWeeklyReport,
+    saveWeeklyReport,
     createUserByAdmin,
     getUsers
   };
