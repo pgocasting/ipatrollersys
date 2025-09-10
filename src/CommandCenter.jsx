@@ -3224,26 +3224,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 </button>
                               </div>
                             </div>
-                            
-                            {/* Clear All Data */}
-                            <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-700 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium text-red-800">Clear All Data</h4>
-                                  <p className="text-xs text-red-700 mt-1">Clear weekly reports, barangays, and concern types</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    handleClearAllData();
-                                    setShowClearModal(false);
-                                  }}
-                                  className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md text-sm font-medium transition-colors duration-200"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                            </div>
                           </div>
                           
                           <DialogFooter>
