@@ -28,7 +28,12 @@ import {
   FileSpreadsheet,
   Plus,
   X,
-  Menu
+  Database,
+  Menu,
+  ChevronDown,
+  ChevronRight,
+  Check,
+  Edit
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from 'xlsx';
@@ -45,6 +50,15 @@ import {
   LineElement
 } from 'chart.js';
 import { Bar, Doughnut, Line } from 'react-chartjs-2';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogTrigger 
+} from "./components/ui/dialog";
 
 // Register Chart.js components
 ChartJS.register(
@@ -74,7 +88,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     saveConcernTypes, 
     getConcernTypes, 
     saveWeeklyReport, 
-    getWeeklyReport 
+    getWeeklyReport,
+    saveWeeklyReportToCollection,
+    getWeeklyReportsFromCollection,
+    updateWeeklyReportInCollection,
+    deleteWeeklyReportFromCollection
   } = useFirebase();
 
   const [terminalInput, setTerminalInput] = useState("");
@@ -113,6 +131,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [barangaySortBy, setBarangaySortBy] = useState('name'); // 'name', 'municipality', 'district', 'importedAt'
   const [barangaySortOrder, setBarangaySortOrder] = useState('asc'); // 'asc', 'desc'
   const [barangayFilterMunicipality, setBarangayFilterMunicipality] = useState(''); // Filter by municipality
+  const [expandedMunicipalities, setExpandedMunicipalities] = useState(new Set()); // Track which municipalities are expanded
+  const [expandedConcernTypeMunicipalities, setExpandedConcernTypeMunicipalities] = useState(new Set()); // Track which municipalities are expanded for concern types
+  const [concernTypeFilterMunicipality, setConcernTypeFilterMunicipality] = useState(''); // Filter concern types by municipality
+  const [concernTypeSortBy, setConcernTypeSortBy] = useState('name'); // 'name', 'municipality', 'district', 'importedAt'
+  const [concernTypeSortOrder, setConcernTypeSortOrder] = useState('asc'); // 'asc', 'desc'
+  const [selectedConcernTypes, setSelectedConcernTypes] = useState([]); // Track selected concern types
+  const [isEditingConcernTypes, setIsEditingConcernTypes] = useState(false);
+  const [editingConcernType, setEditingConcernType] = useState(null);
   const [allMonthsData, setAllMonthsData] = useState({}); // Store data for all months from Excel
   const [isImportingAllMonths, setIsImportingAllMonths] = useState(false);
   const [importAllMonths, setImportAllMonths] = useState(false); // Checkbox state for import all months
@@ -144,6 +170,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedConcernType, setSelectedConcernType] = useState("");
   const [actionTaken, setActionTaken] = useState("");
   const [remarks, setRemarks] = useState("");
+  
+  // Weekly Reports Collection State
+  const [weeklyReportsCollection, setWeeklyReportsCollection] = useState([]);
+  const [isLoadingCollection, setIsLoadingCollection] = useState(false);
+  const [showCollectionView, setShowCollectionView] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleDateString("en-US", { month: "long" }));
   const [selectedYear, setSelectedYear] = useState("2025");
   const [selectedReportMunicipality, setSelectedReportMunicipality] = useState("");
@@ -160,6 +191,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Clear data options state
   const [showClearOptions, setShowClearOptions] = useState(false);
+  const [showClearModal, setShowClearModal] = useState(false);
   const [selectedClearMunicipality, setSelectedClearMunicipality] = useState("");
   
   // Summary modal state
@@ -542,24 +574,54 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   // Clear all weekly report data for active municipality
-  const handleClearActiveMunicipalityData = () => {
+  const handleClearActiveMunicipalityData = async () => {
     if (window.confirm(`Are you sure you want to clear all weekly report data for ${activeMunicipalityTab}? This action cannot be undone.`)) {
-      initializeWeeklyReportData();
-      setSelectedBarangay("");
-      setSelectedConcernType("");
-      setActionTaken("");
-      setRemarks("");
-      toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
-      
-      // Add to terminal history
-      const newEntry = {
-        id: Date.now(),
-        command: "weekly.clear.municipality",
-        output: `Cleared weekly report data for ${activeMunicipalityTab}`,
-        type: "warning",
-        timestamp: new Date()
-      };
-      setTerminalHistory(prev => [...prev, newEntry]);
+      try {
+        // Clear local state
+        initializeWeeklyReportData();
+        setSelectedBarangay("");
+        setSelectedConcernType("");
+        setActionTaken("");
+        setRemarks("");
+        
+        // Clear from Firestore
+        const monthYear = `${selectedMonth}_${selectedYear}`;
+        const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
+        const reportKey = `${monthYear}${municipalityKey}`;
+        
+        const reportData = {
+          month: selectedMonth,
+          year: selectedYear,
+          municipality: activeMunicipalityTab || "All Municipalities",
+          selectedBarangay: "",
+          selectedConcernType: "",
+          actionTaken: "",
+          remarks: "",
+          weeklyReportData: {},
+          savedAt: new Date().toISOString(),
+          clearedAt: new Date().toISOString()
+        };
+
+        const saveResult = await saveWeeklyReport(reportKey, reportData);
+        if (saveResult.success) {
+          toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
+        } else {
+          toast.warning(`Local data cleared, but failed to clear from database: ${saveResult.error}`);
+        }
+        
+        // Add to terminal history
+        const newEntry = {
+          id: Date.now(),
+          command: "weekly.clear.municipality",
+          output: `Cleared weekly report data for ${activeMunicipalityTab}`,
+          type: "warning",
+          timestamp: new Date()
+        };
+        setTerminalHistory(prev => [...prev, newEntry]);
+      } catch (error) {
+        console.error("Error clearing active municipality data:", error);
+        toast.error("Error clearing data: " + error.message);
+      }
     }
   };
 
@@ -619,6 +681,48 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } catch (error) {
         console.error("Error clearing selected municipality data:", error);
         toast.error("Error clearing selected municipality data");
+      }
+    }
+  };
+
+  // Clear all data (weekly reports, barangays, concern types)
+  const handleClearAllData = async () => {
+    if (window.confirm(`Are you sure you want to clear ALL data including weekly reports, barangays, and concern types? This action cannot be undone.`)) {
+      try {
+        // Clear weekly report data
+        initializeWeeklyReportData();
+        setSelectedBarangay("");
+        setSelectedConcernType("");
+        setActionTaken("");
+        setRemarks("");
+        
+        // Clear barangays
+        const barangayResult = await saveBarangays([]);
+        if (barangayResult.success) {
+          setImportedBarangays([]);
+          setSelectedBarangays([]);
+        }
+        
+        // Clear concern types
+        const concernTypeResult = await saveConcernTypes([]);
+        if (concernTypeResult.success) {
+          setImportedConcernTypes([]);
+        }
+        
+        toast.success("All data cleared successfully");
+        
+        // Add to terminal history
+        const newEntry = {
+          id: Date.now(),
+          command: "clear.all",
+          output: "All data cleared successfully",
+          type: "warning",
+          timestamp: new Date()
+        };
+        setTerminalHistory(prev => [...prev, newEntry]);
+      } catch (error) {
+        console.error("Error clearing all data:", error);
+        toast.error("Error clearing all data: " + error.message);
       }
     }
   };
@@ -1233,6 +1337,199 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return municipalities.sort();
   };
 
+  // Group barangays by municipality
+  const getGroupedBarangays = () => {
+    const grouped = {};
+    const sortedBarangays = getSortedBarangays();
+    
+    sortedBarangays.forEach(barangay => {
+      const municipality = barangay.municipality;
+      if (!grouped[municipality]) {
+        grouped[municipality] = [];
+      }
+      grouped[municipality].push(barangay);
+    });
+    
+    return grouped;
+  };
+
+  // Toggle municipality expansion
+  const toggleMunicipality = (municipality) => {
+    const newExpanded = new Set(expandedMunicipalities);
+    if (newExpanded.has(municipality)) {
+      newExpanded.delete(municipality);
+    } else {
+      newExpanded.add(municipality);
+    }
+    setExpandedMunicipalities(newExpanded);
+  };
+
+  // Expand all municipalities
+  const expandAllMunicipalities = () => {
+    const allMunicipalities = getUniqueMunicipalities();
+    setExpandedMunicipalities(new Set(allMunicipalities));
+  };
+
+  // Collapse all municipalities
+  const collapseAllMunicipalities = () => {
+    setExpandedMunicipalities(new Set());
+  };
+
+  // Auto-expand municipality when filtering
+  useEffect(() => {
+    if (barangayFilterMunicipality) {
+      setExpandedMunicipalities(new Set([barangayFilterMunicipality]));
+    }
+  }, [barangayFilterMunicipality]);
+
+  // Auto-expand concern type municipality when filtering
+  useEffect(() => {
+    if (concernTypeFilterMunicipality) {
+      setExpandedConcernTypeMunicipalities(new Set([concernTypeFilterMunicipality]));
+    }
+  }, [concernTypeFilterMunicipality]);
+
+  // Concern types sorting functions
+  const handleConcernTypeSort = (sortBy) => {
+    if (concernTypeSortBy === sortBy) {
+      setConcernTypeSortOrder(concernTypeSortOrder === 'asc' ? 'desc' : 'asc');
+    } else {
+      setConcernTypeSortBy(sortBy);
+      setConcernTypeSortOrder('asc');
+    }
+  };
+
+  const getSortedConcernTypes = () => {
+    // First filter by municipality if filter is set
+    let filteredConcernTypes = importedConcernTypes;
+    if (concernTypeFilterMunicipality) {
+      filteredConcernTypes = importedConcernTypes.filter(concernType => 
+        concernType.municipality.toLowerCase() === concernTypeFilterMunicipality.toLowerCase()
+      );
+    }
+    
+    // Then sort the filtered results
+    return [...filteredConcernTypes].sort((a, b) => {
+      let aValue, bValue;
+      
+      switch (concernTypeSortBy) {
+        case 'name':
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+          break;
+        case 'municipality':
+          aValue = a.municipality.toLowerCase();
+          bValue = b.municipality.toLowerCase();
+          break;
+        case 'district':
+          aValue = a.district.toLowerCase();
+          bValue = b.district.toLowerCase();
+          break;
+        case 'importedAt':
+          aValue = new Date(a.importedAt);
+          bValue = new Date(b.importedAt);
+          break;
+        default:
+          aValue = a.name.toLowerCase();
+          bValue = b.name.toLowerCase();
+      }
+      
+      if (aValue < bValue) return concernTypeSortOrder === 'asc' ? -1 : 1;
+      if (aValue > bValue) return concernTypeSortOrder === 'asc' ? 1 : -1;
+      return 0;
+    });
+  };
+
+  // Group concern types by municipality
+  const getGroupedConcernTypes = () => {
+    const grouped = {};
+    const sortedConcernTypes = getSortedConcernTypes();
+    
+    sortedConcernTypes.forEach(concernType => {
+      const municipality = concernType.municipality;
+      if (!grouped[municipality]) {
+        grouped[municipality] = [];
+      }
+      grouped[municipality].push(concernType);
+    });
+    
+    return grouped;
+  };
+
+  // Toggle concern type municipality expansion
+  const toggleConcernTypeMunicipality = (municipality) => {
+    const newExpanded = new Set(expandedConcernTypeMunicipalities);
+    if (newExpanded.has(municipality)) {
+      newExpanded.delete(municipality);
+    } else {
+      newExpanded.add(municipality);
+    }
+    setExpandedConcernTypeMunicipalities(newExpanded);
+  };
+
+  // Expand all concern type municipalities
+  const expandAllConcernTypeMunicipalities = () => {
+    const allMunicipalities = [...new Set(importedConcernTypes.map(type => type.municipality))];
+    setExpandedConcernTypeMunicipalities(new Set(allMunicipalities));
+  };
+
+  // Collapse all concern type municipalities
+  const collapseAllConcernTypeMunicipalities = () => {
+    setExpandedConcernTypeMunicipalities(new Set());
+  };
+
+  // Concern types selection functions
+  const handleConcernTypeSelection = (concernTypeId, isSelected) => {
+    if (isSelected) {
+      setSelectedConcernTypes([...selectedConcernTypes, concernTypeId]);
+    } else {
+      setSelectedConcernTypes(selectedConcernTypes.filter(id => id !== concernTypeId));
+    }
+  };
+
+  const handleSelectAllConcernTypes = () => {
+    const allConcernTypeIds = getSortedConcernTypes().map(concernType => concernType.id);
+    setSelectedConcernTypes(allConcernTypeIds);
+  };
+
+  const handleDeselectAllConcernTypes = () => {
+    setSelectedConcernTypes([]);
+  };
+
+  // Export concern types to CSV
+  const handleExportConcernTypesCSV = () => {
+    const concernTypesToExport = selectedConcernTypes.length > 0 
+      ? getSortedConcernTypes().filter(concernType => selectedConcernTypes.includes(concernType.id))
+      : getSortedConcernTypes();
+
+    if (concernTypesToExport.length === 0) {
+      toast.error("No concern types to export");
+      return;
+    }
+
+    const csvContent = [
+      ['Name', 'Municipality', 'District', 'Imported At'],
+      ...concernTypesToExport.map(concernType => [
+        concernType.name,
+        concernType.municipality,
+        concernType.district,
+        new Date(concernType.importedAt).toLocaleDateString()
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `concern_types_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success(`Exported ${concernTypesToExport.length} concern types to CSV`);
+  };
+
   const handleClearBarangays = async () => {
     if (importedBarangays.length === 0) {
       toast.error("No barangays to clear");
@@ -1254,6 +1551,50 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         toast.error("Error clearing barangays: " + error.message);
       }
     }
+  };
+
+  const handleClearSelectedBarangays = async () => {
+    if (selectedBarangays.length === 0) {
+      toast.error("No barangays selected to clear");
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to clear ${selectedBarangays.length} selected barangays? This action cannot be undone.`)) {
+      try {
+        // Filter out selected barangays
+        const remainingBarangays = importedBarangays.filter(barangay => !selectedBarangays.includes(barangay.id));
+        
+        // Save updated array to Firestore
+        const saveResult = await saveBarangays(remainingBarangays);
+        if (saveResult.success) {
+          setImportedBarangays(remainingBarangays);
+          setSelectedBarangays([]);
+          toast.success(`${selectedBarangays.length} selected barangays cleared successfully`);
+        } else {
+          toast.error("Failed to clear selected barangays from database: " + saveResult.error);
+        }
+      } catch (error) {
+        toast.error("Error clearing selected barangays: " + error.message);
+      }
+    }
+  };
+
+  const handleEditSelectedBarangays = () => {
+    if (selectedBarangays.length === 0) {
+      toast.error("No barangays selected to edit");
+      return;
+    }
+
+    const selectedBarangayData = importedBarangays.filter(barangay => selectedBarangays.includes(barangay.id));
+    setEditingBarangay({
+      id: 'bulk-edit',
+      name: selectedBarangayData.map(b => b.name).join(', '),
+      municipality: selectedBarangayData[0]?.municipality || '',
+      district: selectedBarangayData[0]?.district || '',
+      isBulkEdit: true,
+      selectedIds: selectedBarangays
+    });
+    setIsEditingBarangays(true);
   };
 
   // Handle barangay selection
@@ -1300,33 +1641,41 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Handle edit selected barangays
-  const handleEditSelectedBarangays = () => {
-    if (selectedBarangays.length === 0) {
-      toast.error("No barangays selected for editing");
-      return;
-    }
-
-    if (selectedBarangays.length > 1) {
-      toast.error("Please select only one barangay to edit at a time");
-      return;
-    }
-
-    const barangayToEdit = importedBarangays.find(brgy => brgy.id === selectedBarangays[0]);
-    if (barangayToEdit) {
-      setEditingBarangay(barangayToEdit);
-      setIsEditingBarangays(true);
-    }
-  };
 
   // Handle save edited barangay
   const handleSaveEditedBarangay = async () => {
     if (!editingBarangay) return;
 
     try {
-      const updatedBarangays = importedBarangays.map(brgy => 
-        brgy.id === editingBarangay.id ? editingBarangay : brgy
-      );
+      let updatedBarangays;
+      
+      if (editingBarangay.isBulkEdit) {
+        // Handle bulk edit
+        const barangayNames = editingBarangay.name.split(',').map(name => name.trim()).filter(name => name);
+        
+        if (barangayNames.length !== editingBarangay.selectedIds.length) {
+          toast.error(`Please provide exactly ${editingBarangay.selectedIds.length} barangay names (one for each selected barangay)`);
+          return;
+        }
+
+        updatedBarangays = importedBarangays.map(brgy => {
+          if (editingBarangay.selectedIds.includes(brgy.id)) {
+            const nameIndex = editingBarangay.selectedIds.indexOf(brgy.id);
+            return {
+              ...brgy,
+              name: barangayNames[nameIndex],
+              municipality: editingBarangay.municipality,
+              district: editingBarangay.district
+            };
+          }
+          return brgy;
+        });
+      } else {
+        // Handle single edit
+        updatedBarangays = importedBarangays.map(brgy => 
+          brgy.id === editingBarangay.id ? editingBarangay : brgy
+        );
+      }
 
       // Save to Firestore
       const saveResult = await saveBarangays(updatedBarangays);
@@ -1335,7 +1684,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         setEditingBarangay(null);
         setIsEditingBarangays(false);
         setSelectedBarangays([]);
-        toast.success("Barangay updated successfully");
+        toast.success(editingBarangay.isBulkEdit ? 
+          `${editingBarangay.selectedIds.length} barangays updated successfully` : 
+          "Barangay updated successfully"
+        );
       } else {
         toast.error("Failed to update barangay in database: " + saveResult.error);
       }
@@ -1405,6 +1757,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const saveResult = await saveConcernTypes([]);
         if (saveResult.success) {
           setImportedConcernTypes([]);
+          setSelectedConcernTypes([]);
           toast.success("All concern types cleared successfully");
         } else {
           toast.error("Failed to clear concern types from database: " + saveResult.error);
@@ -1412,6 +1765,104 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } catch (error) {
         toast.error("Error clearing concern types: " + error.message);
       }
+    }
+  };
+
+  const handleClearSelectedConcernTypes = async () => {
+    if (selectedConcernTypes.length === 0) {
+      toast.error("No concern types selected to clear");
+      return;
+    }
+
+    if (window.confirm(`Are you sure you want to clear ${selectedConcernTypes.length} selected concern types? This action cannot be undone.`)) {
+      try {
+        // Filter out selected concern types
+        const remainingConcernTypes = importedConcernTypes.filter(concernType => !selectedConcernTypes.includes(concernType.id));
+        
+        // Save updated array to Firestore
+        const saveResult = await saveConcernTypes(remainingConcernTypes);
+        if (saveResult.success) {
+          setImportedConcernTypes(remainingConcernTypes);
+          setSelectedConcernTypes([]);
+          toast.success(`${selectedConcernTypes.length} selected concern types cleared successfully`);
+        } else {
+          toast.error("Failed to clear selected concern types from database: " + saveResult.error);
+        }
+      } catch (error) {
+        toast.error("Error clearing selected concern types: " + error.message);
+      }
+    }
+  };
+
+  const handleEditSelectedConcernTypes = () => {
+    if (selectedConcernTypes.length === 0) {
+      toast.error("No concern types selected to edit");
+      return;
+    }
+
+    const selectedConcernTypeData = importedConcernTypes.filter(concernType => selectedConcernTypes.includes(concernType.id));
+    setEditingConcernType({
+      id: 'bulk-edit',
+      name: selectedConcernTypeData.map(ct => ct.name).join(', '),
+      municipality: selectedConcernTypeData[0]?.municipality || '',
+      district: selectedConcernTypeData[0]?.district || '',
+      isBulkEdit: true,
+      selectedIds: selectedConcernTypes
+    });
+    setIsEditingConcernTypes(true);
+  };
+
+  // Handle save edited concern type
+  const handleSaveEditedConcernType = async () => {
+    if (!editingConcernType) return;
+
+    try {
+      let updatedConcernTypes;
+      
+      if (editingConcernType.isBulkEdit) {
+        // Handle bulk edit
+        const concernTypeNames = editingConcernType.name.split(',').map(name => name.trim()).filter(name => name);
+        
+        if (concernTypeNames.length !== editingConcernType.selectedIds.length) {
+          toast.error(`Please provide exactly ${editingConcernType.selectedIds.length} concern type names (one for each selected concern type)`);
+          return;
+        }
+
+        updatedConcernTypes = importedConcernTypes.map(concernType => {
+          if (editingConcernType.selectedIds.includes(concernType.id)) {
+            const nameIndex = editingConcernType.selectedIds.indexOf(concernType.id);
+            return {
+              ...concernType,
+              name: concernTypeNames[nameIndex],
+              municipality: editingConcernType.municipality,
+              district: editingConcernType.district
+            };
+          }
+          return concernType;
+        });
+      } else {
+        // Handle single edit
+        updatedConcernTypes = importedConcernTypes.map(concernType => 
+          concernType.id === editingConcernType.id ? editingConcernType : concernType
+        );
+      }
+
+      // Save to Firestore
+      const saveResult = await saveConcernTypes(updatedConcernTypes);
+      if (saveResult.success) {
+        setImportedConcernTypes(updatedConcernTypes);
+        setEditingConcernType(null);
+        setIsEditingConcernTypes(false);
+        setSelectedConcernTypes([]);
+        toast.success(editingConcernType.isBulkEdit ? 
+          `${editingConcernType.selectedIds.length} concern types updated successfully` : 
+          "Concern type updated successfully"
+        );
+      } else {
+        toast.error("Failed to update concern type in database: " + saveResult.error);
+      }
+    } catch (error) {
+      toast.error("Error updating concern type: " + error.message);
     }
   };
 
@@ -2508,6 +2959,45 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
+  // Load weekly reports from collection
+  const loadWeeklyReportsCollection = async (filters = {}) => {
+    setIsLoadingCollection(true);
+    try {
+      const result = await getWeeklyReportsFromCollection(filters);
+      if (result.success) {
+        setWeeklyReportsCollection(result.data);
+        console.log('✅ Loaded weekly reports from collection:', result.data.length);
+      } else {
+        console.error('❌ Error loading weekly reports collection:', result.error);
+        toast.error('Failed to load weekly reports collection');
+      }
+    } catch (error) {
+      console.error('❌ Error loading weekly reports collection:', error);
+      toast.error('Error loading weekly reports collection');
+    } finally {
+      setIsLoadingCollection(false);
+    }
+  };
+
+  // Delete weekly report from collection
+  const handleDeleteWeeklyReport = async (docId) => {
+    if (window.confirm('Are you sure you want to delete this weekly report? This action cannot be undone.')) {
+      try {
+        const result = await deleteWeeklyReportFromCollection(docId);
+        if (result.success) {
+          toast.success('Weekly report deleted successfully');
+          // Reload the collection
+          await loadWeeklyReportsCollection();
+        } else {
+          toast.error(`Failed to delete weekly report: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('❌ Error deleting weekly report:', error);
+        toast.error('Error deleting weekly report');
+      }
+    }
+  };
+
   // Save weekly report data to Firestore
   const handleSaveWeeklyReport = async () => {
     const monthYear = `${selectedMonth}_${selectedYear}`;
@@ -2526,9 +3016,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
       // Collect all form data from the weekly report table
       const reportData = {
-        month: selectedMonth,
-        year: selectedYear,
-        municipality: activeMunicipalityTab || "All Municipalities",
+        selectedMonth,
+        selectedYear,
+        activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
         selectedBarangay,
         selectedConcernType,
         actionTaken,
@@ -2543,8 +3033,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         sampleData: Object.keys(weeklyReportData).slice(0, 3)
       });
 
+      // Save to the original location (for backward compatibility)
       const saveResult = await saveWeeklyReport(reportKey, reportData);
-      if (saveResult.success) {
+      
+      // Also save to the new weeklyReports collection
+      const collectionSaveResult = await saveWeeklyReportToCollection(reportData);
+      
+      if (saveResult.success && collectionSaveResult.success) {
         toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
         
         // CLEAR LOCAL STORAGE DATA: Remove any conflicting local storage data for this month
@@ -2561,11 +3056,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const newEntry = {
           id: Date.now(),
           command: "weekly.save",
-          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}`,
+          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'} (ID: ${collectionSaveResult.docId})`,
           type: "success",
           timestamp: new Date()
         };
         setTerminalHistory(prev => [...prev, newEntry]);
+      } else if (saveResult.success) {
+        toast.warning(`Weekly report saved to legacy location, but failed to save to collection: ${collectionSaveResult.error}`);
       } else {
         toast.error("Failed to save weekly report: " + saveResult.error);
       }
@@ -2872,7 +3369,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-4">
                     {/* Import Options */}
                     <div className="flex items-center gap-3">
                       <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -2886,19 +3383,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       </label>
                     </div>
                     
-                    {/* Action Buttons */}
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => setShowSummaryModal(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                      title="View Summary"
-                    >
-                      <BarChart3 className="h-4 w-4" />
+                    {/* Action Buttons - Straight Line Layout */}
+                    <div className="flex gap-3 overflow-x-auto">
+                      <button 
+                        onClick={() => setShowSummaryModal(true)}
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                        title="View Summary"
+                      >
+                        <BarChart3 className="h-4 w-4" />
                         <span className="text-sm font-medium">View Summary</span>
-                    </button>
+                      </button>
+                      
                       <button 
                         onClick={() => document.getElementById('excel-file-input').click()}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0 disabled:opacity-50"
                         title={importAllMonths ? "Import All Months" : "Import Excel"}
                         disabled={isImportingExcel || isImportingAllMonths}
                       >
@@ -2911,56 +3409,58 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
                         </span>
                       </button>
-                    </div>
-                    <input
-                      id="excel-file-input"
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      onChange={handleExcelFileSelect}
-                      className="hidden"
-                    />
-                    <div className="relative clear-options-container">
-                      <button 
-                        onClick={() => setShowClearOptions(!showClearOptions)}
-                        className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                        title="Clear Data"
-                      >
-                        <AlertTriangle className="h-4 w-4" />
-                        <span className="text-sm font-medium">Clear Data</span>
-                      </button>
                       
-                      {showClearOptions && (
-                        <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                          <div className="p-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-3">Clear Data Options</h4>
-                            
+                      <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
+                        <DialogTrigger asChild>
+                          <button 
+                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                            title="Clear Data"
+                          >
+                            <AlertTriangle className="h-4 w-4" />
+                            <span className="text-sm font-medium">Clear Data</span>
+                          </button>
+                        </DialogTrigger>
+                        
+                        <DialogContent className="sm:max-w-md bg-white">
+                          <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                              <AlertTriangle className="h-5 w-5 text-red-600" />
+                              Clear Data Options
+                            </DialogTitle>
+                            <DialogDescription>
+                              Choose which data you want to clear. This action cannot be undone.
+                            </DialogDescription>
+                          </DialogHeader>
+                          
+                          <div className="space-y-4">
                             {/* Clear Active Municipality */}
-                            <div className="mb-4">
-                              <button
-                                onClick={() => {
-                                  handleClearActiveMunicipalityData();
-                                  setShowClearOptions(false);
-                                }}
-                                className="w-full text-left p-3 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition-colors duration-200"
-                              >
-                                <div className="flex items-center gap-2">
-                                  <AlertTriangle className="h-4 w-4 text-red-600" />
-                                  <div>
-                                    <div className="text-sm font-medium text-red-800">Clear Active Municipality</div>
-                                    <div className="text-xs text-red-600">Clear data for {activeMunicipalityTab}</div>
-                                  </div>
+                            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-medium text-red-800">Clear Active Municipality</h4>
+                                  <p className="text-xs text-red-600 mt-1">Clear data for {activeMunicipalityTab}</p>
                                 </div>
-                              </button>
+                                <button
+                                  onClick={() => {
+                                    handleClearActiveMunicipalityData();
+                                    setShowClearModal(false);
+                                  }}
+                                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors duration-200"
+                                >
+                                  Clear
+                                </button>
+                              </div>
                             </div>
                             
                             {/* Clear Selected Municipality */}
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-2">Select Municipality to Clear</label>
-                              <div className="flex gap-2">
+                            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                              <h4 className="text-sm font-medium text-gray-800 mb-3">Clear Selected Municipality</h4>
+                              <div className="space-y-3">
                                 <select 
                                   value={selectedClearMunicipality}
                                   onChange={(e) => setSelectedClearMunicipality(e.target.value)}
-                                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
                                 >
                                   <option value="">Choose municipality...</option>
                                   {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
@@ -2970,28 +3470,54 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 <button
                                   onClick={() => {
                                     handleClearSelectedMunicipalityData();
-                                    setShowClearOptions(false);
+                                    setShowClearModal(false);
                                   }}
                                   disabled={!selectedClearMunicipality}
-                                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-lg text-sm font-medium transition-colors duration-200 flex items-center gap-1"
+                                  className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2"
                                 >
                                   <AlertTriangle className="h-4 w-4" />
-                                  Clear
+                                  Clear Selected
                                 </button>
                               </div>
                             </div>
-                            
-                            <div className="mt-3 pt-3 border-t border-gray-200">
-                              <button
-                                onClick={() => setShowClearOptions(false)}
-                                className="w-full text-center text-sm text-gray-600 hover:text-gray-800 transition-colors duration-200"
-                              >
-                                Cancel
-                              </button>
-                            </div>
                           </div>
-                        </div>
-                      )}
+                          
+                          <DialogFooter>
+                            <button
+                              onClick={() => setShowClearModal(false)}
+                              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                            >
+                              Cancel
+                            </button>
+                          </DialogFooter>
+                        </DialogContent>
+                      </Dialog>
+                      
+                      <button 
+                        onClick={handleSaveWeeklyReport}
+                        disabled={isLoadingWeeklyReports}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                        title="Save Data"
+                      >
+                        {isLoadingWeeklyReports ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <CheckCircle className="h-4 w-4" />
+                        )}
+                        <span className="text-sm font-medium">Save Data</span>
+                      </button>
+                      
+                      <button 
+                        onClick={() => {
+                          setShowCollectionView(true);
+                          loadWeeklyReportsCollection();
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                        title="View Collection"
+                      >
+                        <Database className="h-4 w-4" />
+                        <span className="text-sm font-medium">View Collection</span>
+                      </button>
                     </div>
                     <button
                       onClick={handleSaveWeeklyReport}
@@ -3006,6 +3532,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       )}
                       <span className="text-sm font-medium">Save Data</span>
                     </button>
+                    
+                    <input
+                      id="excel-file-input"
+                      type="file"
+                      accept=".xlsx,.xls,.csv"
+                      onChange={handleExcelFileSelect}
+                      className="hidden"
+                    />
                   </div>
                 </div>
               </div>
@@ -3632,7 +4166,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <p className="text-sm text-gray-600">
                       {barangayFilterMunicipality 
                         ? `${getSortedBarangays().length} of ${importedBarangays.length} barangays (${barangayFilterMunicipality})`
-                        : `${importedBarangays.length} barangays imported`
+                        : `${importedBarangays.length} barangays across ${Object.keys(getGroupedBarangays()).length} municipalities`
                       }
                       </p>
                     </div>
@@ -3724,6 +4258,22 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           <Download className="h-4 w-4 mr-2" />
                           Export CSV
                         </button>
+                        <button
+                          onClick={handleEditSelectedBarangays}
+                          disabled={selectedBarangays.length === 0}
+                          className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Selected ({selectedBarangays.length})
+                        </button>
+                        <button
+                          onClick={handleClearSelectedBarangays}
+                          disabled={selectedBarangays.length === 0}
+                          className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear Selected ({selectedBarangays.length})
+                        </button>
                         <button 
                           onClick={handleClearBarangays} 
                           className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
@@ -3748,16 +4298,90 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <p className="text-sm">Use the import form to add barangays</p>
                   </div>
                 ) : (
-                                      <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {getSortedBarangays().map((barangay) => {
+                                      <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {/* Expand/Collapse All Controls */}
+                      <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={expandAllMunicipalities}
+                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                          >
+                            Expand All
+                          </button>
+                          <button
+                            onClick={collapseAllMunicipalities}
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                          >
+                            Collapse All
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {Object.keys(getGroupedBarangays()).length} municipalities
+                        </div>
+                      </div>
+
+                      {/* Grouped Barangays by Municipality */}
+                      {Object.entries(getGroupedBarangays()).map(([municipality, barangays]) => {
+                        const isExpanded = expandedMunicipalities.has(municipality);
+                        const isAllSelected = barangays.every(barangay => selectedBarangays.includes(barangay.id));
+                        const isSomeSelected = barangays.some(barangay => selectedBarangays.includes(barangay.id));
+                        
+                        return (
+                          <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
+                            {/* Municipality Header */}
+                            <div 
+                              className="bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-3 cursor-pointer hover:from-purple-100 hover:to-blue-100 transition-colors"
+                              onClick={() => toggleMunicipality(municipality)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={isAllSelected}
+                                    ref={(input) => {
+                                      if (input) input.indeterminate = isSomeSelected && !isAllSelected;
+                                    }}
+                                    onChange={(e) => {
+                                      e.stopPropagation();
+                                      barangays.forEach(barangay => {
+                                        handleBarangaySelection(barangay.id, e.target.checked);
+                                      });
+                                    }}
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                  />
+                                  <Building2 className="h-5 w-5 text-purple-600" />
+                                  <div>
+                                    <div className="font-semibold text-gray-900">{municipality}</div>
+                                    <div className="text-sm text-gray-600">
+                                      {barangays.length} barangay{barangays.length !== 1 ? 's' : ''}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                    {barangays[0]?.district || 'Unknown District'}
+                                  </span>
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Barangays List */}
+                            {isExpanded && (
+                              <div className="bg-white">
+                                {barangays.map((barangay) => {
                         const isSelected = selectedBarangays.includes(barangay.id);
                         return (
                           <div 
                             key={barangay.id} 
-                            className={`flex items-center justify-between p-3 rounded-lg transition-colors duration-200 ${
+                                      className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${
                               isSelected 
-                                ? 'bg-blue-50 border-2 border-blue-200' 
-                                : 'bg-gray-50 border-2 border-transparent hover:bg-gray-100'
+                                          ? 'bg-blue-50 border-l-4 border-l-blue-400' 
+                                          : 'hover:bg-gray-50'
                             }`}
                           >
                             <div className="flex items-center gap-3">
@@ -3771,13 +4395,18 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                               <div>
                                 <div className="font-medium text-sm">{barangay.name}</div>
                                 <div className="text-xs text-gray-600">
-                                  {barangay.municipality}, {barangay.district}
+                                            {barangay.district}
                                 </div>
                               </div>
                             </div>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                               {new Date(barangay.importedAt).toLocaleDateString()}
                             </span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
@@ -3792,7 +4421,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-lg font-semibold text-gray-900">Edit Barangay</h3>
+                      <h3 className="text-lg font-semibold text-gray-900">
+                        {editingBarangay.isBulkEdit ? `Edit ${editingBarangay.selectedIds.length} Selected Barangays` : 'Edit Barangay'}
+                      </h3>
                       <button
                         onClick={handleCancelEdit}
                         className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
@@ -3805,14 +4436,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Barangay Name</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {editingBarangay.isBulkEdit ? 'Barangay Names (comma-separated)' : 'Barangay Name'}
+                        </label>
                         <input
                           type="text"
                           value={editingBarangay.name}
                           onChange={(e) => setEditingBarangay({...editingBarangay, name: e.target.value})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder="Enter barangay name"
+                          placeholder={editingBarangay.isBulkEdit ? "Enter barangay names separated by commas" : "Enter barangay name"}
                         />
+                        {editingBarangay.isBulkEdit && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Separate multiple barangay names with commas. All selected barangays will be updated with the same municipality and district.
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -3902,6 +4540,95 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
           )}
+          </div>
+        )}
+
+        {/* Edit Concern Type Modal */}
+        {isEditingConcernTypes && editingConcernType && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {editingConcernType.isBulkEdit ? `Edit ${editingConcernType.selectedIds.length} Selected Concern Types` : 'Edit Concern Type'}
+                  </h3>
+                  <button
+                    onClick={() => setIsEditingConcernTypes(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                  >
+                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      {editingConcernType.isBulkEdit ? 'Concern Type Names (comma-separated)' : 'Concern Type Name'}
+                    </label>
+                    <input
+                      type="text"
+                      value={editingConcernType.name}
+                      onChange={(e) => setEditingConcernType({...editingConcernType, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      placeholder={editingConcernType.isBulkEdit ? "Enter concern type names separated by commas" : "Enter concern type name"}
+                    />
+                    {editingConcernType.isBulkEdit && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Separate multiple concern type names with commas. All selected concern types will be updated with the same municipality and district.
+                      </p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                    <select
+                      value={editingConcernType.district}
+                      onChange={(e) => setEditingConcernType({...editingConcernType, district: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      {Object.keys(municipalitiesByDistrict).map((district) => (
+                        <option key={district} value={district}>
+                          {district}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
+                    <select
+                      value={editingConcernType.municipality}
+                      onChange={(e) => setEditingConcernType({...editingConcernType, municipality: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                    >
+                      {editingConcernType.district && municipalitiesByDistrict[editingConcernType.district]?.map((municipality) => (
+                        <option key={municipality} value={municipality}>
+                          {municipality}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      onClick={handleSaveEditedConcernType}
+                      className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Save Changes
+                    </button>
+                    <button
+                      onClick={() => setIsEditingConcernTypes(false)}
+                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
@@ -4059,29 +4786,96 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <div>
                         <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Concern Types</h3>
                         <p className="text-sm text-gray-600">
-                          {importedConcernTypes.length} types imported
+                          {concernTypeFilterMunicipality 
+                            ? `${getSortedConcernTypes().length} of ${importedConcernTypes.length} types (${concernTypeFilterMunicipality})`
+                            : `${importedConcernTypes.length} types across ${Object.keys(getGroupedConcernTypes()).length} municipalities`
+                          }
                         </p>
                       </div>
                     </div>
                     {importedConcernTypes.length > 0 && (
-                      <div className="flex gap-2">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                        {/* Filter and Sort Controls */}
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">Filter:</span>
                         <select 
-                          value={activeMunicipalityTab}
-                          onChange={(e) => handleMunicipalityTabChange(e.target.value)}
-                          className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              value={concernTypeFilterMunicipality}
+                              onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                         >
                           <option value="">All Municipalities</option>
-                          {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
+                              {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
                             <option key={municipality} value={municipality}>{municipality}</option>
                           ))}
                         </select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">Sort by:</span>
+                            <select
+                              value={concernTypeSortBy}
+                              onChange={(e) => handleConcernTypeSort(e.target.value)}
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                            >
+                              <option value="name">Name</option>
+                              <option value="municipality">Municipality</option>
+                              <option value="district">District</option>
+                              <option value="importedAt">Import Date</option>
+                            </select>
+                            <button
+                              onClick={() => setConcernTypeSortOrder(concernTypeSortOrder === 'asc' ? 'desc' : 'asc')}
+                              className="p-1 hover:bg-gray-100 rounded transition-colors"
+                              title={`Sort ${concernTypeSortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                            >
+                              {concernTypeSortOrder === 'asc' ? (
+                                <ChevronDown className="h-4 w-4 text-gray-500" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4 text-gray-500" />
+                              )}
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={selectedConcernTypes.length === getSortedConcernTypes().length ? handleDeselectAllConcernTypes : handleSelectAllConcernTypes}
+                            className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                          >
+                            <Check className="h-4 w-4 mr-2" />
+                            {selectedConcernTypes.length === getSortedConcernTypes().length ? 'Deselect All' : 'Select All'}
+                          </button>
+                          <button
+                            onClick={handleExportConcernTypesCSV}
+                            className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Export CSV
+                          </button>
+                        <button
+                          onClick={handleEditSelectedConcernTypes}
+                          disabled={selectedConcernTypes.length === 0}
+                          className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit Selected ({selectedConcernTypes.length})
+                        </button>
+                        <button
+                          onClick={handleClearSelectedConcernTypes}
+                          disabled={selectedConcernTypes.length === 0}
+                          className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Clear Selected ({selectedConcernTypes.length})
+                        </button>
                         <button 
                           onClick={handleClearConcernTypes} 
                           className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
                         >
                           <AlertTriangle className="h-4 w-4 mr-2" />
-                          Clear Data
+                            Clear All
                         </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -4099,39 +4893,122 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <p className="text-sm">Use the import form to add concern types</p>
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                      {importedConcernTypes.map((type) => {
+                    <div className="space-y-4 max-h-96 overflow-y-auto">
+                      {/* Expand/Collapse All Controls */}
+                      <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={expandAllConcernTypeMunicipalities}
+                            className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                          >
+                            Expand All
+                          </button>
+                          <button
+                            onClick={collapseAllConcernTypeMunicipalities}
+                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                          >
+                            Collapse All
+                          </button>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {Object.keys(getGroupedConcernTypes()).length} municipalities
+                        </div>
+                      </div>
+
+                      {/* Grouped Concern Types by Municipality */}
+                      {Object.entries(getGroupedConcernTypes()).map(([municipality, concernTypes]) => {
+                        const isExpanded = expandedConcernTypeMunicipalities.has(municipality);
+                        const isForCurrentMunicipality = activeMunicipalityTab && 
+                          (municipality === activeMunicipalityTab || municipality === "All Municipalities");
+                        
+                        return (
+                          <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
+                            {/* Municipality Header */}
+                            <div 
+                              className={`px-4 py-3 cursor-pointer transition-colors ${
+                                isForCurrentMunicipality
+                                  ? 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
+                                  : 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
+                              }`}
+                              onClick={() => toggleConcernTypeMunicipality(municipality)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                  <AlertTriangle className={`h-5 w-5 ${
+                                    isForCurrentMunicipality 
+                                      ? 'text-orange-600' 
+                                      : 'text-orange-500'
+                                  }`} />
+                                  <div>
+                                    <div className="font-semibold text-gray-900">{municipality}</div>
+                                    <div className="text-sm text-gray-600">
+                                      {concernTypes.length} concern type{concernTypes.length !== 1 ? 's' : ''}
+                                      {isForCurrentMunicipality && (
+                                        <span className="ml-2 text-orange-600 font-medium">• Available for {activeMunicipalityTab}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                                    {concernTypes[0]?.district || 'Unknown District'}
+                                  </span>
+                                  {isExpanded ? (
+                                    <ChevronDown className="h-4 w-4 text-gray-500" />
+                                  ) : (
+                                    <ChevronRight className="h-4 w-4 text-gray-500" />
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Concern Types List */}
+                            {isExpanded && (
+                              <div className="bg-white">
+                                {concernTypes.map((type) => {
                         const isForCurrentMunicipality = activeMunicipalityTab && 
                           (type.municipality === activeMunicipalityTab || type.municipality === "All Municipalities");
+                                  const isSelected = selectedConcernTypes.includes(type.id);
+                                  
                         return (
                           <div 
                             key={type.id} 
-                            className={`flex items-center justify-between p-3 rounded-lg transition-colors duration-200 ${
-                              activeMunicipalityTab && isForCurrentMunicipality 
-                                ? 'bg-orange-50 border border-orange-200' 
-                                : 'bg-gray-50'
+                                      className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${
+                                        isSelected
+                                          ? 'bg-blue-50 border-l-4 border-l-blue-400' 
+                                          : isForCurrentMunicipality 
+                                            ? 'bg-orange-50 border-l-4 border-l-orange-400' 
+                                            : 'hover:bg-gray-50'
                             }`}
                           >
                             <div className="flex items-center gap-3">
+                                        <input
+                                          type="checkbox"
+                                          checked={isSelected}
+                                          onChange={(e) => handleConcernTypeSelection(type.id, e.target.checked)}
+                                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                        />
                               <AlertTriangle className={`h-4 w-4 ${
-                                activeMunicipalityTab && isForCurrentMunicipality 
+                                          isForCurrentMunicipality 
                                   ? 'text-orange-600' 
                                   : 'text-orange-500'
                               }`} />
                               <div>
                                 <div className="font-medium text-sm">{type.name}</div>
                                 <div className="text-xs text-gray-600">
-                                  {type.municipality}, {type.district}
-                                  {activeMunicipalityTab && isForCurrentMunicipality && (
-                                    <span className="ml-2 text-orange-600 font-medium">• Available for {activeMunicipalityTab}</span>
-                                  )}
+                                            {type.district}
                                 </div>
                               </div>
                             </div>
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
                               {new Date(type.importedAt).toLocaleDateString()}
                             </span>
                           </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                         );
                       })}
                     </div>
@@ -4360,6 +5237,181 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 );
               })()}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Weekly Reports Collection Modal */}
+      {showCollectionView && (
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                    <Database className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">Weekly Reports Collection</h2>
+                    <p className="text-sm text-gray-600">View and manage all weekly reports stored in Firestore</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowCollectionView(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+
+              {/* Filters */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="flex flex-wrap gap-4">
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Month:</label>
+                    <select
+                      value={selectedMonth}
+                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="">All Months</option>
+                      <option value="January">January</option>
+                      <option value="February">February</option>
+                      <option value="March">March</option>
+                      <option value="April">April</option>
+                      <option value="May">May</option>
+                      <option value="June">June</option>
+                      <option value="July">July</option>
+                      <option value="August">August</option>
+                      <option value="September">September</option>
+                      <option value="October">October</option>
+                      <option value="November">November</option>
+                      <option value="December">December</option>
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Year:</label>
+                    <select
+                      value={selectedYear}
+                      onChange={(e) => setSelectedYear(e.target.value)}
+                      className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                    >
+                      <option value="">All Years</option>
+                      <option value="2024">2024</option>
+                      <option value="2025">2025</option>
+                      <option value="2026">2026</option>
+                    </select>
+                  </div>
+                  <button
+                    onClick={() => loadWeeklyReportsCollection({
+                      month: selectedMonth || undefined,
+                      year: selectedYear || undefined,
+                      municipality: activeMunicipalityTab || undefined
+                    })}
+                    disabled={isLoadingCollection}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
+                  >
+                    {isLoadingCollection ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    ) : (
+                      <CheckCircle className="h-4 w-4" />
+                    )}
+                    <span className="text-sm font-medium">Filter</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collection Data */}
+              <div className="space-y-4">
+                {isLoadingCollection ? (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    <span className="ml-3 text-gray-600">Loading collection data...</span>
+                  </div>
+                ) : weeklyReportsCollection.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Reports Found</h3>
+                    <p className="text-gray-600">No weekly reports found in the collection with the current filters.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-gray-600">
+                        Showing {weeklyReportsCollection.length} report(s)
+                      </p>
+                    </div>
+                    
+                    {weeklyReportsCollection.map((report) => (
+                      <div key={report.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {report.selectedMonth} {report.selectedYear}
+                              </h3>
+                              <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                                {report.activeMunicipalityTab || 'All Municipalities'}
+                              </span>
+                            </div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                              <div>
+                                <p className="text-sm text-gray-600">Created:</p>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {new Date(report.createdAt).toLocaleDateString()} {new Date(report.createdAt).toLocaleTimeString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600">Last Updated:</p>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {new Date(report.lastUpdated).toLocaleDateString()} {new Date(report.lastUpdated).toLocaleTimeString()}
+                                </p>
+                              </div>
+                              <div>
+                                <p className="text-sm text-gray-600">Created By:</p>
+                                <p className="text-sm font-medium text-gray-900">{report.createdBy}</p>
+                              </div>
+                            </div>
+
+                            <div className="mb-3">
+                              <p className="text-sm text-gray-600">Report Data Summary:</p>
+                              <div className="mt-1 text-sm text-gray-900">
+                                {report.weeklyReportData && Object.keys(report.weeklyReportData).length > 0 ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {Object.entries(report.weeklyReportData).map(([date, entries]) => (
+                                      <span key={date} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                        {date}: {Array.isArray(entries) ? entries.length : 0} entries
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-500">No data entries</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="text-xs text-gray-500">
+                              ID: {report.id}
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2 ml-4">
+                            <button
+                              onClick={() => handleDeleteWeeklyReport(report.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
+                              title="Delete Report"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>

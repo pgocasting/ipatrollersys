@@ -293,6 +293,141 @@ export const useFirebase = () => {
     }
   };
 
+  // New Weekly Reports Collection Functions
+  const saveWeeklyReportToCollection = async (reportData) => {
+    try {
+      console.log('💾 Saving weekly report to weeklyReports collection...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      // Generate a unique document ID based on month, year, and municipality
+      const { selectedMonth, selectedYear, activeMunicipalityTab } = reportData;
+      const docId = `${selectedMonth}_${selectedYear}_${activeMunicipalityTab || 'All'}_${Date.now()}`;
+      
+      const docRef = doc(db, 'weeklyReports', docId);
+      await setDoc(docRef, {
+        ...reportData,
+        id: docId,
+        createdAt: new Date().toISOString(),
+        createdBy: user.email,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      });
+      
+      console.log('✅ Weekly report saved successfully to weeklyReports collection:', docId);
+      return { success: true, docId };
+    } catch (error) {
+      console.error('❌ Error saving weekly report to collection:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getWeeklyReportsFromCollection = async (filters = {}) => {
+    try {
+      console.log('🔍 Fetching weekly reports from collection with filters:', filters);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const collectionRef = collection(db, 'weeklyReports');
+      let q = collectionRef;
+      
+      // Apply filters if provided
+      if (filters.month) {
+        q = query(q, where('selectedMonth', '==', filters.month));
+      }
+      if (filters.year) {
+        q = query(q, where('selectedYear', '==', filters.year));
+      }
+      if (filters.municipality) {
+        q = query(q, where('activeMunicipalityTab', '==', filters.municipality));
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const reports = [];
+      
+      querySnapshot.forEach((doc) => {
+        reports.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      // Sort by creation date (newest first)
+      reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
+      console.log('✅ Found weekly reports in collection:', reports.length);
+      return { success: true, data: reports };
+    } catch (error) {
+      console.error('❌ Error fetching weekly reports from collection:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const updateWeeklyReportInCollection = async (docId, updateData) => {
+    try {
+      console.log('🔄 Updating weekly report in collection:', docId);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+      
+      const docRef = doc(db, 'weeklyReports', docId);
+      await updateDoc(docRef, {
+        ...updateData,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      });
+      
+      console.log('✅ Weekly report updated successfully in collection:', docId);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error updating weekly report in collection:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const deleteWeeklyReportFromCollection = async (docId) => {
+    try {
+      console.log('🗑️ Deleting weekly report from collection:', docId);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+      
+      const docRef = doc(db, 'weeklyReports', docId);
+      await deleteDoc(docRef);
+      
+      console.log('✅ Weekly report deleted successfully from collection:', docId);
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error deleting weekly report from collection:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   // Save barangays to Firestore
   const saveBarangays = async (barangays) => {
     try {
@@ -457,6 +592,10 @@ export const useFirebase = () => {
     saveConcernTypes,
     getWeeklyReport,
     saveWeeklyReport,
+    saveWeeklyReportToCollection,
+    getWeeklyReportsFromCollection,
+    updateWeeklyReportInCollection,
+    deleteWeeklyReportFromCollection,
     createUserByAdmin,
     getUsers
   };

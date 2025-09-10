@@ -603,14 +603,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         "July", "August", "September", "October", "November", "December"
       ];
       
-      // Header - Centered like preview
+      // Header - Centered with tighter top spacing
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
       const pageWidth = doc.internal.pageSize.width;
       const titleWidth = doc.getTextWidth('I-Patroller Monthly Summary Report');
-      doc.text('I-Patroller Monthly Summary Report', (pageWidth - titleWidth) / 2, 30);
+      doc.text('I-Patroller Monthly Summary Report', (pageWidth - titleWidth) / 2, 20);
       
-      // Report details - centered and spaced like preview
+      // Report details - tighter vertical spacing
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
@@ -623,16 +623,16 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const periodWidth = doc.getTextWidth(periodText);
       const dataSourceWidth = doc.getTextWidth(dataSourceText);
       
-      doc.text(generatedText, (pageWidth - generatedWidth) / 2, 45);
-      doc.text(monthText, (pageWidth - monthWidth) / 2, 52);
-      doc.text(periodText, (pageWidth - periodWidth) / 2, 59);
-      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 66);
+      doc.text(generatedText, (pageWidth - generatedWidth) / 2, 30);
+      doc.text(monthText, (pageWidth - monthWidth) / 2, 36);
+      doc.text(periodText, (pageWidth - periodWidth) / 2, 42);
+      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 48);
       
       // District Summary Table - matching preview format
       if (Object.keys(groupedData).length > 0) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        doc.text('District Summary', 20, 75);
+        doc.text('District Summary', 20, 55);
         
         const districtTableData = Object.keys(groupedData).map(district => {
           const summary = getDistrictSummary(district);
@@ -649,16 +649,16 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         autoTable(doc, {
           head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
           body: districtTableData,
-          startY: 82,
-          styles: { 
-            fontSize: 9, 
+          startY: 60,
+          styles: {
+            fontSize: 9,
             cellPadding: 2,
             overflow: 'linebreak',
             halign: 'left',
             lineColor: [0, 0, 0],
             lineWidth: 0.1
           },
-          headStyles: { 
+          headStyles: {
             fillColor: [59, 130, 246], // Blue background like preview
             fontStyle: 'bold',
             textColor: [255, 255, 255],
@@ -670,12 +670,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             fillColor: [248, 250, 252] // Light gray alternating rows like preview
           },
           columnStyles: {
-            0: { cellWidth: 40, halign: 'left' },
-            1: { cellWidth: 25, halign: 'center' },
-            2: { cellWidth: 25, halign: 'center' },
-            3: { cellWidth: 25, halign: 'center' },
-            4: { cellWidth: 25, halign: 'center' },
-            5: { cellWidth: 25, halign: 'center' }
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'center' },
+            3: { cellWidth: 'auto', halign: 'center' },
+            4: { cellWidth: 'auto', halign: 'center' },
+            5: { cellWidth: 'auto', halign: 'center' }
           },
           margin: { left: 20, right: 20 },
           tableWidth: 'auto',
@@ -713,15 +713,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
           body: municipalityTableData,
           startY: finalY + 7,
-          styles: { 
-            fontSize: 8, 
+          styles: {
+            fontSize: 8,
             cellPadding: 2,
             overflow: 'linebreak',
             halign: 'left',
             lineColor: [0, 0, 0],
             lineWidth: 0.1
           },
-          headStyles: { 
+          headStyles: {
             fillColor: [34, 197, 94], // Green background like preview
             fontStyle: 'bold',
             textColor: [255, 255, 255],
@@ -733,13 +733,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             fillColor: [248, 250, 252] // Light gray alternating rows like preview
           },
           columnStyles: {
-            0: { cellWidth: 30, halign: 'left' },
-            1: { cellWidth: 25, halign: 'left' },
-            2: { cellWidth: 20, halign: 'center' },
-            3: { cellWidth: 20, halign: 'center' },
-            4: { cellWidth: 20, halign: 'center' },
-            5: { cellWidth: 20, halign: 'center' },
-            6: { cellWidth: 15, halign: 'center' }
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'left' },
+            2: { cellWidth: 'auto', halign: 'center' },
+            3: { cellWidth: 'auto', halign: 'center' },
+            4: { cellWidth: 'auto', halign: 'center' },
+            5: { cellWidth: 'auto', halign: 'center' },
+            6: { cellWidth: 'auto', halign: 'center' }
           },
           margin: { left: 20, right: 20 },
           tableWidth: 'auto',
@@ -754,10 +754,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           }
         });
         
-        // Overall Summary Statistics - matching preview format with two-column layout
+        // Overall Summary Statistics - auto-fit table layout
         const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
         
-        // Draw border line like preview
+        // Separator
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         doc.line(20, summaryY, pageWidth - 20, summaryY);
@@ -766,44 +766,28 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         doc.setFont('helvetica', 'bold');
         doc.text('Overall Summary Statistics', 20, summaryY + 10);
         
-        // Two-column layout like preview
-        const leftColumnX = 20;
-        const rightColumnX = pageWidth / 2 + 10;
-        const lineHeight = 10;
-        let currentY = summaryY + 22;
+        // Two-column key/value table that auto-fits to page width
+        const summaryRows = [
+          ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
+          ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
+          ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
+        ];
         
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        // Left column
-        doc.text(`Total Patrols:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalPatrols.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Active Days:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalActive.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Inactive Days:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalInactive.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        // Right column
-        currentY = summaryY + 30;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Average Active Percentage:`, rightColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.avgActivePercentage}%`, rightColumnX + 80, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Municipalities:`, rightColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.municipalityCount}`, rightColumnX + 80, currentY);
+        autoTable(doc, {
+          head: [['Metric', 'Value', 'Metric', 'Value']],
+          body: summaryRows,
+          startY: summaryY + 16,
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'left' },
+            3: { cellWidth: 'auto', halign: 'center' }
+          }
+        });
         
       } else {
         // No data message
@@ -812,10 +796,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         doc.setFont('helvetica', 'italic');
         doc.text('No patrol data available for the selected period.', 20, finalY);
         
-        // Overall Summary Statistics - even when no data, show at bottom with same format
+        // Overall Summary Statistics - even when no data, show as auto-fit table
         const summaryY = finalY + 10;
         
-        // Draw border line like preview
+        // Separator
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         doc.line(20, summaryY, pageWidth - 20, summaryY);
@@ -824,44 +808,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         doc.setFont('helvetica', 'bold');
         doc.text('Overall Summary Statistics', 20, summaryY + 10);
         
-        // Two-column layout like preview
-        const leftColumnX = 20;
-        const rightColumnX = pageWidth / 2 + 10;
-        const lineHeight = 10;
-        let currentY = summaryY + 22;
+        const summaryRowsNoData = [
+          ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
+          ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
+          ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
+        ];
         
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        
-        // Left column
-        doc.text(`Total Patrols:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalPatrols.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Active Days:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalActive.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Inactive Days:`, leftColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.totalInactive.toLocaleString()}`, leftColumnX + 60, currentY);
-        
-        // Right column
-        currentY = summaryY + 30;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Average Active Percentage:`, rightColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.avgActivePercentage}%`, rightColumnX + 80, currentY);
-        
-        currentY += lineHeight;
-        doc.setFont('helvetica', 'normal');
-        doc.text(`Total Municipalities:`, rightColumnX, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`${overallSummary.municipalityCount}`, rightColumnX + 80, currentY);
+        autoTable(doc, {
+          head: [['Metric', 'Value', 'Metric', 'Value']],
+          body: summaryRowsNoData,
+          startY: summaryY + 16,
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'left' },
+            3: { cellWidth: 'auto', halign: 'center' }
+          }
+        });
       }
       
       // Save the PDF

@@ -108,6 +108,22 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
+  // Shared month names for display and exports
+  const MONTH_NAMES = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December"
+  ];
+
   // Update active tab when user department changes
   useEffect(() => {
     if (userDepartment === "agriculture") {
@@ -719,112 +735,116 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
   const exportToPDF = () => {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    
-    // Set page dimensions
     const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const margin = 40;
     const contentWidth = pageWidth - (2 * margin);
-    
-    // Add page border
-    doc.rect(margin, margin, contentWidth, pageHeight - (2 * margin));
-    
-    // Add header
-    doc.setFontSize(24);
+
+    // Header banner
+    const headerHeight = 80;
+    doc.setFillColor(37, 99, 235); // blue-600
+    doc.rect(0, 0, pageWidth, headerHeight, 'F');
+    doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'bold');
-    doc.text('Action Center Report', pageWidth / 2, 80, { align: 'center' });
-    
-    // Add description if provided
+    doc.setFontSize(20);
+    doc.text('Action Center Report', margin, 32);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    const subtitle = `${MONTH_NAMES[selectedMonth] || 'All Months'} • ${selectedYear || 'All Years'} • ${(activeTab || 'unknown').toUpperCase()}`;
+    doc.text(subtitle, margin, 52);
+    doc.setTextColor(0, 0, 0);
+
+    // Optional description
+    let cursorY = headerHeight + 20;
     if (pdfDescription && pdfDescription.trim()) {
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont('helvetica', 'italic');
-      const descriptionLines = doc.splitTextToSize(pdfDescription.trim(), contentWidth - 40);
-      let descriptionY = 105;
-      descriptionLines.forEach((line, index) => {
-        doc.text(line, pageWidth / 2, descriptionY + (index * 15), { align: 'center' });
-      });
-      var finalDescriptionY = descriptionY + (descriptionLines.length * 15) + 10;
+      const descriptionLines = doc.splitTextToSize(pdfDescription.trim(), contentWidth);
+      doc.text(descriptionLines, margin, cursorY);
+      cursorY += (descriptionLines.length * 14) + 10;
+      doc.setFont('helvetica', 'normal');
     }
-    
-    // Add report details section
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const detailsY = pdfDescription && pdfDescription.trim() ? (finalDescriptionY + 20) : 120;
-    const lineHeight = 20;
-    
-    // Report details in two columns
-    const monthNamesExport = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    doc.text(`Month: ${monthNamesExport[selectedMonth] || 'All Months'}`, margin + 20, detailsY);
-    doc.text(`Year: ${selectedYear || 'All Years'}`, margin + 20, detailsY);
-    
-    doc.text(`District: ${selectedDistrict === "all" ? "All Districts" : selectedDistrict}`, margin + 20, detailsY + lineHeight);
-    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, pageWidth / 2 + 20, detailsY + lineHeight);
-    
-    doc.text(`Municipality: ${activeMunicipality === "all" ? "All Municipalities" : activeMunicipality}`, margin + 20, detailsY + (2 * lineHeight));
-    
-    // Add summary statistics
-    const statsY = detailsY + (4 * lineHeight);
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Summary Statistics', margin + 20, statsY);
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    // Statistics in a grid layout
-    const statsData = [
+
+    // Report meta grid
+    const lineHeight = 18;
+    const metaStartY = cursorY;
+    doc.setFontSize(11);
+    doc.text(`Month: ${MONTH_NAMES[selectedMonth] || 'All Months'}`, margin, metaStartY);
+    doc.text(`Year: ${selectedYear || 'All Years'}`, margin + (contentWidth / 2), metaStartY);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, margin, metaStartY + lineHeight);
+    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()}`, margin + (contentWidth / 2), metaStartY + lineHeight);
+    doc.text(`Municipality: ${activeMunicipality === 'all' ? 'All Municipalities' : activeMunicipality}`, margin, metaStartY + (2 * lineHeight));
+
+    // Summary cards
+    let statsData = [
       { label: 'Total Actions', value: totalActions },
-      { label: 'Pending Actions', value: pendingActions },
-      { label: 'Resolved Actions', value: resolvedActions },
-      { label: 'High Priority Actions', value: highPriorityActions }
+      { label: 'Pending', value: pendingActions },
+      { label: 'Resolved', value: resolvedActions },
+      { label: 'High Priority', value: highPriorityActions }
     ];
-    
-    if (activeTab === "pnp") {
-      statsData.push(
+    if (activeTab === 'pnp') {
+      statsData = statsData.concat([
         { label: 'Total Drugs', value: totalDrugs },
         { label: 'Male Drugs', value: totalDrugsMale },
         { label: 'Female Drugs', value: totalDrugsFemale },
         { label: 'Total Illegals', value: totalIllegals }
-      );
-    } else if (activeTab === "agriculture") {
-      statsData.push(
+      ]);
+    } else if (activeTab === 'agriculture') {
+      statsData = statsData.concat([
         { label: 'Total Illegals', value: totalAgricultureIllegals },
         { label: 'Fishing Violations', value: totalFishingViolations },
         { label: 'Illegal Fishing', value: totalIllegalFishing }
-      );
-    } else if (activeTab === "pg-enro") {
-      statsData.push(
+      ]);
+    } else if (activeTab === 'pg-enro') {
+      statsData = statsData.concat([
         { label: 'Environmental Violations', value: totalEnvironmentalViolations },
         { label: 'Waste Management', value: totalWasteManagement },
         { label: 'Tree Planting', value: totalTreePlanting }
-      );
+      ]);
     }
-    
-    // Display statistics in a grid
-    const statsPerRow = 2;
-    let currentRow = 0;
-    let currentCol = 0;
-    
-    statsData.forEach((stat, index) => {
-      const x = margin + 20 + (currentCol * (contentWidth / statsPerRow));
-      const y = statsY + 30 + (currentRow * 25);
-      
-      doc.text(`${stat.label}: ${stat.value}`, x, y);
-      
-      currentCol++;
-      if (currentCol >= statsPerRow) {
-        currentCol = 0;
-        currentRow++;
+
+    const cardsTop = metaStartY + (3 * lineHeight) + 16;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Summary Statistics', margin, cardsTop - 10);
+    doc.setFont('helvetica', 'normal');
+
+    const cardWidth = (contentWidth - 20) / 2; // two columns
+    const cardHeight = 40;
+    let cardX = margin;
+    let cardY = cardsTop + 6;
+    doc.setDrawColor(226, 232, 240); // slate-200 border
+    statsData.forEach((stat, idx) => {
+      doc.roundedRect(cardX, cardY, cardWidth, cardHeight, 4, 4);
+      doc.setFontSize(10);
+      doc.setTextColor(71, 85, 105); // slate-600
+      doc.text(String(stat.label), cardX + 10, cardY + 16);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.setTextColor(15, 23, 42); // slate-900
+      doc.text(String(stat.value ?? 0), cardX + 10, cardY + 32);
+      doc.setFont('helvetica', 'normal');
+
+      // advance position
+      if (cardX + cardWidth + 20 + cardWidth <= pageWidth - margin) {
+        cardX += cardWidth + 20;
+      } else {
+        cardX = margin;
+        cardY += cardHeight + 12;
       }
     });
-    
-    // Prepare table data based on active tab
+
+    const tableStartY = cardY + cardHeight + 24;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Action Items Details', margin, tableStartY - 10);
+    doc.setFont('helvetica', 'normal');
+
+    // Prepare table
     let tableHeaders = ['Municipality', 'District', 'What', 'When', 'Where', 'Action Taken'];
     let tableData = [];
-    
-    if (activeTab === "pnp") {
-      tableHeaders.push('Source', 'Other Information');
+    if (activeTab === 'pnp') {
+      tableHeaders = tableHeaders.concat(['Source', 'Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -835,8 +855,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         item.source || 'N/A',
         item.otherInfo || 'N/A'
       ]);
-    } else if (activeTab === "agriculture") {
-      tableHeaders.push('Illegal Type', 'Other Information');
+    } else if (activeTab === 'agriculture') {
+      tableHeaders = tableHeaders.concat(['Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -844,11 +864,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         formatDate(item.when),
         item.where || 'N/A',
         item.actionTaken || 'N/A',
-
         item.otherInfo || 'N/A'
       ]);
-    } else if (activeTab === "pg-enro") {
-      tableHeaders.push('Other Information');
+    } else if (activeTab === 'pg-enro') {
+      tableHeaders = tableHeaders.concat(['Other Information']);
       tableData = (sortedItems || []).map(item => [
         item.municipality || 'N/A',
         item.district || 'N/A',
@@ -859,58 +878,40 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         item.otherInfo || 'N/A'
       ]);
     }
-    
-    // Calculate table start position
-    const tableStartY = statsY + (Math.ceil(statsData.length / statsPerRow) * 25) + 60;
-    
-    // Add table title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Action Items Details', margin + 20, tableStartY - 20);
-    
-    // Add table with auto table
+
     autoTable(doc, {
       head: [tableHeaders],
       body: tableData,
       startY: tableStartY,
       styles: {
-        fontSize: 8,
-        cellPadding: 4,
-        font: 'helvetica'
+        fontSize: 9,
+        cellPadding: 5,
+        overflow: 'linebreak',
+        lineColor: [226, 232, 240],
+        lineWidth: 0.5
       },
       headStyles: {
-        fillColor: [59, 130, 246],
+        fillColor: [37, 99, 235],
         textColor: 255,
-        fontStyle: 'bold',
-        fontSize: 9,
-        cellPadding: 6
+        fontStyle: 'bold'
       },
       alternateRowStyles: {
         fillColor: [248, 250, 252]
       },
-      margin: { top: tableStartY, left: margin, right: margin },
-      tableWidth: 'auto',
-      columnStyles: {
-        0: { cellWidth: 'auto' }, // Municipality
-        1: { cellWidth: 'auto' }, // District
-        2: { cellWidth: 'auto' }, // What
-        3: { cellWidth: 'auto' }, // When
-        4: { cellWidth: 'auto' }, // Where
-        5: { cellWidth: 'auto' }, // Action Taken
-        6: { cellWidth: 'auto' }  // Source/Illegal Type/Other Information
+      margin: { left: margin, right: margin },
+      theme: 'grid',
+      didDrawPage: (data) => {
+        // Footer with page numbers and meta
+        const footerTextLeft = `Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+        const pageStr = `Page ${doc.internal.getNumberOfPages()}`;
+        doc.setFontSize(8);
+        doc.setTextColor(100);
+        doc.text(footerTextLeft, margin, pageHeight - 20);
+        doc.text(pageStr, pageWidth - margin, pageHeight - 20, { align: 'right' });
       }
     });
-    
-    // Add footer
-    const footerY = pageHeight - 60;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text(`Generated on: ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`, pageWidth / 2, footerY, { align: 'center' });
-    doc.text(`Department: ${(activeTab || 'unknown').toUpperCase()} | Total Records: ${sortedItems ? sortedItems.length : 0}`, pageWidth / 2, footerY + 15, { align: 'center' });
-    
-    // Save the PDF
-    const monthNamesFilename = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-    const fileName = `action-center-${activeTab}-${monthNamesFilename[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
+
+    const fileName = `action-center-${activeTab}-${MONTH_NAMES[selectedMonth] || 'all'}-${selectedYear || 'all'}-${new Date().toISOString().split('T')[0]}.pdf`;
     doc.save(fileName);
   };
 
@@ -3239,7 +3240,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex flex-wrap gap-4">
                       <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                         <p className="text-xs text-blue-100">Month</p>
-                        <p className="font-semibold">{months[selectedMonth] || 'All Months'}</p>
+                        <p className="font-semibold">{MONTH_NAMES[selectedMonth] || 'All Months'}</p>
                       </div>
                       <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
                         <p className="text-xs text-blue-100">Year</p>
