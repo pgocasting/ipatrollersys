@@ -330,6 +330,44 @@ export const useFirebase = () => {
     }
   };
 
+  // Save weekly report under commandCenter/weeklyReports/<Municipality>/<Month_Year>
+  const saveWeeklyReportByMunicipality = async (reportData) => {
+    try {
+      console.log('💾 Saving weekly report by municipality...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      const { selectedMonth, selectedYear, activeMunicipalityTab } = reportData;
+      const municipality = activeMunicipalityTab || 'All';
+      const docId = `${selectedMonth}_${selectedYear}`;
+
+      const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
+      await setDoc(municipalDocRef, {
+        ...reportData,
+        id: docId,
+        municipality: municipality,
+        createdAt: new Date().toISOString(),
+        createdBy: user.email,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      }, { merge: true });
+
+      console.log('✅ Weekly report saved by municipality:', municipality, docId);
+      return { success: true, docId };
+    } catch (error) {
+      console.error('❌ Error saving weekly report by municipality:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   const getWeeklyReportsFromCollection = async (filters = {}) => {
     try {
       console.log('🔍 Fetching weekly reports from collection with filters:', filters);
@@ -593,6 +631,7 @@ export const useFirebase = () => {
     getWeeklyReport,
     saveWeeklyReport,
     saveWeeklyReportToCollection,
+    saveWeeklyReportByMunicipality,
     getWeeklyReportsFromCollection,
     updateWeeklyReportInCollection,
     deleteWeeklyReportFromCollection,

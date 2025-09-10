@@ -26,6 +26,7 @@ import {
   MapPinIcon,
   BarChart3,
   FileSpreadsheet,
+  Save,
   Plus,
   X,
   Database,
@@ -90,6 +91,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     saveWeeklyReport, 
     getWeeklyReport,
     saveWeeklyReportToCollection,
+    saveWeeklyReportByMunicipality,
     getWeeklyReportsFromCollection,
     updateWeeklyReportInCollection,
     deleteWeeklyReportFromCollection
@@ -142,6 +144,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [allMonthsData, setAllMonthsData] = useState({}); // Store data for all months from Excel
   const [isImportingAllMonths, setIsImportingAllMonths] = useState(false);
   const [importAllMonths, setImportAllMonths] = useState(false); // Checkbox state for import all months
+  const [isSavingAllMonths, setIsSavingAllMonths] = useState(false);
+  const [saveAllProgress, setSaveAllProgress] = useState({ current: 0, total: 0 });
   
   // Active Tab State
   const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : "weekly-report");
@@ -242,6 +246,40 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return dates;
   };
 
+  // Normalize any Excel/JS date value to our exact date key in UTC (prevents timezone shifts)
+  const toDateKeyUTC = (year, monthIndex, day) => {
+    const utcDate = new Date(Date.UTC(year, monthIndex, day));
+    return utcDate.toLocaleDateString("en-US", {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC"
+    });
+  };
+
+  const parseExcelDateToKey = (value) => {
+    try {
+      if (value == null || value === '') return null;
+      if (typeof value === 'number') {
+        // Excel serial date to UTC date: base is 1899-12-30, no DST/locale impact
+        const base = Date.UTC(1899, 11, 30);
+        const millis = base + Math.round(value) * 24 * 60 * 60 * 1000;
+        const d = new Date(millis);
+        if (!isNaN(d.getTime())) {
+          return toDateKeyUTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+        }
+        return null;
+      }
+      const d = new Date(value);
+      if (!isNaN(d.getTime())) {
+        return toDateKeyUTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+      }
+      return null;
+    } catch (e) {
+      return null;
+    }
+  };
+
   const currentDates = generateDates(selectedMonth, selectedYear);
 
   // Load data from Firestore on component mount
@@ -260,10 +298,23 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [importedBarangays, activeMunicipalityTab]);
 
-  // Load weekly report data when month/year/municipality changes
+  // Load weekly report data when year/municipality changes (but not month - handled by dropdown)
   useEffect(() => {
-    loadWeeklyReportData();
-  }, [selectedMonth, selectedYear, activeMunicipalityTab]);
+    console.log('🔄 Year/Municipality changed, reloading data:', {
+      selectedMonth,
+      selectedYear,
+      activeMunicipalityTab
+    });
+    console.log('📊 Current allMonthsData state:', Object.keys(allMonthsData));
+    
+    // Only load if we have a valid month and year, and this is not a month change
+    if (selectedMonth && selectedYear) {
+      console.log('✅ Valid month/year, calling loadWeeklyReportData()');
+      loadWeeklyReportData();
+    } else {
+      console.log('❌ Invalid month/year, skipping loadWeeklyReportData()');
+    }
+  }, [selectedYear, activeMunicipalityTab, allMonthsData]); // Removed selectedMonth from dependencies
 
   // Load all months data from local storage on component mount
   useEffect(() => {
@@ -307,30 +358,121 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [activeMunicipalityTab]);
 
+  // Function to manually load data for any month from local storage
+  const loadMonthDataFromStorage = (monthName) => {
+    const monthKey = monthName.toLowerCase();
+    console.log(`🔍 Manually loading data for month: ${monthKey}`);
+    console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
+    console.log(`📊 Data for ${monthKey}:`, allMonthsData[monthKey] ? `${allMonthsData[monthKey].length} entries` : 'No data');
+    
+    if (allMonthsData[monthKey] && allMonthsData[monthKey].length > 0) {
+      console.log(`📦 Loading from local storage for ${monthName}`);
+      
+      // Convert the stored data to the format expected by weeklyReportData
+      const convertedData = {};
+      allMonthsData[monthKey].forEach(entry => {
+        // Filter by municipality if activeMunicipalityTab is set
+        if (activeMunicipalityTab && entry.municipality && entry.municipality !== activeMunicipalityTab) {
+          console.log(`⏭️ Skipping entry for municipality: ${entry.municipality} (current: ${activeMunicipalityTab})`);
+          return;
+        }
+        
+        const dateKey = entry.date;
+        if (!convertedData[dateKey]) {
+          convertedData[dateKey] = [];
+        }
+        
+        // Fix barangay name case sensitivity for dropdown matching
+        let fixedEntry = { ...entry };
+        if (entry.barangay && importedBarangays.length > 0) {
+          // Extract barangay name and municipality from the entry
+          const barangayParts = entry.barangay.split(',').map(part => part.trim());
+          const excelBarangayName = barangayParts[0] || '';
+          const excelMunicipality = barangayParts[1] || '';
+          
+          // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
+          const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
+            if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
+              return null;
+            }
+
+            const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const excelNameNorm = normalize(excelBarangayName);
+            const excelMuniNorm = normalize(excelMunicipality);
+
+            return barangayList.find(barangay => {
+              const barangayName = barangay.name.split(' (')[0].trim();
+              const municipality = barangay.municipality;
+              const nameNorm = normalize(barangayName);
+              const muniNorm = normalize(municipality);
+
+              const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
+              const municipalityMatch = muniNorm === excelMuniNorm;
+
+              return nameMatch && municipalityMatch;
+            });
+          };
+          
+          // Try to find a matching barangay with correct case
+          const matchingBarangay = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
+          if (matchingBarangay) {
+            // Use the correctly cased barangay name from the imported list
+            fixedEntry.barangay = `${matchingBarangay.name}, ${excelMunicipality}`;
+            console.log(`🔧 Fixed barangay case: "${entry.barangay}" -> "${fixedEntry.barangay}"`);
+          }
+        }
+        
+        convertedData[dateKey].push(fixedEntry);
+      });
+      
+      setWeeklyReportData(convertedData);
+      console.log(`✅ Manually loaded ${allMonthsData[monthKey].length} entries from local storage for ${monthName}`);
+      console.log(`📊 Converted data structure:`, Object.keys(convertedData).length, 'dates');
+      return true;
+    } else {
+      console.log(`❌ No data found for ${monthName} in local storage`);
+      return false;
+    }
+  };
+
   // Load weekly report data from Firestore
   const loadWeeklyReportData = async () => {
-    if (!selectedMonth || !selectedYear) return;
+    if (!selectedMonth || !selectedYear) {
+      console.log('❌ loadWeeklyReportData: No month or year selected');
+      return;
+    }
     
+    console.log(`🔄 Loading weekly report data for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
+    console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
     try {
-      // First check if we have data in local storage for this month
-      const monthKey = selectedMonth.toLowerCase();
-      if (allMonthsData[monthKey] && allMonthsData[monthKey].length > 0) {
-        console.log(`📦 Loading data from local storage for ${selectedMonth}`);
+      // PRIORITY: Load from Firestore first (saved data takes precedence)
+      const monthYear = `${selectedMonth}_${selectedYear}`;
+      const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
+      const reportKey = `${monthYear}${municipalityKey}`;
+      
+      console.log('🔍 Checking Firestore for saved data first:', reportKey);
+      const result = await getWeeklyReport(reportKey);
+      
+      if (result.success && result.data && result.data.weeklyReportData) {
+        console.log('📊 Loaded SAVED data from Firestore:', result.data);
+        setWeeklyReportData(result.data.weeklyReportData);
+        console.log('✅ Loaded weeklyReportData from Firestore:', Object.keys(result.data.weeklyReportData).length, 'dates');
         
-        // Convert the stored data to the format expected by weeklyReportData
-        const convertedData = {};
-        allMonthsData[monthKey].forEach(entry => {
-          const dateKey = entry.date;
-          if (!convertedData[dateKey]) {
-            convertedData[dateKey] = [];
-          }
-          convertedData[dateKey].push(entry);
-        });
-        
-        setWeeklyReportData(convertedData);
-        console.log(`✅ Loaded ${allMonthsData[monthKey].length} entries from local storage for ${selectedMonth}`);
-        
+        // Load form fields if they exist (for backward compatibility)
+        setSelectedBarangay(result.data.selectedBarangay || "");
+        setSelectedConcernType(result.data.selectedConcernType || "");
+        setActionTaken(result.data.actionTaken || "");
+        setRemarks(result.data.remarks || "");
+        console.log('✅ Loaded weekly report data for:', reportKey);
+        return;
+      }
+      
+      // FALLBACK: If no saved data in Firestore, check local storage
+      console.log(`📦 No saved data found in Firestore, checking local storage for ${selectedMonth}`);
+      const loadedFromStorage = loadMonthDataFromStorage(selectedMonth);
+      
+      if (loadedFromStorage) {
         // Clear form fields
         setSelectedBarangay("");
         setSelectedConcernType("");
@@ -339,37 +481,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         return;
       }
       
-      // If no local storage data, load from Firestore
-      const monthYear = `${selectedMonth}_${selectedYear}`;
-      const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
-      const reportKey = `${monthYear}${municipalityKey}`;
-      
-      const result = await getWeeklyReport(reportKey);
-      if (result.success && result.data) {
-        // Load existing data into weeklyReportData state
-        if (result.data.weeklyReportData) {
-          setWeeklyReportData(result.data.weeklyReportData);
-        } else {
-          // Initialize empty data structure for all dates
-          initializeWeeklyReportData();
-        }
-        
-        // Load form fields if they exist (for backward compatibility)
-        setSelectedBarangay(result.data.selectedBarangay || "");
-        setSelectedConcernType(result.data.selectedConcernType || "");
-        setActionTaken(result.data.actionTaken || "");
-        setRemarks(result.data.remarks || "");
-        console.log('✅ Loaded weekly report data for:', reportKey);
-      } else {
-        // Initialize empty data structure for all dates
-        initializeWeeklyReportData();
-        // Clear form fields if no data found
-        setSelectedBarangay("");
-        setSelectedConcernType("");
-        setActionTaken("");
-        setRemarks("");
-        console.log('📝 No existing weekly report data found for:', reportKey);
-      }
+      // If no data anywhere, initialize empty structure
+      console.log('📝 No data found anywhere, initializing empty structure');
+      initializeWeeklyReportData();
+      // Clear form fields if no data found
+      setSelectedBarangay("");
+      setSelectedConcernType("");
+      setActionTaken("");
+      setRemarks("");
+      console.log('📝 No existing weekly report data found for:', reportKey);
     } catch (error) {
       console.error('❌ Error loading weekly report data:', error);
       initializeWeeklyReportData();
@@ -773,8 +893,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             const match = entry.barangay.match(/\(([^)]+)\)/);
             barangayMunicipality = match ? match[1] : '';
           } else {
-            // Try to find municipality from imported barangays
-            const matchingBarangay = importedBarangays.find(b => b.name === entry.barangay);
+            // Try to find municipality from imported barangays (case-insensitive)
+            const matchingBarangay = importedBarangays.find(b => 
+              b.name.toLowerCase() === entry.barangay.toLowerCase()
+            );
             barangayMunicipality = matchingBarangay ? matchingBarangay.municipality : '';
           }
           
@@ -2104,8 +2226,28 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           const availableBarangays = importedBarangays.filter(b => b.municipality === currentMunicipality);
           console.log(`Available barangays for ${currentMunicipality}:`, availableBarangays.map(b => `${b.name}, ${b.municipality}`));
           
-          // Import data directly into weeklyReportData
-          const updatedWeeklyData = { ...weeklyReportData };
+          // CLEAR EXISTING DATA: Clear current weekly report data before importing new data
+          console.log('🧹 Clearing existing weekly report data before import...');
+          
+          // Check if there's existing data and ask for confirmation
+          const hasExistingData = Object.keys(weeklyReportData).length > 0;
+          if (hasExistingData) {
+            const confirmClear = window.confirm(
+              `⚠️ WARNING: This will clear all existing data for ${currentMunicipality} municipality.\n\n` +
+              `Current data: ${Object.keys(weeklyReportData).length} dates with entries\n` +
+              `New data: ${municipalityData.length} rows from Excel\n\n` +
+              `Do you want to proceed and replace the existing data?`
+            );
+            
+            if (!confirmClear) {
+              console.log('❌ Import cancelled by user');
+              toast.info('Import cancelled - existing data preserved');
+              setIsImportingExcel(false);
+              return;
+            }
+          }
+          
+          const updatedWeeklyData = {};
           const currentDates = generateDates(selectedMonth, selectedYear);
           
           municipalityData.forEach(row => {
@@ -2177,19 +2319,32 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     // Find the correct barangay name from the imported barangays list
                     let correctBarangayName = row.barangay || 'Unknown Barangay';
                     
-                    // Try to match with imported barangays to get the correct format
-                    if (importedBarangays.length > 0) {
-                      const barangayMatch = importedBarangays.find(barangay => {
-                        // Extract just the barangay name without municipality
-                        const excelBarangayName = row.barangay?.split(',')[0]?.trim();
-                        const excelMunicipality = row.barangay?.split(',')[1]?.trim();
-                        
-                        // Check if this barangay matches (with or without Poblacion)
-                        const barangayName = barangay.name.split(' (')[0]; // Remove (Poblacion) part
+                    // Helper function for case-insensitive barangay matching
+                    const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
+                      if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
+                        return null;
+                      }
+
+                      return barangayList.find(barangay => {
+                        // Extract just the barangay name without municipality and (Poblacion)
+                        const barangayName = barangay.name.split(' (')[0].trim();
                         const municipality = barangay.municipality;
                         
-                        return barangayName === excelBarangayName && municipality === excelMunicipality;
+                        // Case-insensitive comparison
+                        const nameMatch = barangayName.toLowerCase() === excelBarangayName.toLowerCase();
+                        const municipalityMatch = municipality.toLowerCase() === excelMunicipality.toLowerCase();
+                        
+                        return nameMatch && municipalityMatch;
                       });
+                    };
+                    
+                    // Try to match with imported barangays to get the correct format
+                    if (importedBarangays.length > 0) {
+                      // Extract just the barangay name without municipality
+                      const excelBarangayName = row.barangay?.split(',')[0]?.trim();
+                      const excelMunicipality = row.barangay?.split(',')[1]?.trim();
+                      
+                      const barangayMatch = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
                       
                       if (barangayMatch) {
                         correctBarangayName = barangayMatch.name; // Use the full name with (Poblacion) if it exists
@@ -2294,7 +2449,34 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           
           console.log('📊 Excel file loaded for all months. Worksheets:', workbook.SheetNames);
           
-          const allMonthsData = {};
+          // CLEAR EXISTING DATA: Clear current all months data and weekly report data before importing new data
+          console.log('🧹 Clearing existing data before import all months...');
+          
+          // Check if there's existing data and ask for confirmation
+          const hasExistingAllMonthsData = Object.keys(allMonthsData).length > 0;
+          const hasExistingWeeklyData = Object.keys(weeklyReportData).length > 0;
+          
+          if (hasExistingAllMonthsData || hasExistingWeeklyData) {
+            const confirmClear = window.confirm(
+              `⚠️ WARNING: This will clear ALL existing data.\n\n` +
+              `Current all months data: ${Object.keys(allMonthsData).length} months\n` +
+              `Current weekly report data: ${Object.keys(weeklyReportData).length} dates\n\n` +
+              `This action will replace ALL data with the new Excel import.\n\n` +
+              `Do you want to proceed and replace all existing data?`
+            );
+            
+            if (!confirmClear) {
+              console.log('❌ Import all months cancelled by user');
+              toast.info('Import cancelled - existing data preserved');
+              setIsImportingAllMonths(false);
+              return;
+            }
+          }
+          
+          setAllMonthsData({});
+          setWeeklyReportData({});
+          
+          const newAllMonthsData = {};
           const monthNames = [
             'january', 'february', 'march', 'april', 'may', 'june',
             'july', 'august', 'september', 'october', 'november', 'december'
@@ -2378,20 +2560,89 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             // Process the data for this month
             const processedData = processSheetDataForAllMonths(jsonData, detectedMonth);
             if (processedData.length > 0) {
-              allMonthsData[detectedMonth] = processedData;
+              newAllMonthsData[detectedMonth] = processedData;
               console.log(`✅ Added ${processedData.length} entries for ${detectedMonth}`);
             } else {
               console.log(`⚠️ No data processed for ${detectedMonth} (sheet: ${sheetName})`);
             }
           });
           
-          console.log(`✅ Processed data for months:`, Object.keys(allMonthsData));
+          console.log(`✅ Processed data for months:`, Object.keys(newAllMonthsData));
           
           // Store in local storage
-          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(allMonthsData));
-          setAllMonthsData(allMonthsData);
+          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(newAllMonthsData));
+          setAllMonthsData(newAllMonthsData);
           
-          toast.success(`Successfully imported data for ${Object.keys(allMonthsData).length} months!`);
+          // Debug: Show what's being stored
+          console.log(`💾 Stored data in local storage:`, Object.keys(newAllMonthsData));
+          Object.keys(newAllMonthsData).forEach(month => {
+            console.log(`📊 ${month}: ${newAllMonthsData[month].length} entries`);
+            if (newAllMonthsData[month].length > 0) {
+              console.log(`📋 Sample entry for ${month}:`, newAllMonthsData[month][0]);
+            }
+          });
+          
+          // AUTO-POPULATE: If current month data exists, populate it in the table
+          const currentMonthKey = selectedMonth?.toLowerCase();
+          if (currentMonthKey && newAllMonthsData[currentMonthKey]) {
+            console.log(`🔄 Auto-populating current month (${currentMonthKey}) data in table...`);
+            
+            // Convert the stored data to the format expected by weeklyReportData
+            const convertedData = {};
+            newAllMonthsData[currentMonthKey].forEach(entry => {
+              const dateKey = entry.date;
+              if (!convertedData[dateKey]) {
+                convertedData[dateKey] = [];
+              }
+              
+              // Fix barangay name case sensitivity for dropdown matching
+              let fixedEntry = { ...entry };
+              if (entry.barangay && importedBarangays.length > 0) {
+                // Extract barangay name and municipality from the entry
+                const barangayParts = entry.barangay.split(',').map(part => part.trim());
+                const excelBarangayName = barangayParts[0] || '';
+                const excelMunicipality = barangayParts[1] || '';
+                
+                // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
+                const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
+                  if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
+                    return null;
+                  }
+
+                  const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const excelNameNorm = normalize(excelBarangayName);
+                  const excelMuniNorm = normalize(excelMunicipality);
+
+                  return barangayList.find(barangay => {
+                    const barangayName = barangay.name.split(' (')[0].trim();
+                    const municipality = barangay.municipality;
+                    const nameNorm = normalize(barangayName);
+                    const muniNorm = normalize(municipality);
+
+                    const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
+                    const municipalityMatch = muniNorm === excelMuniNorm;
+
+                    return nameMatch && municipalityMatch;
+                  });
+                };
+                
+                // Try to find a matching barangay with correct case
+                const matchingBarangay = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
+                if (matchingBarangay) {
+                  // Use the correctly cased barangay name from the imported list
+                  fixedEntry.barangay = `${matchingBarangay.name}, ${excelMunicipality}`;
+                  console.log(`🔧 Fixed barangay case: "${entry.barangay}" -> "${fixedEntry.barangay}"`);
+                }
+              }
+              
+              convertedData[dateKey].push(fixedEntry);
+            });
+            
+            setWeeklyReportData(convertedData);
+            console.log(`✅ Auto-populated ${Object.keys(convertedData).length} dates for current month (${currentMonthKey})`);
+          }
+          
+          toast.success(`Successfully imported data for ${Object.keys(newAllMonthsData).length} months! ${currentMonthKey && newAllMonthsData[currentMonthKey] ? `Current month (${currentMonthKey}) data is now visible in the table.` : ''}`);
           
         } catch (error) {
           console.error('❌ Error parsing all months from Excel:', error);
@@ -2484,24 +2735,50 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         rawDate: row[dateIndex]
       });
       
-      // Handle Excel date properly (same as parseExcelFile)
-      let processedDate = row[dateIndex] || '';
-      if (typeof processedDate === 'number') {
-        // Convert Excel serial date to proper date
-        try {
-          const excelEpoch = new Date(1900, 0, 1);
-          const daysSinceEpoch = processedDate - 2;
-          const dateObj = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
-          if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) {
-            processedDate = dateObj.toLocaleDateString("en-US", { 
-              month: "long", 
-              day: "numeric", 
-              year: "numeric" 
-            });
-          }
-        } catch (error) {
-          console.warn('Error converting Excel date:', processedDate, error);
+      // Normalize date to exact key using UTC to avoid timezone jumps
+      const processedDate = parseExcelDateToKey(row[dateIndex]) || '';
+      if (!processedDate) {
+        // Skip rows without a valid date to avoid creating empty keys
+        continue;
+      }
+      
+      // Find the correct barangay name from the imported barangays list (same as parseExcelFile)
+      let correctBarangayName = barangayField || 'Unknown Barangay';
+      
+      // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
+      const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
+        if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
+          return null;
         }
+
+        const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const excelNameNorm = normalize(excelBarangayName);
+        const excelMuniNorm = normalize(excelMunicipality);
+
+        return barangayList.find(barangay => {
+          const barangayName = barangay.name.split(' (')[0].trim();
+          const municipality = barangay.municipality;
+          const nameNorm = normalize(barangayName);
+          const muniNorm = normalize(municipality);
+
+          const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
+          const municipalityMatch = muniNorm === excelMuniNorm;
+
+          return nameMatch && municipalityMatch;
+        });
+      };
+      
+      // Try to match with imported barangays to get the correct format
+      let barangayMatch = null;
+      if (importedBarangays.length > 0) {
+        barangayMatch = findMatchingBarangay(barangay, municipality, importedBarangays);
+      }
+      
+      if (barangayMatch) {
+        correctBarangayName = barangayMatch.name; // Use the full name with (Poblacion) if it exists
+        console.log(`Matched barangay: ${barangayField} -> ${correctBarangayName}`);
+      } else {
+        console.warn(`No match found for barangay: ${barangayField}`);
       }
       
       // Create entry for each week that has data (same logic as parseExcelFile)
@@ -2520,7 +2797,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               id: `excel-${monthName}-${Date.now()}-${Math.random()}`,
               date: processedDate,
               municipality: municipality,
-              barangay: barangayField, // Keep full "Barangay, Municipality" format
+              barangay: `${correctBarangayName}, ${municipality}`, // Use corrected barangay name
               concernType: row[concernTypeIndex] || '',
               week1: week === 'week1' ? weekValue : 0,
               week2: week === 'week2' ? weekValue : 0,
@@ -2586,12 +2863,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 year: "numeric" 
               });
               
-              // Find matching date in our current dates
-              const matchingDate = currentDates.find(date => 
-                date === formattedDate || 
-                date.includes(excelDate) || 
-                excelDate.includes(date.split(' ')[1].replace(',', ''))
-              );
+              // Normalize to exact key and match strictly
+              const normalizedKey = parseExcelDateToKey(excelDate);
+              const matchingDate = normalizedKey && currentDates.includes(normalizedKey) ? normalizedKey : null;
               
               if (matchingDate) {
                 // Create new entry for this date
@@ -2774,6 +3048,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         return;
       }
 
+      // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
+      const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
+        if (key && key.trim().length > 0) {
+          acc[key] = weeklyReportData[key];
+        }
+        return acc;
+      }, {});
+
       // Collect all form data from the weekly report table
       const reportData = {
         selectedMonth,
@@ -2783,9 +3065,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         selectedConcernType,
         actionTaken,
         remarks,
-        weeklyReportData, // Include individual date data
+        weeklyReportData: sanitizedWeeklyReportData, // Include individual date data
         savedAt: new Date().toISOString()
       };
+
+      console.log('💾 Saving weekly report data:', {
+        reportKey,
+        dataCount: Object.keys(weeklyReportData).length,
+        sampleData: Object.keys(weeklyReportData).slice(0, 3)
+      });
 
       // Save to the original location (for backward compatibility)
       const saveResult = await saveWeeklyReport(reportKey, reportData);
@@ -2795,6 +3083,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       
       if (saveResult.success && collectionSaveResult.success) {
         toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
+        
+        // CLEAR LOCAL STORAGE DATA: Remove any conflicting local storage data for this month
+        const monthKey = selectedMonth.toLowerCase();
+        if (allMonthsData[monthKey]) {
+          console.log('🧹 Clearing local storage data for this month to prevent conflicts');
+          const updatedAllMonthsData = { ...allMonthsData };
+          delete updatedAllMonthsData[monthKey];
+          setAllMonthsData(updatedAllMonthsData);
+          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(updatedAllMonthsData));
+        }
         
         // Add to terminal history
         const newEntry = {
@@ -2815,6 +3113,112 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       toast.error("Error saving weekly report");
     } finally {
       setIsLoadingWeeklyReports(false);
+    }
+  };
+
+  // Save all imported months (from local storage import) to Firestore
+  const handleSaveAllMonths = async () => {
+    try {
+      const monthKeys = Object.keys(allMonthsData || {});
+      if (!monthKeys.length) {
+        toast.error('No imported months found to save');
+        return;
+      }
+
+      setIsSavingAllMonths(true);
+      setSaveAllProgress({ current: 0, total: monthKeys.length });
+
+      for (let i = 0; i < monthKeys.length; i++) {
+        const monthKeyLower = monthKeys[i];
+        const monthEntries = allMonthsData[monthKeyLower] || [];
+        if (!monthEntries.length) continue;
+
+        // Derive displayed month name (capitalize first letter)
+        const displayMonth = monthKeyLower.charAt(0).toUpperCase() + monthKeyLower.slice(1);
+
+        // Derive year from first entry date like "January 5, 2025"
+        let derivedYear = selectedYear;
+        try {
+          const sampleDate = monthEntries.find(e => e && e.date)?.date;
+          if (sampleDate) {
+            const yearMatch = /\b(20\d{2}|19\d{2})\b/.exec(String(sampleDate));
+            if (yearMatch) derivedYear = yearMatch[1];
+          }
+        } catch (_) {}
+
+        // Convert entries into weeklyReportData shape: { [dateKey]: [rows] }
+        const aggregated = {};
+        monthEntries.forEach((entry) => {
+          if (!entry || !entry.date) return;
+          const dateKey = entry.date;
+          if (!aggregated[dateKey]) aggregated[dateKey] = [];
+          aggregated[dateKey].push(entry);
+        });
+
+        // Group entries by municipality and save per municipality
+        const municipalityToEntries = {};
+        monthEntries.forEach((entry) => {
+          const muni = entry?.municipality || 'All';
+          if (!municipalityToEntries[muni]) municipalityToEntries[muni] = [];
+          municipalityToEntries[muni].push(entry);
+        });
+
+        const municipalities = Object.keys(municipalityToEntries);
+        for (let m = 0; m < municipalities.length; m++) {
+          const municipality = municipalities[m];
+
+          // Aggregate per municipality into weeklyReportData shape
+          const muniAggregated = {};
+          municipalityToEntries[municipality].forEach((entry) => {
+            if (!entry || !entry.date) return;
+            const dateKey = entry.date;
+            if (!muniAggregated[dateKey]) muniAggregated[dateKey] = [];
+            muniAggregated[dateKey].push(entry);
+          });
+
+          const reportData = {
+            selectedMonth: displayMonth,
+            selectedYear: derivedYear,
+            activeMunicipalityTab: municipality,
+            selectedBarangay: '',
+            selectedConcernType: '',
+            actionTaken: '',
+            remarks: '',
+            weeklyReportData: muniAggregated,
+            savedAt: new Date().toISOString()
+          };
+
+          const reportKey = `${displayMonth}_${derivedYear}`;
+
+          try {
+            const saveResult = await saveWeeklyReport(reportKey + `_${municipality}` , reportData);
+            const collectionSaveResult = await saveWeeklyReportToCollection(reportData);
+            const muniSaveResult = await saveWeeklyReportByMunicipality(reportData);
+            if (saveResult.success && collectionSaveResult.success && muniSaveResult.success) {
+              toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
+            } else {
+              const msg = [
+                saveResult.success ? null : `legacy: ${saveResult.error || 'failed'}`,
+                collectionSaveResult.success ? null : `collection: ${collectionSaveResult.error || 'failed'}`,
+                muniSaveResult.success ? null : `byMunicipality: ${muniSaveResult.error || 'failed'}`
+              ].filter(Boolean).join(', ');
+              toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
+            }
+          } catch (err) {
+            console.error('Error saving month by municipality', displayMonth, derivedYear, municipality, err);
+            toast.error(`Error saving ${displayMonth} ${derivedYear} - ${municipality}`);
+          }
+        }
+
+        setSaveAllProgress({ current: i + 1, total: monthKeys.length });
+      }
+
+      // After batch save, clear local storage cache to avoid conflicts
+      setAllMonthsData({});
+      localStorage.removeItem('allMonthsWeeklyData');
+      toast.success('Finished saving all imported months');
+    } finally {
+      setIsSavingAllMonths(false);
     }
   };
 
@@ -3154,6 +3558,24 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                         </span>
                       </button>
                       
+                      <button
+                        onClick={handleSaveAllMonths}
+                        disabled={isSavingAllMonths || !Object.keys(allMonthsData || {}).length}
+                        className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                        title="Save All Imported Months"
+                      >
+                        {isSavingAllMonths ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        <span className="text-sm font-medium">
+                          {isSavingAllMonths
+                            ? `Saving ${saveAllProgress.current}/${saveAllProgress.total}`
+                            : 'Save All Months'}
+                        </span>
+                      </button>
+
                       <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
                         <DialogTrigger asChild>
                           <button 
@@ -3251,17 +3673,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                         <span className="text-sm font-medium">Save Data</span>
                       </button>
                       
-                      <button 
-                        onClick={() => {
-                          setShowCollectionView(true);
-                          loadWeeklyReportsCollection();
-                        }}
-                        className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                        title="View Collection"
-                      >
-                        <Database className="h-4 w-4" />
-                        <span className="text-sm font-medium">View Collection</span>
-                      </button>
                     </div>
                     
                     <input
@@ -3281,7 +3692,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
                     <select 
                       value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
+                      onChange={(e) => {
+                        console.log('📅 Month dropdown changed to:', e.target.value);
+                        setSelectedMonth(e.target.value);
+                        // Automatically load data for the selected month
+                        setTimeout(() => {
+                          console.log('🔄 Auto-loading data for month:', e.target.value);
+                          loadMonthDataFromStorage(e.target.value);
+                        }, 100); // Small delay to ensure state is updated
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
                       {months.map((month) => (

@@ -423,8 +423,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0)
       return "bg-red-600 text-white";
     
-    const requiredBarangays = barangayCounts[municipality] || 0;
-    if (value >= requiredBarangays)
+    // Daily status uses fixed threshold: Active if >= 15, Inactive if <= 14
+    if (value >= 15)
       return "bg-green-600 text-white";
     return "bg-red-600 text-white";
   };
@@ -433,8 +433,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    const requiredBarangays = barangayCounts[municipality] || 0;
-    if (value >= requiredBarangays) return "Active";
+    // Daily status uses fixed threshold: Active if >= 15, Inactive if <= 14
+    if (value >= 15) return "Active";
     return "Inactive";
   };
 
