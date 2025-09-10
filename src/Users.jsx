@@ -126,8 +126,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         municipality: newUser.municipality,
         phoneNumber: newUser.phoneNumber,
         role: "User",
-        accessLevel: newUser.accessLevel,
-        department: newUser.department,
+        accesslevel: newUser.accessLevel,
+        department: newUser.department
       });
 
       if (!response.success) {

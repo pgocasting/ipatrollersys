@@ -1323,7 +1323,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     {item.municipality}
                                   </span>
                                   <div className="text-xs text-gray-500">
-                                    Requires: {barangayCounts[item.municipality] || 0} barangays
+                                    Barangays: {barangayCounts[item.municipality] || 0}
                                   </div>
                                 </div>
                               </div>
