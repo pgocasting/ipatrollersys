@@ -108,7 +108,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   });
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
-<<<<<<< HEAD
   // Shared month names for display and exports
   const MONTH_NAMES = [
     "January",
@@ -125,8 +124,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     "December"
   ];
 
-=======
->>>>>>> bd265319940b80a032a97875d9d419d08c20f933
   // Update active tab when user department changes
   useEffect(() => {
     if (userDepartment === "agriculture") {
