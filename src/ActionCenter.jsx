@@ -9,7 +9,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
-import { Label } from "./components/ui/label";
 import { jsPDF } from 'jspdf';
 import {
   Pagination,
@@ -95,7 +94,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedMonth, setSelectedMonth] = useState('all');
   const [selectedYear, setSelectedYear] = useState('all');
   const [selectedDistrict, setSelectedDistrict] = useState("all");
-  const [selectedDepartment, setSelectedDepartment] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [sortBy, setSortBy] = useState("municipality");
   const [sortOrder, setSortOrder] = useState("asc");
@@ -1527,13 +1525,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8">
+      <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Action Center</h1>
-            <p className="text-gray-500 mt-2">Manage and track action reports across all departments</p>
-          </div>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
+              Action Center Management
+                </h1>
+            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
+              {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} • Incident Response & Action Tracking
+            </p>
+            <div className="flex items-center gap-2 mt-2">
+              <div className={`w-2 h-2 rounded-full ${
+                loading ? 'bg-green-500' : 'bg-yellow-500'
+              }`}></div>
+              <span className={`text-xs md:text-sm font-medium ${
+                loading ? 'text-yellow-600' : 'text-green-600'
+              }`}>
+                {loading ? 'Processing...' : 'System operational'}
+              </span>
+              </div>
+            </div>
           <div className="flex flex-wrap gap-2">
             {/* 3-Lines Menu */}
             <div className="relative">
@@ -1585,8 +1597,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               )}
             </div>
           </div>
-        </div>
-
+          </div>
 
         {/* Department Navigation Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -1739,114 +1750,91 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </Card>
           )}
             </div>
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-0">
-        {/* Report Filters */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Filter className="w-5 h-5 text-gray-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-800">Action Center Filters</h3>
-                  <p className="text-sm text-gray-600">Refine your action reports data</p>
-                </div>
+        {/* Main Content Area - Takes remaining space */}
+        <div className="flex-1 flex flex-col min-h-0 px-6 py-2">
+          {/* Dynamic Search & Filter Module */}
+          <div className="flex-shrink-0 mb-4">
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Search Bar */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search by municipality, district, department, or action..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-10 py-2 text-sm border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm("")}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
-              
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-gray-600">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Search reports..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-[200px] pl-10 pr-10"
-                    />
-                    {searchTerm && (
-                      <button
-                        onClick={() => setSearchTerm("")}
-                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+              {/* Quick Filters */}
+              <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-sm font-medium text-gray-700 mr-2">Quick Filters:</span>
                 
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-gray-600">Month</Label>
-                  <select
-                    value={selectedMonth}
-                    onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-[140px] px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">All Months</option>
-                    {[
-                      'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'
-                    ].map((month, index) => (
-                      <option key={month} value={index}>{month}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-gray-600">Year</Label>
-                  <select
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
-                    className="w-[100px] px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">All Years</option>
-                    {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
-                      <option key={year} value={year}>{year}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-gray-600">District</Label>
-                  <select
-                    value={selectedDistrict}
-                    onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className="w-[160px] px-3 py-2 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="all">All Districts</option>
-                    <option value="1ST DISTRICT">1ST DISTRICT</option>
-                    <option value="2ND DISTRICT">2ND DISTRICT</option>
-                    <option value="3RD DISTRICT">3RD DISTRICT</option>
-                  </select>
-                </div>
-                
-                <div className="flex flex-col gap-1">
-                  <Label className="text-xs font-medium text-gray-600">Actions</Label>
-                  <Button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setSelectedDistrict("all");
-                      setSelectedMonth("all");
-                      setSelectedYear("all");
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="w-[120px]"
-                  >
-                    <RotateCcw className="h-4 w-4 mr-2" />
-                    Clear All
-                  </Button>
-                </div>
+                {/* Month Filter */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Months</option>
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((month, index) => (
+                    <option key={month} value={index}>{month}</option>
+                  ))}
+                </select>
+
+                {/* Year Filter */}
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value === 'all' ? 'all' : parseInt(e.target.value))}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Years</option>
+                  {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+
+                {/* District Filter */}
+                <select
+                  value={selectedDistrict}
+                  onChange={(e) => setSelectedDistrict(e.target.value)}
+                  className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="all">All Districts</option>
+                  <option value="1ST DISTRICT">1ST DISTRICT</option>
+                  <option value="2ND DISTRICT">2ND DISTRICT</option>
+                  <option value="3RD DISTRICT">3RD DISTRICT</option>
+                </select>
+
+                {/* Clear Filters Button */}
+                <Button
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDistrict("all");
+                    setSelectedMonth("all");
+                    setSelectedYear("all");
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="ml-auto text-xs"
+                >
+                  <RotateCcw className="h-3 w-3 mr-1" />
+                  Clear All
+                </Button>
               </div>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Main Content Area */}
-        <div className="flex-1 flex flex-col min-h-0">
+          {/* Summary Cards */}
           <div className="flex-shrink-0 mb-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
               {/* PNP Tab - Drug Related Stats */}
@@ -2058,20 +2046,21 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Button
-                      onClick={handleCleanDuplicates}
-                      variant="outline"
-                      size="sm"
-                      className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
-                    >
-                      <Trash2 className="h-3 w-3 mr-1" />
-                      Clean Duplicates
-                    </Button>
+                    
+              <Button
+                onClick={handleCleanDuplicates}
+                variant="outline"
+                size="sm"
+                className="bg-orange-600 text-white border-orange-600 hover:bg-orange-700 text-xs py-1.5 px-3 h-8"
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Clean Duplicates
+              </Button>
                     <Badge variant="secondary" className="text-sm bg-blue-100/80 text-blue-800">
-                      {sortedItems ? sortedItems.length : 0} items
-                    </Badge>
-                  </div>
+                                             {sortedItems ? sortedItems.length : 0} items
+                  </Badge>
                 </div>
+              </div>
               </div>
               <div className="flex-1 overflow-auto p-4">
                 {loading ? (
@@ -2082,54 +2071,54 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                 ) : (
-                  <div className="border rounded-md border-gray-200 shadow-sm">
-                    <table className="w-full min-w-[800px] border-gray-200">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          <th className="w-[200px] border-gray-200 text-left p-4 font-semibold text-gray-700">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[800px]">
+                      <thead className="sticky top-0 bg-white z-10">
+                        <tr className="border-b transition-all duration-300 border-gray-200">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("municipality")}
-                              className="flex items-center gap-2 hover:text-blue-600"
+                              className="flex items-center gap-1 md:gap-2 transition-colors hover:text-blue-600"
                             >
                               Municipality
                               {sortBy === "municipality" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronDown className="h-3 w-3 md:h-4 md:w-4" />
                               )}
                             </button>
                           </th>
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("district")}
-                              className="flex items-center gap-2 hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               District
                               {sortBy === "district" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">What</th>
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[200px] max-w-[300px] transition-colors duration-300 text-xs md:text-sm text-gray-700">What</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">
                             <button
                               onClick={() => handleSort("when")}
-                              className="flex items-center gap-2 hover:text-blue-600"
+                              className="flex items-center gap-1 transition-colors hover:text-blue-600"
                             >
                               When
                               {sortBy === "when" && (
-                                sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />
+                                sortOrder === "asc" ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />
                               )}
                             </button>
                           </th>
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">Where</th>
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">Action Taken</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[180px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Where</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Action Taken</th>
                           {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
                           {activeTab === "pnp" && (
-                            <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">Source</th>
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Source</th>
                           )}
                           {(activeTab === "agriculture" || activeTab === "pg-enro") && (
-                            <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">Other Information</th>
+                            <th className="text-left p-2 md:p-3 font-semibold min-w-[100px] max-w-[130px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Other Information</th>
                           )}
-                          <th className="border-gray-200 text-left p-4 font-semibold text-gray-700">Actions</th>
+                          <th className="text-left p-2 md:p-3 font-semibold min-w-[120px] max-w-[150px] transition-colors duration-300 text-xs md:text-sm text-gray-700">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -2140,34 +2129,34 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           }
                           const IconComponent = AlertCircle; // Use AlertCircle as default icon
                           return (
-                            <tr key={item.id || `item-${Math.random()}`} className="border-gray-200">
-                              <td className="border-gray-200 p-4">
+                            <tr key={item.id || `item-${Math.random()}`} className="hover:bg-gray-50 transition-colors duration-200">
+                              <td className="p-2 md:p-3">
                                 <div className="flex items-center gap-2">
                                   <div className="p-1.5 rounded-lg bg-blue-100 flex-shrink-0">
-                                    <IconComponent className="h-4 w-4 text-blue-600" />
+                                    <IconComponent className="h-3 w-3 text-blue-600" />
                                   </div>
-                                  <span className="font-medium text-sm text-gray-900 truncate" title={item.municipality}>
+                                  <span className="font-medium text-xs md:text-sm text-gray-900 truncate" title={item.municipality}>
                                     {item.municipality}
                                   </span>
                                 </div>
                               </td>
-                              <td className="border-gray-200 p-4">
+                              <td className="p-2 md:p-3">
                                 <Badge variant="outline" className="text-xs bg-gray-100 text-gray-700 border-gray-300">
                                   {item.district}
                                 </Badge>
                               </td>
-                              <td className="border-gray-200 p-4">
-                                <span className="text-sm break-words leading-relaxed text-gray-700 max-w-[280px] block" title={item.what}>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[280px] block" title={item.what}>
                                   {typeof item.what === 'string' ? item.what : 'N/A'}
                                 </span>
                               </td>
-                              <td className="border-gray-200 p-4">
-                                <span className="text-sm text-gray-600 whitespace-nowrap">
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs text-gray-600 whitespace-nowrap">
                                   {formatDate(item.when)}
                                 </span>
                               </td>
-                              <td className="border-gray-200 p-4">
-                                <span className="text-sm break-words leading-relaxed text-gray-700 max-w-[160px] block" title={item.where}>
+                              <td className="p-2 md:p-3">
+                                <span className="text-xs md:text-sm break-words leading-relaxed text-gray-700 max-w-[160px] block" title={item.where}>
                                   {typeof item.where === 'string' ? item.where : 'N/A'}
                                 </span>
                               </td>
@@ -2190,7 +2179,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </td>
                                 </>
                               )}
-                              <td className="border-gray-200 p-4">
+                              <td className="p-2 md:p-3">
                                 <Badge className={`rounded-none text-xs ${
                                   item.actionTaken === "Resolved" 
                                     ? "bg-green-100 text-green-800"
@@ -2201,20 +2190,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                               </td>
                               {/* Show Source for PNP, Other Information for Agriculture and PG-ENRO */}
                               {activeTab === "pnp" && (
-                                <td className="border-gray-200 p-4">
-                                  <span className="text-sm break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.source}>
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.source}>
                                     {typeof item.source === 'string' ? item.source : 'N/A'}
                                   </span>
                                 </td>
                               )}
                               {(activeTab === "agriculture" || activeTab === "pg-enro") && (
-                                <td className="border-gray-200 p-4">
-                                  <span className="text-sm break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.otherInfo}>
+                                <td className="p-2 md:p-3">
+                                  <span className="text-xs break-words leading-relaxed text-gray-700 max-w-[120px] block" title={item.otherInfo}>
                                     {typeof item.otherInfo === 'string' ? item.otherInfo : 'N/A'}
                                   </span>
                                 </td>
                               )}
-                              <td className="border-gray-200 p-4">
+                                                             {/* Other Information column data hidden */}
+                               {/* <td className="p-4">
+                                 <span className="text-sm break-words leading-relaxed transition-colors duration-300  text-gray-700"" title={item.otherInfo}>
+                                   {item.otherInfo}
+                                 </span>
+                               </td> */}
+                              <td className="p-2 md:p-3">
                                 <div className="flex items-center gap-1">
                                   <Button
                                     size="sm"
@@ -3195,42 +3190,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <p className="text-sm text-gray-600">
                       {(() => {
                         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                        return `${monthNames[selectedMonth] || 'All Months'} ${selectedYear || 'All Years'} • ${selectedDepartment === 'all' ? 'All Departments' : selectedDepartment.toUpperCase()}`;
+                        return `${monthNames[selectedMonth] || 'All Months'} ${selectedYear || 'All Years'} • ${activeTab?.toUpperCase()}`;
                       })()}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm font-medium text-gray-700">Department:</Label>
-                    <select
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                    >
-                      <option value="all">All Departments</option>
-                      <option value="pnp">PNP</option>
-                      <option value="agriculture">Agriculture</option>
-                      <option value="pg-enro">PG-ENRO</option>
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      placeholder="Add description (optional)"
-                      value={pdfDescription}
-                      onChange={(e) => setPdfDescription(e.target.value)}
-                      className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
-                    />
-                  </div>
-                  <Button
-                    onClick={exportToPDF}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2"
-                    title="Export to PDF"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Export PDF
-                  </Button>
+                                 <div className="flex items-center gap-3">
+                   <div className="flex items-center gap-2">
+                     <input
+                       type="text"
+                       placeholder="Add description (optional)"
+                       value={pdfDescription}
+                       onChange={(e) => setPdfDescription(e.target.value)}
+                       className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
+                     />
+                   </div>
+                   <Button
+                     onClick={exportToPDF}
+                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2"
+                     title="Export to PDF"
+                   >
+                     <Download className="w-4 h-4 mr-2" />
+                     Export PDF
+                   </Button>
                   <Button
                     onClick={() => setShowPreviewModal(false)}
                     variant="ghost"
@@ -3246,169 +3228,130 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
                 {/* Report Header */}
                 <div className="mb-8">
-                  <Card className="bg-gradient-to-r from-blue-600 to-indigo-600 border-0 shadow-lg">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col md:flex-row items-start md:items-center justify-between text-white">
-                        <div className="mb-4 md:mb-0">
-                          <h1 className="text-3xl font-bold mb-2">Action Center Report</h1>
-                          {pdfDescription && pdfDescription.trim() && (
-                            <p className="text-sm text-blue-100 max-w-2xl">
-                              {pdfDescription}
-                            </p>
-                          )}
-                        </div>
-                        <div className="flex flex-wrap gap-4">
-                          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
-                            <p className="text-xs text-blue-100">Month</p>
-                            <p className="font-semibold">{MONTH_NAMES[selectedMonth] || 'All Months'}</p>
-                          </div>
-                          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
-                            <p className="text-xs text-blue-100">Year</p>
-                            <p className="font-semibold">{selectedYear || 'All Years'}</p>
-                          </div>
-                          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
-                            <p className="text-xs text-blue-100">District</p>
-                            <p className="font-semibold">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
-                          </div>
-                          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
-                            <p className="text-xs text-blue-100">Department</p>
-                            <p className="font-semibold">{selectedDepartment === "all" ? "All Departments" : selectedDepartment.toUpperCase()}</p>
-                          </div>
-                        </div>
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl p-6 text-white">
+                    <div className="mb-4 md:mb-0">
+                      <h1 className="text-3xl font-bold mb-2">Action Center Report</h1>
+                      {pdfDescription && pdfDescription.trim() && (
+                        <p className="text-sm text-blue-100 max-w-2xl">
+                          {pdfDescription}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-4">
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Month</p>
+                        <p className="font-semibold">{MONTH_NAMES[selectedMonth] || 'All Months'}</p>
                       </div>
-                    </CardContent>
-                  </Card>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Year</p>
+                        <p className="font-semibold">{selectedYear || 'All Years'}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">District</p>
+                        <p className="font-semibold">{selectedDistrict === "all" ? "All Districts" : selectedDistrict}</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+                        <p className="text-xs text-blue-100">Department</p>
+                        <p className="font-semibold">{(activeTab || 'unknown').toUpperCase()}</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Summary Statistics */}
                 <div className="mb-8">
-                  <div className="flex items-center gap-2 mb-4">
-                    <BarChart3 className="w-5 h-5 text-blue-600" />
-                    <h2 className="text-xl font-bold text-gray-900">Summary Statistics</h2>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                    <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-blue-600 mb-1">Total Actions</p>
-                            <p className="text-3xl font-bold text-blue-700">{totalActions}</p>
-                          </div>
-                          <div className="p-3 bg-blue-100 rounded-xl">
-                            <Activity className="w-8 h-8 text-blue-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    
-                    <Card className="border border-orange-200 bg-gradient-to-br from-orange-50 to-white hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-orange-600 mb-1">Pending Actions</p>
-                            <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
-                          </div>
-                          <div className="p-3 bg-orange-100 rounded-xl">
-                            <Clock className="w-8 h-8 text-orange-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
+                    Summary Statistics
+                  </h2>
+                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-blue-600">Total Actions</p>
+                        <p className="text-3xl font-bold text-blue-700">{totalActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Activity className="w-16 h-16 text-blue-600" />
+                      </div>
+                    </div>
+                    <div className="relative overflow-hidden p-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white">
+                      <div className="relative z-10">
+                        <p className="text-sm font-medium text-orange-600">Pending Actions</p>
+                        <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
+                      </div>
+                      <div className="absolute right-0 bottom-0 opacity-10">
+                        <Clock className="w-16 h-16 text-orange-600" />
+                      </div>
+                    </div>
 
-                    {/* Department-specific statistics */}
-                    {selectedDepartment === "pnp" && (
+                    
+                    {/* Tab-specific statistics */}
+                    {activeTab === "pnp" && (
                       <>
-                        <Card className="border border-red-200 bg-gradient-to-br from-red-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-red-600 mb-1">Total Drugs</p>
-                                <p className="text-3xl font-bold text-red-700">{totalDrugs}</p>
-                              </div>
-                              <div className="p-3 bg-red-100 rounded-xl">
-                                <Pill className="w-8 h-8 text-red-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="border border-purple-200 bg-gradient-to-br from-purple-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-purple-600 mb-1">Total Illegals</p>
-                                <p className="text-3xl font-bold text-purple-700">{totalIllegals}</p>
-                              </div>
-                              <div className="p-3 bg-purple-100 rounded-xl">
-                                <Shield className="w-8 h-8 text-purple-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-red-600">Total Drugs</p>
+                            <p className="text-3xl font-bold text-red-700">{totalDrugs}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Pill className="w-16 h-16 text-red-600" />
+                          </div>
+                        </div>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-purple-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-purple-700">{totalIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Shield className="w-16 h-16 text-purple-600" />
+                          </div>
+                        </div>
                       </>
                     )}
                     
-                    {selectedDepartment === "agriculture" && (
+                    {activeTab === "agriculture" && (
                       <>
-                        <Card className="border border-green-200 bg-gradient-to-br from-green-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-green-600 mb-1">Total Illegals</p>
-                                <p className="text-3xl font-bold text-green-700">{totalAgricultureIllegals}</p>
-                              </div>
-                              <div className="p-3 bg-green-100 rounded-xl">
-                                <Leaf className="w-8 h-8 text-green-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-blue-600 mb-1">Fishing Violations</p>
-                                <p className="text-3xl font-bold text-blue-700">{totalFishingViolations}</p>
-                              </div>
-                              <div className="p-3 bg-blue-100 rounded-xl">
-                                <Fish className="w-8 h-8 text-blue-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Total Illegals</p>
+                            <p className="text-3xl font-bold text-green-700">{totalAgricultureIllegals}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Leaf className="w-16 h-16 text-green-600" />
+                          </div>
+                        </div>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalFishingViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Fish className="w-16 h-16 text-blue-600" />
+                          </div>
+                        </div>
                       </>
                     )}
                     
-                    {selectedDepartment === "pg-enro" && (
+                    {activeTab === "pg-enro" && (
                       <>
-                        <Card className="border border-green-200 bg-gradient-to-br from-green-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-green-600 mb-1">Environmental</p>
-                                <p className="text-3xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
-                              </div>
-                              <div className="p-3 bg-green-100 rounded-xl">
-                                <Trees className="w-8 h-8 text-green-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                        
-                        <Card className="border border-blue-200 bg-gradient-to-br from-blue-50 to-white hover:shadow-md transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-blue-600 mb-1">Waste Management</p>
-                                <p className="text-3xl font-bold text-blue-700">{totalWasteManagement}</p>
-                              </div>
-                              <div className="p-3 bg-blue-100 rounded-xl">
-                                <Trash2 className="w-8 h-8 text-blue-600" />
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-green-600">Environmental</p>
+                            <p className="text-3xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trees className="w-16 h-16 text-green-600" />
+                          </div>
+                        </div>
+                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                          <div className="relative z-10">
+                            <p className="text-sm font-medium text-blue-600">Waste Management</p>
+                            <p className="text-3xl font-bold text-blue-700">{totalWasteManagement}</p>
+                          </div>
+                          <div className="absolute right-0 bottom-0 opacity-10">
+                            <Trash2 className="w-16 h-16 text-blue-600" />
+                          </div>
+                        </div>
                       </>
                     )}
                   </div>
@@ -3416,119 +3359,149 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                 {/* Action Items Table */}
                 <div className="mb-8">
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText className="w-5 h-5 text-blue-600" />
-                    <h2 className="text-xl font-bold text-gray-900">Action Items Details</h2>
-                  </div>
-                  <Card className="border border-gray-200 shadow-sm">
-                    <CardContent className="p-0">
-                      <div className="overflow-x-auto">
-                        <Table>
-                          <TableHeader>
-                            <TableRow className="bg-gray-50">
-                              <TableHead className="font-semibold text-gray-700">Municipality</TableHead>
-                              <TableHead className="font-semibold text-gray-700">District</TableHead>
-                              <TableHead className="font-semibold text-gray-700">What</TableHead>
-                              <TableHead className="font-semibold text-gray-700">When</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Where</TableHead>
-                              <TableHead className="font-semibold text-gray-700">Action Taken</TableHead>
-                              {selectedDepartment === "pnp" && (
-                                <TableHead className="font-semibold text-gray-700">Source</TableHead>
-                              )}
-                              {(selectedDepartment === "agriculture" || selectedDepartment === "pg-enro") && (
-                                <TableHead className="font-semibold text-gray-700">Other Information</TableHead>
-                              )}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {(sortedItems || []).slice(0, 20).map((item, index) => (
-                              <TableRow 
-                                key={item.id || index} 
-                                className="hover:bg-gray-50 transition-colors"
+                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                    <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                    Action Items Details
+                  </h2>
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Municipality</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">District</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">What</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">When</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Where</div>
+                          </th>
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Taken</div>
+                          </th>
+                          {activeTab === "pnp" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                            </th>
+                          )}
+                          {activeTab === "agriculture" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
+                            </th>
+                          )}
+                          {activeTab === "pg-enro" && (
+                            <th className="p-4 text-left">
+                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
+                            </th>
+                          )}
+                          <th className="p-4 text-left">
+                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Info</div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {(sortedItems || []).slice(0, 20).map((item, index) => (
+                          <tr 
+                            key={item.id || index} 
+                            className="hover:bg-gray-50 transition-colors duration-150"
+                          >
+                            <td className="p-4">
+                              <div className="flex items-center">
+                                <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                                <span className="text-sm font-medium text-gray-900">{item.municipality || 'N/A'}</span>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge variant="outline" className="font-medium">
+                                {item.district || 'N/A'}
+                              </Badge>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.what}>
+                                {item.what || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <div className="text-sm text-gray-700">{formatDate(item.when)}</div>
+                            </td>
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.where}>
+                                {item.where || 'N/A'}
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              <Badge 
+                                className={`${
+                                  item.actionTaken === "Resolved"
+                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
+                                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                }`}
                               >
-                                <TableCell>
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="w-4 h-4 text-gray-400" />
-                                    <span className="font-medium text-gray-900">{item.municipality || 'N/A'}</span>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge variant="outline" className="font-medium">
-                                    {item.district || 'N/A'}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="max-w-xs truncate text-sm text-gray-700" title={item.what}>
-                                    {item.what || 'N/A'}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <span className="text-sm text-gray-600">{formatDate(item.when)}</span>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="max-w-xs truncate text-sm text-gray-700" title={item.where}>
-                                    {item.where || 'N/A'}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <Badge 
-                                    className={`${
-                                      item.actionTaken === "Resolved"
-                                        ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                        : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
-                                    }`}
-                                  >
-                                    {item.actionTaken || 'Pending'}
-                                  </Badge>
-                                </TableCell>
-                                {selectedDepartment === "pnp" && (
-                                  <TableCell>
-                                    <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
-                                      {item.source || 'N/A'}
-                                    </div>
-                                  </TableCell>
-                                )}
-                                {(selectedDepartment === "agriculture" || selectedDepartment === "pg-enro") && (
-                                  <TableCell>
-                                    <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
-                                      {item.otherInfo || 'N/A'}
-                                    </div>
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
+                                {item.actionTaken || 'Pending'}
+                              </Badge>
+                            </td>
+                            {activeTab === "pnp" && (
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.source}>
+                                  {item.source || 'N/A'}
+                                </div>
+                              </td>
+                            )}
+                            {activeTab === "agriculture" && (
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
+                                </div>
+                              </td>
+                            )}
+                            {activeTab === "pg-enro" && (
+                              <td className="p-4">
+                                <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                  {item.otherInfo || 'N/A'}
+                                </div>
+                              </td>
+                            )}
+                            <td className="p-4">
+                              <div className="max-w-xs truncate text-sm text-gray-700" title={item.otherInfo}>
+                                {item.otherInfo || 'N/A'}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {sortedItems && sortedItems.length > 20 && (
+                      <div className="p-4 border-t border-gray-200 bg-gray-50">
+                        <p className="text-sm text-gray-600 text-center flex items-center justify-center">
+                          <AlertCircle className="w-4 h-4 mr-2 text-blue-500" />
+                          Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
+                        </p>
                       </div>
-                      {sortedItems && sortedItems.length > 20 && (
-                        <div className="p-4 border-t border-gray-200 bg-gray-50">
-                          <p className="text-sm text-gray-600 text-center flex items-center justify-center">
-                            <AlertCircle className="w-4 h-4 mr-2 text-blue-500" />
-                            Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
-                          </p>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 </div>
 
                 {/* Footer */}
-                <Card className="border border-gray-200">
-                  <CardContent className="p-4 text-center">
-                    <p className="text-sm text-gray-600">
-                      Generated on: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      Department: {selectedDepartment === "all" ? "All Departments" : selectedDepartment.toUpperCase()} | Total Records: {sortedItems ? sortedItems.length : 0}
-                    </p>
-                  </CardContent>
-                </Card>
+                <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <p className="text-sm text-gray-600">
+                    Generated on: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    Department: {(activeTab || 'unknown').toUpperCase()} | Total Records: {sortedItems ? sortedItems.length : 0}
+                  </p>
+                </div>
               </div>
             </div>
           </div>
         )}
         </div>
-      </div>
+      </section>
     </Layout>
   );
 } 

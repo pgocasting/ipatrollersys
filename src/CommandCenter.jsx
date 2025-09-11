@@ -4316,7 +4316,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
                 {/* Controls and Actions */}
                                       {importedBarangays.length > 0 && (
-                  <div className="space-y-4">
+                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                     {/* Filter and Sort Controls */}
                     <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                       <div className="flex items-center gap-2">
@@ -4375,6 +4375,24 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           <CheckCircle className="h-4 w-4 mr-2" />
                           {selectedBarangays.length === importedBarangays.length ? 'Deselect All' : 'Select All'}
                         </button>
+                        {selectedBarangays.length > 0 && (
+                          <>
+                            <button 
+                              onClick={handleEditSelectedBarangays}
+                              className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                            >
+                              <FileText className="h-4 w-4 mr-2" />
+                              Edit Selected
+                            </button>
+                            <button 
+                              onClick={handleRemoveSelectedBarangays}
+                              className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                            >
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                              Remove Selected ({selectedBarangays.length})
+                            </button>
+                          </>
+                        )}
                         <button 
                           onClick={handleExportBarangays} 
                           className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
@@ -4406,7 +4424,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           Clear All
                         </button>
                     </div>
-                  </div>
+                      </div>
                     )}
               </div>
               <div className="p-4 md:p-6 pt-0">
@@ -4918,7 +4936,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       </div>
                     </div>
                     {importedConcernTypes.length > 0 && (
-                      <div className="space-y-4">
+                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         {/* Filter and Sort Controls */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                           <div className="flex items-center gap-2">
@@ -5067,6 +5085,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                     <div className="font-semibold text-gray-900">{municipality}</div>
                                     <div className="text-sm text-gray-600">
                                       {concernTypes.length} concern type{concernTypes.length !== 1 ? 's' : ''}
+                                      {isForCurrentMunicipality && (
+                                        <span className="ml-2 text-orange-600 font-medium">• Available for {activeMunicipalityTab}</span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
