@@ -352,9 +352,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const districts = [
     "1ST DISTRICT",
     "2ND DISTRICT", 
-    "3RD DISTRICT",
-    "4TH DISTRICT",
-    "5TH DISTRICT"
+    "3RD DISTRICT"
   ];
   // Municipalities grouped by district
   const municipalitiesByDistrict = {
@@ -893,15 +891,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       const extractedMonth = extractMonthFromDate(validatedIncident.date);
       const extractedYear = extractYearFromDate(validatedIncident.date);
+      
+      // Extract municipality and district from location
+      const locationInfo = extractLocationInfo(validatedIncident.location);
+      
       console.log('📅 Date extraction:', {
         input: validatedIncident.date,
         extractedMonth,
-        extractedYear
+        extractedYear,
+        location: validatedIncident.location,
+        extractedMunicipality: locationInfo.municipality,
+        extractedDistrict: locationInfo.district
       });
+      
       const incidentData = {
         ...validatedIncident,
         month: extractedMonth,
         year: extractedYear,
+        district: validatedIncident.district || locationInfo.district,
+        municipality: validatedIncident.municipality || locationInfo.municipality,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       };
@@ -995,15 +1003,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       const extractedMonth = extractMonthFromDate(validatedIncident.date);
       const extractedYear = extractYearFromDate(validatedIncident.date);
+      
+      // Extract municipality and district from location
+      const locationInfo = extractLocationInfo(validatedIncident.location);
+      
       console.log('📅 Date extraction (edit):', {
         input: validatedIncident.date,
         extractedMonth,
-        extractedYear
+        extractedYear,
+        location: validatedIncident.location,
+        extractedMunicipality: locationInfo.municipality,
+        extractedDistrict: locationInfo.district
       });
+      
       const incidentData = {
         ...validatedIncident,
         month: extractedMonth,
         year: extractedYear,
+        district: validatedIncident.district || locationInfo.district,
+        municipality: validatedIncident.municipality || locationInfo.municipality,
         updatedAt: new Date().toISOString()
       };
       // Update in Firestore
@@ -1067,12 +1085,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             const values = lines[i].split(',').map(value => value.trim());
             // Map to new structure based on user's Excel format
             const description = values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || values[headers.indexOf('Description')] || values[headers.indexOf('DESCRIPTION')] || '';
+            
+            // Get location and extract municipality/district from it
+            const locationValue = values[headers.indexOf('WHERE')] || values[headers.indexOf('Location')] || '';
+            const locationInfo = extractLocationInfo(locationValue);
+            
             const incident = {
               id: importedIncidents.length + 1,
               incidentType: values[headers.indexOf('Type')] || values[headers.indexOf('TYPE')] || identifyIncidentType(description),
-              location: values[headers.indexOf('WHERE')] || values[headers.indexOf('Location')] || '',
-              district: values[headers.indexOf('DISTRICT')] || values[headers.indexOf('District')] || '1ST DISTRICT',
-              municipality: values[headers.indexOf('MUNICIPALITY')] || values[headers.indexOf('Municipality')] || 'Balanga City',
+              location: locationValue,
+              district: values[headers.indexOf('DISTRICT')] || values[headers.indexOf('District')] || locationInfo.district,
+              municipality: values[headers.indexOf('MUNICIPALITY')] || values[headers.indexOf('Municipality')] || locationInfo.municipality,
               date: values[headers.indexOf('WHEN')] || '',
               time: values[headers.indexOf('Time')] || values[headers.indexOf('TIME')] || '',
               description: description,
@@ -1154,14 +1177,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               const dateValue = values[headers.indexOf('WHEN')] || '';
               const month = extractMonthFromDate(dateValue);
               const year = extractYearFromDate(dateValue);
-              // Process all data from the Excel sheet
+              
+              // Get description from What column
               const description = values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || values[headers.indexOf('Description')] || values[headers.indexOf('DESCRIPTION')] || '';
+              
+              // Get incident type from Type column, fallback to auto-identification
+              const typeValue = values[headers.indexOf('Type')] || values[headers.indexOf('TYPE')] || '';
+              const incidentType = typeValue || identifyIncidentType(description);
+              
+              // Get location and extract municipality/district from it
+              const locationValue = values[headers.indexOf('WHERE')] || values[headers.indexOf('Location')] || '';
+              const locationInfo = extractLocationInfo(locationValue);
+              
               const incident = {
                 id: importedIncidents.length + 1,
-                incidentType: values[headers.indexOf('Type')] || values[headers.indexOf('TYPE')] || identifyIncidentType(description),
-                location: values[headers.indexOf('WHERE')] || values[headers.indexOf('Location')] || '',
-                district: values[headers.indexOf('DISTRICT')] || values[headers.indexOf('District')] || '1ST DISTRICT',
-                municipality: values[headers.indexOf('MUNICIPALITY')] || values[headers.indexOf('Municipality')] || 'Balanga City',
+                incidentType: incidentType,
+                location: locationValue,
+                district: values[headers.indexOf('DISTRICT')] || values[headers.indexOf('District')] || locationInfo.district,
+                municipality: values[headers.indexOf('MUNICIPALITY')] || values[headers.indexOf('Municipality')] || locationInfo.municipality,
                 date: dateValue || '',
                 time: values[headers.indexOf('Time')] || values[headers.indexOf('TIME')] || '',
                 description: description,
@@ -1172,17 +1205,24 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 why: values[headers.indexOf('WHY')] || values[headers.indexOf('Why')] || '',
                 link: values[headers.indexOf('LINK')] || values[headers.indexOf('Link')] || '',
                 month: month || '',
+                year: year || '',
                 // Map ACTION TAKEN to new action fields
                 actionType: values[headers.indexOf('ACTION TAKEN')] || values[headers.indexOf('Action Taken')] || values[headers.indexOf('ActionType')] || '',
-                actionDescription: values[headers.indexOf('ACTION TAKEN')] || values[headers.indexOf('Action Taken')] || values[headers.indexOf('ActionDescription')] || '',
-                assignedOfficer: values[headers.indexOf('WHO')] || values[headers.indexOf('Assigned Officer')] || values[headers.indexOf('AssignedOfficer')] || '',
-                actionDate: dateValue || '',
+                actionDescription: values[headers.indexOf('Action Description')] || values[headers.indexOf('ActionDescription')] || '',
+                assignedOfficer: values[headers.indexOf('Assigned Officer')] || values[headers.indexOf('AssignedOfficer')] || '',
+                actionDate: values[headers.indexOf('Action Date')] || values[headers.indexOf('ActionDate')] || '',
                 completionDate: values[headers.indexOf('Completion Date')] || values[headers.indexOf('CompletionDate')] || '',
                 followUpNotes: values[headers.indexOf('Follow Up Notes')] || values[headers.indexOf('FollowUpNotes')] || '',
                 priority: values[headers.indexOf('Priority')] || values[headers.indexOf('PRIORITY')] || 'Medium',
               };
               // Only add incidents that have at least some basic data
               if (incident.incidentType || incident.description || incident.location || incident.officer) {
+                // Debug: Log the processed incident data
+                console.log('📊 Processed incident from Excel:', {
+                  headers: headers,
+                  values: values,
+                  incident: incident
+                });
                 importedIncidents.push(incident);
               }
             }
@@ -1279,6 +1319,43 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     }
     return '';
   };
+
+  // Extract municipality and district from location string
+  const extractLocationInfo = (locationString) => {
+    if (!locationString) return { municipality: 'Balanga City', district: '1ST DISTRICT' };
+    
+    // Common municipalities in Bataan and their districts
+    const municipalityMap = {
+      'Abucay': '1ST DISTRICT',
+      'Orani': '1ST DISTRICT',
+      'Samal': '1ST DISTRICT',
+      'Hermosa': '1ST DISTRICT',
+      'Balanga City': '2ND DISTRICT',
+      'Pilar': '2ND DISTRICT',
+      'Orion': '2ND DISTRICT',
+      'Limay': '2ND DISTRICT',
+      'Bagac': '3RD DISTRICT',
+      'Dinalupihan': '3RD DISTRICT',
+      'Mariveles': '3RD DISTRICT',
+      'Morong': '3RD DISTRICT'
+    };
+
+    // Extract municipality from location string
+    let municipality = 'Balanga City'; // default
+    let district = '2ND DISTRICT'; // default (Balanga City is in 2nd District)
+
+    // Check for municipality names in the location string
+    for (const [muni, dist] of Object.entries(municipalityMap)) {
+      if (locationString.toLowerCase().includes(muni.toLowerCase())) {
+        municipality = muni;
+        district = dist;
+        break;
+      }
+    }
+
+    return { municipality, district };
+  };
+
   // Helper function to extract year from date text
   const extractYearFromDate = (dateString) => {
     if (!dateString) return '';
@@ -3172,36 +3249,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   };
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6"> 
-      <div className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="container mx-auto p-6 space-y-8">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
-              Incidents Reports
-            </h1>
-            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
-              Manage and track incident reports with Excel/CSV import support
-            </p>
-            <div className="flex items-center gap-2 mt-2">
-              <div className={`w-2 h-2 rounded-full ${
-                firestoreStatus === 'connected' ? 'bg-green-500' :
-                firestoreStatus === 'connecting' ? 'bg-yellow-500' :
-                firestoreStatus === 'saving' ? 'bg-blue-500' :
-                'bg-red-500'
-              }`}></div>
-              <span className={`text-xs md:text-sm font-medium ${
-                firestoreStatus === 'connected' ? 'text-green-600' :
-                firestoreStatus === 'connecting' ? 'text-yellow-600' :
-                firestoreStatus === 'saving' ? 'text-blue-600' :
-                'text-red-600'
-              }`}>
-                {firestoreStatus === 'connected' ? 'Connected to Firestore' :
-                 firestoreStatus === 'connecting' ? 'Connecting...' :
-                 firestoreStatus === 'saving' ? 'Saving...' :
-                 'Connection Error'}
-              </span>
-            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Incidents Reports</h1>
+            <p className="text-gray-500 mt-2">Manage and track incident reports with Excel/CSV import support</p>
           </div>
           <div className="flex flex-wrap gap-2">
             {/* 3-Lines Menu */}
@@ -3433,138 +3486,35 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         )}
         {/* Stats Cards */}
-        {selectedMonth !== "all" && (
-          <div className="mb-4 p-3 rounded-lg ${
-            bg-blue-50 border border-blue-200
-          }">
-            <div className="flex items-center gap-2">
-              <Filter className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-              <span className="text-sm font-medium transition-colors duration-300 ${
-                text-blue-700
-              }">
-                Showing data for: <strong>{selectedMonth}</strong>
-              </span>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
+            <div className="text-sm text-gray-600">Total Incidents</div>
           </div>
-        )}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            bg-white/80
-          }">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 ${
-                    text-gray-500
-                  }">Total Incidents</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.total}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  bg-blue-100
-                }">
-                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            bg-white/80
-          }">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 ${
-                    text-gray-500
-                  }">Action Taken</p>
-                  <p className="text-3xl font-bold text-yellow-600 dark:text-yellow-400">{stats.actionTaken}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  bg-yellow-100
-                }">
-                  <CheckCircle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            bg-white/80
-          }">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 ${
-                    text-gray-500
-                  }">Drugs</p>
-                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.drugs}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  bg-red-100
-                }">
-                  <Shield className="h-6 w-6 text-red-600 dark:text-red-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            bg-white/80
-          }">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 ${
-                    text-gray-500
-                  }">Others</p>
-                  <p className="text-3xl font-bold text-gray-600 dark:text-gray-400">{stats.others}</p>
-                </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
-                  bg-gray-200
-                }">
-                  <MoreHorizontal className="h-6 w-6 text-gray-600 dark:text-gray-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 ${
-            bg-white/80
-          }">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium transition-colors duration-300 ${
-                    text-gray-500
-                  }">Accidents</p>
-                  <p className="text-3xl font-bold text-orange-600 dark:text-orange-400">{stats.accidents}</p>
-                  <div className="mt-2 space-y-1">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">Traffic:</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">{stats.trafficAccidents}</span>
-        </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-gray-600">Other</span>
-                      <span className="font-medium text-orange-600 dark:text-orange-400">{stats.otherAccidents}</span>
-                    </div>
-                  </div>
-                </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                  <Car className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+            <div className="text-2xl font-bold text-green-600">{stats.actionTaken}</div>
+            <div className="text-sm text-gray-600">Action Taken</div>
+          </div>
+          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+            <div className="text-2xl font-bold text-red-600">{stats.drugs}</div>
+            <div className="text-sm text-gray-600">Drugs</div>
+          </div>
+          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+            <div className="text-2xl font-bold text-orange-600">{stats.accidents}</div>
+            <div className="text-sm text-gray-600">Accidents</div>
+          </div>
         </div>
         {/* Filters and Search */}
-        <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+        <Card className="bg-white shadow-sm border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
+            <CardTitle className="text-lg font-semibold text-gray-900">
               Filters & Search
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <Label htmlFor="search" className="transition-colors duration-300 ${
-                  text-gray-700
-                }">
+                <Label htmlFor="search" className="text-gray-700">
                   Search
                 </Label>
                 <Input
@@ -3572,15 +3522,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   placeholder="Search incidents..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-1 transition-colors duration-300 ${
-                    bg-white border-gray-300
-                  }"
+                  className="mt-1"
                 />
               </div>
               <div>
-                <Label htmlFor="month-filter" className="transition-colors duration-300 ${
-                  text-gray-700
-                }">
+                <Label htmlFor="month-filter" className="text-gray-700">
                   Month
                 </Label>
                 <select
@@ -3636,13 +3582,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </CardContent>
         </Card>
         {/* Incidents Table */}
-        <Card className="backdrop-blur-sm border-0 shadow-lg ${
-          bg-white/80
-        }">
+        <Card className="bg-white shadow-sm border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
-              text-gray-900
-            }">
+            <CardTitle className="text-lg font-semibold text-gray-900">
               Incidents List ({filteredIncidents.length} incidents)
             </CardTitle>
           </CardHeader>
@@ -3650,42 +3592,22 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b transition-colors duration-300 ${
-                    border-gray-200
-                  }">
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Type</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">What</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">When</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Location</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Who</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Why</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Action Taken</th>
-                    <th className="text-left p-3 font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">Actions</th>
+                  <tr className="border-b border-gray-200">
+                    <th className="text-left p-3 font-medium text-gray-700">Type</th>
+                    <th className="text-left p-3 font-medium text-gray-700">What</th>
+                    <th className="text-left p-3 font-medium text-gray-700">When</th>
+                    <th className="text-left p-3 font-medium text-gray-700">Location</th>
+                    <th className="text-left p-3 font-medium text-gray-700">Who</th>
+                    <th className="text-left p-3 font-medium text-gray-700">Why</th>
+                    <th className="text-left p-3 font-medium text-gray-700">Action Taken</th>
+                    <th className="text-left p-3 font-medium text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredIncidents.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center">
-                        <div className="text-lg transition-colors duration-300 ${
-                          text-gray-500
-                        }">
+                        <div className="text-lg text-gray-500">
                           {incidents.length === 0 ? (
                             <div>
                               <p className="mb-2">No incidents found.</p>
@@ -3701,52 +3623,56 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       </td>
                     </tr>
                   ) : (
-                    filteredIncidents.map((incident, index) => (
-                      <tr key={index} className="border-b transition-colors duration-300 border-gray-200 hover:bg-gray-50">
+                    filteredIncidents.map((incident, index) => {
+                      // Debug: Log incident data being displayed in table
+                      console.log('📋 Displaying incident in table:', {
+                        index: index,
+                        incident: incident,
+                        incidentType: incident.incidentType,
+                        date: incident.date,
+                        location: incident.location,
+                        officer: incident.officer
+                      });
+                      return (
+                      <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 text-gray-900">
+                          <p className="text-gray-900">
                             {incident.incidentType}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 text-gray-900">
+                          <p className="text-gray-900">
                             {incident.description || '-'}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 text-gray-900">
+                          <p className="text-gray-900">
                             {incident.date}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 ${
-                            text-gray-900
-                          }">
+                          <p className="text-gray-900">
                             {incident.location}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 ${
-                            text-gray-900
-                          }">
+                          <p className="text-gray-900">
                             {incident.officer}
                           </p>
                         </div>
                       </td>
                       <td className="p-3">
                         <div>
-                          <p className="transition-colors duration-300 ${
-                            text-gray-900
-                          }">
+                          <p className="text-gray-900">
                             {incident.why}
                           </p>
                         </div>
@@ -3754,15 +3680,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                                               <td className="p-3">
                           <div>
                             {incident.actionType ? (
-                              <p className="transition-colors duration-300 ${
-                                text-gray-900
-                              }">
+                              <p className="text-gray-900">
                                 {incident.actionType}
                               </p>
                             ) : (
-                              <p className="transition-colors duration-300 ${
-                                text-gray-900
-                              }">
+                              <p className="text-gray-900">
                                 No Action
                               </p>
                             )}
@@ -3774,13 +3696,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                             size="sm"
                             variant="outline"
                             onClick={() => {
+                              // Debug: Log incident data when viewing
+                              console.log('👁️ Opening view modal for incident:', {
+                                incident: incident,
+                                incidentType: incident.incidentType,
+                                date: incident.date,
+                                location: incident.location,
+                                officer: incident.officer
+                              });
                               setViewingIncident(incident);
                               setShowViewModal(true);
                             }}
                             className="flex items-center gap-1"
                             title="View Details"
                           >
-                            <Eye className="w-4 h-4" />
+                            <FileText className="w-4 h-4" />
                           </Button>
                           {incident.link && (
                             <Button
@@ -3805,19 +3735,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={() => handleDeleteIncident(incident.id)}
-                            title="Delete Incident"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
                         </div>
                       </td>
-                    </tr>
-                  ))
-                )}
+                      </tr>
+                    );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
@@ -4141,185 +4064,115 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       )}
       {/* View Incident Modal */}
       {showViewModal && viewingIncident && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden ${
-            bg-white
-          }">
-            <div className="flex items-center justify-between p-6 border-b ${
-              border-gray-200
-            }">
-              <h3 className="text-xl font-bold transition-colors duration-300 ${
-                text-gray-900
-              }">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">
                 View Incident Details
               </h3>
               <button
                 onClick={() => setShowViewModal(false)}
-                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  text-gray-500 hover:text-gray-700
-                }"
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    What
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.incidentType}
-                  </p>
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">What</h4>
+                    <p className="text-gray-700">{viewingIncident.incidentType}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">When</h4>
+                    <p className="text-gray-700">{viewingIncident.date}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Location</h4>
+                    <p className="text-gray-700">{viewingIncident.location}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">District</h4>
+                    <p className="text-gray-700">{viewingIncident.district}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Municipality</h4>
+                    <p className="text-gray-700">{viewingIncident.municipality}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Who</h4>
+                    <p className="text-gray-700">{viewingIncident.officer}</p>
+                  </div>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Why</h4>
+                    <p className="text-gray-700">{viewingIncident.why || 'Not specified'}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    When
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Location
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.location}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    District
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.district}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Municipality
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.municipality}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Who
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.officer}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Why
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.why || 'Not specified'}
-                  </p>
-                </div>
-                <div>
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Action Taken
-                  </Label>
-                  <div className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium">Type:</span>
-                        <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+
+                {/* Action Taken Section */}
+                <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-4">Action Taken</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <span className="text-sm font-medium text-gray-600">Type:</span>
+                      <div className="mt-1">
+                        <Badge className="bg-blue-100 text-blue-800">
                           {viewingIncident.actionType || 'Not specified'}
                         </Badge>
                       </div>
-                      {viewingIncident.assignedOfficer && (
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Assigned Officer:</span>
-                          <span>{viewingIncident.assignedOfficer}</span>
-                        </div>
-                      )}
-                      {viewingIncident.actionDate && (
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Action Date:</span>
-                          <span>{viewingIncident.actionDate}</span>
-                        </div>
-                      )}
-                      {viewingIncident.priority && (
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">Priority:</span>
+                    </div>
+                    {viewingIncident.assignedOfficer && (
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Assigned Officer:</span>
+                        <p className="mt-1 text-gray-700">{viewingIncident.assignedOfficer}</p>
+                      </div>
+                    )}
+                    {viewingIncident.actionDate && (
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Action Date:</span>
+                        <p className="mt-1 text-gray-700">{viewingIncident.actionDate}</p>
+                      </div>
+                    )}
+                    {viewingIncident.priority && (
+                      <div>
+                        <span className="text-sm font-medium text-gray-600">Priority:</span>
+                        <div className="mt-1">
                           <Badge className={getPriorityColor(viewingIncident.priority)}>
                             {viewingIncident.priority}
                           </Badge>
                         </div>
-                      )}
-                      {viewingIncident.actionDescription && (
-                        <div>
-                          <span className="font-medium">Description:</span>
-                          <p className="mt-1 text-sm">{viewingIncident.actionDescription}</p>
-                        </div>
-                      )}
-                      {viewingIncident.followUpNotes && (
-                        <div>
-                          <span className="font-medium">Follow-up Notes:</span>
-                          <p className="mt-1 text-sm">{viewingIncident.followUpNotes}</p>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
+                  {viewingIncident.actionDescription && (
+                    <div className="mt-4">
+                      <span className="text-sm font-medium text-gray-600">Description:</span>
+                      <p className="mt-1 text-gray-700">{viewingIncident.actionDescription}</p>
+                    </div>
+                  )}
+                  {viewingIncident.followUpNotes && (
+                    <div className="mt-4">
+                      <span className="text-sm font-medium text-gray-600">Follow-up Notes:</span>
+                      <p className="mt-1 text-gray-700">{viewingIncident.followUpNotes}</p>
+                    </div>
+                  )}
                 </div>
-                <div className="md:col-span-2">
-                  <Label className="font-medium transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    How
-                  </Label>
-                  <p className="mt-1 p-3 rounded-md border transition-colors duration-300 ${
-                    bg-gray-50 border-gray-200 text-gray-900
-                  }">
-                    {viewingIncident.description || 'No description provided'}
-                  </p>
+
+                {/* Description Section */}
+                <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-2">How</h4>
+                  <p className="text-gray-700">{viewingIncident.description || 'No description provided'}</p>
                 </div>
+
+                {/* Link Section */}
                 {viewingIncident.link && (
-                  <div className="md:col-span-2">
-                    <Label className="font-medium transition-colors duration-300 ${
-                      text-gray-700
-                    }">
-                      Link
-                    </Label>
+                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
+                    <h4 className="font-semibold text-gray-900 mb-2">Link</h4>
                     <Button
                       onClick={() => window.open(viewingIncident.link, '_blank')}
-                      className="mt-1 flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                      className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
                     >
                       <Eye className="w-4 h-4" />
                       Open Link
@@ -4328,9 +4181,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 )}
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t ${
-              border-gray-200
-            }">
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowViewModal(false)}
@@ -4343,23 +4194,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       )}
       {/* Edit Incident Modal */}
       {showEditModal && editingIncident && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden ${
-            bg-white
-          }">
-            <div className="flex items-center justify-between p-6 border-b ${
-              border-gray-200
-            }">
-              <h3 className="text-xl font-bold transition-colors duration-300 ${
-                text-gray-900
-              }">
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-xl font-bold text-gray-900">
                 Edit Incident
               </h3>
               <button
                 onClick={() => setShowEditModal(false)}
-                className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                  text-gray-500 hover:text-gray-700
-                }"
+                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -4367,14 +4210,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="p-6 overflow-y-auto max-h-[70vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="edit-incident-type" className="transition-colors duration-300 text-gray-700">
+                  <Label htmlFor="edit-incident-type" className="text-gray-700">
                     Type
                   </Label>
                   <select
                     id="edit-incident-type"
                     value={editingIncident.incidentType}
                     onChange={(e) => setEditingIncident({...editingIncident, incidentType: e.target.value})}
-                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
+                    className="mt-1 w-full p-2 rounded-md border bg-white border-gray-300"
                   >
                     <option value="">Select Incident Type</option>
                     {incidentTypes.map((type, index) => (
@@ -4588,9 +4431,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </div>
               </div>
             </div>
-            <div className="flex justify-end gap-3 p-6 border-t ${
-              border-gray-200
-            }">
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
               <Button
                 variant="outline"
                 onClick={() => setShowEditModal(false)}
@@ -4599,9 +4440,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               </Button>
               <Button
                 onClick={handleEditIncident}
-                className="bg-blue-600 hover:bg-blue-700 text-white"
+                className="bg-black hover:bg-black/90 text-white"
               >
-                Save Changes
+                Update Incident
               </Button>
             </div>
           </div>
@@ -5636,7 +5477,6 @@ Check browser console for detailed debug information.`);
           </div>
         </div>
       )}
-      </section>
     </Layout>
   );
 }

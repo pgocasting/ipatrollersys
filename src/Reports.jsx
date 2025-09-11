@@ -3,35 +3,19 @@ import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
+import { Input } from "./components/ui/input";
+import { Label } from "./components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { Separator } from "./components/ui/separator";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { useData } from "./DataContext";
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  BarChart3, 
-  TrendingUp, 
   Shield, 
-  Users, 
-  MapPin,
-  Activity,
   AlertTriangle,
-  CheckCircle,
-  Clock,
   Filter,
-  Search,
-  Eye,
-  Building2,
   Target,
-  Star,
-  Briefcase,
-  ArrowRight,
-  Plus,
-  Settings,
-  Database,
-  PieChart,
-  LineChart,
   Printer,
   XCircle,
   CheckCircle2
@@ -49,7 +33,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
-  const [searchTerm, setSearchTerm] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [paperSize, setPaperSize] = useState("short"); // "short" for Letter, "long" for Legal
 
@@ -796,14 +779,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  const filteredSections = reportSections.filter(section => {
-    if (!searchTerm) return true;
-    return section.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-           section.reports.some(report => 
-             report.name.toLowerCase().includes(searchTerm.toLowerCase())
-           );
-  });
-
   // Show loading state while data is being fetched
   if (dataLoading) {
     return (
@@ -820,67 +795,36 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="container mx-auto p-6 space-y-8">
           
           {/* Header */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
-              Reports Center
-            </h1>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-6">
-              Generate comprehensive reports across all system modules. Select your report type, apply filters, and export in your preferred format.
-            </p>
-            
-            {/* Paper Size Indicator */}
-            <div className="bg-white rounded-lg shadow-md p-4 mb-6 max-w-md mx-auto">
-              <div className="flex items-center justify-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-blue-600" />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-medium text-gray-700">Paper Size</p>
-                  <p className="text-lg font-bold text-blue-600">
-                    {paperSize === 'short' ? 'Short Bond (Letter)' : 'Long Bond (Legal)'}
-                  </p>
-                </div>
-              </div>
+          <div className="flex justify-between items-center">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Reports Center</h1>
+              <p className="text-gray-500 mt-2">Generate comprehensive reports across all system modules</p>
             </div>
-            
-            {/* Data availability warning */}
-            {(!ipatrollerData || ipatrollerData.length === 0) && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-                <div className="flex items-center">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
-                  <p className="text-yellow-800 text-sm">
-                    <strong>Note:</strong> No patrol data found for the current period. Some reports may show limited information.
-                  </p>
-                </div>
-              </div>
-            )}
-            
             <Button
               onClick={generateAllReports}
               disabled={isGenerating}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-8 py-3 text-lg font-semibold shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl disabled:opacity-50"
+              className="bg-black hover:bg-black/90 text-white"
             >
               {isGenerating ? (
                 <>
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white mr-3"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                   Generating All Reports...
                 </>
               ) : (
                 <>
-                  <Printer className="w-6 h-6 mr-3" />
+                  <Printer className="mr-2 h-4 w-4" />
                   Generate All Reports
                 </>
               )}
             </Button>
           </div>
 
-          {/* Quick Stats - Matching exact data from each page */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+          {/* Quick Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="bg-white shadow-sm border border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -896,7 +840,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+            <Card className="bg-white shadow-sm border border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -912,7 +856,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+            <Card className="bg-white shadow-sm border border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -928,7 +872,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
+            <Card className="bg-white shadow-sm border border-gray-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -945,59 +889,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </Card>
           </div>
 
-          {/* Additional Stats Row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Action Reports</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {actionReports?.length || 0}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <Target className="w-8 h-8 text-purple-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Incidents</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {incidents?.length || 0}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-red-100 rounded-xl">
-                    <AlertTriangle className="w-8 h-8 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-lg border-0 rounded-xl hover:shadow-xl transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Municipalities</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {calculateOverallSummary().municipalityCount}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Building2 className="w-8 h-8 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Report Filters */}
-          <Card className="mb-8 bg-white shadow-lg border-0 rounded-xl">
+          <Card className="bg-white shadow-sm border border-gray-200">
             <CardContent className="p-6">
               <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
@@ -1012,206 +905,143 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 
                 <div className="flex flex-wrap items-center gap-4">
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-600">Month</label>
-                    <select
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      {months.map((month, index) => (
-                        <option key={index} value={index}>{month}</option>
-                      ))}
-                    </select>
+                    <Label htmlFor="month-select" className="text-xs font-medium text-gray-600">Month</Label>
+                    <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                      <SelectTrigger className="w-[140px]">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((month, index) => (
+                          <SelectItem key={index} value={index.toString()}>{month}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-600">Year</label>
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      {[2023, 2024, 2025, 2026, 2027].map(year => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
+                    <Label htmlFor="year-select" className="text-xs font-medium text-gray-600">Year</Label>
+                    <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+                      <SelectTrigger className="w-[100px]">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {[2023, 2024, 2025, 2026, 2027].map(year => (
+                          <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-600">District</label>
-                    <select
-                      value={selectedDistrict}
-                      onChange={(e) => setSelectedDistrict(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      {districts.map((district) => (
-                        <option key={district} value={district}>
-                          {district === "all" ? "All Districts" : district}
-                        </option>
-                      ))}
-                    </select>
+                    <Label htmlFor="district-select" className="text-xs font-medium text-gray-600">District</Label>
+                    <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                      <SelectTrigger className="w-[160px]">
+                        <SelectValue placeholder="Select district" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {districts.map((district) => (
+                          <SelectItem key={district} value={district}>
+                            {district === "all" ? "All Districts" : district}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-medium text-gray-600">Paper Size</label>
-                    <select
-                      value={paperSize}
-                      onChange={(e) => setPaperSize(e.target.value)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                    >
-                      <option value="short">Short Bond (Letter)</option>
-                      <option value="long">Long Bond (Legal)</option>
-                    </select>
+                    <Label htmlFor="paper-size-select" className="text-xs font-medium text-gray-600">Paper Size</Label>
+                    <Select value={paperSize} onValueChange={setPaperSize}>
+                      <SelectTrigger className="w-[180px]">
+                        <SelectValue placeholder="Select paper size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="short">Short Bond (Letter)</SelectItem>
+                        <SelectItem value="long">Long Bond (Legal)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Search */}
-          <div className="mb-8">
-            <div className="relative max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search reports..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-sm hover:shadow-md transition-shadow duration-200"
-              />
-            </div>
-          </div>
-
-          {/* Report Sections */}
-          <div className="space-y-8">
-            {filteredSections.map((section) => (
-              <Card key={section.id} className="bg-white shadow-lg border-0 overflow-hidden rounded-xl hover:shadow-xl transition-all duration-300">
-                <CardHeader className={`bg-gradient-to-r ${section.color} text-white`}>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {section.icon}
-                      <div>
-                        <CardTitle className="text-xl">{section.title}</CardTitle>
-                        <p className="text-blue-100 text-sm mt-1">{section.description}</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {section.reports.map((report, index) => (
-                      <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300 hover:border-blue-200 bg-gray-50/50">
-                        <div className="flex items-start justify-between mb-4">
-                          <h4 className="font-semibold text-gray-900 text-lg">{report.name}</h4>
-                          <Badge className={`${getPriorityColor(report.priority)} text-xs px-3 py-1`}>
-                            {report.priority}
-                          </Badge>
+          {/* Reports Table */}
+          <div className="border rounded-md border-gray-200 shadow-sm">
+            <Table className="border-gray-200">
+              <TableCaption className="text-slate-500">Available reports for generation.</TableCaption>
+              <TableHeader>
+                <TableRow className="border-b border-gray-200">
+                  <TableHead className="w-[200px] border-gray-200">Report Type</TableHead>
+                  <TableHead className="border-gray-200">Description</TableHead>
+                  <TableHead className="border-gray-200">Priority</TableHead>
+                  <TableHead className="border-gray-200">Formats</TableHead>
+                  <TableHead className="text-right border-gray-200">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportSections.map((section) => 
+                  section.reports.map((report, index) => (
+                    <TableRow key={`${section.id}-${index}`} className="border-gray-200">
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-2">
+                          {section.icon}
+                          {report.name}
                         </div>
-                        
-                        <p className="text-sm text-gray-600 mb-6 leading-relaxed">{report.description}</p>
-                        
-                        <div className="space-y-4">
-                          <div>
-                            <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">Available Formats:</p>
-                            <div className="flex flex-wrap gap-2">
-                              {report.formats.map((format) => (
-                                <span
-                                  key={format}
-                                  className={`px-3 py-1 text-xs rounded-full font-medium ${getFormatColor(format)}`}
-                                >
-                                  {format}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <Button
-                            onClick={() => {
-                              setIsGenerating(true);
-                              try {
-                                report.action();
-                              } finally {
-                                setTimeout(() => setIsGenerating(false), 1000);
-                              }
-                            }}
-                            disabled={isGenerating}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm disabled:opacity-50 py-3 rounded-lg transition-all duration-200 hover:shadow-md"
-                          >
-                            {isGenerating ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Printer className="w-4 h-4 mr-2" />
-                                Generate PDF
-                              </>
-                            )}
-                          </Button>
+                      </TableCell>
+                      <TableCell>{report.description}</TableCell>
+                      <TableCell>
+                        <Badge className={`${getPriorityColor(report.priority)} text-xs px-2 py-1`}>
+                          {report.priority}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {report.formats.map((format) => (
+                            <Badge
+                              key={format}
+                              variant="secondary"
+                              className={`text-xs ${getFormatColor(format)}`}
+                            >
+                              {format}
+                            </Badge>
+                          ))}
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          onClick={() => {
+                            setIsGenerating(true);
+                            try {
+                              report.action();
+                            } finally {
+                              setTimeout(() => setIsGenerating(false), 1000);
+                            }
+                          }}
+                          disabled={isGenerating}
+                          variant="ghost"
+                          size="sm"
+                        >
+                          {isGenerating ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Printer className="w-4 h-4 mr-2" />
+                              Generate
+                            </>
+                          )}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="mt-12 bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-xl rounded-xl overflow-hidden">
-            <CardContent className="p-8">
-              <div className="text-center">
-                <h3 className="text-2xl font-bold mb-4">Need Help with Reports?</h3>
-                <p className="text-blue-100 mb-8 max-w-2xl mx-auto leading-relaxed">
-                  Navigate directly to any module to access detailed reports, analytics, and export options. Each section provides comprehensive data and multiple export formats.
-                </p>
-                
-                <div className="flex flex-wrap justify-center gap-4">
-                  <Button
-                    onClick={() => onNavigate('dashboard')}
-                    className="bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
-                  >
-                    <BarChart3 className="w-5 h-5 mr-2" />
-                    Dashboard Analytics
-                  </Button>
-                  
-                  <Button
-                    onClick={() => onNavigate('ipatroller')}
-                    className="bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
-                  >
-                    <Shield className="w-5 h-5 mr-2" />
-                    Patrol Data
-                  </Button>
-                  
-                  <Button
-                    onClick={() => onNavigate('incidents')}
-                    className="bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
-                  >
-                    <AlertTriangle className="w-5 h-5 mr-2" />
-                    Incident Reports
-                  </Button>
-                  
-                  <Button
-                    onClick={() => onNavigate('actioncenter')}
-                    className="bg-white text-blue-600 hover:bg-gray-100 px-6 py-3 rounded-lg transition-all duration-200 hover:shadow-lg hover:scale-105"
-                  >
-                    <Target className="w-5 h-5 mr-2" />
-                    Action Center
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Footer Info */}
-          <div className="mt-12 text-center text-gray-500 text-sm">
-            <p>Reports are generated based on current filters and data availability.</p>
-            <p className="mt-1">For custom reports or additional formats, please contact your system administrator.</p>
-          </div>
         </div>
-      </div>
-    </Layout>
-  );
-}
+      </Layout>
+    );
+  }

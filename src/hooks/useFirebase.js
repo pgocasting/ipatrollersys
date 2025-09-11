@@ -616,6 +616,111 @@ export const useFirebase = () => {
     }
   };
 
+  // Admin user update function
+  const updateUser = async (userId, userData) => {
+    try {
+      if (!user) {
+        return { success: false, error: "No admin user logged in" };
+      }
+
+      // Check if current user is admin
+      const currentUserRole = await getCurrentUserRole();
+      if (!currentUserRole.success || currentUserRole.data.role !== "Admin") {
+        return { success: false, error: "Only admin users can update user accounts" };
+      }
+
+      // Update user in Firestore management document
+      const docRef = doc(db, 'users', 'management');
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        return { success: false, error: "Management document not found" };
+      }
+
+      const currentData = docSnap.data();
+      const users = currentData.users || [];
+      
+      // Find the user to update
+      const userIndex = users.findIndex(u => u.id === userId);
+      if (userIndex === -1) {
+        return { success: false, error: "User not found" };
+      }
+
+      // Update the user data
+      const updatedUsers = [...users];
+      updatedUsers[userIndex] = {
+        ...updatedUsers[userIndex],
+        ...userData,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: user.email
+      };
+
+      await setDoc(docRef, {
+        ...currentData,
+        users: updatedUsers,
+        updatedAt: new Date(),
+        updatedBy: user.uid
+      });
+
+      return { success: true, user: updatedUsers[userIndex] };
+    } catch (error) {
+      console.error('❌ Error updating user:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Admin user delete function
+  const deleteUser = async (userId) => {
+    try {
+      if (!user) {
+        return { success: false, error: "No admin user logged in" };
+      }
+
+      // Check if current user is admin
+      const currentUserRole = await getCurrentUserRole();
+      if (!currentUserRole.success || currentUserRole.data.role !== "Admin") {
+        return { success: false, error: "Only admin users can delete user accounts" };
+      }
+
+      // Delete user from Firestore management document
+      const docRef = doc(db, 'users', 'management');
+      const docSnap = await getDoc(docRef);
+      
+      if (!docSnap.exists()) {
+        return { success: false, error: "Management document not found" };
+      }
+
+      const currentData = docSnap.data();
+      const users = currentData.users || [];
+      
+      // Find the user to delete
+      const userToDelete = users.find(u => u.id === userId);
+      if (!userToDelete) {
+        return { success: false, error: "User not found" };
+      }
+
+      // Prevent admin from deleting themselves
+      if (userToDelete.email === user.email) {
+        return { success: false, error: "You cannot delete your own account" };
+      }
+
+      // Remove the user from the array
+      const updatedUsers = users.filter(u => u.id !== userId);
+
+      await setDoc(docRef, {
+        ...currentData,
+        users: updatedUsers,
+        updatedAt: new Date(),
+        updatedBy: user.uid
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('❌ Error deleting user:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     user,
     loading,
@@ -636,6 +741,8 @@ export const useFirebase = () => {
     updateWeeklyReportInCollection,
     deleteWeeklyReportFromCollection,
     createUserByAdmin,
+    updateUser,
+    deleteUser,
     getUsers
   };
 };

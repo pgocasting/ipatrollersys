@@ -13,12 +13,18 @@ import { toast } from "sonner";
 import { AlertTriangle, Loader2, User, UserPlus } from "lucide-react";
 
 export default function Users({ onLogout, onNavigate, currentPage }) {
-  const { user, getUsers, createUserByAdmin } = useFirebase();
+  const { user, getUsers, createUserByAdmin, updateUser, deleteUser } = useFirebase();
   const [tableLoading, setTableLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
+  const [updateLoading, setUpdateLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
   const [users, setUsers] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   const municipalities = [
     "Abucay",
@@ -45,6 +51,16 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     municipality: "",
     phoneNumber: "",
     role: "User",
+    accessLevel: "action-center",
+    department: "",
+  });
+
+  const [editUser, setEditUser] = useState({
+    firstName: "",
+    lastName: "",
+    username: "",
+    municipality: "",
+    phoneNumber: "",
     accessLevel: "action-center",
     department: "",
   });
@@ -176,6 +192,123 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
       toast.error(err.message);
     } finally {
       setCreateLoading(false);
+    }
+  };
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user);
+    setEditUser({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      username: user.username || "",
+      municipality: user.municipality || "",
+      phoneNumber: user.phoneNumber || "",
+      accessLevel: user.accessLevel || "action-center",
+      department: user.department || "",
+    });
+    setIsEditDialogOpen(true);
+  };
+
+  const handleEditInputChange = (e) => {
+    const { name, value } = e.target;
+    setEditUser((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleUpdateUser = async (e) => {
+    e.preventDefault();
+    if (!isAdmin || !selectedUser) return;
+    
+    // Validate form
+    if (!editUser.municipality) {
+      toast.error("Please select a municipality");
+      return;
+    }
+    if (!editUser.firstName || !editUser.lastName) {
+      toast.error("Please enter first and last name");
+      return;
+    }
+    if (!editUser.username) {
+      toast.error("Please enter username");
+      return;
+    }
+
+    setUpdateLoading(true);
+    try {
+      const response = await updateUser(selectedUser.id, {
+        firstName: editUser.firstName,
+        lastName: editUser.lastName,
+        username: editUser.username,
+        municipality: editUser.municipality,
+        phoneNumber: editUser.phoneNumber,
+        accessLevel: editUser.accessLevel,
+        department: editUser.department,
+      });
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to update user");
+      }
+
+      toast.success("User updated successfully");
+      
+      // Close dialog and reset form
+      setIsEditDialogOpen(false);
+      setSelectedUser(null);
+      setEditUser({
+        firstName: "",
+        lastName: "",
+        username: "",
+        municipality: "",
+        phoneNumber: "",
+        accessLevel: "action-center",
+        department: "",
+      });
+      
+      // Refresh user list
+      const result = await getUsers();
+      if (result.success) {
+        setUsers(result.data || []);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUpdateLoading(false);
+    }
+  };
+
+  const handleDeleteUser = (user) => {
+    setUserToDelete(user);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!isAdmin || !userToDelete) return;
+
+    setDeleteLoading(true);
+    try {
+      const response = await deleteUser(userToDelete.id);
+
+      if (!response.success) {
+        throw new Error(response.error || "Failed to delete user");
+      }
+
+      toast.success("User deleted successfully");
+      
+      // Close dialog and reset state
+      setIsDeleteDialogOpen(false);
+      setUserToDelete(null);
+      
+      // Refresh user list
+      const result = await getUsers();
+      if (result.success) {
+        setUsers(result.data || []);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -317,6 +450,184 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                 </form>
               </DialogContent>
             </Dialog>
+            
+            {/* Edit User Dialog */}
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogContent className="sm:max-w-[500px] bg-white border border-slate-200">
+                <DialogHeader>
+                  <DialogTitle>Edit User</DialogTitle>
+                  <DialogDescription>
+                    Update user information.
+                  </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editFirstName">First Name</Label>
+                      <Input 
+                        id="editFirstName" 
+                        name="firstName" 
+                        placeholder="John" 
+                        value={editUser.firstName} 
+                        onChange={handleEditInputChange} 
+                        className="col-span-3 bg-white border-slate-200" 
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="editLastName">Last Name</Label>
+                      <Input 
+                        id="editLastName" 
+                        name="lastName" 
+                        placeholder="Doe" 
+                        value={editUser.lastName} 
+                        onChange={handleEditInputChange} 
+                        className="col-span-3 bg-white border-slate-200" 
+                        required 
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editUsername">Username</Label>
+                      <Input 
+                        id="editUsername" 
+                        name="username" 
+                        placeholder="johndoe" 
+                        value={editUser.username} 
+                        onChange={handleEditInputChange} 
+                        className="col-span-3 bg-white border-slate-200" 
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="editMunicipality">Municipality</Label>
+                      <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
+                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                          <SelectValue placeholder="Select municipality" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-slate-200">
+                          {municipalities.map((m) => (
+                            <SelectItem key={m} value={m}>{m}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="editAccessLevel">Access Level</Label>
+                      <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
+                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                          <SelectValue placeholder="Select access level" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-slate-200">
+                          <SelectItem value="action-center">Action Center</SelectItem>
+                          <SelectItem value="command-center">Command Center</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {editUser.accessLevel === "action-center" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="editDepartment">Department</Label>
+                        <Select value={editUser.department} onValueChange={(value) => setEditUser((prev) => ({ ...prev, department: value }))}>
+                          <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                            <SelectValue placeholder="Select department" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            <SelectItem value="agriculture">Agriculture</SelectItem>
+                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="editPhoneNumber">Contact Number</Label>
+                    <Input
+                      id="editPhoneNumber"
+                      name="phoneNumber"
+                      type="tel"
+                      placeholder="+63 9XX XXX XXXX"
+                      value={editUser.phoneNumber}
+                      onChange={(e) => {
+                        let value = e.target.value.replace(/\D/g, "");
+                        if (!value.startsWith("63") && value.length > 0) {
+                          value = "63" + value;
+                        }
+                        if (value.length > 12) {
+                          value = value.slice(0, 12);
+                        }
+                        if (value.length > 2) {
+                          const rest = value.slice(2);
+                          const parts = rest.match(/.{1,3}/g) || [];
+                          value = "+" + value.slice(0, 2) + " " + parts.join(" ");
+                        }
+                        setEditUser((prev) => ({ ...prev, phoneNumber: value }));
+                      }}
+                      pattern="^\+63 \d{3} \d{3} \d{4}$"
+                      title="Please enter a valid Philippine mobile number (+63 XXX XXX XXXX)"
+                      className="col-span-3 bg-white border-slate-200"
+                    />
+                  </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">Cancel</Button>
+                    </DialogClose>
+                    <Button type="submit" disabled={updateLoading} className="bg-black text-white hover:bg-black/90">
+                      {updateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Update User
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
+            
+            {/* Delete User Confirmation Dialog */}
+            <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+              <DialogContent className="sm:max-w-[400px] bg-white border border-slate-200">
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-500" />
+                    Delete User
+                  </DialogTitle>
+                  <DialogDescription>
+                    Are you sure you want to delete this user? This action cannot be undone.
+                  </DialogDescription>
+                </DialogHeader>
+                {userToDelete && (
+                  <div className="py-4">
+                    <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                      <h4 className="font-medium text-red-800">User to be deleted:</h4>
+                      <p className="text-red-700 mt-1">
+                        <strong>Name:</strong> {`${userToDelete.firstName || ""} ${userToDelete.lastName || ""}`.trim()}
+                      </p>
+                      <p className="text-red-700">
+                        <strong>Email:</strong> {userToDelete.email}
+                      </p>
+                      <p className="text-red-700">
+                        <strong>Username:</strong> {userToDelete.username}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button type="button" variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <Button 
+                    type="button" 
+                    variant="destructive" 
+                    onClick={confirmDeleteUser}
+                    disabled={deleteLoading}
+                    className="bg-red-600 hover:bg-red-700 text-white"
+                  >
+                    {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Delete User
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
           <div className="border rounded-md border-gray-200 shadow-sm">
             <Table className="border-gray-200">
@@ -359,7 +670,23 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         </span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">Edit</Button>
+                        <div className="flex gap-2 justify-end">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditUser(u)}
+                          >
+                            Edit
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleDeleteUser(u)}
+                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          >
+                            Delete
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
