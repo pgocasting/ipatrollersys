@@ -51,6 +51,8 @@ import {
   Shield,
   Users,
   Target,
+  Trophy,
+  AlertTriangle,
   Zap,
   Sun,
   Moon,
@@ -84,6 +86,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Top Performers state variables
+  const [showTopPerformersModal, setShowTopPerformersModal] = useState(false);
+  const [showTopPerformersPreview, setShowTopPerformersPreview] = useState(false);
+  const [selectedTopPerformersMonth, setSelectedTopPerformersMonth] = useState(new Date().getMonth());
+  const [selectedTopPerformersYear, setSelectedTopPerformersYear] = useState(new Date().getFullYear());
+  const [filteredTopPerformersData, setFilteredTopPerformersData] = useState([]);
+  const [loadingTopPerformers, setLoadingTopPerformers] = useState(false);
+  const topPerformersPreviewRef = useRef(null);
 
   // Calculate daily summary data for a specific day
   const getDailySummaryData = (dayIndex) => {
@@ -193,6 +204,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     loadPatrolDataFromFirestore();
   }, [selectedMonth, selectedYear]);
+
+  // Load Top Performers data when modal is shown
+  useEffect(() => {
+    if (showTopPerformersModal) {
+      loadTopPerformersData(selectedTopPerformersMonth, selectedTopPerformersYear);
+    }
+  }, [selectedTopPerformersMonth, selectedTopPerformersYear, showTopPerformersModal]);
 
   const loadPatrolDataFromFirestore = async () => {
     setLoading(true);
@@ -436,6 +454,295 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     // Daily status uses fixed threshold: Active if >= 15, Inactive if <= 14
     if (value >= 15) return "Active";
     return "Inactive";
+  };
+
+  // Top Performers functions
+  const loadTopPerformersData = async (month, year) => {
+    try {
+      setLoadingTopPerformers(true);
+      const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+      
+      const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+      const querySnapshot = await getDocs(municipalitiesRef);
+      
+      const topPerformersData = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data && data.municipality) {
+          topPerformersData.push({
+            id: doc.id,
+            municipality: data.municipality,
+            district: data.district,
+            data: data.data || []
+          });
+        }
+      });
+      
+      setFilteredTopPerformersData(topPerformersData);
+    } catch (error) {
+      console.error('Error loading top performers data:', error);
+      setFilteredTopPerformersData([]);
+    } finally {
+      setLoadingTopPerformers(false);
+    }
+  };
+
+  const getTopPerformers = () => {
+    const dataToUse = filteredTopPerformersData;
+    
+    if (!dataToUse || dataToUse.length === 0) {
+      return [];
+    }
+    
+    return dataToUse
+      .filter(item => item && (item.municipality || item.id))
+      .map(item => {
+        const activeDays = item.data.filter(count => count >= 15).length;
+        const inactiveDays = item.data.filter(count => count < 15 && count > 0).length;
+        const totalDays = item.data.length;
+        const activePercentage = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
+        
+        return {
+          ...item,
+          activeDays,
+          inactiveDays,
+          totalDays,
+          activePercentage,
+          totalPatrols: item.data.reduce((sum, count) => sum + (count || 0), 0)
+        };
+      })
+      .sort((a, b) => {
+        // Sort by active percentage first, then by total patrols
+        if (b.activePercentage !== a.activePercentage) {
+          return b.activePercentage - a.activePercentage;
+        }
+        return b.totalPatrols - a.totalPatrols;
+      })
+      .slice(0, 12); // Top 12 performers
+  };
+
+  // Function to generate PDF report for Top Performers
+  const generateTopPerformersPDF = () => {
+    try {
+      const topPerformers = getTopPerformers();
+      if (topPerformers.length === 0) {
+        toast.error('No performance data available to export');
+        return;
+      }
+
+      // Create new PDF document
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      
+      // Set font
+      doc.setFont('helvetica');
+      
+      // Get page dimensions
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // Add border around the page
+      doc.setDrawColor(200, 200, 200);
+      doc.setLineWidth(1);
+      doc.rect(20, 20, pageWidth - 40, pageHeight - 40);
+      
+      // Add title
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(59, 130, 246); // Blue color
+      doc.text('Top Performers Ranking Report', pageWidth / 2, 50, { align: 'center' });
+      
+      // Add subtitle
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Performance Analysis for ${new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`, pageWidth / 2, 70, { align: 'center' });
+      
+      // Add generation date
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric'
+      })}`, pageWidth / 2, 85, { align: 'center' });
+      
+      // Prepare table data
+      const tableData = topPerformers.map((performer, index) => {
+        const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+          ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+          : 0;
+        
+        const getStatusText = () => {
+          if (activePercentage === 100) return 'Very Satisfactory';
+          if (activePercentage >= 75) return 'Very Good';
+          if (activePercentage >= 50) return 'Good';
+          return 'Needs Improvement';
+        };
+
+        return [
+          index + 1,
+          performer.municipality,
+          performer.district,
+          performer.activeDays,
+          performer.totalPatrols,
+          `${activePercentage}%`,
+          getStatusText()
+        ];
+      });
+
+      // Add table using autoTable
+      autoTable(doc, {
+        head: [['Rank', 'Municipality', 'District', 'Active Days', 'Total Patrols', 'Performance', 'Status']],
+        body: tableData,
+        startY: 110,
+        styles: {
+          fontSize: 9,
+          cellPadding: 4,
+          halign: 'center',
+          valign: 'middle'
+        },
+        headStyles: {
+          fillColor: [59, 130, 246],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold'
+        },
+        columnStyles: {
+          0: { halign: 'center', cellWidth: 30 },  // Rank
+          1: { halign: 'left', cellWidth: 80 },    // Municipality
+          2: { halign: 'left', cellWidth: 60 },     // District
+          3: { halign: 'center', cellWidth: 50 },   // Active Days
+          4: { halign: 'center', cellWidth: 50 },   // Total Patrols
+          5: { halign: 'center', cellWidth: 50 },   // Performance
+          6: { halign: 'center', cellWidth: 60 }    // Status
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252]
+        },
+        didParseCell: function(data) {
+          // Color coding for status column
+          if (data.column.index === 6 && data.section === 'body') {
+            const status = data.cell.text[0];
+            if (status === 'Very Satisfactory') {
+              data.cell.styles.fillColor = [16, 185, 129]; // Emerald
+              data.cell.styles.textColor = [255, 255, 255];
+            } else if (status === 'Very Good') {
+              data.cell.styles.fillColor = [34, 197, 94]; // Green
+              data.cell.styles.textColor = [255, 255, 255];
+            } else if (status === 'Good') {
+              data.cell.styles.fillColor = [245, 158, 11]; // Yellow
+              data.cell.styles.textColor = [0, 0, 0];
+            } else if (status === 'Needs Improvement') {
+              data.cell.styles.fillColor = [239, 68, 68]; // Red
+              data.cell.styles.textColor = [255, 255, 255];
+            }
+          }
+          
+          // Color coding for Active Days column (green)
+          if (data.column.index === 3 && data.section === 'body') {
+            data.cell.styles.textColor = [34, 197, 94]; // Green
+            data.cell.styles.fontStyle = 'bold';
+          }
+          
+          // Color coding for Total Patrols column (blue)
+          if (data.column.index === 4 && data.section === 'body') {
+            data.cell.styles.textColor = [59, 130, 246]; // Blue
+            data.cell.styles.fontStyle = 'bold';
+          }
+          
+          // Color coding for Performance column (purple)
+          if (data.column.index === 5 && data.section === 'body') {
+            data.cell.styles.textColor = [147, 51, 234]; // Purple
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      });
+
+      // Add summary statistics
+      const finalY = doc.lastAutoTable.finalY + 20;
+      
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Summary Statistics', 30, finalY);
+      
+      // Calculate summary stats
+      const totalActiveDays = topPerformers.reduce((sum, p) => sum + p.activeDays, 0);
+      const totalPatrols = topPerformers.reduce((sum, p) => sum + p.totalPatrols, 0);
+      const avgActiveDays = (totalActiveDays / topPerformers.length).toFixed(1);
+      const avgPatrols = (totalPatrols / topPerformers.length).toFixed(1);
+      
+      // Add summary in two columns
+      const leftColumn = 30;
+      const rightColumn = pageWidth / 2 + 20;
+      const summaryY = finalY + 20;
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Left column
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Most Active Municipality:', leftColumn, summaryY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${topPerformers[0]?.municipality || 'N/A'} (${topPerformers[0]?.activeDays || 0} days)`, leftColumn + 120, summaryY);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Total Active Days:', leftColumn, summaryY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text(totalActiveDays.toString(), leftColumn + 120, summaryY + 15);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Average Active Days:', leftColumn, summaryY + 30);
+      doc.setFont('helvetica', 'normal');
+      doc.text(avgActiveDays, leftColumn + 120, summaryY + 30);
+      
+      // Right column
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Total Patrols:', rightColumn, summaryY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(totalPatrols.toString(), rightColumn + 100, summaryY);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Average Patrols:', rightColumn, summaryY + 15);
+      doc.setFont('helvetica', 'normal');
+      doc.text(avgPatrols, rightColumn + 100, summaryY + 15);
+      
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Average Performance:', rightColumn, summaryY + 30);
+      doc.setFont('helvetica', 'normal');
+      const avgPercentage = Math.round(topPerformers.reduce((sum, p) => {
+        const activePercentage = p.activeDays + p.inactiveDays > 0 
+          ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
+          : 0;
+        return sum + activePercentage;
+      }, 0) / topPerformers.length);
+      doc.text(`${avgPercentage}%`, rightColumn + 100, summaryY + 30);
+      
+      // Add footer
+      const footerY = pageHeight - 40;
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Report generated by iPatroller Management System', pageWidth / 2, footerY, { align: 'center' });
+      doc.text('Page 1 of 1', pageWidth / 2, footerY + 15, { align: 'center' });
+      
+      // Save the PDF
+      const fileName = `top-performers-ranking-${selectedTopPerformersMonth + 1}-${selectedTopPerformersYear}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('PDF report generated successfully', {
+        description: `Top Performers Ranking report saved as ${fileName}`,
+        duration: 3000,
+        position: 'top-right',
+      });
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF report', {
+        description: 'Please try again or contact support if the issue persists',
+        duration: 4000,
+        position: 'top-right',
+      });
+    }
   };
 
   const filteredData = patrolData
@@ -1193,6 +1500,24 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 <BarChart3 className="w-4 h-4" />
                 Status
               </button>
+              <button
+                onClick={() => setShowTopPerformersModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
+              >
+                <Target className="w-4 h-4" />
+                Top Performers
+              </button>
+            </div>
+            
+            {/* Required Counts Information */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <BarChart3 className="w-4 h-4" />
+                <span className="font-medium">Required Counts per Daily:</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">15 Above = Green</span>
+                <span className="text-gray-500">•</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">15 Below = Red</span>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -1290,7 +1615,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     {item.municipality}
                                   </span>
                                   <div className="text-xs text-gray-500">
-                                    Requires: {barangayCounts[item.municipality] || 0} barangays
+                                    {barangayCounts[item.municipality] || 0} barangays
                                   </div>
                                 </div>
                               </div>
@@ -1837,6 +2162,297 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       )}
 
       {/* Removed custom modal in favor of Sonner toast */}
+
+      {/* Top Performers Modal */}
+      {showTopPerformersModal && (
+        <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          <div className="rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full flex items-center justify-center bg-emerald-100">
+                  <Target className="h-7 w-7 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900"><i>Top Performers Ranking</i></h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">
+                    Top 12 performing municipalities based on patrol data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                    <span className="text-xs font-medium text-gray-600">Performance Analytics Active</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="top-performers-month" className="text-sm font-medium text-gray-700">Month:</Label>
+                  <select
+                    id="top-performers-month"
+                    value={selectedTopPerformersMonth}
+                    onChange={(e) => setSelectedTopPerformersMonth(parseInt(e.target.value))}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value={0}>January</option>
+                    <option value={1}>February</option>
+                    <option value={2}>March</option>
+                    <option value={3}>April</option>
+                    <option value={4}>May</option>
+                    <option value={5}>June</option>
+                    <option value={6}>July</option>
+                    <option value={7}>August</option>
+                    <option value={8}>September</option>
+                    <option value={9}>October</option>
+                    <option value={10}>November</option>
+                    <option value={11}>December</option>
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="top-performers-year" className="text-sm font-medium text-gray-700">Year:</Label>
+                  <select
+                    id="top-performers-year"
+                    value={selectedTopPerformersYear}
+                    onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value={2025}>2025</option>
+                  </select>
+                </div>
+                <Button
+                  onClick={generateTopPerformersPDF}
+                  disabled={loadingTopPerformers || !getTopPerformers().length}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export PDF
+                </Button>
+                <Button
+                  onClick={() => setShowTopPerformersModal(false)}
+                  variant="outline"
+                  size="sm"
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
+              {loadingTopPerformers ? (
+                <div className="text-center py-12">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                  <p className="text-lg font-medium text-gray-700">Loading performance data...</p>
+                  <p className="text-sm text-gray-500">Fetching data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
+                </div>
+              ) : (!filteredTopPerformersData || filteredTopPerformersData.length === 0) ? (
+                <div className="text-center py-12">
+                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
+                    <p className="text-gray-600 text-center">
+                      There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+                    </p>
+                  </div>
+                </div>
+              ) : getTopPerformers().length > 0 ? (
+                <div className="space-y-6">
+                  {/* Summary Stats Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Most Active</p>
+                            <p className="text-3xl font-bold text-emerald-600">
+                              {getTopPerformers()[0]?.activeDays || 0}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-emerald-100">
+                            <Trophy className="h-6 w-6 text-emerald-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols</p>
+                            <p className="text-3xl font-bold text-blue-600">
+                              {getTopPerformers().reduce((sum, p) => sum + p.totalPatrols, 0)}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                            <Activity className="h-6 w-6 text-blue-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Avg Performance</p>
+                            <p className="text-3xl font-bold text-purple-600">
+                              {Math.round(getTopPerformers().reduce((sum, p) => sum + p.activePercentage, 0) / Math.max(getTopPerformers().length, 1))}%
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
+                            <TrendingUp className="h-6 w-6 text-purple-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                      <CardContent className="p-6">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Top Municipality</p>
+                            <p className="text-lg font-bold text-orange-600">
+                              {getTopPerformers()[0]?.municipality || 'N/A'}
+                            </p>
+                          </div>
+                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
+                            <Building2 className="h-6 w-6 text-orange-600" />
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Top Performers Table */}
+                  <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                    <CardHeader>
+                      <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                        <Trophy className="w-5 h-5 text-yellow-500" />
+                        Top 12 Performers Ranking for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                          <thead>
+                            <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
+                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Rank
+                              </th>
+                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Municipality
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                District
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Active Days
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Total Patrols
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Performance
+                              </th>
+                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                Status
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {getTopPerformers().map((performer, index) => {
+                              const activePercentage = performer.activeDays + performer.inactiveDays > 0 
+                                ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
+                                : 0;
+                              
+                              const getStatusStyle = () => {
+                                if (activePercentage === 100) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                if (activePercentage >= 75) return 'bg-green-100 text-green-800 border-green-200';
+                                if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+                                return 'bg-red-100 text-red-800 border-red-200';
+                              };
+                              
+                              const getStatusText = () => {
+                                if (activePercentage === 100) return 'Very Satisfactory';
+                                if (activePercentage >= 75) return 'Very Good';
+                                if (activePercentage >= 50) return 'Good';
+                                return 'Needs Improvement';
+                              };
+
+                              return (
+                                <tr key={performer.id} className="transition-colors duration-200 hover:bg-gray-50">
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center">
+                                      {index < 3 ? (
+                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                                          index === 0 ? 'bg-yellow-500' : 
+                                          index === 1 ? 'bg-gray-400' : 
+                                          'bg-orange-500'
+                                        }`}>
+                                          {index + 1}
+                                        </div>
+                                      ) : (
+                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-700 font-bold">
+                                          {index + 1}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center gap-3">
+                                      <MapPin className="w-4 h-4 text-gray-600" />
+                                      <span className="font-medium transition-colors duration-300 text-gray-900">
+                                        {performer.municipality}
+                                      </span>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <Badge className="transition-all duration-300 bg-gray-100 text-gray-800 border-gray-200">
+                                      {performer.district}
+                                    </Badge>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
+                                      {performer.activeDays}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <span className="text-lg font-semibold transition-colors duration-300 text-blue-600">
+                                      {performer.totalPatrols}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <span className="text-lg font-semibold transition-colors duration-300 text-purple-600">
+                                      {activePercentage}%
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-center">
+                                    <Badge className={`transition-all duration-300 ${getStatusStyle()}`}>
+                                      {getStatusText()}
+                                    </Badge>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="text-center py-12">
+                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Performance Data</h3>
+                    <p className="text-gray-600 text-center">
+                      No performance data found for the selected period.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
