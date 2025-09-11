@@ -158,8 +158,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [editingItem, setEditingItem] = useState(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [imageModalData, setImageModalData] = useState({ imageSource: '', fileName: '' });
+  const [successMessage, setSuccessMessage] = useState('');
 
-  const [successMessage, setSuccessMessage] = useState("");
   const [newActionReport, setNewActionReport] = useState({
     department: "",
     municipality: "",
@@ -192,39 +192,77 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       try {
         console.log('🔄 Loading action reports from Firestore...');
         
-        // Create a query to get action reports, ordered by timestamp
-        const actionReportsRef = collection(db, 'actionReports');
-        const q = query(actionReportsRef, orderBy('timestamp', 'desc'));
-        const querySnapshot = await getDocs(q);
+        // Try multiple query approaches to ensure we get all data
+        let allActionReports = [];
         
-        if (!querySnapshot.empty) {
-          console.log(`✅ Found ${querySnapshot.size} documents in Firestore`);
+        try {
+          // First try: Order by 'when' field
+          const actionReportsRef = collection(db, 'actionReports');
+          const q = query(actionReportsRef, orderBy('when', 'desc'));
+          const querySnapshot = await getDocs(q);
           
-          // Process all documents to extract action reports
-          const allActionReports = [];
+          if (!querySnapshot.empty) {
+            console.log(`✅ Found ${querySnapshot.size} documents using 'when' field`);
+            querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              if (data) {
+                allActionReports.push({
+                  id: doc.id,
+                  ...data
+                });
+              }
+            });
+          }
+        } catch (orderByError) {
+          console.log('⚠️ OrderBy query failed, trying without orderBy...', orderByError.message);
           
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data) {
-              allActionReports.push({
-                id: doc.id,
-                ...data
+          try {
+            // Second try: Get all documents without orderBy
+            const actionReportsRef = collection(db, 'actionReports');
+            const querySnapshot = await getDocs(actionReportsRef);
+            
+            if (!querySnapshot.empty) {
+              console.log(`✅ Found ${querySnapshot.size} documents without orderBy`);
+              querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                if (data) {
+                  allActionReports.push({
+                    id: doc.id,
+                    ...data
+                  });
+                }
+              });
+              
+              // Sort manually by 'when' field if it exists
+              allActionReports.sort((a, b) => {
+                const aWhen = a.when?.toDate ? a.when.toDate() : new Date(a.when || 0);
+                const bWhen = b.when?.toDate ? b.when.toDate() : new Date(b.when || 0);
+                return bWhen - aWhen; // Descending order
               });
             }
-          });
-
+          } catch (fallbackError) {
+            console.error('❌ Fallback query also failed:', fallbackError);
+          }
+        }
+        
+        if (allActionReports.length > 0) {
           console.log('✅ Processed action reports:', allActionReports.length);
+          console.log('📋 Sample data structure:', allActionReports[0]);
           
           // Filter reports based on active tab if needed
           const filteredReports = activeTab === 'all' 
             ? allActionReports 
             : allActionReports.filter(report => report.department?.toLowerCase() === activeTab?.toLowerCase());
           
+          console.log(`🔍 Filtered reports for ${activeTab}:`, filteredReports.length);
+          
           setAllActionReports(allActionReports);
           setActionItems(filteredReports);
           
           if (allActionReports.length === 0) {
             setSuccessMessage('No action reports found');
+          } else {
+            setSuccessMessage(`✅ Loaded ${allActionReports.length} total reports, ${filteredReports.length} for ${activeTab}`);
           }
         } else {
           console.log('📭 No action reports found in Firestore');
@@ -245,6 +283,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     loadActionReports();
   }, [activeTab]);
+
+  // Load data when component mounts
+  useEffect(() => {
+    console.log('🚀 ActionCenter component mounted, loading data...');
+    loadActionReports();
+  }, []);
 
   // Municipalities by district mapping
   const municipalitiesByDistrict = {
@@ -1834,6 +1878,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
             </div>
+          
+          {/* Success Message */}
+          {successMessage && (
+            <div className="mb-4 p-3 bg-green-100 border border-green-300 rounded-lg">
+              <p className="text-sm text-green-700 font-medium">{successMessage}</p>
+            </div>
+          )}
+          
           {/* Summary Cards */}
           <div className="flex-shrink-0 mb-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
@@ -3406,7 +3458,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200">
-                        {(sortedItems || []).slice(0, 20).map((item, index) => (
+                        {(sortedItems || []).map((item, index) => (
                           <tr 
                             key={item.id || index} 
                             className="hover:bg-gray-50 transition-colors duration-150"

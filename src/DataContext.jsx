@@ -62,8 +62,7 @@ export const DataProvider = ({ children }) => {
         // Load minimal data needed for initial render
         const essentialDataQuery = query(
           collection(db, 'patrolData'),
-          orderBy('timestamp', 'desc'),
-          limit(10)
+          orderBy('timestamp', 'desc')
         );
         const snapshot = await getDocs(essentialDataQuery);
         const essentialData = snapshot.docs.map(doc => ({
@@ -366,7 +365,7 @@ export const DataProvider = ({ children }) => {
     // Load Action Reports
     const loadActionReports = async () => {
       try {
-        const actionsQuery = query(collection(db, 'actionReports'), orderBy('when', 'desc'), limit(50));
+        const actionsQuery = query(collection(db, 'actionReports'), orderBy('when', 'desc'));
         const unsubscribe = onSnapshot(actionsQuery, (snapshot) => {
           const actionReports = [];
           snapshot.forEach((doc) => {
@@ -394,7 +393,7 @@ export const DataProvider = ({ children }) => {
     // Load Incidents
     const loadIncidents = async () => {
       try {
-        const incidentsQuery = query(collection(db, 'incidents'), orderBy('date', 'desc'), limit(50));
+        const incidentsQuery = query(collection(db, 'incidents'), orderBy('date', 'desc'));
         const unsubscribe = onSnapshot(incidentsQuery, (snapshot) => {
           const incidents = [];
           snapshot.forEach((doc) => {
