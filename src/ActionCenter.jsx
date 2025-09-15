@@ -57,7 +57,8 @@ import {
   Leaf,
   Fish,
   Trees,
-  Building2
+  Building2,
+  Info
 } from "lucide-react";
 /**
  * Action Center Component
@@ -88,7 +89,7 @@ import {
  * ]
  */
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
-  const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments } = useFirebase();
+  const { user, addActionReport, updateActionReport, deleteActionReport, queryDocuments, getAllActionReports } = useFirebase();
   const { isAdmin, userDepartment, userMunicipality } = useAuth();
   // Firebase removed - using local data storage
   const [selectedMonth, setSelectedMonth] = useState('all');
@@ -130,6 +131,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setActiveTab("agriculture");
     } else if (userDepartment === "pg-enro") {
       setActiveTab("pg-enro");
+    } else {
+      setActiveTab("pnp"); // Default for admin or other users
     }
   }, [userDepartment]);
 
@@ -221,23 +224,45 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
-  // Load action items from Firestore
-    const loadActionReports = async () => {
-      setLoading(true);
+  // Load action items from Firestore using month-based structure
+  const loadActionReports = async () => {
+    setLoading(true);
+    try {
+      console.log('🔄 Loading action reports from Firestore...');
+      console.log('🔍 Current activeTab:', activeTab);
+      console.log('🔍 Current userDepartment:', userDepartment);
+      
+      // Try multiple query approaches to ensure we get all data
+      let allActionReports = [];
+      
       try {
-        console.log('🔄 Loading action reports from Firestore...');
+        // First try: Order by 'when' field
+        const actionReportsRef = collection(db, 'actionReports');
+        const q = query(actionReportsRef, orderBy('when', 'desc'));
+        const querySnapshot = await getDocs(q);
         
-        // Try multiple query approaches to ensure we get all data
-        let allActionReports = [];
+        if (!querySnapshot.empty) {
+          console.log(`✅ Found ${querySnapshot.size} documents using 'when' field`);
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data) {
+              allActionReports.push({
+                id: doc.id,
+                ...data
+              });
+            }
+          });
+        }
+      } catch (orderByError) {
+        console.log('⚠️ OrderBy query failed, trying without orderBy...', orderByError.message);
         
         try {
-          // First try: Order by 'when' field
+          // Second try: Get all documents without orderBy
           const actionReportsRef = collection(db, 'actionReports');
-          const q = query(actionReportsRef, orderBy('when', 'desc'));
-          const querySnapshot = await getDocs(q);
+          const querySnapshot = await getDocs(actionReportsRef);
           
           if (!querySnapshot.empty) {
-            console.log(`✅ Found ${querySnapshot.size} documents using 'when' field`);
+            console.log(`✅ Found ${querySnapshot.size} documents without orderBy`);
             querySnapshot.forEach((doc) => {
               const data = doc.data();
               if (data) {
@@ -247,73 +272,61 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 });
               }
             });
-          }
-        } catch (orderByError) {
-          console.log('⚠️ OrderBy query failed, trying without orderBy...', orderByError.message);
-          
-          try {
-            // Second try: Get all documents without orderBy
-            const actionReportsRef = collection(db, 'actionReports');
-            const querySnapshot = await getDocs(actionReportsRef);
             
-            if (!querySnapshot.empty) {
-              console.log(`✅ Found ${querySnapshot.size} documents without orderBy`);
-              querySnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data) {
-                  allActionReports.push({
-                    id: doc.id,
-                    ...data
-                  });
-                }
-              });
-              
-              // Sort manually by 'when' field if it exists
-              allActionReports.sort((a, b) => {
-                const aWhen = a.when?.toDate ? a.when.toDate() : new Date(a.when || 0);
-                const bWhen = b.when?.toDate ? b.when.toDate() : new Date(b.when || 0);
-                return bWhen - aWhen; // Descending order
-              });
-            }
-          } catch (fallbackError) {
-            console.error('❌ Fallback query also failed:', fallbackError);
+            // Sort manually by 'when' field if it exists
+            allActionReports.sort((a, b) => {
+              const aWhen = a.when?.toDate ? a.when.toDate() : new Date(a.when || 0);
+              const bWhen = b.when?.toDate ? b.when.toDate() : new Date(b.when || 0);
+              return bWhen - aWhen; // Descending order
+            });
           }
+        } catch (fallbackError) {
+          console.error('❌ Fallback query also failed:', fallbackError);
         }
+      }
+      
+      if (allActionReports.length > 0) {
+        console.log('✅ Processed action reports:', allActionReports.length);
+        console.log('📋 Sample data structure:', allActionReports[0]);
+        console.log('📋 All departments found:', [...new Set(allActionReports.map(r => r.department))]);
         
-        if (allActionReports.length > 0) {
-          console.log('✅ Processed action reports:', allActionReports.length);
-          console.log('📋 Sample data structure:', allActionReports[0]);
-          
-          // Filter reports based on active tab if needed
-          const filteredReports = activeTab === 'all' 
-            ? allActionReports 
-            : allActionReports.filter(report => report.department?.toLowerCase() === activeTab?.toLowerCase());
-          
-          console.log(`🔍 Filtered reports for ${activeTab}:`, filteredReports.length);
-          
-          setAllActionReports(allActionReports);
-          setActionItems(filteredReports);
-          
-          if (allActionReports.length === 0) {
-            setSuccessMessage('No action reports found');
-          } else {
-            setSuccessMessage(`✅ Loaded ${allActionReports.length} total reports, ${filteredReports.length} for ${activeTab}`);
-          }
-        } else {
-          console.log('📭 No action reports found in Firestore');
-          setActionItems([]);
-          setAllActionReports([]);
+        // Filter reports based on active tab if needed
+        const filteredReports = activeTab === 'all' 
+          ? allActionReports 
+          : allActionReports.filter(report => {
+            const reportDept = report.department?.toLowerCase();
+            const activeTabLower = activeTab?.toLowerCase();
+            const matches = reportDept === activeTabLower;
+            console.log(`🔍 Checking report: ${report.municipality} - department: "${reportDept}" vs activeTab: "${activeTabLower}" = ${matches}`);
+            return matches;
+          });
+        
+        console.log(`🔍 Filtered reports for ${activeTab}:`, filteredReports.length);
+        console.log('📋 Filtered reports sample:', filteredReports.slice(0, 2));
+        
+        setAllActionReports(allActionReports);
+        setActionItems(filteredReports);
+        
+        if (allActionReports.length === 0) {
           setSuccessMessage('No action reports found');
+        } else {
+          setSuccessMessage(`✅ Loaded ${allActionReports.length} total reports, ${filteredReports.length} for ${activeTab}`);
         }
-      } catch (error) {
-        console.error('❌ Error loading action reports:', error);
+      } else {
+        console.log('📭 No action reports found in Firestore');
         setActionItems([]);
         setAllActionReports([]);
-        setSuccessMessage('Error loading action reports');
-      } finally {
-        setLoading(false);
+        setSuccessMessage('No action reports found');
       }
-      };
+    } catch (error) {
+      console.error('❌ Error loading action reports:', error);
+      setActionItems([]);
+      setAllActionReports([]);
+      setSuccessMessage('Error loading action reports');
+    } finally {
+      setLoading(false);
+    }
+  };
   
   useEffect(() => {
     loadActionReports();
@@ -793,9 +806,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const confirmDelete = async () => {
     if (selectedItem) {
       try {
-        const result = await deleteActionReport(selectedItem.id);
+        // Try to generate month key from the report's when field
+        let monthKey = null;
+        if (selectedItem.when) {
+          const reportDate = new Date(selectedItem.when);
+          monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+        }
+        
+        const result = await deleteActionReport(selectedItem.id, monthKey);
         if (result.success) {
           setActionItems(prevItems => (prevItems || []).filter(item => item.id !== selectedItem.id));
+          setAllActionReports(prevAll => (prevAll || []).filter(item => item.id !== selectedItem.id));
           setShowDeleteModal(false);
           setSelectedItem(null);
           alert(`Successfully deleted: ${selectedItem.what}`);
@@ -1509,7 +1530,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       if (hasUndefinedValues) {
         throw new Error('Data validation failed: undefined values still present');
       }
-      const result = await updateActionReport(editingItem.id, cleanReport);
+      // Try to generate month key from the report's when field
+      let monthKey = null;
+      if (editingItem.when) {
+        const reportDate = new Date(editingItem.when);
+        monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+      }
+      
+      const result = await updateActionReport(editingItem.id, monthKey, cleanReport);
       if (result.success) {
         setActionItems(prevItems => 
           (prevItems || []).map(item => 
@@ -1603,8 +1631,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         ...report,
         photos: updatedPhotos
       };
+      // Try to generate month key from the report's when field
+      let monthKey = null;
+      if (report.when) {
+        const reportDate = new Date(report.when);
+        monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+      }
+      
       // Update in Firestore
-      const result = await updateActionReport(reportId, updatedReport);
+      const result = await updateActionReport(reportId, monthKey, updatedReport);
       if (result.success) {
         // Update local state
         setActionItems(prevItems => 
@@ -1649,9 +1684,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </span>
               </div>
             </div>
-          <div className="flex flex-wrap gap-2">
-            {/* 3-Lines Menu */}
-            <div className="relative">
+            <div className="flex flex-wrap gap-2">
+              {/* 3-Lines Menu */}
+              <div className="relative">
               <Button
                 id="actioncenter-menu-button"
                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
@@ -3296,17 +3331,34 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {showPreviewModal && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="relative w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-xl shadow-2xl bg-white">
-              {/* Header with Export PDF button */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-blue-100">
-                    <FileText className="h-6 w-6 text-blue-600" />
+              {/* Header with Department Selection and Export PDF button */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 rounded-xl bg-blue-100 shadow-sm">
+                    <FileText className="h-7 w-7 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Action Center Report Preview</h3>
+                    <h3 className="text-2xl font-bold text-gray-900">Action Center Report Preview</h3>
+                    <p className="text-sm text-gray-600 mt-1">Comprehensive report with department filtering</p>
                   </div>
                 </div>
-                                 <div className="flex items-center gap-3">
+                
+                <div className="flex items-center gap-4">
+                  {/* Department Selection */}
+                  <div className="flex items-center gap-2">
+                    <label className="text-sm font-medium text-gray-700">Department:</label>
+                    <select
+                      value={previewDepartment}
+                      onChange={(e) => setPreviewDepartment(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white shadow-sm"
+                    >
+                      <option value="all">All Departments</option>
+                      <option value="pnp">PNP</option>
+                      <option value="agriculture">Agriculture</option>
+                      <option value="pg-enro">PG-ENRO</option>
+                    </select>
+                  </div>
+                  
                    <div className="flex items-center gap-2">
                      <input
                        type="text"
@@ -3316,19 +3368,21 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                        className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm w-64"
                      />
                    </div>
+                  
                    <Button
                      onClick={exportToPDF}
-                     className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2 shadow-lg hover:shadow-xl transition-all duration-200"
                      title="Export to PDF"
                    >
                      <Download className="w-4 h-4 mr-2" />
                      Export PDF
                    </Button>
+                  
                   <Button
                     onClick={() => setShowPreviewModal(false)}
                     variant="ghost"
                     size="sm"
-                    className="h-10 w-10 p-0"
+                    className="h-10 w-10 p-0 hover:bg-gray-100 rounded-lg"
                   >
                     <X className="h-5 w-5" />
                   </Button>
@@ -3446,47 +3500,208 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                 {/* Summary Statistics */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                    <BarChart3 className="w-5 h-5 mr-2 text-blue-600" />
-                    Summary Statistics
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <BarChart3 className="w-6 h-6 mr-3 text-blue-600" />
+                    Executive Summary
                   </h2>
-                  <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-                    <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white">
+                  
+                  {/* Main Statistics Grid */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    {/* Total Actions Card */}
+                    <div className="relative overflow-hidden p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-blue-50 via-white to-blue-50 shadow-lg hover:shadow-xl transition-all duration-300">
                       <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-xl bg-blue-100">
+                            <Activity className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div className="text-right">
                         <p className="text-sm font-medium text-blue-600">Total Actions</p>
                         <p className="text-3xl font-bold text-blue-700">{totalActions}</p>
                       </div>
-                      <div className="absolute right-0 bottom-0 opacity-10">
-                        <Activity className="w-16 h-16 text-blue-600" />
                       </div>
+                        <div className="text-xs text-blue-600 font-medium">
+                          All departments combined
                     </div>
-                    <div className="relative overflow-hidden p-4 rounded-xl border border-orange-100 bg-gradient-to-br from-orange-50 to-white">
-                      <div className="relative z-10">
-                        <p className="text-sm font-medium text-orange-600">Pending Actions</p>
-                        <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
                       </div>
-                      <div className="absolute right-0 bottom-0 opacity-10">
-                        <Clock className="w-16 h-16 text-orange-600" />
+                      <div className="absolute -right-4 -bottom-4 opacity-10">
+                        <Activity className="w-20 h-20 text-blue-600" />
                       </div>
                     </div>
 
-                    
-                    {/* Tab-specific statistics */}
-                    {activeTab === "pnp" && (
-                      <>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-red-100 bg-gradient-to-br from-red-50 to-white col-span-2">
+                    {/* Pending Actions Card */}
+                    <div className="relative overflow-hidden p-6 rounded-2xl border border-orange-200 bg-gradient-to-br from-orange-50 via-white to-orange-50 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-xl bg-orange-100">
+                            <Clock className="w-6 h-6 text-orange-600" />
+                          </div>
+                          <div className="text-right">
+                        <p className="text-sm font-medium text-orange-600">Pending Actions</p>
+                        <p className="text-3xl font-bold text-orange-700">{pendingActions}</p>
+                      </div>
+                        </div>
+                        <div className="text-xs text-orange-600 font-medium">
+                          Requires attention
+                        </div>
+                      </div>
+                      <div className="absolute -right-4 -bottom-4 opacity-10">
+                        <Clock className="w-20 h-20 text-orange-600" />
+                      </div>
+                    </div>
+
+                    {/* Resolved Actions Card */}
+                    <div className="relative overflow-hidden p-6 rounded-2xl border border-green-200 bg-gradient-to-br from-green-50 via-white to-green-50 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-xl bg-green-100">
+                            <CheckCircle className="w-6 h-6 text-green-600" />
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-green-600">Resolved Actions</p>
+                            <p className="text-3xl font-bold text-green-700">{totalActions - pendingActions}</p>
+                          </div>
+                        </div>
+                        <div className="text-xs text-green-600 font-medium">
+                          Successfully completed
+                        </div>
+                      </div>
+                      <div className="absolute -right-4 -bottom-4 opacity-10">
+                        <CheckCircle className="w-20 h-20 text-green-600" />
+                      </div>
+                    </div>
+
+                    {/* Department Distribution Card */}
+                    <div className="relative overflow-hidden p-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 via-white to-purple-50 shadow-lg hover:shadow-xl transition-all duration-300">
+                      <div className="relative z-10">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="p-3 rounded-xl bg-purple-100">
+                            <Users className="w-6 h-6 text-purple-600" />
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-medium text-purple-600">Departments</p>
+                            <p className="text-3xl font-bold text-purple-700">
+                              {previewDepartment === 'all' ? '3' : '1'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-xs text-purple-600 font-medium">
+                          {previewDepartment === 'all' ? 'All departments' : previewDepartment.toUpperCase()}
+                        </div>
+                      </div>
+                      <div className="absolute -right-4 -bottom-4 opacity-10">
+                        <Users className="w-20 h-20 text-purple-600" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Department-Specific Statistics */}
+                  {previewDepartment === 'all' && (
+                    <div className="mb-8">
+                      <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 mr-2 text-gray-600" />
+                        Department Breakdown
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* PNP Statistics */}
+                        <div className="bg-gradient-to-br from-red-50 to-white p-6 rounded-xl border border-red-200 shadow-md">
+                          <div className="flex items-center mb-4">
+                            <div className="p-2 rounded-lg bg-red-100 mr-3">
+                              <Shield className="w-5 h-5 text-red-600" />
+                            </div>
+                            <h4 className="text-lg font-semibold text-red-800">PNP Department</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-red-600">Total Actions:</span>
+                              <span className="font-bold text-red-700">{totalActions}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-red-600">Drug Cases:</span>
+                              <span className="font-bold text-red-700">{totalDrugs}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-red-600">Illegal Activities:</span>
+                              <span className="font-bold text-red-700">{totalIllegals}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Agriculture Statistics */}
+                        <div className="bg-gradient-to-br from-green-50 to-white p-6 rounded-xl border border-green-200 shadow-md">
+                          <div className="flex items-center mb-4">
+                            <div className="p-2 rounded-lg bg-green-100 mr-3">
+                              <Leaf className="w-5 h-5 text-green-600" />
+                            </div>
+                            <h4 className="text-lg font-semibold text-green-800">Agriculture</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-green-600">Total Actions:</span>
+                              <span className="font-bold text-green-700">{totalActions}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-green-600">Illegal Activities:</span>
+                              <span className="font-bold text-green-700">{totalAgricultureIllegals}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-green-600">Fishing Violations:</span>
+                              <span className="font-bold text-green-700">{totalFishingViolations}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PG-ENRO Statistics */}
+                        <div className="bg-gradient-to-br from-blue-50 to-white p-6 rounded-xl border border-blue-200 shadow-md">
+                          <div className="flex items-center mb-4">
+                            <div className="p-2 rounded-lg bg-blue-100 mr-3">
+                              <Trees className="w-5 h-5 text-blue-600" />
+                            </div>
+                            <h4 className="text-lg font-semibold text-blue-800">PG-ENRO</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-blue-600">Total Actions:</span>
+                              <span className="font-bold text-blue-700">{totalActions}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-blue-600">Environmental:</span>
+                              <span className="font-bold text-blue-700">{totalEnvironmentalViolations}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-blue-600">Waste Management:</span>
+                              <span className="font-bold text-blue-700">{totalWasteManagement}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Single Department Statistics */}
+                  {previewDepartment !== 'all' && (
+                    <div className="mb-8">
+                      <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
+                        <Building2 className="w-5 h-5 mr-2 text-gray-600" />
+                        {previewDepartment.toUpperCase()} Department Details
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {previewDepartment === "pnp" && (
+                          <>
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-red-600">Total Drugs</p>
-                            <p className="text-3xl font-bold text-red-700">{totalDrugs}</p>
+                                <p className="text-sm font-medium text-red-600 mb-2">Total Drug Cases</p>
+                                <p className="text-4xl font-bold text-red-700">{totalDrugs}</p>
+                                <p className="text-xs text-red-600 mt-2">Drug-related incidents</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Pill className="w-16 h-16 text-red-600" />
                           </div>
                         </div>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-purple-100 bg-gradient-to-br from-purple-50 to-white col-span-2">
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-purple-600">Total Illegals</p>
-                            <p className="text-3xl font-bold text-purple-700">{totalIllegals}</p>
+                                <p className="text-sm font-medium text-purple-600 mb-2">Total Illegal Activities</p>
+                                <p className="text-4xl font-bold text-purple-700">{totalIllegals}</p>
+                                <p className="text-xs text-purple-600 mt-2">Other illegal activities</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Shield className="w-16 h-16 text-purple-600" />
@@ -3495,21 +3710,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </>
                     )}
                     
-                    {activeTab === "agriculture" && (
+                        {previewDepartment === "agriculture" && (
                       <>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-green-600">Total Illegals</p>
-                            <p className="text-3xl font-bold text-green-700">{totalAgricultureIllegals}</p>
+                                <p className="text-sm font-medium text-green-600 mb-2">Total Illegal Activities</p>
+                                <p className="text-4xl font-bold text-green-700">{totalAgricultureIllegals}</p>
+                                <p className="text-xs text-green-600 mt-2">Agriculture violations</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Leaf className="w-16 h-16 text-green-600" />
                           </div>
                         </div>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-blue-600">Fishing Violations</p>
-                            <p className="text-3xl font-bold text-blue-700">{totalFishingViolations}</p>
+                                <p className="text-sm font-medium text-blue-600 mb-2">Fishing Violations</p>
+                                <p className="text-4xl font-bold text-blue-700">{totalFishingViolations}</p>
+                                <p className="text-xs text-blue-600 mt-2">Marine violations</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Fish className="w-16 h-16 text-blue-600" />
@@ -3518,21 +3735,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </>
                     )}
                     
-                    {activeTab === "pg-enro" && (
+                        {previewDepartment === "pg-enro" && (
                       <>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-green-100 bg-gradient-to-br from-green-50 to-white col-span-2">
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-green-200 bg-gradient-to-br from-green-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-green-600">Environmental</p>
-                            <p className="text-3xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
+                                <p className="text-sm font-medium text-green-600 mb-2">Environmental Violations</p>
+                                <p className="text-4xl font-bold text-green-700">{totalEnvironmentalViolations}</p>
+                                <p className="text-xs text-green-600 mt-2">Environmental issues</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Trees className="w-16 h-16 text-green-600" />
                           </div>
                         </div>
-                        <div className="relative overflow-hidden p-4 rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-white col-span-2">
+                            <div className="relative overflow-hidden p-6 rounded-xl border border-blue-200 bg-gradient-to-br from-blue-50 to-white shadow-lg">
                           <div className="relative z-10">
-                            <p className="text-sm font-medium text-blue-600">Waste Management</p>
-                            <p className="text-3xl font-bold text-blue-700">{totalWasteManagement}</p>
+                                <p className="text-sm font-medium text-blue-600 mb-2">Waste Management</p>
+                                <p className="text-4xl font-bold text-blue-700">{totalWasteManagement}</p>
+                                <p className="text-xs text-blue-600 mt-2">Waste management issues</p>
                           </div>
                           <div className="absolute right-0 bottom-0 opacity-10">
                             <Trash2 className="w-16 h-16 text-blue-600" />
@@ -3541,146 +3760,368 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </>
                     )}
                   </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Action Items Table */}
                 <div className="mb-8">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                    <FileText className="w-5 h-5 mr-2 text-blue-600" />
-                    Action Items Details
+                  <h2 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
+                    <FileText className="w-6 h-6 mr-3 text-blue-600" />
+                    Detailed Action Items
                   </h2>
-                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
-                    <table className="w-full table-fixed">
+                  
+                  {/* Table Summary */}
+                  <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-blue-700">Total Records: {getPreviewFilteredData().length}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-green-700">Resolved: {getPreviewFilteredData().filter(item => item.actionTaken === 'Resolved').length}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-orange-700">Pending: {getPreviewFilteredData().filter(item => item.actionTaken !== 'Resolved').length}</span>
+                        </div>
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        Department: {previewDepartment === 'all' ? 'All Departments' : previewDepartment.toUpperCase()}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-lg">
+                    <table className="w-full table-auto">
                       <thead>
-                        <tr className="bg-gradient-to-r from-gray-50 to-white border-b border-gray-200">
-                          <th className="w-24 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Municipality</div>
+                        <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                          <th className="px-4 py-4 text-left min-w-[200px]">
+                            <div className="flex items-center gap-2">
+                              <MapPin className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Location</span>
+                            </div>
                           </th>
-                          <th className="w-20 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">District</div>
+                          <th className="px-4 py-4 text-left min-w-[150px]">
+                            <div className="flex items-center gap-2">
+                              <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Date & Time</span>
+                            </div>
                           </th>
-                          <th className="w-32 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">What</div>
+                          <th className="px-4 py-4 text-left min-w-[250px]">
+                            <div className="flex items-center gap-2">
+                              <AlertTriangle className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Incident Details</span>
+                            </div>
                           </th>
-                          <th className="w-20 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">When</div>
+                          <th className="px-4 py-4 text-left min-w-[150px]">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Action Status</span>
+                            </div>
                           </th>
-                          <th className="w-24 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Where</div>
-                          </th>
-                          <th className="w-28 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Taken</div>
-                          </th>
-                          {activeTab === "pnp" && (
-                            <th className="w-24 p-2 text-left">
-                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Source</div>
+                          {previewDepartment === 'all' && (
+                            <th className="px-4 py-4 text-left min-w-[120px]">
+                              <div className="flex items-center gap-2">
+                                <Building2 className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Department</span>
+                              </div>
                             </th>
                           )}
-                          {activeTab === "agriculture" && (
-                            <th className="w-32 p-2 text-left">
-                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
+                          {previewDepartment === "pnp" && (
+                            <th className="px-4 py-4 text-left min-w-[150px]">
+                              <div className="flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                                <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Source</span>
+                              </div>
                             </th>
                           )}
-                          {activeTab === "pg-enro" && (
-                            <th className="w-32 p-2 text-left">
-                              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Information</div>
-                            </th>
-                          )}
-                          <th className="w-32 p-2 text-left">
-                            <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Other Info</div>
+                          <th className="px-4 py-4 text-left min-w-[200px]">
+                            <div className="flex items-center gap-2">
+                              <Info className="w-4 h-4 text-gray-500 flex-shrink-0" />
+                              <span className="text-sm font-bold text-gray-700 uppercase tracking-wider">Additional Info</span>
+                            </div>
                           </th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-gray-200">
+                      <tbody className="divide-y divide-gray-100">
                         {(getPreviewFilteredData() || []).map((item, index) => (
                           <tr 
                             key={item.id || index} 
-                            className="hover:bg-gray-50 transition-colors duration-150"
+                            className="hover:bg-blue-50 transition-colors duration-200 group"
                           >
-                            <td className="p-2">
-                              <div className="flex items-center">
-                                <MapPin className="w-3 h-3 text-gray-400 mr-1" />
-                                <span className="text-xs font-medium text-gray-900 truncate">{item.municipality || 'N/A'}</span>
+                            {/* Location Column */}
+                            <td className="px-4 py-4">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <MapPin className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                                  <span className="text-sm font-semibold text-gray-900 break-words whitespace-normal">{item.municipality || 'N/A'}</span>
                               </div>
-                            </td>
-                            <td className="p-2">
-                              <Badge variant="outline" className="font-medium text-xs px-1 py-0">
+                                <div className="flex items-center gap-2">
+                                  <Badge variant="outline" className="text-xs px-2 py-1 bg-gray-100 text-gray-700 border-gray-300 whitespace-nowrap">
                                 {item.district || 'N/A'}
                               </Badge>
-                            </td>
-                            <td className="p-2">
-                              <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.what}>
-                                {item.what || 'N/A'}
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1 break-words leading-relaxed whitespace-normal">
+                                  {item.where || 'Location not specified'}
+                                </div>
                               </div>
                             </td>
-                            <td className="p-2">
-                              <div className="text-xs text-gray-700">{formatDate(item.when)}</div>
-                            </td>
-                            <td className="p-2">
-                              <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.where}>
-                                {item.where || 'N/A'}
+
+                            {/* Date & Time Column */}
+                            <td className="px-4 py-4">
+                              <div className="space-y-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="w-3 h-3 text-green-500 flex-shrink-0" />
+                                  <span className="text-sm font-medium text-gray-900 break-words">
+                                    {item.when ? formatDate(item.when) : 'Date not specified'}
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-500 break-words">
+                                  {item.when && !isNaN(new Date(item.when).getTime()) 
+                                    ? new Date(item.when).toLocaleTimeString('en-US', {
+                                        hour: '2-digit',
+                                        minute: '2-digit',
+                                        hour12: true
+                                      })
+                                    : 'Time not specified'
+                                  }
+                                </div>
                               </div>
                             </td>
-                            <td className="p-2 max-w-[150px]">
+
+                            {/* Incident Details Column */}
+                            <td className="px-4 py-4">
+                              <div className="space-y-2 min-w-0">
+                                <div className="flex items-start gap-2">
+                                  <AlertTriangle className="w-3 h-3 text-orange-500 mt-1 flex-shrink-0" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium text-gray-900 leading-relaxed break-words whitespace-normal" title={item.what}>
+                                      {item.what || 'No details provided'}
+                                    </p>
+                                  </div>
+                                </div>
+                                {item.who && (
+                                  <div className="text-xs text-gray-600 bg-gray-50 px-2 py-1 rounded break-words whitespace-normal">
+                                    <span className="font-medium">Involved:</span> {item.who}
+                                  </div>
+                                )}
+                                {item.actionTaken && (
+                                  <div className="text-xs text-gray-600 bg-blue-50 px-2 py-1 rounded break-words whitespace-normal">
+                                    <span className="font-medium">Action:</span> {item.actionTaken}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Action Status Column */}
+                            <td className="px-4 py-4">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <CheckCircle className={`w-4 h-4 flex-shrink-0 ${item.actionTaken === 'Resolved' ? 'text-green-500' : 'text-orange-500'}`} />
                               <Badge 
-                                className={`text-xs whitespace-normal break-words ${
+                                  className={`text-xs px-3 py-1 font-medium break-words whitespace-normal ${
                                   item.actionTaken === "Resolved"
-                                    ? 'bg-green-100 text-green-800 hover:bg-green-200'
-                                    : 'bg-orange-100 text-orange-800 hover:bg-orange-200'
+                                      ? 'bg-green-100 text-green-800 border-green-200 hover:bg-green-200'
+                                      : 'bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-200'
                                 }`}
                               >
                                 {item.actionTaken || 'Pending'}
                               </Badge>
-                            </td>
-                            {activeTab === "pnp" && (
-                              <td className="p-2">
-                                <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.source}>
-                                  {item.source || 'N/A'}
+                                </div>
+                              </td>
+
+                            {/* Department Column (only for all departments view) */}
+                            {previewDepartment === 'all' && (
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Building2 className="w-3 h-3 text-purple-500 flex-shrink-0" />
+                                  <Badge 
+                                    variant="outline" 
+                                    className={`text-xs px-2 py-1 font-medium break-words ${
+                                      item.department === 'pnp' 
+                                        ? 'bg-red-50 text-red-700 border-red-200'
+                                        : item.department === 'agriculture'
+                                        ? 'bg-green-50 text-green-700 border-green-200'
+                                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                                    }`}
+                                  >
+                                    {item.department?.toUpperCase() || 'N/A'}
+                                  </Badge>
                                 </div>
                               </td>
                             )}
-                            {activeTab === "agriculture" && (
-                              <td className="p-2">
-                                <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.otherInfo}>
-                                  {item.otherInfo || 'N/A'}
+
+                            {/* Source Column (only for PNP) */}
+                            {previewDepartment === "pnp" && (
+                              <td className="px-4 py-4">
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Shield className="w-3 h-3 text-red-500 flex-shrink-0" />
+                                  <span className="text-sm text-gray-700 break-words leading-relaxed whitespace-normal" title={item.source}>
+                                    {item.source || 'N/A'}
+                                  </span>
                                 </div>
                               </td>
                             )}
-                            {activeTab === "pg-enro" && (
-                              <td className="p-2">
-                                <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.otherInfo}>
-                                  {item.otherInfo || 'N/A'}
+
+                            {/* Additional Info Column */}
+                            <td className="px-4 py-4">
+                              <div className="flex items-start gap-2 min-w-0">
+                                <Info className="w-3 h-3 text-gray-500 mt-1 flex-shrink-0" />
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm text-gray-700 leading-relaxed break-words whitespace-normal" title={item.otherInfo}>
+                                    {item.otherInfo || 'No additional information'}
+                                  </p>
                                 </div>
-                              </td>
-                            )}
-                            <td className="p-2">
-                              <div className="text-xs text-gray-700 break-words leading-relaxed" title={item.otherInfo}>
-                                {item.otherInfo || 'N/A'}
                               </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {sortedItems && sortedItems.length > 20 && (
-                      <div className="p-4 border-t border-gray-200 bg-gray-50">
-                        <p className="text-sm text-gray-600 text-center flex items-center justify-center">
-                          <AlertCircle className="w-4 h-4 mr-2 text-blue-500" />
-                          Showing first 20 of {sortedItems.length} records. Export to PDF to see all records.
-                        </p>
+                    
+                    {/* Table Footer */}
+                    {getPreviewFilteredData().length === 0 && (
+                      <div className="p-8 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <div className="p-3 rounded-full bg-gray-100">
+                            <FileText className="w-8 h-8 text-gray-400" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-medium text-gray-900">No records found</h3>
+                            <p className="text-sm text-gray-500 mt-1">
+                              Try adjusting your filter criteria to see more results.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {getPreviewFilteredData().length > 20 && (
+                      <div className="p-4 border-t border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
+                        <div className="flex items-center justify-center gap-2">
+                          <AlertCircle className="w-4 h-4 text-blue-500" />
+                          <p className="text-sm text-blue-700 font-medium">
+                            Showing first 20 of {getPreviewFilteredData().length} records. Export to PDF to see all records.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
 
-                {/* Footer */}
-                <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <p className="text-sm text-gray-600">
-                    Generated on: {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Department: {(activeTab || 'unknown').toUpperCase()} | Total Records: {sortedItems ? sortedItems.length : 0}
-                  </p>
+                {/* Enhanced Footer */}
+                <div className="mt-8 p-6 bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl border border-gray-200 shadow-sm">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Report Information */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <FileText className="w-5 h-5 mr-2 text-blue-600" />
+                        Report Information
+                      </h3>
+                      <div className="space-y-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2">
+                          <Calendar className="w-4 h-4 text-gray-500" />
+                          <span>Generated on: {new Date().toLocaleDateString('en-US', { 
+                            weekday: 'long', 
+                            year: 'numeric', 
+                            month: 'long', 
+                            day: 'numeric' 
+                          })}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-gray-500" />
+                          <span>Time: {new Date().toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit' 
+                          })}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Building2 className="w-4 h-4 text-gray-500" />
+                          <span>Department: {(previewDepartment === 'all' ? 'All Departments' : previewDepartment.toUpperCase())}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="w-4 h-4 text-gray-500" />
+                          <span>Total Records: {getPreviewFilteredData().length}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Filter Summary */}
+                    <div className="space-y-3">
+                      <h3 className="text-lg font-semibold text-gray-800 flex items-center">
+                        <Filter className="w-5 h-5 mr-2 text-blue-600" />
+                        Applied Filters
+                      </h3>
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {previewDepartment !== 'all' && (
+                            <Badge className="bg-blue-100 text-blue-800 border-blue-200">
+                              Department: {previewDepartment.toUpperCase()}
+                            </Badge>
+                          )}
+                          {previewMonth !== 'all' && (
+                            <Badge className="bg-green-100 text-green-800 border-green-200">
+                              Month: {MONTH_NAMES[previewMonth]}
+                            </Badge>
+                          )}
+                          {previewYear !== 'all' && (
+                            <Badge className="bg-purple-100 text-purple-800 border-purple-200">
+                              Year: {previewYear}
+                            </Badge>
+                          )}
+                          {previewDistrict !== 'all' && (
+                            <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+                              District: {previewDistrict}
+                            </Badge>
+                          )}
+                          {previewDepartment === 'all' && previewMonth === 'all' && previewYear === 'all' && previewDistrict === 'all' && (
+                            <Badge className="bg-gray-100 text-gray-800 border-gray-200">
+                              No filters applied
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Report Statistics Summary */}
+                  <div className="mt-6 pt-4 border-t border-gray-200">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">{getPreviewFilteredData().length}</div>
+                        <div className="text-xs text-gray-600 uppercase tracking-wider">Total Records</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {getPreviewFilteredData().filter(item => item.actionTaken === 'Resolved').length}
+                        </div>
+                        <div className="text-xs text-gray-600 uppercase tracking-wider">Resolved</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {getPreviewFilteredData().filter(item => item.actionTaken !== 'Resolved').length}
+                        </div>
+                        <div className="text-xs text-gray-600 uppercase tracking-wider">Pending</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-purple-600">
+                          {Math.round((getPreviewFilteredData().filter(item => item.actionTaken === 'Resolved').length / Math.max(getPreviewFilteredData().length, 1)) * 100)}%
+                        </div>
+                        <div className="text-xs text-gray-600 uppercase tracking-wider">Resolution Rate</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* System Information */}
+                  <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+                    <p className="text-xs text-gray-500">
+                      Generated by IPatroller Action Center System • 
+                      Report ID: {Date.now().toString().slice(-8)} • 
+                      Version 2.0
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>

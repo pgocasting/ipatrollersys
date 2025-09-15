@@ -721,6 +721,392 @@ export const useFirebase = () => {
     }
   };
 
+  // Action Reports Functions - Month-based structure
+  const addActionReport = async (reportData) => {
+    try {
+      console.log('💾 Adding action report to Firestore...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      // Generate month key from report date
+      const reportDate = new Date(reportData.when);
+      const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
+      
+      // Generate unique report ID
+      const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Prepare report data with metadata
+      const reportWithMetadata = {
+        ...reportData,
+        id: reportId,
+        userId: user.uid,
+        userEmail: user.email,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      // Get existing month document
+      const monthDocRef = doc(db, 'actionReports', monthKey);
+      const monthDocSnap = await getDoc(monthDocRef);
+      
+      let monthData;
+      if (monthDocSnap.exists()) {
+        monthData = monthDocSnap.data();
+      } else {
+        // Create new month document structure
+        monthData = {
+          monthKey: monthKey,
+          totalReports: 0,
+          lastUpdated: new Date().toISOString(),
+          metadata: {
+            year: reportDate.getFullYear(),
+            month: reportDate.getMonth() + 1,
+            districts: [],
+            municipalities: []
+          },
+          data: []
+        };
+      }
+
+      // Add report to data array
+      monthData.data.push(reportWithMetadata);
+      monthData.totalReports = monthData.data.length;
+      monthData.lastUpdated = new Date().toISOString();
+
+      // Update metadata
+      if (reportData.district && !monthData.metadata.districts.includes(reportData.district)) {
+        monthData.metadata.districts.push(reportData.district);
+      }
+      if (reportData.municipality && !monthData.metadata.municipalities.includes(reportData.municipality)) {
+        monthData.metadata.municipalities.push(reportData.municipality);
+      }
+
+      // Save updated month document
+      await setDoc(monthDocRef, monthData);
+      
+      console.log('✅ Action report saved successfully:', reportId);
+      return { success: true, reportId, monthKey, reportCount: monthData.totalReports };
+    } catch (error) {
+      console.error('❌ Error adding action report:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const updateActionReport = async (reportId, monthKey, updateData) => {
+    try {
+      console.log('🔄 Updating action report:', reportId);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      // If monthKey is provided, try month-based structure first
+      if (monthKey) {
+        try {
+          const monthDocRef = doc(db, 'actionReports', monthKey);
+          const monthDocSnap = await getDoc(monthDocRef);
+          
+          if (monthDocSnap.exists()) {
+            const monthData = monthDocSnap.data();
+            const reportIndex = monthData.data.findIndex(report => report.id === reportId);
+            
+            if (reportIndex !== -1) {
+              // Update the report
+              monthData.data[reportIndex] = {
+                ...monthData.data[reportIndex],
+                ...updateData,
+                updatedAt: new Date().toISOString(),
+                updatedBy: user.email
+              };
+
+              monthData.lastUpdated = new Date().toISOString();
+
+              // Save updated month document
+              await setDoc(monthDocRef, monthData);
+              
+              console.log('✅ Action report updated in month structure:', reportId);
+              return { success: true };
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Month-based update failed, trying individual document:', error.message);
+        }
+      }
+
+      // Fallback: try to update as individual document (old structure)
+      try {
+        const reportDocRef = doc(db, 'actionReports', reportId);
+        await updateDoc(reportDocRef, {
+          ...updateData,
+          updatedAt: new Date().toISOString(),
+          updatedBy: user.email
+        });
+        
+        console.log('✅ Action report updated in individual document:', reportId);
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error updating individual document:', error);
+        return { success: false, error: "Report not found in either structure" };
+      }
+    } catch (error) {
+      console.error('❌ Error updating action report:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const deleteActionReport = async (reportId, monthKey) => {
+    try {
+      console.log('🗑️ Deleting action report:', reportId);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      // If monthKey is provided, try month-based structure first
+      if (monthKey) {
+        try {
+          const monthDocRef = doc(db, 'actionReports', monthKey);
+          const monthDocSnap = await getDoc(monthDocRef);
+          
+          if (monthDocSnap.exists()) {
+            const monthData = monthDocSnap.data();
+            const reportIndex = monthData.data.findIndex(report => report.id === reportId);
+            
+            if (reportIndex !== -1) {
+              // Remove the report from data array
+              monthData.data.splice(reportIndex, 1);
+              monthData.totalReports = monthData.data.length;
+              monthData.lastUpdated = new Date().toISOString();
+
+              // Save updated month document
+              await setDoc(monthDocRef, monthData);
+              
+              console.log('✅ Action report deleted from month structure:', reportId);
+              return { success: true };
+            }
+          }
+        } catch (error) {
+          console.log('⚠️ Month-based delete failed, trying individual document:', error.message);
+        }
+      }
+
+      // Fallback: try to delete as individual document (old structure)
+      try {
+        const reportDocRef = doc(db, 'actionReports', reportId);
+        await deleteDoc(reportDocRef);
+        
+        console.log('✅ Action report deleted from individual document:', reportId);
+        return { success: true };
+      } catch (error) {
+        console.error('❌ Error deleting individual document:', error);
+        return { success: false, error: "Report not found in either structure" };
+      }
+    } catch (error) {
+      console.error('❌ Error deleting action report:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const queryDocuments = async (collectionName, filters = {}) => {
+    try {
+      console.log('🔍 Querying documents from collection:', collectionName);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const collectionRef = collection(db, collectionName);
+      let q = collectionRef;
+      
+      // Apply filters if provided
+      if (filters.where) {
+        filters.where.forEach(condition => {
+          q = query(q, where(condition.field, condition.operator, condition.value));
+        });
+      }
+      
+      if (filters.orderBy) {
+        q = query(q, orderBy(filters.orderBy.field, filters.orderBy.direction || 'asc'));
+      }
+      
+      if (filters.limit) {
+        q = query(q, limit(filters.limit));
+      }
+      
+      const querySnapshot = await getDocs(q);
+      const documents = [];
+      
+      querySnapshot.forEach((doc) => {
+        documents.push({
+          id: doc.id,
+          ...doc.data()
+        });
+      });
+      
+      console.log('✅ Found documents in collection:', documents.length);
+      return { success: true, data: documents };
+    } catch (error) {
+      console.error('❌ Error querying documents:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getActionReportsByMonth = async (monthKey) => {
+    try {
+      console.log('🔍 Getting action reports for month:', monthKey);
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const monthDocRef = doc(db, 'actionReports', monthKey);
+      const monthDocSnap = await getDoc(monthDocRef);
+      
+      if (monthDocSnap.exists()) {
+        const monthData = monthDocSnap.data();
+        console.log('✅ Found action reports for month:', monthKey, monthData.data?.length || 0);
+        return { success: true, data: monthData.data || [] };
+      } else {
+        console.log('📝 No action reports found for month:', monthKey);
+        return { success: true, data: [] };
+      }
+    } catch (error) {
+      console.error('❌ Error getting action reports by month:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getAllActionReportsMonths = async () => {
+    try {
+      console.log('🔍 Getting all action report months...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const collectionRef = collection(db, 'actionReports');
+      const querySnapshot = await getDocs(collectionRef);
+      
+      const months = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        months.push({
+          monthKey: doc.id,
+          ...data
+        });
+      });
+      
+      // Sort by month key (newest first)
+      months.sort((a, b) => {
+        const [aMonth, aYear] = a.monthKey.split('-').map(Number);
+        const [bMonth, bYear] = b.monthKey.split('-').map(Number);
+        if (aYear !== bYear) return bYear - aYear;
+        return bMonth - aMonth;
+      });
+      
+      console.log('✅ Found action report months:', months.length);
+      return { success: true, data: months };
+    } catch (error) {
+      console.error('❌ Error getting all action report months:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const getAllActionReports = async () => {
+    try {
+      console.log('🔍 Getting all action reports from Firestore (hybrid approach)...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      const allReports = [];
+      
+      // First, try the new month-based structure
+      try {
+        const monthsResult = await getAllActionReportsMonths();
+        if (monthsResult.success && monthsResult.data.length > 0) {
+          console.log('📅 Found month-based structure with', monthsResult.data.length, 'months');
+          for (const month of monthsResult.data) {
+            if (month.data && Array.isArray(month.data)) {
+              allReports.push(...month.data);
+            }
+          }
+          console.log('✅ Found', allReports.length, 'reports from month-based structure');
+        }
+      } catch (error) {
+        console.log('⚠️ Month-based structure not found or error:', error.message);
+      }
+      
+      // If no reports found in month-based structure, try the old individual document structure
+      if (allReports.length === 0) {
+        console.log('🔍 Trying old individual document structure...');
+        try {
+          const collectionRef = collection(db, 'actionReports');
+          const querySnapshot = await getDocs(collectionRef);
+          
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            
+            // Check if this is a month-based document (has 'data' array)
+            if (data.data && Array.isArray(data.data)) {
+              console.log('📅 Found month document:', doc.id, 'with', data.data.length, 'reports');
+              allReports.push(...data.data);
+            } else {
+              // This is an individual action report document (old structure)
+              console.log('📄 Found individual report document:', doc.id);
+              allReports.push({
+                id: doc.id,
+                ...data
+              });
+            }
+          });
+          
+          console.log('✅ Found', allReports.length, 'total reports from both structures');
+        } catch (error) {
+          console.error('❌ Error loading from old structure:', error);
+        }
+      }
+      
+      // Sort by creation date or when field (newest first)
+      allReports.sort((a, b) => {
+        const aDate = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
+        const bDate = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
+        return bDate - aDate;
+      });
+      
+      console.log('✅ Found total action reports:', allReports.length);
+      return { success: true, data: allReports };
+    } catch (error) {
+      console.error('❌ Error getting all action reports:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     user,
     loading,
@@ -743,6 +1129,13 @@ export const useFirebase = () => {
     createUserByAdmin,
     updateUser,
     deleteUser,
-    getUsers
+    getUsers,
+    addActionReport,
+    updateActionReport,
+    deleteActionReport,
+    queryDocuments,
+    getActionReportsByMonth,
+    getAllActionReportsMonths,
+    getAllActionReports
   };
 };

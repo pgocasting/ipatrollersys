@@ -104,13 +104,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = patrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        const isActive = dailyCount >= 15;
+        const isActive = dailyCount >= 5;
         
         return {
           municipality,
           dailyCount,
           isActive,
-          percentage: dailyCount >= 15 ? 100 : Math.round((dailyCount / 15) * 100)
+          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
         };
       });
     });
@@ -441,8 +441,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0)
       return "bg-red-600 text-white";
     
-    // Daily status uses fixed threshold: Active if >= 15, Inactive if <= 14
-    if (value >= 15)
+    // Daily status uses fixed threshold: Active if >= 5, Inactive if <= 4
+    if (value >= 5)
       return "bg-green-600 text-white";
     return "bg-red-600 text-white";
   };
@@ -451,8 +451,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    // Daily status uses fixed threshold: Active if >= 15, Inactive if <= 14
-    if (value >= 15) return "Active";
+    // Daily status uses fixed threshold: Active if >= 5, Inactive if <= 4
+    if (value >= 5) return "Active";
     return "Inactive";
   };
 
@@ -497,8 +497,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return dataToUse
       .filter(item => item && (item.municipality || item.id))
       .map(item => {
-        const activeDays = item.data.filter(count => count >= 15).length;
-        const inactiveDays = item.data.filter(count => count < 15 && count > 0).length;
+        const activeDays = item.data.filter(count => count >= 5).length;
+        const inactiveDays = item.data.filter(count => count < 5 && count > 0).length;
         const totalDays = item.data.length;
         const activePercentage = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
         
@@ -1514,9 +1514,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <div className="flex items-center gap-2 text-sm text-blue-800">
                 <BarChart3 className="w-4 h-4" />
                 <span className="font-medium">Required Counts per Daily:</span>
-                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">15 Above = Green</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 Above = Green</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">15 Below = Red</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">5 Below = Red</span>
               </div>
             </div>
           </CardHeader>
