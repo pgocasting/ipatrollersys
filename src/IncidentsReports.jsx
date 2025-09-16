@@ -6,6 +6,10 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
 import { Textarea } from "./components/ui/textarea";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
 import { 
   collection, 
   getDocs, 
@@ -378,23 +382,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [editingIncident, setEditingIncident] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
-
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showMenuDropdown) {
-        const dropdown = document.getElementById('incidents-menu-dropdown');
-        const button = document.getElementById('incidents-menu-button');
-        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
-          setShowMenuDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenuDropdown]);
   const [selectedMonth, setSelectedMonth] = useState("all");
   // PDF Edit Interface State
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
@@ -3254,146 +3241,96 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Incidents Reports</h1>
-            <p className="text-gray-500 mt-2">Manage and track incident reports with Excel/CSV import support</p>
+            <p className="text-gray-500 mt-2">Manage and track incident reports with comprehensive analytics</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {/* 3-Lines Menu */}
-            <div className="relative">
-              <Button
-                id="incidents-menu-button"
-                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-                title="Incidents Reports Options"
-              >
-                <Menu className="w-5 h-5" />
-                <span className="text-sm font-medium">View Options</span>
-              </Button>
-              
-              {/* Dropdown Menu */}
-              {showMenuDropdown && (
-                <div 
-                  id="incidents-menu-dropdown"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+            {/* View Options Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="secondary"
+                  size="default"
+                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                  title="Incidents Reports Options"
                 >
-                  <div className="py-1">
-                    {/* Incident Management */}
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Incident Management</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        setShowAddModal(true);
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={loading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Plus className="w-4 h-4 text-green-600" />
-                      <span>Add New Incident</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        setShowSummaryModal(true);
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={loading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <BarChart3 className="w-4 h-4 text-indigo-600" />
-                      <span>Summary Insights</span>
-                    </button>
-                    
-                    <div className="border-t border-gray-200 my-1"></div>
-                    
-                    {/* Data Management */}
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Management</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        handleImportExcel();
-                        setShowMenuDropdown(false);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
-                    >
-                      <Upload className="w-4 h-4 text-blue-600" />
-                      <span>Import Excel/CSV</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        showPdfEditInterface();
-                        setShowMenuDropdown(false);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-200"
-                    >
-                      <Printer className="w-4 h-4 text-purple-600" />
-                      <span>Export to PDF</span>
-                    </button>
-                    
-                    <div className="border-t border-gray-200 my-1"></div>
-                    
-                    {/* Data Cleanup */}
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Cleanup</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        identifyDuplicateIncidents();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={cleanupLoading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Search className="w-4 h-4 text-orange-600" />
-                      <span>Identify Duplicates</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        manualCleanupDuplicates();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={cleanupLoading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-yellow-50 hover:text-yellow-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Eraser className="w-4 h-4 text-yellow-600" />
-                      <span>Clean Duplicates</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        clearCurrentMonthIncidents();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={cleanupLoading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Calendar className="w-4 h-4 text-indigo-600" />
-                      <span>Clear Current Month</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
-                          clearAllIncidentsData();
-                          setShowMenuDropdown(false);
-                        }
-                      }}
-                      disabled={cleanupLoading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-600" />
-                      <span>Clear All Data</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                  <Menu className="w-5 h-5" />
+                  <span className="text-sm font-medium">View Options</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-64 bg-white border border-gray-200 shadow-lg rounded-lg" align="end" sideOffset={5}>
+                <DropdownMenuLabel>Incident Management</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setShowAddModal(true)}
+                  disabled={loading}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-green-50 hover:text-green-700 focus:bg-green-50 focus:text-green-700"
+                >
+                  <Plus className="w-4 h-4 text-green-600" />
+                  <span>Add New Incident</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setShowSummaryModal(true)}
+                  disabled={loading}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
+                >
+                  <BarChart3 className="w-4 h-4 text-indigo-600" />
+                  <span>Summary Insights</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Data Management</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={handleImportExcel}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:text-blue-700"
+                >
+                  <Upload className="w-4 h-4 text-blue-600" />
+                  <span>Import Excel/CSV</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={showPdfEditInterface}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-50 focus:text-purple-700"
+                >
+                  <Printer className="w-4 h-4 text-purple-600" />
+                  <span>Export to PDF</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Data Cleanup</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={identifyDuplicateIncidents}
+                  disabled={cleanupLoading}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-orange-50 hover:text-orange-700 focus:bg-orange-50 focus:text-orange-700"
+                >
+                  <Search className="w-4 h-4 text-orange-600" />
+                  <span>Identify Duplicates</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={manualCleanupDuplicates}
+                  disabled={cleanupLoading}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-yellow-50 hover:text-yellow-700 focus:bg-yellow-50 focus:text-yellow-700"
+                >
+                  <Eraser className="w-4 h-4 text-yellow-600" />
+                  <span>Clean Duplicates</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={clearCurrentMonthIncidents}
+                  disabled={cleanupLoading}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
+                >
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  <span>Clear Current Month</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
+                      clearAllIncidentsData();
+                    }
+                  }}
+                  disabled={cleanupLoading}
+                  className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
+                >
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <span>Clear All Data</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <input
               id="incidents-file-input"
               name="incidents-file-input"
@@ -3485,143 +3422,219 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
           </div>
         )}
-        {/* Stats Cards */}
+        {/* Quick Stats */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-            <div className="text-2xl font-bold text-blue-600">{stats.total}</div>
-            <div className="text-sm text-gray-600">Total Incidents</div>
-          </div>
-          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-            <div className="text-2xl font-bold text-green-600">{stats.actionTaken}</div>
-            <div className="text-sm text-gray-600">Action Taken</div>
-          </div>
-          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-            <div className="text-2xl font-bold text-red-600">{stats.drugs}</div>
-            <div className="text-sm text-gray-600">Drugs</div>
-          </div>
-          <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-            <div className="text-2xl font-bold text-orange-600">{stats.accidents}</div>
-            <div className="text-sm text-gray-600">Accidents</div>
-          </div>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {stats.total.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <AlertTriangle className="w-8 h-8 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Action Taken</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {stats.actionTaken.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Drug Related</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {stats.drugs.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <Shield className="w-8 h-8 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Accidents</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    {stats.accidents.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-3 bg-orange-100 rounded-xl">
+                  <Car className="w-8 h-8 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        {/* Filters and Search */}
+        {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">
-              Filters & Search
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div>
-                <Label htmlFor="search" className="text-gray-700">
-                  Search
-                </Label>
-                <Input
-                  id="search"
-                  placeholder="Search incidents..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-1"
-                />
+          <CardContent className="p-6">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+              {/* Header Section */}
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <Filter className="w-4 h-4 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Report Filters</h3>
+                  <p className="text-sm text-gray-500">Refine your incident data</p>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="month-filter" className="text-gray-700">
-                  Month
-                </Label>
-                <select
-                  id="month-filter"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                    bg-white border-gray-300
-                  }"
-                >
-                  <option value="all">All Months</option>
-                  {availableMonths.map((month) => (
-                    <option key={month} value={month}>
-                      {month}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="status-filter" className="transition-colors duration-300 ${
-                  text-gray-700
-                }">
-                  Status
-                </Label>
-                <select
-                  id="status-filter"
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value)}
-                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 ${
-                    bg-white border-gray-300
-                  }"
-                >
-                  <option value="all">All Status</option>
-                                  <option value="Active">Active</option>
-                  <option value="Under Investigation">Under Investigation</option>
-                <option value="Completed">Completed</option>
-                </select>
-              </div>
-              <div className="flex items-end">
-                <Button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setFilterStatus("all");
-                    setSelectedMonth("all");
-                  }}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Clear Filters
-                </Button>
+              
+              {/* Filters Section */}
+              <div className="flex flex-col sm:flex-row items-end gap-4 w-full lg:w-auto">
+                {/* Search Filter */}
+                <div className="flex flex-col gap-2 w-full sm:w-[240px]">
+                  <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      id="search"
+                      placeholder="Search incidents..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </div>
+                
+                {/* Month Filter */}
+                <div className="flex flex-col gap-2 w-full sm:w-[160px]">
+                  <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Months" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Months</SelectItem>
+                      {availableMonths.map((month) => (
+                        <SelectItem key={month} value={month}>
+                          {month}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Status Filter */}
+                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                  <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Status</Label>
+                  <Select value={filterStatus} onValueChange={setFilterStatus}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All Status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Status</SelectItem>
+                      <SelectItem value="Active">Active</SelectItem>
+                      <SelectItem value="Under Investigation">Under Investigation</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Clear Filters Button */}
+                <div className="flex items-end">
+                  <Button
+                    onClick={() => {
+                      setSearchTerm("");
+                      setFilterStatus("all");
+                      setSelectedMonth("all");
+                    }}
+                    variant="outline"
+                    size="default"
+                  >
+                    Clear Filters
+                  </Button>
+                </div>
               </div>
             </div>
+            
+            {/* Active Filters Display */}
+            {(searchTerm || filterStatus !== "all" || selectedMonth !== "all") && (
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium text-gray-600">Active filters:</span>
+                  {searchTerm && (
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                      <Search className="w-3 h-3 mr-1" />
+                      Search: "{searchTerm}"
+                    </Badge>
+                  )}
+                  {selectedMonth !== "all" && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                      <Calendar className="w-3 h-3 mr-1" />
+                      Month: {selectedMonth}
+                    </Badge>
+                  )}
+                  {filterStatus !== "all" && (
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200">
+                      <Activity className="w-3 h-3 mr-1" />
+                      Status: {filterStatus}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
         {/* Incidents Table */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold text-gray-900">
-              Incidents List ({filteredIncidents.length} incidents)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-200">
-                    <th className="text-left p-3 font-medium text-gray-700">Type</th>
-                    <th className="text-left p-3 font-medium text-gray-700">What</th>
-                    <th className="text-left p-3 font-medium text-gray-700">When</th>
-                    <th className="text-left p-3 font-medium text-gray-700">Location</th>
-                    <th className="text-left p-3 font-medium text-gray-700">Who</th>
-                    <th className="text-left p-3 font-medium text-gray-700">Why</th>
-                    <th className="text-left p-3 font-medium text-gray-700">Action Taken</th>
-                    <th className="text-left p-3 font-medium text-gray-700">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredIncidents.length === 0 ? (
-                    <tr>
-                      <td colSpan={8} className="p-8 text-center">
-                        <div className="text-lg text-gray-500">
-                          {incidents.length === 0 ? (
-                            <div>
-                              <p className="mb-2">No incidents found.</p>
-                              <p className="text-sm">Click "Add Incident" to create your first incident or import data from Excel.</p>
-                            </div>
-                          ) : (
-                            <div>
-                              <p className="mb-2">No incidents match your current filters.</p>
-                              <p className="text-sm">Try adjusting your search terms or filters.</p>
-                            </div>
-                          )}
+        <div className="border rounded-md border-gray-200 shadow-sm overflow-x-auto">
+          <div className="min-w-[1200px]">
+            <Table className="border-gray-200 w-full table-fixed">
+              <TableCaption className="text-slate-500">Incident reports and their current status.</TableCaption>
+            <TableHeader>
+              <TableRow className="border-b border-gray-200">
+                <TableHead className="w-[140px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Type</TableHead>
+                <TableHead className="w-[280px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Description</TableHead>
+                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Date</TableHead>
+                <TableHead className="w-[200px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Location</TableHead>
+                <TableHead className="w-[160px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Officer</TableHead>
+                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Status</TableHead>
+                <TableHead className="w-[200px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Action Taken</TableHead>
+                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredIncidents.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="p-8 text-center align-middle">
+                    <div className="text-lg text-gray-500">
+                      {incidents.length === 0 ? (
+                        <div>
+                          <p className="mb-2">No incidents found.</p>
+                          <p className="text-sm">Click "Add Incident" to create your first incident or import data from Excel.</p>
                         </div>
-                      </td>
-                    </tr>
+                      ) : (
+                        <div>
+                          <p className="mb-2">No incidents match your current filters.</p>
+                          <p className="text-sm">Try adjusting your search terms or filters.</p>
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
                   ) : (
                     filteredIncidents.map((incident, index) => {
                       // Debug: Log incident data being displayed in table
@@ -3634,67 +3647,75 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         officer: incident.officer
                       });
                       return (
-                      <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
+                      <TableRow key={index} className="border-gray-200 hover:bg-gray-50/50">
+                      <TableCell className="font-medium break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
                             {incident.incidentType}
                           </p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <p className="text-gray-900 text-sm leading-relaxed break-words hyphens-auto word-wrap">
                             {incident.description || '-'}
                           </p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
-                            {incident.date}
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <p className="text-gray-900 text-sm break-words hyphens-auto word-wrap">
+                            {incident.date || '-'}
                           </p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
-                            {incident.location}
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
+                            {incident.location || '-'}
                           </p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
-                            {incident.officer}
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <p className="text-gray-900 text-sm break-words hyphens-auto word-wrap">
+                            {incident.officer || '-'}
                           </p>
                         </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <p className="text-gray-900">
-                            {incident.why}
-                          </p>
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs break-words hyphens-auto word-wrap whitespace-normal ${
+                              incident.status === 'Active' ? 'bg-red-100 text-red-800 border-red-200' :
+                              incident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                              incident.status === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
+                              'bg-gray-100 text-gray-800 border-gray-200'
+                            }`}
+                          >
+                            {incident.status || 'Unknown'}
+                          </Badge>
                         </div>
-                      </td>
-                                              <td className="p-3">
-                          <div>
-                            {incident.actionType ? (
-                              <p className="text-gray-900">
-                                {incident.actionType}
-                              </p>
-                            ) : (
-                              <p className="text-gray-900">
-                                No Action
-                              </p>
-                            )}
-                          </div>
-                        </td>
-                      <td className="p-3">
-                        <div className="flex gap-2">
+                      </TableCell>
+                      <TableCell className="break-all align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0">
+                          {incident.actionType ? (
+                            <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
+                              {incident.actionType}
+                            </p>
+                          ) : (
+                            <p className="text-gray-500 text-sm italic break-words hyphens-auto word-wrap">
+                              No Action
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right break-words align-top whitespace-normal">
+                        <div className="py-2 px-4 min-w-0 flex justify-end gap-1">
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => {
                               // Debug: Log incident data when viewing
                               console.log('👁️ Opening view modal for incident:', {
@@ -3707,45 +3728,45 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                               setViewingIncident(incident);
                               setShowViewModal(true);
                             }}
-                            className="flex items-center gap-1"
+                            className="h-8 w-8 p-0"
                             title="View Details"
                           >
-                            <FileText className="w-4 h-4" />
+                            <Eye className="w-4 h-4" />
                           </Button>
                           {incident.link && (
                             <Button
                               size="sm"
-                              variant="outline"
+                              variant="ghost"
                               onClick={() => window.open(incident.link, '_blank')}
-                              className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+                              className="h-8 w-8 p-0 bg-blue-50 hover:bg-blue-100 text-blue-700"
                               title="Open Link"
                             >
-                                                          <Eye className="w-4 h-4" />
+                              <Link className="w-4 h-4" />
                             </Button>
                           )}
                           <Button
                             size="sm"
-                            variant="outline"
+                            variant="ghost"
                             onClick={() => {
                               const validatedIncident = validateIncidentForEdit(incident);
                               setEditingIncident(validatedIncident);
                               setShowEditModal(true);
                             }}
+                            className="h-8 w-8 p-0"
                             title="Edit Incident"
                           >
                             <Edit className="w-4 h-4" />
                           </Button>
                         </div>
-                      </td>
-                      </tr>
+                      </TableCell>
+                      </TableRow>
                     );
                     })
                   )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+            </TableBody>
+          </Table>
+          </div>
+        </div>
       </div>
       {/* Add Incident Modal */}
       {showAddModal && (
@@ -3783,30 +3804,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <X className="h-6 w-6" />
               </button>
             </div>
-                        {/* Content with improved spacing and styling */}
+            {/* Content with improved spacing and styling */}
             <div className="p-8 overflow-y-auto max-h-[75vh]">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="incidentType" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="incidentType" className="text-sm font-semibold text-gray-700">
                     Department *
                   </Label>
-                  <select
-                    id="incidentType"
-                    value={newIncident.incidentType}
-                    onChange={(e) => handleIncidentTypeChange(e.target.value)}
-                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
-                  >
-                    <option value="">Select Incident Type</option>
-                    {incidentTypes.map((type, index) => (
-                      <option key={index} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={newIncident.incidentType} onValueChange={handleIncidentTypeChange}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select Incident Type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {incidentTypes.map((type, index) => (
+                        <SelectItem key={index} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   {newIncident.incidentType && newIncident.incidentType.startsWith("Other (") && (
                     <p className="mt-1 text-xs transition-colors duration-300 ${
                       text-blue-600
@@ -3833,46 +3849,38 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   />
                 </div>
                 <div>
-                  <Label htmlFor="district" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="district" className="text-sm font-semibold text-gray-700">
                     District *
                   </Label>
-                  <select
-                    id="district"
-                    value={newIncident.district}
-                    onChange={(e) => handleDistrictChange(e.target.value)}
-                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
-                  >
-                    {districts.map((district) => (
-                      <option key={district} value={district}>
-                        {district}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={newIncident.district} onValueChange={handleDistrictChange}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select District" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {districts.map((district) => (
+                        <SelectItem key={district} value={district}>
+                          {district}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label htmlFor="municipality" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="municipality" className="text-sm font-semibold text-gray-700">
                     Municipality *
                   </Label>
-                  <select
-                    id="municipality"
-                    value={newIncident.municipality}
-                    onChange={(e) => setNewIncident({...newIncident, municipality: e.target.value})}
-                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
-                  >
-                    {municipalitiesByDistrict[newIncident.district]?.map((municipality) => (
-                      <option key={municipality} value={municipality}>
-                        {municipality}
-                      </option>
-                    )) || []}
-                  </select>
+                  <Select value={newIncident.municipality} onValueChange={(value) => setNewIncident({...newIncident, municipality: value})}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select Municipality" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {municipalitiesByDistrict[newIncident.district]?.map((municipality) => (
+                        <SelectItem key={municipality} value={municipality}>
+                          {municipality}
+                        </SelectItem>
+                      )) || []}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <Label htmlFor="location" className="text-sm font-semibold transition-colors duration-300 ${
