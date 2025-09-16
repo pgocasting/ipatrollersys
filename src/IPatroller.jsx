@@ -241,13 +241,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         // If we have data from Firestore, use it
         if (firestoreData.length > 0) {
-          console.log('📊 Loaded data from Firestore:', firestoreData.length, 'municipalities');
           setPatrolData(firestoreData);
           setFirestoreStatus('connected');
         } else {
           // If no data exists, don't create initial structure
           // Only show municipalities that actually have data
-          console.log('📝 No data found for this month, showing empty state');
           setPatrolData([]);
           setFirestoreStatus('connected');
         }
@@ -312,7 +310,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Execute batch write
       await Promise.all(batch);
-      console.log('✅ Initial Firestore structure created');
       
       // Update local state
       setPatrolData(initialData);
@@ -327,7 +324,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   };
 
   const createLocalFallbackData = () => {
-    console.log('🔄 Creating local fallback data...');
     // Don't create fallback data for all municipalities
     // Only show municipalities that actually have data in Firestore
     setPatrolData([]);
@@ -336,7 +332,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   const syncToFirestore = async () => {
     if (firestoreStatus !== 'connected') {
-      console.log('❌ Cannot sync: Firestore not connected');
       return;
     }
 
@@ -371,7 +366,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       });
 
       await Promise.all(batch);
-      console.log('✅ Data synced to Firestore for municipalities with data');
       setFirestoreStatus('connected');
       
       // Show success toast with details about actually updated municipalities
@@ -887,13 +881,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     };
 
     // Log to verify data source
-    console.log('📊 Generating summary report based on IPatroller daily counts:', {
+    // Generate summary report based on IPatroller daily counts
+    const reportData = {
       totalMunicipalities: patrolData.length,
       totalDaysInMonth: totalDaysInMonth,
       daysWithData: daysWithData,
       dataCompleteness: previewData.dataCompleteness + '%',
       overallSummary: overallSummary
-    });
+    };
 
     setPreviewData(previewData);
     setShowPrintPreview(true);

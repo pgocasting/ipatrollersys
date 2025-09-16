@@ -5,7 +5,6 @@ import { db } from '../firebase';
 // Initialize default users in Firestore
 export const initializeUsers = async () => {
   try {
-    console.log('🔧 Initializing users collection in Firestore...');
     
     if (!db) {
       console.warn('⚠️ Firestore database not available');
@@ -16,7 +15,6 @@ export const initializeUsers = async () => {
     const docSnap = await getDoc(docRef);
     
     if (!docSnap.exists()) {
-      console.log('📝 Creating initial users document...');
       
       const defaultUsers = [
         {
@@ -38,10 +36,8 @@ export const initializeUsers = async () => {
         updatedBy: "system"
       });
       
-      console.log('✅ Initial users document created successfully');
       return { success: true, data: defaultUsers };
     } else {
-      console.log('✅ Users document already exists');
       const existingUsers = docSnap.data().users || [];
       return { success: true, data: existingUsers };
     }
@@ -54,7 +50,6 @@ export const initializeUsers = async () => {
 // Check if users collection exists and is accessible
 export const checkUsersCollection = async () => {
   try {
-    console.log('🔍 Checking users collection...');
     
     if (!db) {
       return { success: false, error: "Database not available" };
@@ -65,10 +60,8 @@ export const checkUsersCollection = async () => {
     
     if (docSnap.exists()) {
       const users = docSnap.data().users || [];
-      console.log('✅ Users collection accessible, found', users.length, 'users');
       return { success: true, data: users };
     } else {
-      console.log('📝 Users collection does not exist');
       return { success: true, data: [] };
     }
   } catch (error) {
@@ -80,7 +73,6 @@ export const checkUsersCollection = async () => {
 // Create a test user for development
 export const createTestUser = async (email, password) => {
   try {
-    console.log('🧪 Creating test user:', email);
     
     const testUser = {
       id: Date.now(),

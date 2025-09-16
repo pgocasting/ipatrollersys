@@ -1,7 +1,6 @@
 // Console helper functions - Firebase has been removed from this project
 // These functions are kept as placeholders to prevent import errors
 
-console.log('⚠️ Firebase has been removed from this project');
 
 // Placeholder functions that return error messages
 window.testFirebase = async () => {

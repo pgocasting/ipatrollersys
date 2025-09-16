@@ -138,15 +138,15 @@ import {
   MonitorSpeaker as MonitorSpeakerIcon,
   Menu
 } from "lucide-react";
-// Enhanced Tailwind utility classes for modern styling
+// Enhanced Tailwind utility classes for black and white theme
 const enhancedClasses = {
-  // Modern gradient backgrounds
-  gradientPrimary: 'bg-gradient-to-br from-blue-500 to-purple-600',
-  gradientSecondary: 'bg-gradient-to-br from-green-500 to-teal-600',
-  gradientWarning: 'bg-gradient-to-br from-yellow-500 to-orange-600',
+  // Black and white gradient backgrounds
+  gradientPrimary: 'bg-gradient-to-br from-black to-gray-800',
+  gradientSecondary: 'bg-gradient-to-br from-gray-600 to-gray-800',
+  gradientWarning: 'bg-gradient-to-br from-gray-500 to-gray-700',
   // Glass morphism effects
-  glassEffect: 'backdrop-blur-md bg-white/10 border border-white/20',
-  glassEffectDark: 'backdrop-blur-md bg-black/10 border border-white/10',
+  glassEffect: 'backdrop-blur-md bg-white/10 border border-gray-200',
+  glassEffectDark: 'backdrop-blur-md bg-black/10 border border-gray-300',
   // Enhanced shadows
   shadowGlow: 'shadow-lg shadow-blue-500/25',
   shadowGlowGreen: 'shadow-lg shadow-green-500/25',
@@ -476,14 +476,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       // Automatically clean up duplicates if any were found
       if (documentsToDelete.length > 0) {
-        console.log(`🧹 Auto-cleaning ${documentsToDelete.length} duplicate incidents...`);
         try {
           const batch = writeBatch(db);
           documentsToDelete.forEach(docRef => {
             batch.delete(docRef);
           });
           await batch.commit();
-          console.log(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
         } catch (cleanupError) {
           console.error('❌ Error during automatic duplicate cleanup:', cleanupError);
           console.warn('💡 Duplicates were detected but could not be automatically removed. Use manual cleanup options.');
@@ -491,9 +489,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       }
       setIncidents(incidentsData);
       setFirestoreStatus('connected');
-      console.log('✅ Loaded incidents from Firestore:', incidentsData.length);
       if (duplicateIds.size > 0) {
-        console.log(`ℹ️ Found and cleaned up ${duplicateIds.size} duplicate incident IDs:`, Array.from(duplicateIds));
       }
     } catch (error) {
       console.error('❌ Error loading incidents:', error);
@@ -523,7 +519,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         updatedAt: new Date().toISOString()
       });
       setFirestoreStatus('connected');
-      console.log('✅ Incident saved to Firestore with ID:', docRef.id);
       return docRef.id;
     } catch (error) {
       console.error('❌ Error saving incident:', error);
@@ -549,14 +544,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         });
-        console.log('✅ New incident created with ID:', newDocRef.id);
       } else {
         // Update existing document
         await updateDoc(incidentRef, {
           ...incidentData,
           updatedAt: new Date().toISOString()
         });
-        console.log('✅ Incident updated in Firestore:', incidentId);
       }
       setFirestoreStatus('connected');
     } catch (error) {
@@ -574,7 +567,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const incidentRef = doc(db, 'incidents', incidentId);
       await deleteDoc(incidentRef);
       setFirestoreStatus('connected');
-      console.log('✅ Incident deleted from Firestore:', incidentId);
     } catch (error) {
       console.error('❌ Error deleting incident:', error);
       setFirestoreStatus('error');
@@ -596,7 +588,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       await batch.commit();
       setIncidents([]);
       setFirestoreStatus('connected');
-      console.log('✅ All incidents cleared from Firestore');
     } catch (error) {
       console.error('❌ Error clearing incidents:', error);
       setFirestoreStatus('error');
@@ -621,14 +612,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           // This is a duplicate, remove it
           batch.delete(doc.ref);
           duplicatesRemoved++;
-          console.log('🗑️ Removing duplicate incident:', doc.id);
         } else {
           incidentsMap.set(key, doc);
         }
       });
       if (duplicatesRemoved > 0) {
         await batch.commit();
-        console.log(`✅ Removed ${duplicatesRemoved} duplicate incidents from Firestore`);
         // Reload incidents after cleanup
         await loadIncidents();
       } else {
@@ -662,11 +651,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       if (removedCount > 0) {
         await batch.commit();
-        console.log(`✅ Removed ${removedCount} incidents from current month (${currentMonth + 1}/${currentYear})`);
         await loadIncidents();
         alert(`✅ Successfully removed ${removedCount} incidents from current month`);
       } else {
-        console.log('✅ No incidents found for current month');
         alert('✅ No incidents found for current month');
       }
       setFirestoreStatus('connected');
@@ -692,11 +679,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       if (removedCount > 0) {
         await batch.commit();
-        console.log(`✅ Removed all ${removedCount} incidents from Firestore`);
         setIncidents([]);
         alert(`✅ Successfully removed all ${removedCount} incidents`);
       } else {
-        console.log('✅ No incidents found to remove');
         alert('✅ No incidents found to remove');
       }
       setFirestoreStatus('connected');
@@ -765,7 +750,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         }
       });
       if (documentsToDelete.length > 0) {
-        console.log(`🧹 Manually cleaning up ${documentsToDelete.length} duplicate incidents...`);
         const batch = writeBatch(db);
         documentsToDelete.forEach(docRef => {
           batch.delete(docRef);
@@ -776,7 +760,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         await loadIncidents();
         alert(`✅ Successfully cleaned up ${documentsToDelete.length} duplicate incidents`);
       } else {
-        console.log('✅ No duplicates found to clean up');
         alert('✅ No duplicates found to clean up');
       }
       setFirestoreStatus('connected');
@@ -809,12 +792,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     const handleOnline = () => {
       setIsOnline(true);
       setConnectionError(null);
-      console.log('🌐 Internet connection restored');
     };
     const handleOffline = () => {
       setIsOnline(false);
       setConnectionError('No internet connection');
-      console.log('❌ Internet connection lost');
     };
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
@@ -3250,7 +3231,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <Button
                   variant="secondary"
                   size="default"
-                  className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                  className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                   title="Incidents Reports Options"
                 >
                   <Menu className="w-5 h-5" />
@@ -3262,9 +3243,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <DropdownMenuItem
                   onClick={() => setShowAddModal(true)}
                   disabled={loading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-green-50 hover:text-green-700 focus:bg-green-50 focus:text-green-700"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
                 >
-                  <Plus className="w-4 h-4 text-green-600" />
+                  <Plus className="w-4 h-4 text-black" />
                   <span>Add New Incident</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -3272,23 +3253,23 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   disabled={loading}
                   className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
                 >
-                  <BarChart3 className="w-4 h-4 text-indigo-600" />
+                  <BarChart3 className="w-4 h-4 text-black" />
                   <span>Summary Insights</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Data Management</DropdownMenuLabel>
                 <DropdownMenuItem
                   onClick={handleImportExcel}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-blue-50 hover:text-blue-700 focus:bg-blue-50 focus:text-blue-700"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
                 >
-                  <Upload className="w-4 h-4 text-blue-600" />
+                  <Upload className="w-4 h-4 text-black" />
                   <span>Import Excel/CSV</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={showPdfEditInterface}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-purple-50 hover:text-purple-700 focus:bg-purple-50 focus:text-purple-700"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
                 >
-                  <Printer className="w-4 h-4 text-purple-600" />
+                  <Printer className="w-4 h-4 text-black" />
                   <span>Export to PDF</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -3296,17 +3277,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <DropdownMenuItem
                   onClick={identifyDuplicateIncidents}
                   disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-orange-50 hover:text-orange-700 focus:bg-orange-50 focus:text-orange-700"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
                 >
-                  <Search className="w-4 h-4 text-orange-600" />
+                  <Search className="w-4 h-4 text-black" />
                   <span>Identify Duplicates</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={manualCleanupDuplicates}
                   disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-yellow-50 hover:text-yellow-700 focus:bg-yellow-50 focus:text-yellow-700"
+                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
                 >
-                  <Eraser className="w-4 h-4 text-yellow-600" />
+                  <Eraser className="w-4 h-4 text-black" />
                   <span>Clean Duplicates</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -3314,7 +3295,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   disabled={cleanupLoading}
                   className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
                 >
-                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  <Calendar className="w-4 h-4 text-black" />
                   <span>Clear Current Month</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -3324,7 +3305,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     }
                   }}
                   disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
+                  className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-gray-100 hover:text-red-700 focus:bg-gray-100 focus:text-red-700"
                 >
                   <Trash2 className="w-4 h-4 text-red-600" />
                   <span>Clear All Data</span>
@@ -3344,12 +3325,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         </div>
         {/* Loading Indicator */}
         {loading && (
-          <div className="mb-4 p-4 rounded-lg bg-blue-50 border border-blue-200">
+          <div className="mb-4 p-4 rounded-lg bg-gray-100 border border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              <span className="text-sm font-medium transition-colors duration-300 ${
-                text-blue-700
-              }">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
+              <span className="text-sm font-medium text-black">
                 {firestoreStatus === 'saving' ? 'Saving to database...' : 
                  firestoreStatus === 'connecting' ? 'Loading from database...' : 
                  'Processing...'}
@@ -3429,12 +3408,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-3xl font-bold text-blue-600">
+                  <p className="text-3xl font-bold text-black">
                     {stats.total.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-blue-600" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <AlertTriangle className="w-8 h-8 text-black" />
                 </div>
               </div>
             </CardContent>
@@ -3445,12 +3424,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Action Taken</p>
-                  <p className="text-3xl font-bold text-green-600">
+                  <p className="text-3xl font-bold text-black">
                     {stats.actionTaken.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <CheckCircle className="w-8 h-8 text-black" />
                 </div>
               </div>
             </CardContent>
@@ -3461,12 +3440,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Drug Related</p>
-                  <p className="text-3xl font-bold text-red-600">
+                  <p className="text-3xl font-bold text-black">
                     {stats.drugs.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <Shield className="w-8 h-8 text-red-600" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <Shield className="w-8 h-8 text-black" />
                 </div>
               </div>
             </CardContent>
@@ -3481,8 +3460,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     {stats.accidents.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <Car className="w-8 h-8 text-orange-600" />
+                <div className="p-3 bg-gray-100 rounded-xl">
+                  <Car className="w-8 h-8 text-black" />
                 </div>
               </div>
             </CardContent>
@@ -3494,8 +3473,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
               {/* Header Section */}
               <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Filter className="w-4 h-4 text-blue-600" />
+                <div className="p-2 bg-gray-100 rounded-lg">
+                  <Filter className="w-4 h-4 text-black" />
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">Report Filters</h3>
@@ -3577,19 +3556,19 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-600">Active filters:</span>
                   {searchTerm && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200">
+                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
                       <Search className="w-3 h-3 mr-1" />
                       Search: "{searchTerm}"
                     </Badge>
                   )}
                   {selectedMonth !== "all" && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
                       <Calendar className="w-3 h-3 mr-1" />
                       Month: {selectedMonth}
                     </Badge>
                   )}
                   {filterStatus !== "all" && (
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 border-purple-200">
+                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
                       <Activity className="w-3 h-3 mr-1" />
                       Status: {filterStatus}
                     </Badge>

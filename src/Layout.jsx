@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Separator } from "./components/ui/separator";
+import { Sheet, SheetContent, SheetTrigger } from "./components/ui/sheet";
+import { Card, CardContent } from "./components/ui/card";
 
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
@@ -15,10 +17,9 @@ import {
   Menu,
   X,
   Bell,
-  User,
-  LogOut,
   Activity,
-  Command
+  Command,
+  User
 } from "lucide-react";
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
@@ -50,19 +51,18 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Close sidebar when clicking outside on mobile
+  // Close sidebar when clicking outside (mobile)
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (sidebarOpen && window.innerWidth < 768) {
-        const sidebar = document.getElementById('sidebar');
-        const hamburger = document.getElementById('hamburger');
-        if (sidebar && !sidebar.contains(event.target) && !hamburger?.contains(event.target)) {
-          setSidebarOpen(false);
-        }
+      if (sidebarOpen && !event.target.closest('aside') && !event.target.closest('[data-sidebar-trigger]')) {
+        setSidebarOpen(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
+    if (sidebarOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [sidebarOpen]);
 
@@ -88,16 +88,21 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   const [showProfile, setShowProfile] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Define all navigation items - moved outside component to prevent recreation
   const allNavigationItems = React.useMemo(() => [
-    { id: 'dashboard', label: 'Dashboard', icon: <Home className="h-5 w-5" />, showFor: 'all' },
-    { id: 'ipatroller', label: 'I-Patroller', icon: <Car className="h-5 w-5" />, showFor: 'admin' },
-    { id: 'commandcenter', label: 'Command Center', icon: <Command className="h-5 w-5" />, showFor: 'command-center' },
-    { id: 'actioncenter', label: 'Action Center', icon: <Activity className="h-5 w-5" />, showFor: 'action-center' },
-    { id: 'incidents', label: 'Incidents Reports', icon: <AlertTriangle className="h-5 w-5" />, showFor: 'admin' },
-    { id: 'reports', label: 'Reports', icon: <BarChart3 className="h-5 w-5" />, showFor: 'admin' },
-    { id: 'users', label: 'Users', icon: <User className="h-5 w-5" />, showFor: 'admin' },
+    { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: 'all' },
+    { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: 'admin' },
+    { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
+    { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
+    { id: 'incidents', label: 'Incidents Reports', icon: AlertTriangle, showFor: 'admin' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
+    { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
   ], []);
 
   // Filter navigation items based on user role and access level - memoized to prevent recalculation
@@ -109,19 +114,16 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       // Show for all users
       if (item.showFor === 'all') return true;
       
-      // Show for specific access level users (non-admin)
-      if (item.showFor === 'action-center' || item.showFor === 'command-center') {
-        return userAccessLevel === item.showFor;
-      }
+      // Show based on user access level
+      if (item.showFor === userAccessLevel) return true;
       
       return false;
-    }),
-    [allNavigationItems, isAdmin, userAccessLevel]
+    }), [allNavigationItems, isAdmin, userAccessLevel]
   );
 
   const handleNavigation = (pageId) => {
-    // Close mobile sidebar
-    if (window.innerWidth < 768) {
+    // Close mobile sidebar when navigating
+    if (sidebarOpen && window.innerWidth < 768) {
       setSidebarOpen(false);
     }
     
@@ -132,108 +134,66 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     window.history.replaceState({ page: pageId }, '', `/${pageId}`);
   };
 
+  if (!mounted) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen transition-all duration-300 max-w-full bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      {/* Mobile Sidebar Overlay */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 z-40 bg-black/50 md:hidden backdrop-blur-sm" 
-          onClick={() => setSidebarOpen(false)} 
-        />
-      )}
-
-      {/* Responsive Sidebar */}
-      <Sidebar 
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
-        navigationItems={navigationItems}
-        currentPage={currentPage}
-        handleNavigation={handleNavigation}
-        isCollapsed={isCollapsed}
-        setIsCollapsed={setIsCollapsed}
-      />
-
-      {/* Responsive Header */}
-      <header className={`fixed z-30 top-0 left-0 w-full md:w-[calc(100%-${isCollapsed ? '64px' : '224px'})] md:left-${isCollapsed ? '16' : '56'} px-3 md:px-6 py-3 md:py-6 backdrop-blur-xl border-b flex items-center justify-between gap-3 md:gap-4 transition-all duration-300 bg-white/80 border-gray-200`}>
-        {/* Hamburger for mobile */}
-        <Button
-          id="hamburger"
-          variant="ghost"
-          size="sm"
-          className="md:hidden p-2 h-10 w-10 rounded-lg transition-all duration-200"
-          onClick={() => setSidebarOpen(v => !v)}
-        >
-          <span className="sr-only">Open sidebar</span>
-          <Menu className="h-5 w-5" />
-        </Button>
-
-        {/* Page Title */}
-        <div className="flex items-center gap-3 flex-1">
-          <img 
-            src="/images/Ipatroller_Logo.png" 
-            alt="IPatroller Logo" 
-            className="h-44 w-auto md:hidden"
+    <div className="flex h-screen w-full bg-white">
+      {/* Mobile Sidebar using Sheet */}
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-72 p-0">
+          <Sidebar 
+            sidebarOpen={true}
+            setSidebarOpen={setSidebarOpen}
+            navigationItems={navigationItems}
+            currentPage={currentPage}
+            handleNavigation={handleNavigation}
+            isCollapsed={false}
+            setIsCollapsed={setIsCollapsed}
+            isMobile={true}
+            onLogout={onLogout}
           />
-          <h1 className="text-lg md:text-2xl font-bold capitalize truncate transition-colors duration-300 text-gray-900">
-            {navigationItems.find(item => item.id === currentPage)?.label || currentPage}
-          </h1>
-        </div>
+        </SheetContent>
+      </Sheet>
 
-        {/* Right side controls */}
-        <div className="flex items-center gap-2 md:gap-3">
-          {/* User Profile */}
-          <div className="relative">
-            <Button
-              variant="ghost"
-              className="flex items-center gap-2 md:gap-3 p-2 h-auto rounded-full transition-all duration-200"
-              onClick={() => setShowProfile(v => !v)}
-            >
-              {userInfo.avatar ? (
-                <img src={userInfo.avatar} alt="avatar" className="w-8 h-8 rounded-full object-cover" />
-              ) : (
-                <span className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold text-sm shadow-md">
-                  {initials}
-                </span>
-              )}
-              <span className="hidden sm:block font-medium truncate max-w-[120px] transition-colors duration-300">
-                {userInfo.name}
-              </span>
-            </Button>
-            
-            {showProfile && (
-              <div className="absolute right-0 mt-2 w-64 rounded-lg shadow-xl border z-50 p-4 transition-all duration-300 bg-white border-gray-200">
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 text-white flex items-center justify-center font-bold">
-                    {initials}
-                  </span>
-                  <div>
-                    <div className="font-semibold transition-colors duration-300 text-gray-900">{userInfo.name}</div>
-                    <div className="text-sm transition-colors duration-300 text-gray-600">@{userInfo.username}</div>
-                  </div>
-                </div>
-                <Separator className="my-3" />
-                <Button 
-                  onClick={onLogout} 
-                  className="w-full bg-red-600 hover:bg-red-700 text-white font-medium"
-                >
-                  Logout
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar 
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+          navigationItems={navigationItems}
+          currentPage={currentPage}
+          handleNavigation={handleNavigation}
+          isCollapsed={isCollapsed}
+          setIsCollapsed={setIsCollapsed}
+          isMobile={false}
+          onLogout={onLogout}
+        />
+      </div>
 
-      {/* Main Content */}
-      <main className="flex-1 min-h-screen max-w-full transition-all duration-300 bg-white" 
-        style={{ 
-          marginLeft: window.innerWidth >= 768 ? (isCollapsed ? 64 : SIDEBAR_WIDTH) : 0, 
-          paddingTop: 72 
-        }}>
-        <div className="flex-1 min-h-0 max-w-full overflow-auto p-3 md:p-6 mobile-content">
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-auto bg-white">
+        <div className="h-full p-6">
           {children}
         </div>
       </main>
+
+      {/* Mobile Menu Button - Fixed Position */}
+      <div className="fixed top-4 left-4 z-50 md:hidden">
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button variant="outline" size="icon" className="bg-white shadow-md border-gray-200">
+              <Menu className="h-4 w-4 text-black" />
+              <span className="sr-only">Toggle navigation</span>
+            </Button>
+          </SheetTrigger>
+        </Sheet>
+      </div>
     </div>
   );
 } 

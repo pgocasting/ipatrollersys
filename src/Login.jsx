@@ -27,14 +27,11 @@ export default function Login({ onLogin }) {
     setIsLoading(true);
 
     try {
-      console.log('🔐 Attempting login with username:', formData.username);
       const result = await signIn(formData.username, formData.password, formData.keepLoggedIn);
       
       if (result.success) {
-        console.log('✅ Login successful:', result.user?.email);
         onLogin();
       } else {
-        console.error('❌ Login failed:', result.error);
         setError(result.error || "Invalid email or password");
       }
     } catch (error) {

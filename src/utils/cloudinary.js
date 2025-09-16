@@ -14,7 +14,6 @@ export const cloudinaryUtils = {
   // Upload image to Cloudinary
   async uploadImage(file, options = {}) {
     try {
-      console.log('📤 Uploading image to Cloudinary...');
       
       const formData = new FormData();
       formData.append('file', file);
@@ -48,7 +47,6 @@ export const cloudinaryUtils = {
 
       const result = await response.json();
       
-      console.log('✅ Image uploaded successfully:', result.public_id);
       return {
         success: true,
         data: {
@@ -73,7 +71,6 @@ export const cloudinaryUtils = {
   // Upload video to Cloudinary
   async uploadVideo(file, options = {}) {
     try {
-      console.log('📤 Uploading video to Cloudinary...');
       
       const formData = new FormData();
       formData.append('file', file);
@@ -107,7 +104,6 @@ export const cloudinaryUtils = {
 
       const result = await response.json();
       
-      console.log('✅ Video uploaded successfully:', result.public_id);
       return {
         success: true,
         data: {
@@ -133,7 +129,6 @@ export const cloudinaryUtils = {
   // Upload file to Cloudinary
   async uploadFile(file, options = {}) {
     try {
-      console.log('📤 Uploading file to Cloudinary...');
       
       const formData = new FormData();
       formData.append('file', file);
@@ -227,7 +222,6 @@ export const clientUploadUtils = {
   // Upload file directly from browser to Cloudinary
   async uploadToCloudinary(file, options = {}) {
     try {
-      console.log('📤 Uploading file to Cloudinary from browser...');
       
       const formData = new FormData();
       formData.append('file', file);
@@ -275,7 +269,6 @@ export const clientUploadUtils = {
   // Upload multiple files
   async uploadMultipleFiles(files, options = {}) {
     try {
-      console.log(`📤 Uploading ${files.length} files to Cloudinary...`);
       
       const uploadPromises = files.map(file => 
         this.uploadToCloudinary(file, options)
@@ -285,7 +278,6 @@ export const clientUploadUtils = {
       const successful = results.filter(result => result.success);
       const failed = results.filter(result => !result.success);
       
-      console.log(`✅ Uploaded ${successful.length} files successfully`);
       if (failed.length > 0) {
         console.warn(`⚠️ ${failed.length} files failed to upload`);
       }

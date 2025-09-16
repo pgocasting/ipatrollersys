@@ -761,21 +761,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   const getPriorityColor = (priority) => {
     switch (priority) {
-      case "high": return "bg-red-100 text-red-800 border-red-200";
-      case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case "low": return "bg-green-100 text-green-800 border-green-200";
-      default: return "bg-gray-100 text-gray-800 border-gray-200";
+      case "high": return "bg-black text-white border-black";
+      case "medium": return "bg-gray-600 text-white border-gray-600";
+      case "low": return "bg-gray-400 text-white border-gray-400";
+      default: return "bg-gray-200 text-black border-gray-200";
     }
   };
 
   const getFormatColor = (format) => {
     switch (format) {
-      case "PDF": return "bg-red-100 text-red-700";
-      case "Excel": return "bg-green-100 text-green-700";
-      case "CSV": return "bg-blue-100 text-blue-700";
-      case "PNG": return "bg-purple-100 text-purple-700";
-      case "JPG": return "bg-orange-100 text-orange-700";
-      default: return "bg-gray-100 text-gray-700";
+      case "PDF": return "bg-black text-white";
+      case "Excel": return "bg-gray-700 text-white";
+      case "CSV": return "bg-gray-600 text-white";
+      case "PNG": return "bg-gray-500 text-white";
+      case "JPG": return "bg-gray-400 text-black";
+      default: return "bg-gray-200 text-black";
     }
   };
 
@@ -783,10 +783,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   if (dataLoading) {
     return (
       <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 flex items-center justify-center">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-            <p className="text-gray-600 text-lg">Loading report data...</p>
+        <div className="min-h-screen bg-white flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="animate-spin rounded-full h-16 w-16 border-4 border-gray-200 border-t-black mx-auto"></div>
+            <p className="text-black text-xl font-semibold">Loading report data...</p>
+            <p className="text-gray-600">Please wait while we fetch your reports</p>
           </div>
         </div>
       </Layout>
@@ -795,27 +796,28 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8">
+      <div className="min-h-screen bg-white">
+        <div className="container mx-auto p-6 space-y-8">
           
           {/* Header */}
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">Reports Center</h1>
-              <p className="text-gray-500 mt-2">Generate comprehensive reports across all system modules</p>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-6 border-b border-gray-200">
+            <div className="space-y-2">
+              <h1 className="text-4xl font-bold text-black tracking-tight">Reports Center</h1>
+              <p className="text-gray-600 text-lg">Generate comprehensive reports across all system modules</p>
             </div>
             <Button
               onClick={generateAllReports}
               disabled={isGenerating}
-              className="bg-black hover:bg-black/90 text-white"
+              className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-6 py-3 text-base font-semibold"
             >
               {isGenerating ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
                   Generating All Reports...
                 </>
               ) : (
                 <>
-                  <Printer className="mr-2 h-4 w-4" />
+                  <Printer className="mr-3 h-5 w-5" />
                   Generate All Reports
                 </>
               )}
@@ -823,225 +825,173 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           </div>
 
           {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <Card className="bg-white shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Total Patrols</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Action Reports</p>
                     <p className="text-3xl font-bold text-blue-600">
-                      {calculateOverallSummary().totalPatrols.toLocaleString()}
+                      {(actionReports || []).length.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Shield className="w-8 h-8 text-blue-600" />
+                  <div className="p-4 bg-blue-500 rounded-lg">
+                    <Target className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
+            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Active Days</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Incidents</p>
+                    <p className="text-3xl font-bold text-red-600">
+                      {(incidents || []).length.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-red-500 rounded-lg">
+                    <AlertTriangle className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Active Days</p>
                     <p className="text-3xl font-bold text-green-600">
                       {calculateOverallSummary().totalActive.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <CheckCircle2 className="w-8 h-8 text-green-600" />
+                  <div className="p-4 bg-green-500 rounded-lg">
+                    <CheckCircle2 className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
+            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Inactive Days</p>
-                    <p className="text-3xl font-bold text-red-600">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Inactive Days</p>
+                    <p className="text-3xl font-bold text-orange-600">
                       {calculateOverallSummary().totalInactive.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-3 bg-red-100 rounded-xl">
-                    <XCircle className="w-8 h-8 text-red-600" />
+                  <div className="p-4 bg-orange-500 rounded-lg">
+                    <XCircle className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
+            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-500 mb-1">Avg Active %</p>
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Avg Active %</p>
                     <p className="text-3xl font-bold text-purple-600">
                       {calculateOverallSummary().avgActivePercentage}%
                     </p>
                   </div>
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <Target className="w-8 h-8 text-purple-600" />
+                  <div className="p-4 bg-purple-500 rounded-lg">
+                    <Target className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Report Filters */}
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gray-100 rounded-lg">
-                    <Filter className="w-5 h-5 text-gray-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Report Filters</h3>
-                    <p className="text-sm text-gray-600">Refine your report data</p>
-                  </div>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-4">
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="month-select" className="text-xs font-medium text-gray-600">Month</Label>
-                    <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue placeholder="Select month" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {months.map((month, index) => (
-                          <SelectItem key={index} value={index.toString()}>{month}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="year-select" className="text-xs font-medium text-gray-600">Year</Label>
-                    <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
-                      <SelectTrigger className="w-[100px]">
-                        <SelectValue placeholder="Select year" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {[2023, 2024, 2025, 2026, 2027].map(year => (
-                          <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="district-select" className="text-xs font-medium text-gray-600">District</Label>
-                    <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                      <SelectTrigger className="w-[160px]">
-                        <SelectValue placeholder="Select district" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {districts.map((district) => (
-                          <SelectItem key={district} value={district}>
-                            {district === "all" ? "All Districts" : district}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <div className="flex flex-col gap-1">
-                    <Label htmlFor="paper-size-select" className="text-xs font-medium text-gray-600">Paper Size</Label>
-                    <Select value={paperSize} onValueChange={setPaperSize}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue placeholder="Select paper size" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="short">Short Bond (Letter)</SelectItem>
-                        <SelectItem value="long">Long Bond (Legal)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
+
+          {/* Reports Table */}
+          <Card className="bg-white border-2 border-gray-200 shadow-lg">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
+              <p className="text-gray-600">Generate individual reports or all reports at once</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b-2 border-gray-200 bg-gray-50">
+                    <TableHead className="font-bold text-black py-4 px-6">Report Type</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6">Description</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6">Priority</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6">Formats</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportSections.map((section) => 
+                    section.reports.map((report, index) => (
+                      <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                        <TableCell className="font-semibold py-4 px-6">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-black rounded-lg">
+                              {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
+                            </div>
+                            <span className="text-black">{report.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-gray-700">{report.description}</TableCell>
+                        <TableCell className="py-4 px-6">
+                          <Badge className={`${getPriorityColor(report.priority)} text-xs px-3 py-1 font-semibold border`}>
+                            {report.priority.toUpperCase()}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="py-4 px-6">
+                          <div className="flex flex-wrap gap-2">
+                            {report.formats.map((format) => (
+                              <Badge
+                                key={format}
+                                variant="outline"
+                                className="text-xs px-3 py-1 font-semibold border-2 border-black text-black hover:bg-black hover:text-white transition-colors"
+                              >
+                                {format}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
+                          <Button
+                            onClick={() => {
+                              setIsGenerating(true);
+                              try {
+                                report.action();
+                              } finally {
+                                setTimeout(() => setIsGenerating(false), 1000);
+                              }
+                            }}
+                            disabled={isGenerating}
+                            className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
+                          >
+                            {isGenerating ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Printer className="w-4 h-4 mr-2" />
+                                Generate
+                              </>
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
-          {/* Reports Table */}
-          <div className="border rounded-md border-gray-200 shadow-sm">
-            <Table className="border-gray-200">
-              <TableCaption className="text-slate-500">Available reports for generation.</TableCaption>
-              <TableHeader>
-                <TableRow className="border-b border-gray-200">
-                  <TableHead className="w-[200px] border-gray-200">Report Type</TableHead>
-                  <TableHead className="border-gray-200">Description</TableHead>
-                  <TableHead className="border-gray-200">Priority</TableHead>
-                  <TableHead className="border-gray-200">Formats</TableHead>
-                  <TableHead className="text-right border-gray-200">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reportSections.map((section) => 
-                  section.reports.map((report, index) => (
-                    <TableRow key={`${section.id}-${index}`} className="border-gray-200">
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          {section.icon}
-                          {report.name}
-                        </div>
-                      </TableCell>
-                      <TableCell>{report.description}</TableCell>
-                      <TableCell>
-                        <Badge className={`${getPriorityColor(report.priority)} text-xs px-2 py-1`}>
-                          {report.priority}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {report.formats.map((format) => (
-                            <Badge
-                              key={format}
-                              variant="secondary"
-                              className={`text-xs ${getFormatColor(format)}`}
-                            >
-                              {format}
-                            </Badge>
-                          ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          onClick={() => {
-                            setIsGenerating(true);
-                            try {
-                              report.action();
-                            } finally {
-                              setTimeout(() => setIsGenerating(false), 1000);
-                            }
-                          }}
-                          disabled={isGenerating}
-                          variant="ghost"
-                          size="sm"
-                        >
-                          {isGenerating ? (
-                            <>
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
-                              Generating...
-                            </>
-                          ) : (
-                            <>
-                              <Printer className="w-4 h-4 mr-2" />
-                              Generate
-                            </>
-                          )}
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
         </div>
-      </Layout>
-    );
+      </div>
+    </Layout>
+  );
   }
