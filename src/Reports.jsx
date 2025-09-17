@@ -796,120 +796,102 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="min-h-screen bg-white">
-        <div className="container mx-auto p-6 space-y-8">
-          
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 pb-6 border-b border-gray-200">
-            <div className="space-y-2">
-              <h1 className="text-4xl font-bold text-black tracking-tight">Reports Center</h1>
-              <p className="text-gray-600 text-lg">Generate comprehensive reports across all system modules</p>
-            </div>
-            <Button
-              onClick={generateAllReports}
-              disabled={isGenerating}
-              className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-6 py-3 text-base font-semibold"
-            >
-              {isGenerating ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                  Generating All Reports...
-                </>
-              ) : (
-                <>
-                  <Printer className="mr-3 h-5 w-5" />
-                  Generate All Reports
-                </>
-              )}
-            </Button>
+      <div className="container mx-auto p-6 space-y-8">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Reports Center</h1>
+            <p className="text-gray-500 mt-2">Generate comprehensive reports across all system modules</p>
           </div>
+          <Button
+            onClick={generateAllReports}
+            disabled={isGenerating}
+            className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-6 py-3 text-base font-semibold"
+          >
+            {isGenerating ? (
+              <>
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
+                Generating All Reports...
+              </>
+            ) : (
+              <>
+                <Printer className="mr-3 h-5 w-5" />
+                Generate All Reports
+              </>
+            )}
+          </Button>
+        </div>
 
-          {/* Quick Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Action Reports</p>
-                    <p className="text-3xl font-bold text-blue-600">
-                      {(actionReports || []).length.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-blue-500 rounded-lg">
-                    <Target className="w-8 h-8 text-white" />
-                  </div>
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Action Reports</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {(actionReports || []).length.toLocaleString()}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Target className="w-8 h-8 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Total Incidents</p>
-                    <p className="text-3xl font-bold text-red-600">
-                      {(incidents || []).length.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-red-500 rounded-lg">
-                    <AlertTriangle className="w-8 h-8 text-white" />
-                  </div>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {(incidents || []).length.toLocaleString()}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <AlertTriangle className="w-8 h-8 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Active Days</p>
-                    <p className="text-3xl font-bold text-green-600">
-                      {calculateOverallSummary().totalActive.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-green-500 rounded-lg">
-                    <CheckCircle2 className="w-8 h-8 text-white" />
-                  </div>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Active Days</p>
+                  <p className="text-3xl font-bold text-green-600">
+                    {calculateOverallSummary().totalActive.toLocaleString()}
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Inactive Days</p>
-                    <p className="text-3xl font-bold text-orange-600">
-                      {calculateOverallSummary().totalInactive.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-4 bg-orange-500 rounded-lg">
-                    <XCircle className="w-8 h-8 text-white" />
-                  </div>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500 mb-1">Avg Active %</p>
+                  <p className="text-3xl font-bold text-orange-600">
+                    {calculateOverallSummary().avgActivePercentage}%
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white border-2 border-gray-200 shadow-lg hover:shadow-xl transition-shadow duration-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-2">
-                    <p className="text-sm font-semibold text-gray-600 uppercase tracking-wide">Avg Active %</p>
-                    <p className="text-3xl font-bold text-purple-600">
-                      {calculateOverallSummary().avgActivePercentage}%
-                    </p>
-                  </div>
-                  <div className="p-4 bg-purple-500 rounded-lg">
-                    <Target className="w-8 h-8 text-white" />
-                  </div>
+                <div className="p-3 bg-orange-100 rounded-xl">
+                  <Target className="w-8 h-8 text-orange-600" />
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </CardContent>
+          </Card>
           </div>
 
 
           {/* Reports Table */}
-          <Card className="bg-white border-2 border-gray-200 shadow-lg">
+          <Card className="bg-white shadow-sm border border-gray-200">
             <CardHeader className="pb-4 border-b border-gray-100">
               <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
               <p className="text-gray-600">Generate individual reports or all reports at once</p>
@@ -991,7 +973,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           </Card>
 
         </div>
-      </div>
     </Layout>
   );
-  }
+}

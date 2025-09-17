@@ -359,7 +359,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="municipality">Municipality</Label>
                       <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
-                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="municipality" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select municipality" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -374,7 +374,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="accessLevel">Access Level</Label>
                       <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="accessLevel" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -387,7 +387,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-2">
                         <Label htmlFor="department">Department</Label>
                         <Select value={newUser.department} onValueChange={(value) => setNewUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="department" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -503,7 +503,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="editMunicipality">Municipality</Label>
                       <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
-                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="editMunicipality" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select municipality" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -518,7 +518,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="editAccessLevel">Access Level</Label>
                       <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="editAccessLevel" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -531,7 +531,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-2">
                         <Label htmlFor="editDepartment">Department</Label>
                         <Select value={editUser.department} onValueChange={(value) => setEditUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="editDepartment" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">

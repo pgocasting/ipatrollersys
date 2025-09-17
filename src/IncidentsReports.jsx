@@ -3408,12 +3408,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-3xl font-bold text-black">
+                  <p className="text-3xl font-bold text-blue-600">
                     {stats.total.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-black" />
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <AlertTriangle className="w-8 h-8 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -3424,12 +3424,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Action Taken</p>
-                  <p className="text-3xl font-bold text-black">
+                  <p className="text-3xl font-bold text-green-600">
                     {stats.actionTaken.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-black" />
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
               </div>
             </CardContent>
@@ -3440,12 +3440,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-1">Drug Related</p>
-                  <p className="text-3xl font-bold text-black">
+                  <p className="text-3xl font-bold text-red-600">
                     {stats.drugs.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <Shield className="w-8 h-8 text-black" />
+                <div className="p-3 bg-red-100 rounded-xl">
+                  <Shield className="w-8 h-8 text-red-600" />
                 </div>
               </div>
             </CardContent>
@@ -3460,8 +3460,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     {stats.accidents.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-gray-100 rounded-xl">
-                  <Car className="w-8 h-8 text-black" />
+                <div className="p-3 bg-orange-100 rounded-xl">
+                  <Car className="w-8 h-8 text-orange-600" />
                 </div>
               </div>
             </CardContent>
@@ -3503,7 +3503,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[160px]">
                   <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger>
+                    <SelectTrigger id="month-filter">
                       <SelectValue placeholder="All Months" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3521,7 +3521,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Status</Label>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger>
+                    <SelectTrigger id="status-filter">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>

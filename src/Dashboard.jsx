@@ -21,35 +21,16 @@ import {
 } from 'chart.js';
 import {
   BarChart3,
-  TrendingUp,
-  Users,
-  Activity,
   CheckCircle,
   XCircle,
   Target,
-  Calendar,
-  Filter,
   Download,
-  FileText,
-  Search,
   PieChartIcon,
-  Building2,
-  MapPin,
-  Shield,
   AlertTriangle,
-  Zap,
-  Database,
-  Wifi,
-  WifiOff,
-  Plus,
-  Eye,
-  Edit,
-  Trash2,
-  MoreHorizontal,
-  ChevronDown,
-  ChevronUp,
-  Menu,
-  RefreshCw
+  RefreshCw,
+  List,
+  Building2,
+  MapPin
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -70,6 +51,16 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       console.error('Logout error:', error);
     }
   };
+
+  // Get yesterday's date for display
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayFormatted = yesterday.toLocaleDateString('en-US', { 
+    weekday: 'long', 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
 
   // Calculate activity data with fallback sample data
   const getActivityData = (period) => {
@@ -202,13 +193,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Sample district data
-  // Calculate active/inactive municipalities with fallback data
-  const totalMunicipalities = 12;
-  const activeCount = ipatrollerData && ipatrollerData.length > 0 
-    ? ipatrollerData.filter(item => item.isActive).length 
-    : 8; // Default fallback
-  const inactiveCount = totalMunicipalities - activeCount;
+  // Calculate active/inactive municipalities based on yesterday's data
+  const totalMunicipalities = ipatrollerData ? ipatrollerData.length : 12;
+  const activeCount = summaryStats.activeMunicipalities || 0;
+  const inactiveCount = summaryStats.inactiveMunicipalities || 12;
   const activePercentage = totalMunicipalities > 0 ? (activeCount / totalMunicipalities) * 100 : 0;
 
   // Calculate district distribution with fallback data
@@ -233,7 +221,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       districtCounts['3RD DISTRICT'] = 2;
     }
 
-    const totalActive = Object.values(districtCounts).reduce((sum, count) => sum + count, 0);
+    // If we have data but zero active across all districts, fallback to sample so the pie isn't empty
+    let totalActive = Object.values(districtCounts).reduce((sum, count) => sum + count, 0);
+    if (ipatrollerData && ipatrollerData.length > 0 && totalActive === 0) {
+      districtCounts['1ST DISTRICT'] = 3;
+      districtCounts['2ND DISTRICT'] = 3;
+      districtCounts['3RD DISTRICT'] = 2;
+      totalActive = 8;
+    }
     
     // Calculate percentages
     const labels = Object.keys(districtCounts).map(district => {
@@ -260,6 +255,101 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   };
 
   const districtData = getDistrictData();
+
+  // Get municipality lists for yesterday's data
+  const getMunicipalityLists = () => {
+    if (!ipatrollerData || ipatrollerData.length === 0) {
+      return {
+        active: [],
+        inactive: []
+      };
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayIndex = yesterday.getDate() - 1;
+
+    const active = [];
+    const inactive = [];
+
+    ipatrollerData.forEach(item => {
+      let yesterdayPatrols = 0;
+      
+      if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+        yesterdayPatrols = item.data[yesterdayIndex] || 0;
+      }
+
+      const municipalityInfo = {
+        name: item.municipality,
+        district: item.district,
+        patrols: yesterdayPatrols
+      };
+
+      if (yesterdayPatrols >= 5) {
+        active.push(municipalityInfo);
+      } else {
+        inactive.push(municipalityInfo);
+      }
+    });
+
+    // Sort by district and then by municipality name
+    const sortMunicipalities = (a, b) => {
+      if (a.district !== b.district) {
+        return a.district.localeCompare(b.district);
+      }
+      return a.name.localeCompare(b.name);
+    };
+
+    return {
+      active: active.sort(sortMunicipalities),
+      inactive: inactive.sort(sortMunicipalities)
+    };
+  };
+
+  const municipalityLists = getMunicipalityLists();
+
+  // Get district statistics for yesterday's data
+  const getDistrictStats = () => {
+    if (!ipatrollerData || ipatrollerData.length === 0) {
+      return [];
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayIndex = yesterday.getDate() - 1;
+
+    const districtStats = {
+      '1ST DISTRICT': { active: 0, total: 0, color: 'blue' },
+      '2ND DISTRICT': { active: 0, total: 0, color: 'emerald' },
+      '3RD DISTRICT': { active: 0, total: 0, color: 'orange' }
+    };
+
+    ipatrollerData.forEach(item => {
+      if (item.district && districtStats[item.district]) {
+        districtStats[item.district].total++;
+        
+        let yesterdayPatrols = 0;
+        if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+          yesterdayPatrols = item.data[yesterdayIndex] || 0;
+        }
+
+        if (yesterdayPatrols >= 5) {
+          districtStats[item.district].active++;
+        }
+      }
+    });
+
+    return Object.entries(districtStats).map(([district, stats]) => ({
+      name: district,
+      active: stats.active,
+      total: stats.total,
+      inactive: stats.total - stats.active,
+      percentage: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0,
+      color: stats.color
+    }));
+  };
+
+  const districtStats = getDistrictStats();
 
   if (dataLoading) {
     return (
@@ -289,30 +379,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <BarChart3 className="w-8 h-8 text-blue-600" />
                 </div>
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">System Dashboard</h1>
+                  <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                   <p className="text-gray-600 mt-1">
-                    Real-time overview of IPatroller system performance and analytics
+                    Overview of IPatroller system performance based on yesterday's patrol data ({yesterdayFormatted})
                   </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                  onClick={() => window.location.reload()}
-                >
-                  <RefreshCw className="w-4 h-4" />
-                  Refresh Data
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Download className="w-4 h-4" />
-                  Export Report
-                </Button>
               </div>
             </div>
           </div>
@@ -328,7 +399,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       {activeCount}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {Math.round(activePercentage)}% of total
+                      Yesterday's data
                     </p>
                   </div>
                   <div className="p-3 bg-emerald-100 rounded-xl">
@@ -347,7 +418,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       {inactiveCount}
                     </p>
                     <p className="text-xs text-gray-500">
-                      Requires attention
+                      Yesterday's data
                     </p>
                   </div>
                   <div className="p-3 bg-red-100 rounded-xl">
@@ -398,73 +469,94 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
           {/* Analytics Section */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Activity Chart */}
+            {/* Municipality Lists */}
             <Card className="lg:col-span-2 bg-white border border-gray-200 rounded-xl shadow-sm">
               <CardHeader className="p-6 pb-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <BarChart3 className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg font-semibold text-gray-900">Activity Overview</CardTitle>
-                      <p className="text-sm text-gray-600">Weekly patrol and incident trends</p>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <List className="w-5 h-5 text-blue-600" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant={selectedTimePeriod === 'weekly' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedTimePeriod('weekly')}
-                      className="text-xs"
-                    >
-                      Weekly
-                    </Button>
-                    <Button
-                      variant={selectedTimePeriod === 'monthly' ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => setSelectedTimePeriod('monthly')}
-                      className="text-xs"
-                    >
-                      Monthly
-                    </Button>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Municipality List</CardTitle>
+                    <p className="text-sm text-gray-600">Active and inactive municipalities for yesterday</p>
                   </div>
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-0">
-                <div className="h-80">
-                  <Bar data={getActivityData(selectedTimePeriod)} options={{
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                      legend: {
-                        display: false
-                      }
-                    },
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        grid: {
-                          color: '#f3f4f6'
-                        }
-                      },
-                      x: {
-                        grid: {
-                          display: false
-                        }
-                      }
-                    }
-                  }} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-80 overflow-y-auto">
+                  
+                  {/* Active Municipalities */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-4">
+                      <CheckCircle className="w-5 h-5 text-emerald-600" />
+                      <h3 className="font-semibold text-emerald-600">Active Municipalities ({municipalityLists.active.length})</h3>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {municipalityLists.active.length > 0 ? (
+                        municipalityLists.active.map((municipality, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-100">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="w-4 h-4 text-emerald-600" />
+                              <div>
+                                <p className="font-medium text-gray-900">{municipality.name}</p>
+                                <p className="text-xs text-gray-500">{municipality.district}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-emerald-600">{municipality.patrols} patrols</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p>No active municipalities</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Inactive Municipalities */}
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2 mb-4">
+                      <XCircle className="w-5 h-5 text-red-600" />
+                      <h3 className="font-semibold text-red-600">Inactive Municipalities ({municipalityLists.inactive.length})</h3>
+                    </div>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {municipalityLists.inactive.length > 0 ? (
+                        municipalityLists.inactive.map((municipality, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg border border-red-100">
+                            <div className="flex items-center gap-3">
+                              <Building2 className="w-4 h-4 text-red-600" />
+                              <div>
+                                <p className="font-medium text-gray-900">{municipality.name}</p>
+                                <p className="text-xs text-gray-500">{municipality.district}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-red-600">{municipality.patrols} patrols</p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Building2 className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                          <p>No inactive municipalities</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                 </div>
               </CardContent>
             </Card>
 
-            {/* District Distribution */}
+            {/* District Distribution Cards */}
             <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
               <CardHeader className="p-6 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-100 rounded-lg">
-                    <PieChartIcon className="w-5 h-5 text-emerald-600" />
+                    <MapPin className="w-5 h-5 text-emerald-600" />
                   </div>
                   <div>
                     <CardTitle className="text-lg font-semibold text-gray-900">District Distribution</CardTitle>
@@ -473,63 +565,77 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 </div>
               </CardHeader>
               <CardContent className="p-6 pt-0">
-                <div className="h-80">
-                  <PieChart data={districtData} />
+                <div className="space-y-4 h-80 overflow-y-auto">
+                  {districtStats.map((district, index) => (
+                    <div key={index} className={`p-4 rounded-xl border-2 ${
+                      district.color === 'blue' ? 'bg-blue-50 border-blue-200' :
+                      district.color === 'emerald' ? 'bg-emerald-50 border-emerald-200' :
+                      'bg-orange-50 border-orange-200'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${
+                            district.color === 'blue' ? 'bg-blue-100' :
+                            district.color === 'emerald' ? 'bg-emerald-100' :
+                            'bg-orange-100'
+                          }`}>
+                            <Building2 className={`w-5 h-5 ${
+                              district.color === 'blue' ? 'text-blue-600' :
+                              district.color === 'emerald' ? 'text-emerald-600' :
+                              'text-orange-600'
+                            }`} />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{district.name}</h3>
+                            <p className="text-sm text-gray-600">{district.total} municipalities</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className={`text-2xl font-bold ${
+                            district.color === 'blue' ? 'text-blue-600' :
+                            district.color === 'emerald' ? 'text-emerald-600' :
+                            'text-orange-600'
+                          }`}>
+                            {district.active}
+                          </p>
+                          <p className="text-xs text-gray-500">Active</p>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4">
+                          <div className="flex items-center gap-1">
+                            <CheckCircle className="w-4 h-4 text-emerald-500" />
+                            <span className="text-emerald-600 font-medium">{district.active} Active</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <XCircle className="w-4 h-4 text-red-500" />
+                            <span className="text-red-600 font-medium">{district.inactive} Inactive</span>
+                          </div>
+                        </div>
+                        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                          district.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                          district.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                          'bg-orange-100 text-orange-700'
+                        }`}>
+                          {district.percentage}%
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {districtStats.length === 0 && (
+                    <div className="text-center py-8 text-gray-500">
+                      <MapPin className="w-8 h-8 mx-auto mb-2 text-gray-300" />
+                      <p>No district data available</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </div>
 
-          {/* Quick Actions Panel */}
-          <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Zap className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Quick Actions</CardTitle>
-                  <p className="text-sm text-gray-600">Navigate to system modules</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <Button
-                  variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-blue-50 hover:border-blue-200"
-                  onClick={() => onNavigate('ipatroller')}
-                >
-                  <Shield className="w-6 h-6 text-blue-600" />
-                  <span className="text-sm font-medium">IPatroller</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-emerald-50 hover:border-emerald-200"
-                  onClick={() => onNavigate('command-center')}
-                >
-                  <Database className="w-6 h-6 text-emerald-600" />
-                  <span className="text-sm font-medium">Command Center</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-orange-50 hover:border-orange-200"
-                  onClick={() => onNavigate('action-center')}
-                >
-                  <Target className="w-6 h-6 text-orange-600" />
-                  <span className="text-sm font-medium">Action Center</span>
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-20 flex flex-col items-center justify-center gap-2 hover:bg-red-50 hover:border-red-200"
-                  onClick={() => onNavigate('incidents-reports')}
-                >
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
-                  <span className="text-sm font-medium">Incidents</span>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
       </div>
     </Layout>

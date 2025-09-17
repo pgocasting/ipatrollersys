@@ -40,9 +40,11 @@ export const DataProvider = ({ children }) => {
       recentActivity: [],
       // Add IPatroller specific stats
       totalDailyPatrols: 0,
+      totalYesterdayPatrols: 0,
       totalPhotosUploaded: 0,
       activeDistricts: 0,
-      monthlyPatrolTrend: []
+      monthlyPatrolTrend: [],
+      yesterdayDate: null
     }
   });
 
@@ -204,39 +206,52 @@ export const DataProvider = ({ children }) => {
         
         const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
         
-        // Calculate active and inactive municipalities based on totalPatrols
-        const activeMunicipalities = ipatrollerData.filter(item => {
-          // Use totalPatrols field to determine if municipality is active
-          if (item.totalPatrols !== undefined) {
-            const isActive = item.totalPatrols >= 5;
-            console.log(`📊 ${item.municipality}: totalPatrols=${item.totalPatrols}, active=${isActive}`);
-            return isActive;
-          } else if (item.data && Array.isArray(item.data)) {
-            // Fallback to calculating from data array
-            const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
-            const isActive = totalPatrols >= 5;
-            console.log(`📊 ${item.municipality}: calculated totalPatrols=${totalPatrols}, active=${isActive}`);
-            return isActive;
+        // Calculate active and inactive municipalities based on YESTERDAY's patrol data
+        // Using the EXACT same logic as IPatroller page getStatusText function
+        const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(today.getDate() - 1);
+        
+        // Array index should match the day of the month - 1 (since arrays are 0-indexed)
+        // If yesterday was September 16, we want index 15 (16-1)
+        const yesterdayIndex = yesterday.getDate() - 1;
+        
+        console.log(`📅 Calculating active/inactive municipalities for yesterday`);
+        console.log(`📅 Today is: ${today.toDateString()} (Day ${today.getDate()})`);
+        console.log(`📅 Yesterday was: ${yesterday.toDateString()} (Day ${yesterday.getDate()})`);
+        console.log(`📅 Looking at array index: ${yesterdayIndex} (should be day ${yesterday.getDate()} data)`);
+        console.log(`📅 Total municipalities to check: ${ipatrollerData.length}`);
+        
+        // Count active and inactive municipalities using the same logic as IPatroller getStatusText
+        let activeCount = 0;
+        let inactiveCount = 0;
+        
+        ipatrollerData.forEach(item => {
+          let yesterdayPatrols = 0;
+          
+          // Get yesterday's patrol count from the data array
+          if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+            yesterdayPatrols = item.data[yesterdayIndex] || 0;
           } else {
-            console.log('❌ No data for municipality:', item.municipality);
-            return false;
+            console.log(`⚠️ ${item.municipality}: No data available for index ${yesterdayIndex} (array length: ${item.data ? item.data.length : 'no data array'})`);
+          }
+          
+          // Use the EXACT same logic as IPatroller getStatusText function:
+          // Active if >= 5, Inactive if < 5 (including 0)
+          if (yesterdayPatrols >= 5) {
+            activeCount++;
+            console.log(`✅ ${item.municipality}: ${yesterdayPatrols} patrols (index ${yesterdayIndex}) → ACTIVE`);
+          } else {
+            inactiveCount++;
+            console.log(`❌ ${item.municipality}: ${yesterdayPatrols} patrols (index ${yesterdayIndex}) → INACTIVE`);
           }
         });
         
-        const inactiveMunicipalities = ipatrollerData.filter(item => {
-          // Use totalPatrols field to determine if municipality is inactive
-          if (item.totalPatrols !== undefined) {
-            const isActive = item.totalPatrols >= 5;
-            return !isActive; // Inactive if totalPatrols < 5
-          } else if (item.data && Array.isArray(item.data)) {
-            // Fallback to calculating from data array
-            const totalPatrols = item.data.reduce((sum, val) => sum + (val || 0), 0);
-            return totalPatrols < 5; // Municipality is inactive if totalPatrols < 5
-          } else {
-            console.log('❌ No data for municipality (inactive):', item.municipality);
-            return true; // No data = inactive
-          }
-        });
+        console.log(`📈 Final counts: ${activeCount} active, ${inactiveCount} inactive (total: ${activeCount + inactiveCount})`);
+        
+        // Create dummy arrays for compatibility (we only need the counts)
+        const activeMunicipalities = new Array(activeCount).fill(null);
+        const inactiveMunicipalities = new Array(inactiveCount).fill(null);
         
         // Calculate monthly patrol trend (placeholder for now)
         const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => {
@@ -245,20 +260,25 @@ export const DataProvider = ({ children }) => {
           return { month, year, count: Math.floor(Math.random() * 100) + 20 }; // Placeholder data
         });
         
+        // Calculate total patrols for yesterday across all municipalities
+        const totalYesterdayPatrols = ipatrollerData.reduce((total, item) => {
+          let yesterdayPatrols = 0;
+          if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+            yesterdayPatrols = item.data[yesterdayIndex] || 0;
+          }
+          return total + yesterdayPatrols;
+        }, 0);
+        
         console.log('📈 Calculated stats:', {
           totalDailyPatrols,
+          totalYesterdayPatrols,
           activeDistricts,
-          activeMunicipalities: activeMunicipalities.length,
-          inactiveMunicipalities: inactiveMunicipalities.length,
-          totalMunicipalities: ipatrollerData.length
+          activeMunicipalities: activeCount,
+          inactiveMunicipalities: inactiveCount,
+          totalMunicipalities: ipatrollerData.length,
+          yesterdayDate: yesterday.toDateString()
         });
         
-        // Debug: Log each municipality's status
-        console.log('🔍 Municipality Status Breakdown:');
-        ipatrollerData.forEach(item => {
-          const status = item.totalPatrols >= 5 ? 'ACTIVE' : 'INACTIVE';
-          console.log(`  ${item.municipality}: ${item.totalPatrols} patrols → ${status}`);
-        });
         
         setDashboardData(prev => ({
           ...prev,
@@ -266,10 +286,12 @@ export const DataProvider = ({ children }) => {
           summaryStats: {
             ...prev.summaryStats,
             totalDailyPatrols,
+            totalYesterdayPatrols,
             activeDistricts,
-            activeMunicipalities: activeMunicipalities.length,
-            inactiveMunicipalities: inactiveMunicipalities.length,
-            monthlyPatrolTrend
+            activeMunicipalities: activeCount,
+            inactiveMunicipalities: inactiveCount,
+            monthlyPatrolTrend,
+            yesterdayDate: yesterday.toDateString()
           }
         }));
         
