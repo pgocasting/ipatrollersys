@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Button } from "./components/ui/button";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Badge } from "./components/ui/badge";
-import { Textarea } from "./components/ui/textarea";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
 import { 
   collection, 
   getDocs, 
@@ -378,11 +375,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [viewingIncident, setViewingIncident] = useState(null);
   const [editingIncident, setEditingIncident] = useState(null);
+  const [deletingIncident, setDeletingIncident] = useState(null);
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterDistrict, setFilterDistrict] = useState("all");
+  const [filterMunicipality, setFilterMunicipality] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedMonth, setSelectedMonth] = useState("all");
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
   // PDF Edit Interface State
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
@@ -1419,14 +1420,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                                incident.description !== "No description available";
     const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
+    const matchesDistrict = filterDistrict === "all" || incident.district === filterDistrict;
+    const matchesMunicipality = filterMunicipality === "all" || incident.municipality === filterMunicipality;
     const matchesSearch = searchTerm === "" || 
                          (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
-    return hasValidDescription && matchesStatus && matchesMonth && matchesSearch;
+    return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
   });
   // Get available months from incidents data
   const availableMonths = [...new Set(incidents.map(incident => incident.month).filter(month => month))];
+  // Get available districts from incidents data
+  const availableDistricts = [...new Set(incidents.map(incident => incident.district).filter(district => district))];
+  // Get available municipalities from incidents data
+  const availableMunicipalities = [...new Set(incidents.map(incident => incident.municipality).filter(municipality => municipality))];
   const getStatusColor = (status) => {
     switch (status) {
       case "Completed":
@@ -3224,19 +3231,17 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <h1 className="text-3xl font-bold text-gray-900">Incidents Reports</h1>
             <p className="text-gray-500 mt-2">Manage and track incident reports with comprehensive analytics</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          
+          <div className="flex items-center gap-4">
             {/* View Options Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="secondary"
-                  size="default"
+                <button
                   className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-                  title="Incidents Reports Options"
                 >
                   <Menu className="w-5 h-5" />
                   <span className="text-sm font-medium">View Options</span>
-                </Button>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-64 bg-white border border-gray-200 shadow-lg rounded-lg" align="end" sideOffset={5}>
                 <DropdownMenuLabel>Incident Management</DropdownMenuLabel>
@@ -3323,79 +3328,44 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             />
           </div>
         </div>
-        {/* Loading Indicator */}
-        {loading && (
-          <div className="mb-4 p-4 rounded-lg bg-gray-100 border border-gray-200">
-            <div className="flex items-center gap-3">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
-              <span className="text-sm font-medium text-black">
-                {firestoreStatus === 'saving' ? 'Saving to database...' : 
-                 firestoreStatus === 'connecting' ? 'Loading from database...' : 
-                 'Processing...'}
-              </span>
-            </div>
-          </div>
-        )}
         {/* Connection Error Display */}
         {connectionError && (
-          <div className="mb-4 p-4 rounded-lg ${
-            bg-red-50 border border-red-200
-          }">
+          <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center ${
-                bg-red-100
-              }">
-                <AlertTriangle className="w-4 h-4 ${
-                  text-red-600
-                }" />
+              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-red-100">
+                <AlertTriangle className="w-4 h-4 text-red-600" />
               </div>
               <div className="flex-1">
-                <span className="text-sm font-medium transition-colors duration-300 ${
-                  text-red-700
-                }">
+                <span className="text-sm font-medium transition-colors duration-300 text-red-700">
                   {connectionError}
                 </span>
                 {!isOnline && (
                   <div className="mt-1">
-                    <span className="text-xs transition-colors duration-300 ${
-                      text-red-600
-                    }">
+                    <span className="text-xs transition-colors duration-300 text-red-600">
                       📡 You are currently offline
                     </span>
                   </div>
                 )}
               </div>
-              <Button
+              <button
                 onClick={loadIncidents}
                 disabled={loading}
-                size="sm"
-                variant="outline"
-                className="h-8 px-3 text-xs ${
-                  border-red-500 text-red-600 hover:bg-red-50
-                }"
+                className="h-8 px-3 text-xs border border-red-500 text-red-600 hover:bg-red-50 rounded-md transition-colors duration-200 flex items-center"
               >
                 <RefreshCw className="w-3 h-3 mr-1" />
                 Retry
-              </Button>
+              </button>
             </div>
           </div>
         )}
         {/* Connection Status Indicator */}
         {!isOnline && !connectionError && (
-          <div className="mb-4 p-4 rounded-lg ${
-            bg-yellow-50 border border-yellow-200
-          }">
+          <div className="mb-4 p-4 rounded-lg bg-yellow-50 border border-yellow-200">
             <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full flex items-center justify-center ${
-                bg-yellow-100
-              }">
-                <AlertTriangle className="w-4 h-4 ${
-                  text-yellow-600
-                }" />
+              <div className="w-6 h-6 rounded-full flex items-center justify-center bg-yellow-100">
+                <AlertTriangle className="w-4 h-4 text-yellow-600" />
               </div>
-              <span className="text-sm font-medium transition-colors duration-300 ${
-                text-yellow-700
-              }">
+              <span className="text-sm font-medium transition-colors duration-300 text-yellow-700">
                 📡 You are currently offline. Some features may not work properly.
               </span>
             </div>
@@ -3533,44 +3503,125 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Select>
                 </div>
                 
+                {/* District Filter */}
+                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                  <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
+                  <Select value={filterDistrict} onValueChange={setFilterDistrict}>
+                    <SelectTrigger id="district-filter">
+                      <SelectValue placeholder="All Districts" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Districts</SelectItem>
+                      {availableDistricts.map((district) => (
+                        <SelectItem key={district} value={district}>
+                          {district}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                {/* Municipality Filter */}
+                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                  <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
+                  <Select value={filterMunicipality} onValueChange={setFilterMunicipality}>
+                    <SelectTrigger id="municipality-filter">
+                      <SelectValue placeholder="All Municipalities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Municipalities</SelectItem>
+                      {availableMunicipalities.map((municipality) => (
+                        <SelectItem key={municipality} value={municipality}>
+                          {municipality}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
                 {/* Clear Filters Button */}
                 <div className="flex items-end">
-                  <Button
+                  <button
                     onClick={() => {
                       setSearchTerm("");
                       setFilterStatus("all");
-                      setSelectedMonth("all");
+                      setFilterDistrict("all");
+                      setFilterMunicipality("all");
                     }}
-                    variant="outline"
-                    size="default"
+                    className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
                   >
                     Clear Filters
-                  </Button>
+                  </button>
                 </div>
               </div>
             </div>
             
+            {/* Municipality Quick Filters */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="mb-4">
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">Municipality</Label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {availableMunicipalities.map((municipality) => {
+                    const municipalityIncidents = incidents.filter(incident => incident.municipality === municipality);
+                    const incidentCount = municipalityIncidents.length;
+                    const isActive = filterMunicipality === municipality;
+                    
+                    return (
+                      <Badge
+                        key={municipality}
+                        variant={isActive ? "default" : "secondary"}
+                        className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
+                          isActive 
+                            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" 
+                            : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400"
+                        }`}
+                        onClick={() => setFilterMunicipality(isActive ? "all" : municipality)}
+                      >
+                        <Building2 className="w-3 h-3 mr-1" />
+                        {municipality}
+                        <span className="ml-1 text-xs opacity-75">
+                          {incidentCount} {incidentCount === 1 ? 'brgy' : 'brgy'} • {municipalityIncidents.filter(i => i.incidentType).length} {municipalityIncidents.filter(i => i.incidentType).length === 1 ? 'type' : 'types'}
+                        </span>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
             {/* Active Filters Display */}
-            {(searchTerm || filterStatus !== "all" || selectedMonth !== "all") && (
+            {(searchTerm || filterStatus !== "all" || filterDistrict !== "all" || filterMunicipality !== "all") && (
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-600">Active filters:</span>
                   {searchTerm && (
-                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border border-blue-200">
                       <Search className="w-3 h-3 mr-1" />
                       Search: "{searchTerm}"
                     </Badge>
                   )}
                   {selectedMonth !== "all" && (
-                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
+                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 border border-purple-200">
                       <Calendar className="w-3 h-3 mr-1" />
                       Month: {selectedMonth}
                     </Badge>
                   )}
                   {filterStatus !== "all" && (
-                    <Badge variant="secondary" className="bg-gray-100 text-black border-gray-200">
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 border border-green-200">
                       <Activity className="w-3 h-3 mr-1" />
                       Status: {filterStatus}
+                    </Badge>
+                  )}
+                  {filterDistrict !== "all" && (
+                    <Badge variant="secondary" className="bg-orange-100 text-orange-800 border border-orange-200">
+                      <Building2 className="w-3 h-3 mr-1" />
+                      District: {filterDistrict}
+                    </Badge>
+                  )}
+                  {filterMunicipality !== "all" && (
+                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border border-emerald-200">
+                      <MapPin className="w-3 h-3 mr-1" />
+                      Municipality: {filterMunicipality}
                     </Badge>
                   )}
                 </div>
@@ -3579,24 +3630,35 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </CardContent>
         </Card>
         {/* Incidents Table */}
-        <div className="border rounded-md border-gray-200 shadow-sm overflow-x-auto">
-          <div className="min-w-[1200px]">
-            <Table className="border-gray-200 w-full table-fixed">
+        <div className="border rounded-md border-gray-200 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <Table className="border-gray-200 w-full">
               <TableCaption className="text-slate-500">Incident reports and their current status.</TableCaption>
             <TableHeader>
               <TableRow className="border-b border-gray-200">
-                <TableHead className="w-[140px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Type</TableHead>
-                <TableHead className="w-[280px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Description</TableHead>
-                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Date</TableHead>
-                <TableHead className="w-[200px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Location</TableHead>
-                <TableHead className="w-[160px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Officer</TableHead>
-                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Status</TableHead>
-                <TableHead className="w-[200px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Action Taken</TableHead>
-                <TableHead className="w-[120px] border-gray-200 align-top py-3 px-4 break-words whitespace-normal font-semibold text-center">Actions</TableHead>
+                <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Type</TableHead>
+                <TableHead className="min-w-[200px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Description</TableHead>
+                <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Date</TableHead>
+                <TableHead className="min-w-[150px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Location</TableHead>
+                <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Officer</TableHead>
+                <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Status</TableHead>
+                <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Action Taken</TableHead>
+                <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredIncidents.length === 0 ? (
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="p-8 text-center align-middle">
+                    <div className="text-lg text-gray-500">
+                      <div className="flex items-center justify-center gap-2">
+                        <RotateCcw className="w-5 h-5 animate-spin" />
+                        <span>Loading incident reports...</span>
+                      </div>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ) : filteredIncidents.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="p-8 text-center align-middle">
                     <div className="text-lg text-gray-500">
@@ -3628,114 +3690,131 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       return (
                       <TableRow key={index} className="border-gray-200 hover:bg-gray-50/50">
                       <TableCell className="font-medium break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
+                        <div className="py-2 px-1 min-w-0">
+                          <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap">
                             {incident.incidentType}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <p className="text-gray-900 text-sm leading-relaxed break-words hyphens-auto word-wrap">
+                        <div className="py-2 px-1 min-w-0">
+                          <p className="text-gray-900 text-xs leading-relaxed break-words hyphens-auto word-wrap">
                             {incident.description || '-'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <p className="text-gray-900 text-sm break-words hyphens-auto word-wrap">
+                        <div className="py-2 px-1 min-w-0">
+                          <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap">
                             {incident.date || '-'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
+                        <div className="py-2 px-1 min-w-0">
+                          <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap">
                             {incident.location || '-'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <p className="text-gray-900 text-sm break-words hyphens-auto word-wrap">
+                        <div className="py-2 px-1 min-w-0">
+                          <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap">
                             {incident.officer || '-'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
-                          <Badge 
-                            variant="secondary" 
-                            className={`text-xs break-words hyphens-auto word-wrap whitespace-normal ${
-                              incident.status === 'Active' ? 'bg-red-100 text-red-800 border-red-200' :
-                              incident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
-                              incident.status === 'Completed' ? 'bg-green-100 text-green-800 border-green-200' :
-                              'bg-gray-100 text-gray-800 border-gray-200'
+                        <div className="py-2 px-1 min-w-0">
+                          <span 
+                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
+                              incident.status === 'Active' ? 'bg-red-100 text-red-800 border border-red-200' :
+                              incident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                              incident.status === 'Completed' ? 'bg-green-100 text-green-800 border border-green-200' :
+                              'bg-gray-100 text-gray-800 border border-gray-200'
                             }`}
                           >
                             {incident.status || 'Unknown'}
-                          </Badge>
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0">
+                        <div className="py-2 px-1 min-w-0">
                           {incident.actionType ? (
-                            <p className="text-gray-900 text-sm leading-tight break-words hyphens-auto word-wrap">
+                            <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap">
                               {incident.actionType}
                             </p>
                           ) : (
-                            <p className="text-gray-500 text-sm italic break-words hyphens-auto word-wrap">
+                            <p className="text-gray-500 text-xs italic break-words hyphens-auto word-wrap">
                               No Action
                             </p>
                           )}
                         </div>
                       </TableCell>
-                      <TableCell className="text-right break-words align-top whitespace-normal">
-                        <div className="py-2 px-4 min-w-0 flex justify-end gap-1">
-                          <Button
-                            size="sm"
-                            variant="ghost"
+                      <TableCell className="break-all align-top whitespace-normal text-center">
+                        <div className="py-2 px-1 min-w-0 flex items-center justify-center gap-1 text-center">
+                          <button
                             onClick={() => {
-                              // Debug: Log incident data when viewing
-                              console.log('👁️ Opening view modal for incident:', {
-                                incident: incident,
-                                incidentType: incident.incidentType,
-                                date: incident.date,
-                                location: incident.location,
-                                officer: incident.officer
-                              });
+                              // Close all other modals first
+                              setShowAddModal(false);
+                              setShowEditModal(false);
+                              setShowSummaryModal(false);
+                              setShowPdfEditModal(false);
+                              setShowPdfPreviewModal(false);
+                              
                               setViewingIncident(incident);
                               setShowViewModal(true);
                             }}
-                            className="h-8 w-8 p-0"
+                            className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-colors duration-200"
                             title="View Details"
                           >
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {incident.link && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => window.open(incident.link, '_blank')}
-                              className="h-8 w-8 p-0 bg-blue-50 hover:bg-blue-100 text-blue-700"
-                              title="Open Link"
-                            >
-                              <Link className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="ghost"
+                            <Eye className="w-3 h-3" />
+                          </button>
+                          <button
                             onClick={() => {
+                              // Close all other modals first
+                              setShowAddModal(false);
+                              setShowViewModal(false);
+                              setShowSummaryModal(false);
+                              setShowPdfEditModal(false);
+                              setShowPdfPreviewModal(false);
+                              
                               const validatedIncident = validateIncidentForEdit(incident);
                               setEditingIncident(validatedIncident);
                               setShowEditModal(true);
                             }}
-                            className="h-8 w-8 p-0"
+                            className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors duration-200"
                             title="Edit Incident"
                           >
-                            <Edit className="w-4 h-4" />
-                          </Button>
+                            <Edit className="w-3 h-3" />
+                          </button>
+                          {incident.link && (
+                            <button
+                              onClick={() => window.open(incident.link, '_blank')}
+                              className="p-1 text-purple-600 hover:bg-purple-50 rounded transition-colors duration-200"
+                              title="Open Link"
+                            >
+                              <Link className="w-3 h-3" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => {
+                              // Close all other modals first
+                              setShowAddModal(false);
+                              setShowViewModal(false);
+                              setShowEditModal(false);
+                              setShowSummaryModal(false);
+                              setShowPdfEditModal(false);
+                              setShowPdfPreviewModal(false);
+                              
+                              setDeletingIncident(incident);
+                              setShowDeleteModal(true);
+                            }}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors duration-200"
+                            title="Delete Incident"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
                         </div>
                       </TableCell>
                       </TableRow>
@@ -3749,36 +3828,21 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       </div>
       {/* Add Incident Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          {/* Completely transparent backdrop */}
-          <div className="absolute inset-0"></div>
-          {/* Modal Container */}
-          <div className="relative rounded-3xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden border ${
-            bg-white border-gray-200
-          }">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
             {/* Header with solid background */}
-            <div className="relative p-6 border-b ${
-              bg-gray-50 border-gray-200
-            }">
+            <div className="relative p-6 border-b bg-gray-50 border-gray-200">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl ${
-                  bg-blue-100
-                }">
-                  <FileText className="h-6 w-6 ${
-                    text-blue-600
-                  }" />
+                <div className="p-2 rounded-xl bg-blue-100">
+                  <FileText className="h-6 w-6 text-blue-600" />
                 </div>
-                <h3 className="text-2xl font-bold transition-colors duration-300 ${
-                text-gray-900
-              }">
+                <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
                   Add New Action Report
               </h3>
               </div>
               <button
                 onClick={() => setShowAddModal(false)}
-                className="absolute top-4 right-4 p-2 rounded-xl transition-all duration-300 hover:scale-110 ${
-                  text-gray-500 hover:text-gray-700 hover:bg-gray-100
-                }"
+                className="absolute top-4 right-4 p-2 rounded-xl transition-all duration-300 hover:scale-110 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -3803,17 +3867,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     </SelectContent>
                   </Select>
                   {newIncident.incidentType && newIncident.incidentType.startsWith("Other (") && (
-                    <p className="mt-1 text-xs transition-colors duration-300 ${
-                      text-blue-600
-                    }">
+                    <p className="mt-1 text-xs transition-colors duration-300 text-blue-600">
                       ✅ Formatted as: {newIncident.incidentType}
                     </p>
                   )}
                 </div>
                 <div>
-                  <Label htmlFor="date" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="date" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     When *
                   </Label>
                   <Input
@@ -3822,9 +3882,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={newIncident.date}
                     onChange={(e) => setNewIncident({...newIncident, date: e.target.value})}
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div>
@@ -4029,416 +4087,27 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <div className="flex justify-end gap-4 p-6 border-t ${
               border-gray-200 bg-gray-50
             }">
-              <Button
-                variant="outline"
+              <button
                 onClick={() => setShowAddModal(false)}
-                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 ${
-                  border-gray-300 text-gray-700 hover:bg-gray-100 hover:text-gray-900
-                }"
+                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={handleAddIncident}
-                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl"
+                className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-lg hover:shadow-xl flex items-center"
               >
                 <Save className="w-5 h-5 mr-2" />
                 Save Report
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* View Incident Modal */}
-      {showViewModal && viewingIncident && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">
-                View Incident Details
-              </h3>
-              <button
-                onClick={() => setShowViewModal(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
               </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">What</h4>
-                    <p className="text-gray-700">{viewingIncident.incidentType}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">When</h4>
-                    <p className="text-gray-700">{viewingIncident.date}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Location</h4>
-                    <p className="text-gray-700">{viewingIncident.location}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">District</h4>
-                    <p className="text-gray-700">{viewingIncident.district}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Municipality</h4>
-                    <p className="text-gray-700">{viewingIncident.municipality}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Who</h4>
-                    <p className="text-gray-700">{viewingIncident.officer}</p>
-                  </div>
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Why</h4>
-                    <p className="text-gray-700">{viewingIncident.why || 'Not specified'}</p>
-                  </div>
-                </div>
-
-                {/* Action Taken Section */}
-                <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-4">Action Taken</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <span className="text-sm font-medium text-gray-600">Type:</span>
-                      <div className="mt-1">
-                        <Badge className="bg-blue-100 text-blue-800">
-                          {viewingIncident.actionType || 'Not specified'}
-                        </Badge>
-                      </div>
-                    </div>
-                    {viewingIncident.assignedOfficer && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">Assigned Officer:</span>
-                        <p className="mt-1 text-gray-700">{viewingIncident.assignedOfficer}</p>
-                      </div>
-                    )}
-                    {viewingIncident.actionDate && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">Action Date:</span>
-                        <p className="mt-1 text-gray-700">{viewingIncident.actionDate}</p>
-                      </div>
-                    )}
-                    {viewingIncident.priority && (
-                      <div>
-                        <span className="text-sm font-medium text-gray-600">Priority:</span>
-                        <div className="mt-1">
-                          <Badge className={getPriorityColor(viewingIncident.priority)}>
-                            {viewingIncident.priority}
-                          </Badge>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                  {viewingIncident.actionDescription && (
-                    <div className="mt-4">
-                      <span className="text-sm font-medium text-gray-600">Description:</span>
-                      <p className="mt-1 text-gray-700">{viewingIncident.actionDescription}</p>
-                    </div>
-                  )}
-                  {viewingIncident.followUpNotes && (
-                    <div className="mt-4">
-                      <span className="text-sm font-medium text-gray-600">Follow-up Notes:</span>
-                      <p className="mt-1 text-gray-700">{viewingIncident.followUpNotes}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Description Section */}
-                <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">How</h4>
-                  <p className="text-gray-700">{viewingIncident.description || 'No description provided'}</p>
-                </div>
-
-                {/* Link Section */}
-                {viewingIncident.link && (
-                  <div className="p-4 rounded-lg bg-white shadow-sm border border-gray-200">
-                    <h4 className="font-semibold text-gray-900 mb-2">Link</h4>
-                    <Button
-                      onClick={() => window.open(viewingIncident.link, '_blank')}
-                      className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
-                    >
-                      <Eye className="w-4 h-4" />
-                      Open Link
-                    </Button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <Button
-                variant="outline"
-                onClick={() => setShowViewModal(false)}
-              >
-                Close
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Edit Incident Modal */}
-      {showEditModal && editingIncident && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <h3 className="text-xl font-bold text-gray-900">
-                Edit Incident
-              </h3>
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="p-2 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[70vh]">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="edit-incident-type" className="text-gray-700">
-                    Type
-                  </Label>
-                  <select
-                    id="edit-incident-type"
-                    value={editingIncident.incidentType}
-                    onChange={(e) => setEditingIncident({...editingIncident, incidentType: e.target.value})}
-                    className="mt-1 w-full p-2 rounded-md border bg-white border-gray-300"
-                  >
-                    <option value="">Select Incident Type</option>
-                    {incidentTypes.map((type, index) => (
-                      <option key={index} value={type}>
-                        {type}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-date" className="transition-colors duration-300 text-gray-700">
-                    When
-                  </Label>
-                  <Input
-                    id="edit-date"
-                    type="text"
-                    placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
-                    value={editingIncident.date || ''}
-                    onChange={(e) => setEditingIncident({...editingIncident, date: e.target.value})}
-                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-district" className="transition-colors duration-300 text-gray-700">
-                    District
-                  </Label>
-                  <select
-                    id="edit-district"
-                    value={editingIncident.district}
-                    onChange={(e) => handleEditDistrictChange(e.target.value)}
-                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
-                  >
-                    {districts.map((district) => (
-                      <option key={district} value={district}>
-                        {district}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-municipality" className="transition-colors duration-300 text-gray-700">
-                    Municipality
-                  </Label>
-                  <select
-                    id="edit-municipality"
-                    value={editingIncident.municipality}
-                    onChange={(e) => setEditingIncident({...editingIncident, municipality: e.target.value})}
-                    className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
-                  >
-                    {municipalitiesByDistrict[editingIncident.district]?.map((municipality) => (
-                      <option key={municipality} value={municipality}>
-                        {municipality}
-                      </option>
-                    )) || []}
-                  </select>
-                </div>
-                <div>
-                  <Label htmlFor="edit-location" className="transition-colors duration-300 text-gray-700">
-                    Location
-                  </Label>
-                  <Input
-                    id="edit-location"
-                    value={editingIncident.location}
-                    onChange={(e) => setEditingIncident({...editingIncident, location: e.target.value})}
-                    placeholder="Enter specific location"
-                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-officer" className="transition-colors duration-300 text-gray-700">
-                    Who
-                  </Label>
-                  <Input
-                    id="edit-officer"
-                    value={editingIncident.officer}
-                    onChange={(e) => setEditingIncident({...editingIncident, officer: e.target.value})}
-                    placeholder="Enter officer/accused details"
-                    className="mt-1 transition-colors duration-300 bg-white border-gray-300"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-why" className="transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Why
-                  </Label>
-                  <Input
-                    id="edit-why"
-                    value={editingIncident.why}
-                    onChange={(e) => setEditingIncident({...editingIncident, why: e.target.value})}
-                    placeholder="Enter reason (optional)"
-                    className="mt-1 transition-colors duration-300 ${
-                      bg-white border-gray-300
-                    }"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="edit-status" className="transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Action Taken
-                  </Label>
-                  <div className="grid grid-cols-1 gap-3 mt-1">
-                    <select
-                      id="edit-actionType"
-                      value={editingIncident.actionType}
-                      onChange={(e) => setEditingIncident({...editingIncident, actionType: e.target.value})}
-                      className="w-full p-2 rounded-md border transition-colors duration-300 ${
-                        bg-white border-gray-300
-                      }"
-                    >
-                      <option value="">Select Action Type</option>
-                      {actionTypes.map((type) => (
-                        <option key={type} value={type}>
-                          {type}
-                        </option>
-                      ))}
-                    </select>
-                    <Input
-                      placeholder="Assigned Officer"
-                      value={editingIncident.assignedOfficer}
-                      onChange={(e) => setEditingIncident({...editingIncident, assignedOfficer: e.target.value})}
-                      className="transition-colors duration-300 ${
-                        bg-white border-gray-300
-                      }"
-                    />
-                    <div className="grid grid-cols-2 gap-2">
-                      <Input
-                        type="date"
-                        placeholder="Action Date"
-                        value={editingIncident.actionDate}
-                        onChange={(e) => setEditingIncident({...editingIncident, actionDate: e.target.value})}
-                        className="transition-colors duration-300 ${
-                          bg-white border-gray-300
-                        }"
-                      />
-                      <select
-                        value={editingIncident.priority}
-                        onChange={(e) => setEditingIncident({...editingIncident, priority: e.target.value})}
-                        className="p-2 rounded-md border transition-colors duration-300 ${
-                          bg-white border-gray-300
-                        }"
-                      >
-                        {priorityLevels.map((level) => (
-                          <option key={level} value={level}>
-                            {level} Priority
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <textarea
-                      placeholder="Action Description"
-                      value={editingIncident.actionDescription}
-                      onChange={(e) => setEditingIncident({...editingIncident, actionDescription: e.target.value})}
-                      rows={2}
-                      className="w-full p-2 rounded-md border transition-colors duration-300 ${
-                        bg-white border-gray-300
-                      }"
-                    />
-                  </div>
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="edit-description" className="transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    How
-                  </Label>
-                  <textarea
-                    id="edit-description"
-                    value={editingIncident.description}
-                    onChange={(e) => setEditingIncident({...editingIncident, description: e.target.value})}
-                    placeholder="Enter detailed description"
-                    rows={4}
-                    className="mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
-                      bg-white border-gray-300
-                    }"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="edit-link" className="transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Link (Optional)
-                  </Label>
-                  <Input
-                    id="edit-link"
-                    value={editingIncident.link}
-                    onChange={(e) => setEditingIncident({...editingIncident, link: e.target.value})}
-                    placeholder="Enter URL link"
-                    className="mt-1 transition-colors duration-300 ${
-                      bg-white border-gray-300
-                    }"
-                  />
-                </div>
-                <div className="md:col-span-2">
-                  <Label htmlFor="edit-followUpNotes" className="transition-colors duration-300 ${
-                    text-gray-700
-                  }">
-                    Follow-up Notes (Optional)
-                  </Label>
-                  <textarea
-                    id="edit-followUpNotes"
-                    value={editingIncident.followUpNotes}
-                    onChange={(e) => setEditingIncident({...editingIncident, followUpNotes: e.target.value})}
-                    placeholder="Enter any follow-up notes or additional information"
-                    rows={3}
-                    className="mt-1 w-full p-3 rounded-md border transition-colors duration-300 ${
-                      bg-white border-gray-300
-                    }"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <Button
-                variant="outline"
-                onClick={() => setShowEditModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleEditIncident}
-                className="bg-black hover:bg-black/90 text-white"
-              >
-                Update Incident
-              </Button>
             </div>
           </div>
         </div>
       )}
       {/* Summary Insights Modal */}
       {showSummaryModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="rounded-2xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden bg-white">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
             <div className="flex items-center justify-between p-6 border-b ${
               border-gray-200
             }">
@@ -4454,27 +4123,31 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <Button
+                <button
                   onClick={() => {
                     const insights = generateSummaryInsights();
                     alert(`Detection Test Results:
-1ST DISTRICT: ${insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
-2ND DISTRICT: ${insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
-3RD DISTRICT: ${insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.join(', ') || 'None detected'}
-Check browser console for detailed debug information.`);
+Total Incidents: ${insights.totalIncidents}
+Active: ${insights.activeIncidents}
+Completed: ${insights.completedIncidents}
+Completion Rate: ${insights.completionRate}%
+
+Top District: ${insights.topDistrict}
+Top Municipality: ${insights.topMunicipality}
+Top Location: ${insights.topLocation}`);
                   }}
-                  className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                  className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
                   title="Test Detection"
                 >
                   <Zap className="w-5 h-5" />
-                </Button>
-                <Button
+                </button>
+                <button
                   onClick={exportSummaryToPDF}
-                  className="bg-red-600 hover:bg-red-700 text-white"
+                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
                   title="Export to PDF"
                 >
                   <Download className="w-5 h-5" />
-                </Button>
+                </button>
                 <button
                   onClick={() => setShowSummaryModal(false)}
                   className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
@@ -5065,33 +4738,31 @@ Check browser console for detailed debug information.`);
               })()}
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <Button
-                variant="outline"
+              <button
                 onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
               >
                 Close
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
       {/* PDF Edit Modal */}
       {showPdfEditModal && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-          <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl bg-white">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold transition-colors duration-300 text-gray-900">
                   📄 Edit PDF Report
                 </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => setShowPdfEditModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200"
                 >
                   <X className="w-5 h-5" />
-                </Button>
+                </button>
               </div>
             </div>
             <div className="p-6 space-y-6">
@@ -5196,60 +4867,56 @@ Check browser console for detailed debug information.`);
               </div>
             </div>
             <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <Button
-                variant="outline"
+              <button
                 onClick={() => setShowPdfEditModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
               >
                 Cancel
-              </Button>
-              <Button
-                variant="outline"
+              </button>
+              <button
                 onClick={() => {
                   setShowPdfEditModal(false);
-                  previewPdfReport();
+                  setShowPdfPreviewModal(true);
                 }}
-                className="border-blue-600 text-blue-600 hover:bg-blue-50"
+                className="px-4 py-2 border border-blue-600 text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
               >
                 Preview
-              </Button>
-              <Button
+              </button>
+              <button
                 onClick={() => {
                   setShowPdfEditModal(false);
                   exportIncidentsToPDF();
                 }}
-                disabled={isGeneratingPdf}
-                className="bg-blue-600 hover:bg-blue-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors duration-200 flex items-center"
               >
-                {isGeneratingPdf ? (
+                {pdfGenerating ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    Generating PDF...
+                    Generating...
                   </>
                 ) : (
                   'Generate PDF'
                 )}
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
       {/* PDF Preview Modal */}
       {showPdfPreviewModal && (
-        <div className="fixed inset-0 bg-transparent flex items-center justify-center z-50">
-          <div className="w-full max-w-6xl max-h-[95vh] overflow-y-auto rounded-lg shadow-xl bg-white">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-6xl max-h-[95vh] overflow-y-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
             <div className="p-6 border-b border-gray-200">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold transition-colors duration-300 text-gray-900">
                   📄 PDF Report Preview
                 </h2>
-                <Button
-                  variant="ghost"
-                  size="sm"
+                <button
                   onClick={() => setShowPdfPreviewModal(false)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors duration-200"
                 >
                   <X className="w-5 h-5" />
-                </Button>
+                </button>
               </div>
             </div>
             <div className="p-6 space-y-6">
@@ -5460,6 +5127,516 @@ Check browser console for detailed debug information.`);
                   'Generate PDF'
                 )}
               </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Details Modal */}
+      {showViewModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Eye className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">View Incident Details</h3>
+                  <p className="text-sm text-gray-500">Detailed information about the selected incident report</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowViewModal(false);
+                  setViewingIncident(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="p-6 space-y-4 max-h-96 overflow-y-auto">
+              {viewingIncident && (
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Incident Type</label>
+                    <p className="text-base font-semibold text-gray-900 mt-1">
+                      {viewingIncident.incidentType || 'Not specified'}
+                    </p>
+                  </div>
+                    
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Date & Time</label>
+                    <p className="text-base font-semibold text-gray-900 mt-1">
+                      {viewingIncident.date || 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Location</label>
+                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      {viewingIncident.location || 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">District & Municipality</label>
+                    <p className="text-base font-semibold text-gray-900 mt-1">
+                      {viewingIncident.district || 'Not specified'} - {viewingIncident.municipality || 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <div className="mt-2">
+                      <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
+                        viewingIncident.status === 'Active' ? 'bg-red-100 text-red-800 border border-red-200' :
+                        viewingIncident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                        viewingIncident.status === 'Completed' ? 'bg-green-100 text-green-800 border border-green-200' :
+                        'bg-gray-100 text-gray-800 border border-gray-200'
+                      }`}>
+                        {viewingIncident.status || 'Unknown'}
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Reporting Officer</label>
+                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      {viewingIncident.officer || 'Not specified'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Description</label>
+                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      {viewingIncident.description || 'No description available'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Witnesses</label>
+                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      {viewingIncident.witnesses || 'No witnesses recorded'}
+                    </p>
+                  </div>
+                  
+                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
+                    <label className="text-sm font-medium text-gray-600">Evidence</label>
+                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      {viewingIncident.evidence || 'No evidence recorded'}
+                    </p>
+                  </div>
+                  
+                  {/* Action Taken */}
+                  {(viewingIncident.actionType || viewingIncident.actionDescription) && (
+                    <div className="border-t border-gray-200 pt-6">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                        Action Taken
+                      </h3>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Action Type</label>
+                          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                            <p className="text-gray-900 break-words whitespace-pre-wrap">{viewingIncident.actionType || 'Not specified'}</p>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Assigned Officer</label>
+                          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
+                            <p className="text-gray-900 break-words whitespace-pre-wrap">{viewingIncident.assignedOfficer || 'Not assigned'}</p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {viewingIncident.actionDescription && (
+                        <div className="mt-4">
+                          <label className="block text-sm font-semibold text-gray-700 mb-2">Action Description</label>
+                          <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 min-h-[100px]">
+                            <p className="text-gray-900 break-words whitespace-pre-wrap leading-relaxed">{viewingIncident.actionDescription}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Link */}
+                  {viewingIncident.link && (
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2">Related Link</label>
+                      <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
+                        <a 
+                          href={viewingIncident.link} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-800 underline break-all font-medium"
+                        >
+                          {viewingIncident.link}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  
+                </div>
+              )}
+            </div>
+            
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200">
+              <button 
+                onClick={() => {
+                  setShowViewModal(false);
+                  setViewingIncident(null);
+                }} 
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg transition-colors duration-200"
+              >
+                <X className="w-4 h-4 mr-2 inline" />
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Incident Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <Edit className="w-5 h-5 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Edit Incident Report</h3>
+                  <p className="text-sm text-gray-500">Update the details of the selected incident report</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingIncident(null);
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+            
+            {/* Content */}
+            <div className="overflow-y-auto max-h-[calc(90vh-80px)]">
+          
+              {editingIncident && (
+                <div className="p-6 space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Incident Type */}
+                    <div>
+                      <label htmlFor="edit-incident-type" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Incident Type *
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="edit-incident-type"
+                          value={editingIncident.incidentType}
+                          onChange={(e) => setEditingIncident({...editingIncident, incidentType: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
+                        >
+                          <option value="">Select Incident Type</option>
+                          {incidentTypes.map((type, index) => (
+                            <option key={index} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                
+                    {/* Date */}
+                    <div>
+                      <label htmlFor="edit-date" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Date *
+                      </label>
+                      <input
+                        id="edit-date"
+                        type="date"
+                        value={editingIncident.date}
+                        onChange={(e) => setEditingIncident({...editingIncident, date: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                      />
+                    </div>
+                    
+                    {/* Time */}
+                    <div>
+                      <label htmlFor="edit-time" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Time
+                      </label>
+                      <input
+                        id="edit-time"
+                        type="time"
+                        value={editingIncident.time}
+                        onChange={(e) => setEditingIncident({...editingIncident, time: e.target.value})}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                      />
+                    </div>
+                    
+                    {/* Status */}
+                    <div>
+                      <label htmlFor="edit-status" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Status *
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="edit-status"
+                          value={editingIncident.status}
+                          onChange={(e) => setEditingIncident({...editingIncident, status: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
+                        >
+                          <option value="">Select Status</option>
+                          <option value="Active">Active</option>
+                          <option value="Under Investigation">Under Investigation</option>
+                          <option value="Completed">Completed</option>
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                
+                    {/* District */}
+                    <div>
+                      <label htmlFor="edit-district" className="block text-sm font-semibold text-gray-700 mb-2">
+                        District *
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="edit-district"
+                          value={editingIncident.district}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            const municipalitiesForDistrict = municipalitiesByDistrict[value] || [];
+                            const firstMunicipality = municipalitiesForDistrict[0] || "";
+                            setEditingIncident({
+                              ...editingIncident, 
+                              district: value,
+                              municipality: firstMunicipality
+                            });
+                          }}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
+                        >
+                          <option value="">Select District</option>
+                          {districts.map((district, index) => (
+                            <option key={index} value={district}>
+                              {district}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                    
+                    {/* Municipality */}
+                    <div>
+                      <label htmlFor="edit-municipality" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Municipality *
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="edit-municipality"
+                          value={editingIncident.municipality}
+                          onChange={(e) => setEditingIncident({...editingIncident, municipality: e.target.value})}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
+                        >
+                          <option value="">Select Municipality</option>
+                          {(municipalitiesByDistrict[editingIncident.district] || []).map((municipality, index) => (
+                            <option key={index} value={municipality}>
+                              {municipality}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Location */}
+                  <div>
+                    <label htmlFor="edit-location" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Location *
+                    </label>
+                    <textarea
+                      id="edit-location"
+                      value={editingIncident.location}
+                      onChange={(e) => setEditingIncident({...editingIncident, location: e.target.value})}
+                      placeholder="Enter detailed location..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 min-h-[100px] resize-y"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  {/* Description */}
+                  <div>
+                    <label htmlFor="edit-description" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Description *
+                    </label>
+                    <textarea
+                      id="edit-description"
+                      value={editingIncident.description}
+                      onChange={(e) => setEditingIncident({...editingIncident, description: e.target.value})}
+                      placeholder="Enter incident description..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 min-h-[140px] resize-y"
+                      rows={5}
+                    />
+                  </div>
+              
+                  {/* Officer and Additional Info */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="edit-officer" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Reporting Officer
+                      </label>
+                      <input
+                        id="edit-officer"
+                        type="text"
+                        value={editingIncident.officer}
+                        onChange={(e) => setEditingIncident({...editingIncident, officer: e.target.value})}
+                        placeholder="Enter officer name..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label htmlFor="edit-link" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Related Link
+                      </label>
+                      <input
+                        id="edit-link"
+                        type="url"
+                        value={editingIncident.link}
+                        onChange={(e) => setEditingIncident({...editingIncident, link: e.target.value})}
+                        placeholder="Enter related link..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                      />
+                    </div>
+                  </div>
+              
+                  {/* Witnesses */}
+                  <div>
+                    <label htmlFor="edit-witnesses" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Witnesses
+                    </label>
+                    <textarea
+                      id="edit-witnesses"
+                      value={editingIncident.witnesses}
+                      onChange={(e) => setEditingIncident({...editingIncident, witnesses: e.target.value})}
+                      placeholder="Enter witness information..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 min-h-[100px] resize-y"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  {/* Evidence */}
+                  <div>
+                    <label htmlFor="edit-evidence" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Evidence
+                    </label>
+                    <textarea
+                      id="edit-evidence"
+                      value={editingIncident.evidence}
+                      onChange={(e) => setEditingIncident({...editingIncident, evidence: e.target.value})}
+                      placeholder="Enter evidence information..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 min-h-[100px] resize-y"
+                      rows={3}
+                    />
+                  </div>
+              
+                  {/* Action Taken Section */}
+                  <div className="border-t border-gray-200 pt-6">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                      Action Taken
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <label htmlFor="edit-action-type" className="block text-sm font-semibold text-gray-700 mb-2">
+                          Action Type
+                        </label>
+                        <input
+                          id="edit-action-type"
+                          type="text"
+                          value={editingIncident.actionType}
+                          onChange={(e) => setEditingIncident({...editingIncident, actionType: e.target.value})}
+                          placeholder="Enter action type..."
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label htmlFor="edit-assigned-officer" className="block text-sm font-semibold text-gray-700 mb-2">
+                          Assigned Officer
+                        </label>
+                        <input
+                          id="edit-assigned-officer"
+                          type="text"
+                          value={editingIncident.assignedOfficer}
+                          onChange={(e) => setEditingIncident({...editingIncident, assignedOfficer: e.target.value})}
+                          placeholder="Enter assigned officer..."
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="mt-4">
+                      <label htmlFor="edit-action-description" className="block text-sm font-semibold text-gray-700 mb-2">
+                        Action Description
+                      </label>
+                      <textarea
+                        id="edit-action-description"
+                        value={editingIncident.actionDescription}
+                        onChange={(e) => setEditingIncident({...editingIncident, actionDescription: e.target.value})}
+                        placeholder="Enter detailed action description..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 min-h-[120px] resize-y"
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+              
+                  {/* Action Buttons */}
+                  <div className="flex justify-end gap-4 pt-6 border-t border-gray-200">
+                    <button
+                      onClick={() => {
+                        setShowEditModal(false);
+                        setEditingIncident(null);
+                      }}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors duration-200"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await updateIncident(editingIncident.id, editingIncident);
+                          await loadIncidents();
+                          setShowEditModal(false);
+                          setEditingIncident(null);
+                        } catch (error) {
+                          console.error('Error updating incident:', error);
+                          alert('Error updating incident. Please try again.');
+                        }
+                      }}
+                      className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-xl transition-colors duration-200"
+                    >
+                      Save Changes
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

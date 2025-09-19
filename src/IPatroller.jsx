@@ -6,6 +6,7 @@ import { Input } from "./components/ui/input";
 import { Badge } from "./components/ui/badge";
 import { Label } from "./components/ui/label";
 import { toast } from "sonner";
+import { useNotification, NotificationContainer } from './components/ui/notification';
 import { 
   collection, 
   query, 
@@ -68,6 +69,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [patrolData, setPatrolData] = useState([]);
   const [loading, setLoading] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState('connecting');
+  const { notifications, showSuccess, showError, removeNotification } = useNotification();
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -351,6 +353,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           position: 'top-right',
           style: { background: 'white' },
         });
+        showSuccess('No changes to save - No patrol data has been entered yet');
         setLoading(false);
         return;
       }
@@ -378,6 +381,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         position: 'top-right',
         style: { background: 'white' },
       });
+      showSuccess('Changes saved successfully!');
     } catch (error) {
       console.error('❌ Error syncing to Firestore:', error);
       setFirestoreStatus('error');
@@ -388,6 +392,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         position: 'top-right',
         style: { background: 'white' },
       });
+      showError('Failed to save changes');
     } finally {
       setLoading(false);
     }
@@ -521,6 +526,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const topPerformers = getTopPerformers();
       if (topPerformers.length === 0) {
         toast.error('No performance data available to export');
+        showError('No performance data available to export');
         return;
       }
 
@@ -727,7 +733,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         description: `Top Performers Ranking report saved as ${fileName}`,
         duration: 3000,
         position: 'top-right',
+        style: { background: 'white' },
       });
+      showSuccess('PDF report generated successfully!');
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -735,7 +743,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         description: 'Please try again or contact support if the issue persists',
         duration: 4000,
         position: 'top-right',
+        style: { background: 'white' },
       });
+      showError('Failed to generate PDF report');
     }
   };
 
@@ -1144,6 +1154,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         position: 'top-right',
         style: { background: 'white' },
       });
+      showSuccess('Monthly Summary Report Generated!');
       
     } catch (error) {
       console.error('Error generating report:', error);
@@ -1153,6 +1164,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         position: 'top-right',
         style: { background: 'white' },
       });
+      showError('Failed to generate report');
     } finally {
       setIsGeneratingReport(false);
     }
@@ -1160,14 +1172,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
+      <div className="container mx-auto p-6 space-y-8 bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
-              I-Patroller Management
-            </h1>
-            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900">I-Patroller Management</h1>
+            <p className="text-gray-500 mt-2">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
                 "en-US",
                 { month: "long", year: "numeric" },
@@ -1198,13 +1208,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               )}
             </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {/* 3-Lines Menu */}
+          
+          <div className="flex items-center gap-4">
+            {/* Menu Dropdown */}
             <div className="relative">
               <Button
                 id="ipatroller-menu-button"
                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
                 title="I-Patroller Options"
               >
                 <Menu className="w-5 h-5" />
@@ -1290,64 +1301,67 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
 
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-            <CardContent className="p-6">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols</p>
-                  <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Patrols</p>
+                  <p className="text-2xl font-bold text-blue-600">
                     {overallSummary.totalPatrols.toLocaleString()}
                   </p>
                 </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                  <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <BarChart3 className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                                 <div>
-                   <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Active Days</p>
-                   <p className="text-3xl font-bold text-green-600 dark:text-green-400">
-                     {overallSummary.totalActive.toLocaleString()}
-                   </p>
-                 </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
-                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                                 <div>
-                   <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Inactive Days</p>
-                   <p className="text-3xl font-bold text-red-600 dark:text-red-400">
-                     {overallSummary.totalInactive.toLocaleString()}
-                   </p>
-                 </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
-                  <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-            <CardContent className="p-6">
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Avg Active %</p>
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Active Days</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {overallSummary.totalActive.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Days</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {overallSummary.totalInactive.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <XCircle className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Avg Active %</p>
+                  <p className="text-2xl font-bold text-orange-600">
                     {overallSummary.avgActivePercentage}%
                   </p>
                 </div>
-                <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                  <Target className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Target className="w-6 h-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>
@@ -1355,12 +1369,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Filters and Search */}
-        <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
-                Filters & Search
-              </CardTitle>
+        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
               <div className="flex gap-2">
                 <Button
                   onClick={() => {
@@ -1387,11 +1399,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
             </div>
-          </CardHeader>
-          <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <Label htmlFor="search" className="transition-colors duration-300 text-gray-700">
+                <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                   Search
                 </Label>
                 <Input
@@ -1399,18 +1409,18 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   placeholder="Search municipalities..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="mt-1 transition-colors duration-300 bg-white border-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
               <div>
-                <Label htmlFor="month-filter" className="transition-colors duration-300 text-gray-700">
+                <Label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
                   Month
                 </Label>
                 <select
                   id="month-filter"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   <option value={0}>January</option>
                   <option value={1}>February</option>
@@ -1427,14 +1437,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </select>
               </div>
               <div>
-                <Label htmlFor="year-filter" className="transition-colors duration-300 text-gray-700">
+                <Label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-2">
                   Year
                 </Label>
                 <select
                   id="year-filter"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   <option value={2023}>2023</option>
                   <option value={2024}>2024</option>
@@ -1444,14 +1454,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </select>
               </div>
               <div>
-                <Label htmlFor="district-filter" className="transition-colors duration-300 text-gray-700">
+                <Label htmlFor="district-filter" className="block text-sm font-medium text-gray-700 mb-2">
                   District
                 </Label>
                 <select
                   id="district-filter"
                   value={selectedDistrict}
                   onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="mt-1 w-full p-2 rounded-md border transition-colors duration-300 bg-white border-gray-300"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
                   <option value="ALL">All Districts</option>
                   <option value="1ST DISTRICT">1ST DISTRICT</option>
@@ -1464,7 +1474,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         </Card>
 
         {/* Patrol Data Table */}
-        <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
           <CardHeader>
             <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
@@ -1922,12 +1932,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                         description: `Saved as ${fileName}`,
                         duration: 3000
                       });
+                      showSuccess('PDF Generated Successfully!');
                     } catch (error) {
                       console.error('Error generating PDF:', error);
                       toast.error('Failed to generate PDF', {
                         description: error.message,
                         duration: 3000
                       });
+                      showError('Failed to generate PDF');
                     } finally {
                       setIsGeneratingPdf(false);
                       setShowPdfPreview(false);
@@ -2223,6 +2235,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   Export PDF
                 </Button>
                 <Button
+                  onClick={() => showSuccess('Export feature coming soon!')}
+                  variant="outline"
+                  size="sm"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  Export Feature
+                </Button>
+                <Button
                   onClick={() => setShowTopPerformersModal(false)}
                   variant="outline"
                   size="sm"
@@ -2448,6 +2468,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
       )}
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </Layout>
   );
 }

@@ -37,20 +37,8 @@ import {
   Edit
 } from "lucide-react";
 import { toast } from "sonner";
+import { useNotification, NotificationContainer } from './components/ui/notification';
 import * as XLSX from 'xlsx';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement
-} from 'chart.js';
-import { Bar, Doughnut, Line } from 'react-chartjs-2';
 import { 
   Dialog, 
   DialogContent, 
@@ -61,22 +49,14 @@ import {
   DialogTrigger 
 } from "./components/ui/dialog";
 
-// Register Chart.js components
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-  ArcElement,
-  PointElement,
-  LineElement
-);
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
   const { isAdmin, userMunicipality } = useAuth();
+  const { notifications, showSuccess, showError, removeNotification } = useNotification();
+  
+  // Municipality tabs state - moved here to be available for useEffect
+  const [activeMunicipalityTab, setActiveMunicipalityTab] = useState("");
   
   useEffect(() => {
     if (userMunicipality) {
@@ -148,7 +128,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [saveAllProgress, setSaveAllProgress] = useState({ current: 0, total: 0 });
   
   // Active Tab State
-  const [activeTab, setActiveTab] = useState(isAdmin ? "overview" : "weekly-report");
+  const [activeTab, setActiveTab] = useState("weekly-report");
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
 
   // Close dropdown when clicking outside
@@ -190,8 +170,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Weekly Report Data - Individual date entries
   const [weeklyReportData, setWeeklyReportData] = useState({});
   
-  // Municipality tabs state
-  const [activeMunicipalityTab, setActiveMunicipalityTab] = useState("");
+  // Municipality tabs state - moved to top of component
   
   // Clear data options state
   const [showClearOptions, setShowClearOptions] = useState(false);
@@ -647,8 +626,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const saveResult = await saveWeeklyReport(reportKey, reportData);
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
+          showSuccess(`Weekly report data cleared for ${activeMunicipalityTab}`);
         } else {
           toast.warning(`Local data cleared, but failed to clear from database: ${saveResult.error}`);
+          showError(`Local data cleared, but failed to clear from database: ${saveResult.error}`);
         }
         
         // Add to terminal history
@@ -663,6 +644,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } catch (error) {
         console.error("Error clearing active municipality data:", error);
         toast.error("Error clearing data: " + error.message);
+        showError('Error clearing data: ' + error.message);
       }
     }
   };
@@ -671,6 +653,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleClearSelectedMunicipalityData = async () => {
     if (!selectedClearMunicipality) {
       toast.error("Please select a municipality to clear data for");
+      showError('Please select a municipality to clear data for');
       return;
     }
 
@@ -698,6 +681,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const saveResult = await saveWeeklyReport(reportKey, reportData);
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${selectedClearMunicipality}`);
+          showSuccess(`Weekly report data cleared for ${selectedClearMunicipality}`);
           
           // If the cleared municipality is the active tab, also clear local data
           if (selectedClearMunicipality === activeMunicipalityTab) {
@@ -719,10 +703,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setTerminalHistory(prev => [...prev, newEntry]);
         } else {
           toast.error("Failed to clear data from database: " + saveResult.error);
+          showError('Failed to clear data from database: ' + saveResult.error);
         }
       } catch (error) {
         console.error("Error clearing selected municipality data:", error);
         toast.error("Error clearing selected municipality data");
+        showError('Error clearing selected municipality data');
       }
     }
   };
@@ -752,6 +738,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         }
         
         toast.success("All data cleared successfully");
+        showSuccess('All data cleared successfully!');
         
         // Add to terminal history
         const newEntry = {
@@ -765,6 +752,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } catch (error) {
         console.error("Error clearing all data:", error);
         toast.error("Error clearing all data: " + error.message);
+        showError('Error clearing all data: ' + error.message);
       }
     }
   };
@@ -820,6 +808,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     window.URL.revokeObjectURL(url);
     
     toast.success("Weekly report exported successfully");
+    showSuccess('Weekly report exported successfully!');
   };
 
   // Get concern types for a specific municipality
@@ -1063,10 +1052,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } else {
         console.error('❌ Failed to load barangays:', result.error);
         toast.error('Failed to load barangays from database');
+        showError('Failed to load barangays from database');
       }
     } catch (error) {
       console.error('❌ Error loading barangays:', error);
       toast.error('Error loading barangays from database');
+      showError('Error loading barangays from database');
     } finally {
       setIsLoadingBarangays(false);
     }
@@ -1083,10 +1074,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } else {
         console.error('❌ Failed to load concern types:', result.error);
         toast.error('Failed to load concern types from database');
+        showError('Failed to load concern types from database');
       }
     } catch (error) {
       console.error('❌ Error loading concern types:', error);
       toast.error('Error loading concern types from database');
+      showError('Error loading concern types from database');
     } finally {
       setIsLoadingConcernTypes(false);
     }
@@ -1246,6 +1239,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleBarangayImport = async () => {
     if (!selectedDistrict || !selectedMunicipality || !barangayData.trim()) {
       toast.error("Please select district, municipality and enter barangay data");
+      showError('Please select district, municipality and enter barangay data');
       return;
     }
 
@@ -1275,6 +1269,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       const saveResult = await saveBarangays(updatedBarangays);
       if (saveResult.success) {
         toast.success(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
+        showSuccess(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
         
         // Add to terminal history
         const newEntry = {
@@ -1287,12 +1282,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         setTerminalHistory(prev => [...prev, newEntry]);
       } else {
         toast.error("Failed to save barangays to database: " + saveResult.error);
+        showError('Failed to save barangays to database: ' + saveResult.error);
         // Revert local state if save failed
         setImportedBarangays(importedBarangays);
       }
       
     } catch (error) {
       toast.error("Error importing barangays: " + error.message);
+      showError('Error importing barangays: ' + error.message);
     } finally {
       setIsImporting(false);
     }
@@ -1301,6 +1298,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleExportBarangays = () => {
     if (importedBarangays.length === 0) {
       toast.error("No barangays to export");
+      showError('No barangays to export');
       return;
     }
 
@@ -1322,6 +1320,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     window.URL.revokeObjectURL(url);
     
     toast.success("Barangays exported successfully");
+    showSuccess('Barangays exported successfully!');
   };
 
   // Barangay sorting functions
@@ -1546,6 +1545,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
     if (concernTypesToExport.length === 0) {
       toast.error("No concern types to export");
+      showError('No concern types to export');
       return;
     }
 
@@ -1570,11 +1570,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     document.body.removeChild(link);
     
     toast.success(`Exported ${concernTypesToExport.length} concern types to CSV`);
+    showSuccess(`Exported ${concernTypesToExport.length} concern types to CSV`);
   };
 
   const handleClearBarangays = async () => {
     if (importedBarangays.length === 0) {
       toast.error("No barangays to clear");
+      showError('No barangays to clear');
       return;
     }
 
@@ -1586,11 +1588,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setImportedBarangays([]);
           setSelectedBarangays([]);
           toast.success("All barangays cleared successfully");
+          showSuccess('All barangays cleared successfully!');
         } else {
           toast.error("Failed to clear barangays from database: " + saveResult.error);
+          showError('Failed to clear barangays from database: ' + saveResult.error);
         }
       } catch (error) {
         toast.error("Error clearing barangays: " + error.message);
+        showError('Error clearing barangays: ' + error.message);
       }
     }
   };
@@ -1598,6 +1603,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleClearSelectedBarangays = async () => {
     if (selectedBarangays.length === 0) {
       toast.error("No barangays selected to clear");
+      showError('No barangays selected to clear');
       return;
     }
 
@@ -1612,11 +1618,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setImportedBarangays(remainingBarangays);
           setSelectedBarangays([]);
           toast.success(`${selectedBarangays.length} selected barangays cleared successfully`);
+          showSuccess(`${selectedBarangays.length} selected barangays cleared successfully!`);
         } else {
           toast.error("Failed to clear selected barangays from database: " + saveResult.error);
+          showError('Failed to clear selected barangays from database: ' + saveResult.error);
         }
       } catch (error) {
         toast.error("Error clearing selected barangays: " + error.message);
+        showError('Error clearing selected barangays: ' + error.message);
       }
     }
   };
@@ -1624,6 +1633,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleEditSelectedBarangays = () => {
     if (selectedBarangays.length === 0) {
       toast.error("No barangays selected to edit");
+      showError('No barangays selected to edit');
       return;
     }
 
@@ -3226,63 +3236,36 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout}>
       <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
         {/* Header */}
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold transition-colors duration-300 text-gray-900">
-              Command Center
-            </h1>
-            <p className="text-base md:text-lg transition-colors duration-300 text-gray-600">
-              {new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" })} • Real-time monitoring and control system
-            </p>
-            <div className="flex items-center gap-2 mt-2">
-              <div className="w-2 h-2 rounded-full bg-green-500"></div>
-              <span className="text-sm font-medium text-green-600 dark:text-green-400">
-                All systems operational
-              </span>
-            </div>
+            <h1 className="text-3xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-gray-500 mt-2">Real-time monitoring and control system with comprehensive analytics</p>
           </div>
           
-          {/* 3-Lines Menu */}
-          <div className="relative">
-            <button
-              id="commandcenter-menu-button"
-              onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-              title="Command Center Options"
-            >
-              <Menu className="w-5 h-5" />
-              <span className="text-sm font-medium">View Options</span>
-            </button>
-            
-            {/* Dropdown Menu */}
-            {showMenuDropdown && (
-              <div 
-                id="commandcenter-menu-dropdown"
-                className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+          <div className="flex items-center gap-4">
+            {/* View Options Dropdown */}
+            <div className="relative">
+              <button
+                id="commandcenter-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
               >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </button>
+              
+              {/* Dropdown Menu */}
+              {showMenuDropdown && (
+                <div 
+                  id="commandcenter-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
                 <div className="py-1">
                 {/* Navigation Options */}
                 <div className="px-3 py-2">
                   <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
                 </div>
 
-                {/* Show Overview only for admin */}
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      setActiveTab("overview");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "overview"
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                    }`}
-                  >
-                    <BarChart3 className="w-4 h-4 text-blue-600" />
-                    <span>Overview</span>
-                  </button>
-                )}
 
                 {/* Weekly Report - available for all users */}
                 <button
@@ -3337,31 +3320,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 )}
                 </div>
               </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
       {/* Main Dashboard */}
       <div className="space-y-4">
 
-        {/* Barangay Stats Cards */}
-        <div className={`grid grid-cols-1 ${isAdmin ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-1'} gap-4 md:gap-6`}>
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
+        {/* Quick Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+            <div className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Barangays</p>
-                  <p className="text-2xl md:text-3xl font-bold text-purple-600">
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
+                  <p className="text-2xl font-bold text-blue-600">
                     {isAdmin 
                       ? importedBarangays.length 
                       : importedBarangays.filter(b => b.municipality === userMunicipality).length}
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {isAdmin ? 'All municipalities' : userMunicipality}
-                  </p>
                 </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                  <Building2 className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Building2 className="w-6 h-6 text-blue-600" />
                 </div>
               </div>
             </div>
@@ -3369,144 +3350,75 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
           {isAdmin && (
             <>
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Districts</p>
-                  <p className="text-2xl md:text-3xl font-bold text-blue-600">
-                    {new Set(importedBarangays.map(b => b.district)).size}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Active districts
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                  <MapPin className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
+              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Districts</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {new Set(importedBarangays.map(b => b.district)).size}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <MapPin className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Total Municipalities</p>
-                  <p className="text-2xl md:text-3xl font-bold text-green-600">
-                    {new Set(importedBarangays.map(b => b.municipality)).size}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    With barangays
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
-                  <Users className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
+              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Municipalities</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {new Set(importedBarangays.map(b => b.municipality)).size}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <Building2 className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs md:text-sm font-medium transition-colors duration-300 text-gray-500">Avg per Municipality</p>
-                  <p className="text-2xl md:text-3xl font-bold text-orange-600">
-                    {new Set(importedBarangays.map(b => b.municipality)).size > 0 
-                      ? Math.round(importedBarangays.length / new Set(importedBarangays.map(b => b.municipality)).size)
-                      : 0}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Barangays per municipality
-                  </p>
-                </div>
-                <div className="h-10 w-10 md:h-12 md:w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                  <Activity className="h-5 w-5 md:h-6 md:w-6 text-orange-600" />
+              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+                <div className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Active Systems</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        4
+                      </p>
+                    </div>
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <Activity className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
             </>
           )}
         </div>
 
-        {/* Overview Section - only for admin */}
-        {isAdmin && activeTab === "overview" && (
-          <div className="space-y-6">
-            {/* Charts Grid */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Weekly Patrol Activity */}
-              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-                <div className="p-4 md:p-6 pb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                      <BarChart3 className="h-4 w-4 text-blue-600" />
-                    </div>
-                    <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Weekly Patrol Activity</h3>
-                  </div>
-                </div>
-                <div className="p-4 md:p-6 pt-0">
-                  <div className="h-64">
-                    <Bar data={patrolData} options={chartOptions} />
-                  </div>
-                </div>
-              </div>
-
-              {/* District Distribution */}
-              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-                <div className="p-4 md:p-6 pb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                      <Users className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">District Distribution</h3>
-                  </div>
-                </div>
-                <div className="p-4 md:p-6 pt-0">
-                  <div className="h-64">
-                    <Doughnut data={districtData} options={doughnutOptions} />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Alert Trends */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-red-100">
-                    <AlertTriangle className="h-4 w-4 text-red-600" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Alert Trends (6 Months)</h3>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 pt-0">
-                <div className="h-80">
-                  <Line data={alertTrendData} options={chartOptions} />
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Weekly Report Section */}
         {activeTab === "weekly-report" && (
           <div className="space-y-6">
             {/* Weekly Report Header */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-6 pb-0">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
-                      <FileText className="h-4 w-4 text-green-600" />
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <FileText className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
+                      <h3 className="text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
                       {activeMunicipalityTab && (
                         <div className="flex items-center gap-4 mt-1">
                           <div className="flex items-center gap-2">
-                            <Building2 className="h-4 w-4 text-green-600" />
+                            <Building2 className="w-4 h-4 text-green-600" />
                             <span className="text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
                           </div>
                           <div className="text-sm text-gray-600">
@@ -3531,14 +3443,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       </label>
                     </div>
                     
-                    {/* Action Buttons - Straight Line Layout */}
+                    {/* Action Buttons */}
                     <div className="flex gap-3 overflow-x-auto">
                       <button 
                         onClick={() => setShowSummaryModal(true)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
                         title="View Summary"
                       >
-                        <BarChart3 className="h-4 w-4" />
+                        <BarChart3 className="w-4 h-4" />
                         <span className="text-sm font-medium">View Summary</span>
                       </button>
                       
@@ -4036,7 +3948,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                         className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
                                         title="Remove entry"
                                       >
-                                        <X className="h-4 w-4" />
+                                        <X className="w-4 h-4" />
                                       </button>
                                     </div>
                                   </td>
@@ -5408,14 +5320,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               </div>
 
               {/* Filters */}
-              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <div className="flex flex-wrap gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Month:</label>
+              <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-6 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Month</label>
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">All Months</option>
                       <option value="January">January</option>
@@ -5432,12 +5344,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <option value="December">December</option>
                     </select>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Year:</label>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Year</label>
                     <select
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(e.target.value)}
-                      className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
                       <option value="">All Years</option>
                       <option value="2024">2024</option>
@@ -5445,22 +5357,25 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <option value="2026">2026</option>
                     </select>
                   </div>
-                  <button
-                    onClick={() => loadWeeklyReportsCollection({
-                      month: selectedMonth || undefined,
-                      year: selectedYear || undefined,
-                      municipality: activeMunicipalityTab || undefined
-                    })}
-                    disabled={isLoadingCollection}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center gap-2"
-                  >
-                    {isLoadingCollection ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    ) : (
-                      <CheckCircle className="h-4 w-4" />
-                    )}
-                    <span className="text-sm font-medium">Filter</span>
-                  </button>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Actions</label>
+                    <button
+                      onClick={() => loadWeeklyReportsCollection({
+                        month: selectedMonth || undefined,
+                        year: selectedYear || undefined,
+                        municipality: activeMunicipalityTab || undefined
+                      })}
+                      disabled={isLoadingCollection}
+                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                    >
+                      {isLoadingCollection ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <CheckCircle className="w-4 h-4" />
+                      )}
+                      <span className="text-sm font-medium">Filter</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -5558,6 +5473,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
       )}
+      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </Layout>
   );
 }
