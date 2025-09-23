@@ -48,6 +48,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "./components/ui/dialog";
+import { Badge } from "./components/ui/badge";
 
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
@@ -177,8 +178,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [showClearModal, setShowClearModal] = useState(false);
   const [selectedClearMunicipality, setSelectedClearMunicipality] = useState("");
   
-  // Summary modal state
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   
   // Excel Import States
   const [isImportingExcel, setIsImportingExcel] = useState(false);
@@ -983,6 +982,190 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         completionRate: 0,
         remarksRate: 0,
         municipality: municipality || "All Municipalities"
+      };
+    }
+  };
+
+  // Calculate quarterly summary statistics
+  const calculateQuarterlySummary = (municipality = null) => {
+    try {
+      const currentYear = selectedYear;
+      const quarters = [
+        { name: "Q1", months: ["January", "February", "March"], color: "blue" },
+        { name: "Q2", months: ["April", "May", "June"], color: "green" },
+        { name: "Q3", months: ["July", "August", "September"], color: "orange" },
+        { name: "Q4", months: ["October", "November", "December"], color: "purple" }
+      ];
+
+      let totalEntries = 0;
+      let totalWeeklySum = 0;
+      let uniqueBarangays = new Set();
+      let uniqueConcernTypes = new Set();
+      let entriesWithAction = 0;
+      let entriesWithRemarks = 0;
+      let concernTypeStats = {};
+      let barangayStats = {};
+      let quarterlyStats = {};
+
+      // Initialize quarterly stats
+      quarters.forEach(quarter => {
+        quarterlyStats[quarter.name] = {
+          entries: 0,
+          weeklySum: 0,
+          barangays: new Set(),
+          concernTypes: new Set()
+        };
+      });
+
+      // Check if we have any data
+      if (!weeklyReportData || Object.keys(weeklyReportData).length === 0) {
+        return {
+          totalEntries: 0,
+          totalWeeklySum: 0,
+          uniqueBarangays: 0,
+          uniqueConcernTypes: 0,
+          entriesWithAction: 0,
+          entriesWithRemarks: 0,
+          quarterlyStats: quarters.map(q => ({
+            name: q.name,
+            entries: 0,
+            weeklySum: 0,
+            barangays: 0,
+            concernTypes: 0,
+            color: q.color
+          })),
+          topConcernTypes: [],
+          topBarangays: [],
+          completionRate: 0,
+          remarksRate: 0,
+          municipality: municipality || "All Municipalities",
+          year: currentYear
+        };
+      }
+
+      // Process data for each quarter
+      quarters.forEach(quarter => {
+        quarter.months.forEach(month => {
+          const dates = generateDates(month, currentYear);
+          dates.forEach(date => {
+            const dateEntries = getDateData(date);
+            dateEntries.forEach(entry => {
+              // Validate entry exists and has required properties
+              if (!entry || typeof entry !== 'object') {
+                return;
+              }
+
+              // Filter by municipality if specified
+              if (municipality && entry.barangay) {
+                let barangayMunicipality = '';
+                if (entry.barangay.includes(', ')) {
+                  barangayMunicipality = entry.barangay.split(', ')[1];
+                } else if (entry.barangay.includes(' (')) {
+                  const match = entry.barangay.match(/\(([^)]+)\)/);
+                  barangayMunicipality = match ? match[1] : '';
+                } else {
+                  const matchingBarangay = importedBarangays.find(b => 
+                    b.name.toLowerCase() === entry.barangay.toLowerCase()
+                  );
+                  barangayMunicipality = matchingBarangay ? matchingBarangay.municipality : '';
+                }
+                
+                if (barangayMunicipality !== municipality) {
+                  return;
+                }
+              }
+              
+              totalEntries++;
+              quarterlyStats[quarter.name].entries++;
+              
+              // Count weekly values
+              const week1 = isNaN(parseInt(entry.week1)) ? 0 : parseInt(entry.week1);
+              const week2 = isNaN(parseInt(entry.week2)) ? 0 : parseInt(entry.week2);
+              const week3 = isNaN(parseInt(entry.week3)) ? 0 : parseInt(entry.week3);
+              const week4 = isNaN(parseInt(entry.week4)) ? 0 : parseInt(entry.week4);
+              
+              const entryWeeklySum = week1 + week2 + week3 + week4;
+              totalWeeklySum += entryWeeklySum;
+              quarterlyStats[quarter.name].weeklySum += entryWeeklySum;
+              
+              // Track unique values
+              if (entry.barangay) {
+                uniqueBarangays.add(entry.barangay);
+                quarterlyStats[quarter.name].barangays.add(entry.barangay);
+                barangayStats[entry.barangay] = (barangayStats[entry.barangay] || 0) + 1;
+              }
+              
+              if (entry.concernType) {
+                uniqueConcernTypes.add(entry.concernType);
+                quarterlyStats[quarter.name].concernTypes.add(entry.concernType);
+                concernTypeStats[entry.concernType] = (concernTypeStats[entry.concernType] || 0) + 1;
+              }
+              
+              // Count entries with action taken and remarks
+              if (entry.actionTaken && entry.actionTaken.trim()) {
+                entriesWithAction++;
+              }
+              if (entry.remarks && entry.remarks.trim()) {
+                entriesWithRemarks++;
+              }
+            });
+          });
+        });
+      });
+
+      // Convert quarterly stats to final format
+      const finalQuarterlyStats = quarters.map(quarter => ({
+        name: quarter.name,
+        entries: quarterlyStats[quarter.name].entries,
+        weeklySum: quarterlyStats[quarter.name].weeklySum,
+        barangays: quarterlyStats[quarter.name].barangays.size,
+        concernTypes: quarterlyStats[quarter.name].concernTypes.size,
+        color: quarter.color,
+        months: quarter.months
+      }));
+
+      // Find top concern types and barangays
+      const topConcernTypes = Object.entries(concernTypeStats)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([type, count]) => ({ type, count }));
+
+      const topBarangays = Object.entries(barangayStats)
+        .sort(([,a], [,b]) => b - a)
+        .slice(0, 5)
+        .map(([barangay, count]) => ({ barangay, count }));
+
+      return {
+        totalEntries,
+        totalWeeklySum,
+        uniqueBarangays: uniqueBarangays.size,
+        uniqueConcernTypes: uniqueConcernTypes.size,
+        entriesWithAction,
+        entriesWithRemarks,
+        quarterlyStats: finalQuarterlyStats,
+        topConcernTypes,
+        topBarangays,
+        completionRate: totalEntries > 0 ? Math.round((entriesWithAction / totalEntries) * 100) : 0,
+        remarksRate: totalEntries > 0 ? Math.round((entriesWithRemarks / totalEntries) * 100) : 0,
+        municipality: municipality || "All Municipalities",
+        year: currentYear
+      };
+    } catch (error) {
+      console.error('Error calculating quarterly summary:', error);
+      return {
+        totalEntries: 0,
+        totalWeeklySum: 0,
+        uniqueBarangays: 0,
+        uniqueConcernTypes: 0,
+        entriesWithAction: 0,
+        entriesWithRemarks: 0,
+        quarterlyStats: [],
+        topConcernTypes: [],
+        topBarangays: [],
+        completionRate: 0,
+        remarksRate: 0,
+        municipality: municipality || "All Municipalities",
+        year: selectedYear
       };
     }
   };
@@ -3318,6 +3501,26 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <span>Concern Types</span>
                   </button>
                 )}
+
+                {/* Divider */}
+                <div className="border-t border-gray-200 my-1"></div>
+
+                {/* Actions Section */}
+                <div className="px-3 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</h3>
+                </div>
+
+                {/* Summary Button */}
+                <button
+                  onClick={() => {
+                    setShowSummaryModal(true);
+                    setShowMenuDropdown(false);
+                  }}
+                  className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 text-gray-700 hover:bg-blue-50 hover:text-blue-700"
+                >
+                  <BarChart3 className="w-4 h-4 text-blue-600" />
+                  <span>Summary</span>
+                </button>
                 </div>
               </div>
               )}
@@ -3445,14 +3648,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {/* Action Buttons */}
                     <div className="flex gap-3 overflow-x-auto">
-                      <button 
-                        onClick={() => setShowSummaryModal(true)}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                        title="View Summary"
-                      >
-                        <BarChart3 className="w-4 h-4" />
-                        <span className="text-sm font-medium">View Summary</span>
-                      </button>
                       
                       <button 
                         onClick={() => document.getElementById('excel-file-input').click()}
@@ -3637,7 +3832,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 {/* Municipality Selection */}
                 <div className="mb-6">
                   <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-3">
                     {isAdmin ? (
                       // Show all municipalities for admin
                       Object.values(municipalitiesByDistrict).flat().map((municipality) => {
@@ -3646,40 +3841,48 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                         const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
                         
                         return (
-                          <button
+                          <Badge
                             key={municipality}
-                            onClick={() => handleMunicipalityTabChange(municipality)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 ${
+                            variant={isActive ? "default" : "secondary"}
+                            className={`px-4 py-2 h-auto cursor-pointer transition-all duration-200 flex items-center gap-2 hover:scale-105 ${
                               isActive
-                                ? 'bg-green-600 text-white shadow-lg'
-                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-50 hover:border-green-300'
+                                ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg border-green-600'
+                                : 'bg-white hover:bg-green-50 text-gray-700 border border-gray-300 hover:border-green-300'
                             }`}
+                            onClick={() => handleMunicipalityTabChange(municipality)}
                           >
                             <Building2 className="h-4 w-4" />
-                            <span>{municipality}</span>
-                            <div className={`text-xs px-2 py-1 rounded-full ${
-                              isActive 
-                                ? 'bg-green-500 text-white' 
-                                : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <span className="font-medium">{municipality}</span>
+                            <Badge 
+                              variant="outline" 
+                              className={`text-xs ml-1 ${
+                                isActive 
+                                  ? 'bg-green-500 border-green-400 text-white hover:bg-green-400' 
+                                  : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+                              }`}
+                            >
                               {barangaysCount} brgy • {concernTypesCount} types
-                            </div>
-                          </button>
+                            </Badge>
+                          </Badge>
                         );
                       })
                     ) : (
                       // Show only user's municipality
                       userMunicipality ? (
-                        <button
+                        <Badge
+                          variant="default"
+                          className="px-4 py-2 h-auto cursor-pointer bg-green-600 hover:bg-green-700 text-white shadow-lg border-green-600 flex items-center gap-2"
                           onClick={() => handleMunicipalityTabChange(userMunicipality)}
-                          className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white shadow-lg flex items-center gap-2"
                         >
                           <Building2 className="h-4 w-4" />
-                          <span>{userMunicipality}</span>
-                          <div className="text-xs px-2 py-1 rounded-full bg-green-500 text-white">
+                          <span className="font-medium">{userMunicipality}</span>
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs ml-1 bg-green-500 border-green-400 text-white hover:bg-green-400"
+                          >
                             {importedBarangays.filter(b => b.municipality === userMunicipality).length} brgy • {getConcernTypesForMunicipality(userMunicipality).length} types
-                          </div>
-                        </button>
+                          </Badge>
+                        </Badge>
                       ) : (
                         <div className="text-gray-500">No municipality assigned</div>
                       )
@@ -5075,226 +5278,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       </div>
       </section>
 
-      {/* Summary Modal */}
-      {showSummaryModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                  <BarChart3 className="h-6 w-6 text-blue-600" />
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">
-                  Weekly Report Summary
-                </h2>
-                    {activeMunicipalityTab && (
-                      <p className="text-sm text-gray-600 mt-1">
-                        Municipality: <span className="font-medium text-blue-600">{activeMunicipalityTab}</span>
-                      </p>
-                    )}
-                  </div>
-                </div>
-                  <button
-                    onClick={() => setShowSummaryModal(false)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-              </div>
-
-              {(() => {
-                const summary = calculateWeeklyReportSummary(activeMunicipalityTab);
-                return (
-                  <div className="space-y-6">
-                    {/* Overview Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-blue-600">Total Entries</p>
-                            <p className="text-2xl font-bold text-blue-900">{summary.totalEntries}</p>
-                          </div>
-                          <FileText className="h-8 w-8 text-blue-600" />
-                        </div>
-                      </div>
-                      
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-green-600">Total Weekly Sum</p>
-                            <p className="text-2xl font-bold text-green-900">{summary.totalWeeklySum}</p>
-                          </div>
-                          <BarChart3 className="h-8 w-8 text-green-600" />
-                        </div>
-                      </div>
-                      
-                      <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-purple-600">Unique Barangays</p>
-                            <p className="text-2xl font-bold text-purple-900">{summary.uniqueBarangays}</p>
-                          </div>
-                          <MapPinIcon className="h-8 w-8 text-purple-600" />
-                        </div>
-                      </div>
-                      
-                      <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-orange-600">Concern Types</p>
-                            <p className="text-2xl font-bold text-orange-900">{summary.uniqueConcernTypes}</p>
-                          </div>
-                          <AlertTriangle className="h-8 w-8 text-orange-600" />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Weekly Breakdown */}
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                      <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <BarChart3 className="h-5 w-5 text-gray-600" />
-                        Weekly Breakdown
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div className="text-center">
-                          <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
-                            <p className="text-sm font-medium text-yellow-800">Week 1</p>
-                            <p className="text-xl font-bold text-yellow-900">{summary.totalWeek1}</p>
-                            <p className="text-xs text-yellow-700">{selectedMonth} 1-7</p>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-green-100 border border-green-300 rounded-lg p-3">
-                            <p className="text-sm font-medium text-green-800">Week 2</p>
-                            <p className="text-xl font-bold text-green-900">{summary.totalWeek2}</p>
-                            <p className="text-xs text-green-700">{selectedMonth} 8-14</p>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
-                            <p className="text-sm font-medium text-blue-800">Week 3</p>
-                            <p className="text-xl font-bold text-blue-900">{summary.totalWeek3}</p>
-                            <p className="text-xs text-blue-700">{selectedMonth} 15-21</p>
-                          </div>
-                        </div>
-                        <div className="text-center">
-                          <div className="bg-purple-100 border border-purple-300 rounded-lg p-3">
-                            <p className="text-sm font-medium text-purple-800">Week 4</p>
-                            <p className="text-xl font-bold text-purple-900">{summary.totalWeek4}</p>
-                            <p className="text-xs text-purple-700">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Completion Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          Completion Rate
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Entries with Action Taken</span>
-                            <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${summary.completionRate}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <MessageSquare className="h-5 w-5 text-blue-600" />
-                          Remarks Rate
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Entries with Remarks</span>
-                            <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                              style={{ width: `${summary.remarksRate}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Top Lists */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <AlertTriangle className="h-5 w-5 text-orange-600" />
-                          Top Concern Types
-                        </h3>
-                        {summary.topConcernTypes.length > 0 ? (
-                          <div className="space-y-2">
-                            {summary.topConcernTypes.map((item, index) => (
-                              <div key={item.type} className="flex justify-between items-center p-2 bg-orange-50 rounded-lg">
-                                <span className="text-sm font-medium text-orange-900">{item.type}</span>
-                                <span className="text-sm font-bold text-orange-700">{item.count}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">No concern types recorded</p>
-                        )}
-                      </div>
-
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <MapPinIcon className="h-5 w-5 text-purple-600" />
-                          Top Barangays
-                        </h3>
-                        {summary.topBarangays.length > 0 ? (
-                          <div className="space-y-2">
-                            {summary.topBarangays.map((item, index) => (
-                              <div key={item.barangay} className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
-                                <span className="text-sm font-medium text-purple-900">{item.barangay}</span>
-                                <span className="text-sm font-bold text-purple-700">{item.count}</span>
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500">No barangays recorded</p>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Summary Info */}
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
-                          <BarChart3 className="h-4 w-4 text-blue-600" />
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-blue-900 mb-1">Summary for {selectedMonth} {selectedYear}</h4>
-                          <p className="text-sm text-blue-700">
-                            {summary.municipality} • 
-                            {summary.totalEntries} total entries • 
-                            {summary.totalWeeklySum} total weekly sum • 
-                            {summary.completionRate}% completion rate
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Weekly Reports Collection Modal */}
       {showCollectionView && (

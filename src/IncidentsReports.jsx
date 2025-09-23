@@ -6,6 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
+import { Textarea } from "./components/ui/textarea";
 import { Badge } from "./components/ui/badge";
 import { 
   collection, 
@@ -2189,16 +2190,16 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       // Enhanced auto-fit helper function to check page overflow and add new pages
       const checkPageOverflow = (yPosition, requiredSpace = 10) => {
         const pageHeight = doc.internal.pageSize.height;
-        const bottomMargin = 20; // Adequate bottom margin for page numbers
+        const bottomMargin = 25; // Bottom margin for page numbers
         const availableSpace = pageHeight - bottomMargin;
         if (yPosition + requiredSpace > availableSpace) {
           doc.addPage();
-          return 20; // Reset to top of new page with proper margin
+          return 15; // Reset to top of new page with minimal margin
         }
         return yPosition;
       };
       // Enhanced auto-fit text function that handles overflow with minimal spacing
-      const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 5) => {
+      const addAutoFitText = (text, x, y, maxWidth, fontSize = 11, lineSpacing = 4) => {
         if (!text || text.trim() === '') {
           return y + lineSpacing;
         }
@@ -2206,7 +2207,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         const lines = doc.splitTextToSize(text.trim(), maxWidth);
         let currentY = y;
         lines.forEach((line, index) => {
-          currentY = checkPageOverflow(currentY, lineSpacing);
+          // Check for page overflow before adding each line (less aggressive)
+          currentY = checkPageOverflow(currentY, lineSpacing + 2);
           doc.text(line, x, currentY);
           currentY += lineSpacing;
         });
@@ -2214,20 +2216,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       // Enhanced section header function with minimal spacing
       const addSectionHeader = (text, yPosition, fontSize = 14) => {
-        const newY = checkPageOverflow(yPosition, 15);
+        const newY = checkPageOverflow(yPosition, 8);
         doc.setFontSize(fontSize);
         doc.setFont('helvetica', 'bold');
         doc.text(text, leftMargin, newY);
         // Add underline for section header
         doc.setLineWidth(0.2);
         doc.line(leftMargin, newY + 1, doc.internal.pageSize.width - leftMargin, newY + 1);
-        return newY + 8; // Return position after header with minimal spacing
+        return newY + 5; // Return position after header with minimal spacing
       };
       // Enhanced bullet list function with minimal spacing
       const addBulletList = (items, yPosition, fontSize = 10, indent = 15) => {
         let currentY = yPosition;
         items.forEach((item, index) => {
-          currentY = checkPageOverflow(currentY, 6);
+          currentY = checkPageOverflow(currentY, 4);
           // Bullet point
           doc.setFontSize(fontSize);
           doc.setFont('helvetica', 'bold');
@@ -2236,8 +2238,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           const itemText = typeof item === 'string' ? item : `${item.title}: ${item.content}`;
           const textX = leftMargin + indent;
           const textWidth = doc.internal.pageSize.width - leftMargin * 2 - indent;
-          currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 5);
-          currentY += 2; // Minimal gap between items
+          currentY = addAutoFitText(itemText, textX, currentY, textWidth, fontSize, 4);
+          currentY += 1; // Minimal gap between items
         });
         return currentY;
       };
@@ -2271,32 +2273,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       doc.text('FOR', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
-      yPos += 5; // Minimal spacing between fields
+      yPos = addAutoFitText(pdfReportData.memorandum.for, contentMargin, yPos, maxContentWidth - contentMargin, 11, 4);
+      yPos += 3; // Reduced spacing between fields
       // FROM line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('FROM', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
-      yPos += 5;
+      yPos = addAutoFitText(pdfReportData.memorandum.from, contentMargin, yPos, maxContentWidth - contentMargin, 11, 4);
+      yPos += 3;
       // DATE line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('DATE', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
-      yPos += 5;
+      yPos = addAutoFitText(pdfReportData.memorandum.date, contentMargin, yPos, maxContentWidth - contentMargin, 11, 4);
+      yPos += 3;
       // SUBJECT line
       yPos = checkPageOverflow(yPos, 8);
       doc.setFont('helvetica', 'bold');
       doc.text('SUBJECT', leftMargin, yPos);
       doc.text(':', leftMargin + 20, yPos);
       doc.setFont('helvetica', 'normal');
-      yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 5);
-      yPos += 8; // Minimal spacing before custom notes
+      yPos = addAutoFitText(pdfReportData.memorandum.subject, contentMargin, yPos, maxContentWidth - contentMargin, 11, 4);
+      yPos += 6; // Reduced spacing before custom notes
       // Add custom notes if provided
       if (pdfReportData.customNotes && pdfReportData.customNotes.trim()) {
         yPos = checkPageOverflow(yPos, 10);
@@ -2485,10 +2487,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             }
           },
           didDrawPage: function(data) {
-            // Add page numbers
-            const pageCount = doc.internal.getNumberOfPages();
-            doc.setFontSize(10);
-            doc.text(`Page ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+            // Page numbers are handled globally at the end
           }
         });
         // Update yPos to after table with minimal spacing
@@ -2497,9 +2496,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         console.error('Error generating table:', tableError);
         throw new Error('Failed to generate incident table: ' + tableError.message);
       }
-            // B. Crime Hotspots and High-Risk Areas
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
+      // B. Crime Hotspots and High-Risk Areas
+      yPos = checkPageOverflow(yPos, 10);
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
       doc.text('B. Crime Hotspots and High-Risk Areas:', leftMargin, yPos);
       yPos += 5;
       // Generate dynamic crime hotspots content
@@ -2555,31 +2555,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       };
       // Display dynamic hotspots
       const dynamicHotspots = generateDynamicHotspots();
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
       dynamicHotspots.forEach((hotspot, index) => {
-        // Check for page overflow before each hotspot
-        yPos = checkPageOverflow(yPos, 20);
-        // Add page break before Barangay Hotspots if it's a long section
-        if (hotspot.title === 'Barangay Hotspots:' && yPos > doc.internal.pageSize.height * 0.7) {
-          doc.addPage();
-          yPos = 25; // Account for header
-        }
+        // Check for page overflow before each hotspot section (less aggressive)
+        yPos = checkPageOverflow(yPos, 8);
+        
+        // Add the hotspot title and content
         const text = `${hotspot.title} ${hotspot.content}`;
-        yPos = addAutoFitText(text, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 10, 5);
-        yPos += 3;
+        yPos = addAutoFitText(text, leftMargin, yPos, doc.internal.pageSize.width - leftMargin * 2, 10, 4);
+        yPos += 2;
+        
+        // Add sub-items if they exist
         if (hotspot.subItems) {
           hotspot.subItems.forEach(item => {
-            yPos = addAutoFitText(`• ${item}`, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 5);
-            yPos += 2;
+            // Check for page overflow before each sub-item (less aggressive)
+            yPos = checkPageOverflow(yPos, 6);
+            yPos = addAutoFitText(`• ${item}`, leftMargin + 10, yPos, doc.internal.pageSize.width - leftMargin * 2 - 10, 10, 4);
+            yPos += 1;
           });
-          yPos += 3;
+          yPos += 2;
         }
       });
       } // End of Section 2 conditional
-      // Add new page for Trend & Pattern Analysis (Page 3)
-      doc.addPage();
-      yPos = 25; // Start with proper margin accounting for header
+      // Continue with Trend & Pattern Analysis (let it flow naturally)
+      yPos += 3; // Minimal spacing before next section
       // 3. Trend & Pattern Analysis
       if (pdfReportData.includeSections.trendAnalysis) {
         yPos = addSectionHeader('3. Trend & Pattern Analysis', yPos);
@@ -3253,14 +3254,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   <Plus className="w-4 h-4 text-black" />
                   <span>Add New Incident</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setShowSummaryModal(true)}
-                  disabled={loading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
-                >
-                  <BarChart3 className="w-4 h-4 text-black" />
-                  <span>Summary Insights</span>
-                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Data Management</DropdownMenuLabel>
                 <DropdownMenuItem
@@ -3269,13 +3262,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 >
                   <Upload className="w-4 h-4 text-black" />
                   <span>Import Excel/CSV</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={showPdfEditInterface}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
-                >
-                  <Printer className="w-4 h-4 text-black" />
-                  <span>Export to PDF</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Data Cleanup</DropdownMenuLabel>
@@ -3556,73 +3542,40 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               </div>
             </div>
             
-            {/* Municipality Quick Filters */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <div className="mb-4">
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">Municipality</Label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {availableMunicipalities.map((municipality) => {
-                    const municipalityIncidents = incidents.filter(incident => incident.municipality === municipality);
-                    const incidentCount = municipalityIncidents.length;
-                    const isActive = filterMunicipality === municipality;
-                    
-                    return (
-                      <Badge
-                        key={municipality}
-                        variant={isActive ? "default" : "secondary"}
-                        className={`cursor-pointer transition-all duration-200 hover:scale-105 ${
-                          isActive 
-                            ? "bg-blue-600 text-white border-blue-600 hover:bg-blue-700" 
-                            : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:border-gray-400"
-                        }`}
-                        onClick={() => setFilterMunicipality(isActive ? "all" : municipality)}
-                      >
-                        <Building2 className="w-3 h-3 mr-1" />
-                        {municipality}
-                        <span className="ml-1 text-xs opacity-75">
-                          {incidentCount} {incidentCount === 1 ? 'brgy' : 'brgy'} • {municipalityIncidents.filter(i => i.incidentType).length} {municipalityIncidents.filter(i => i.incidentType).length === 1 ? 'type' : 'types'}
-                        </span>
-                      </Badge>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
             {/* Active Filters Display */}
             {(searchTerm || filterStatus !== "all" || filterDistrict !== "all" || filterMunicipality !== "all") && (
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-600">Active filters:</span>
                   {searchTerm && (
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border border-blue-200">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Search className="w-3 h-3 mr-1" />
                       Search: "{searchTerm}"
-                    </Badge>
+                    </span>
                   )}
                   {selectedMonth !== "all" && (
-                    <Badge variant="secondary" className="bg-purple-100 text-purple-800 border border-purple-200">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Calendar className="w-3 h-3 mr-1" />
                       Month: {selectedMonth}
-                    </Badge>
+                    </span>
                   )}
                   {filterStatus !== "all" && (
-                    <Badge variant="secondary" className="bg-green-100 text-green-800 border border-green-200">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Activity className="w-3 h-3 mr-1" />
                       Status: {filterStatus}
-                    </Badge>
+                    </span>
                   )}
                   {filterDistrict !== "all" && (
-                    <Badge variant="secondary" className="bg-orange-100 text-orange-800 border border-orange-200">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Building2 className="w-3 h-3 mr-1" />
                       District: {filterDistrict}
-                    </Badge>
+                    </span>
                   )}
                   {filterMunicipality !== "all" && (
-                    <Badge variant="secondary" className="bg-emerald-100 text-emerald-800 border border-emerald-200">
+                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <MapPin className="w-3 h-3 mr-1" />
                       Municipality: {filterMunicipality}
-                    </Badge>
+                    </span>
                   )}
                 </div>
               </div>
@@ -3855,7 +3808,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     Department *
                   </Label>
                   <Select value={newIncident.incidentType} onValueChange={handleIncidentTypeChange}>
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger id="incidentType" className="mt-2">
                       <SelectValue placeholder="Select Incident Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3890,7 +3843,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     District *
                   </Label>
                   <Select value={newIncident.district} onValueChange={handleDistrictChange}>
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger id="district" className="mt-2">
                       <SelectValue placeholder="Select District" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3907,7 +3860,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     Municipality *
                   </Label>
                   <Select value={newIncident.municipality} onValueChange={(value) => setNewIncident({...newIncident, municipality: value})}>
-                    <SelectTrigger className="mt-2">
+                    <SelectTrigger id="municipality" className="mt-2">
                       <SelectValue placeholder="Select Municipality" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3920,9 +3873,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="location" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="location" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Where *
                   </Label>
                   <Input
@@ -3930,15 +3881,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.location}
                     onChange={(e) => setNewIncident({...newIncident, location: e.target.value})}
                     placeholder="Location of the incident..."
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="officer" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="officer" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Who *
                   </Label>
                   <Input
@@ -3946,15 +3893,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.officer}
                     onChange={(e) => setNewIncident({...newIncident, officer: e.target.value})}
                     placeholder="Personnel involved..."
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="why" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="why" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Why
                   </Label>
                   <Input
@@ -3962,15 +3905,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.why}
                     onChange={(e) => setNewIncident({...newIncident, why: e.target.value})}
                     placeholder="Reason for the action..."
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="what" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="what" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     What *
                   </Label>
                   <Input
@@ -3978,15 +3917,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.description}
                     onChange={(e) => handleDescriptionChange(e.target.value)}
                     placeholder="Describe what happened..."
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="actionType" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="actionType" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Action Taken *
                   </Label>
                   <div className="grid grid-cols-1 gap-3 mt-2">
@@ -3994,9 +3929,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       id="actionType"
                       value={newIncident.actionType}
                       onChange={(e) => setNewIncident({...newIncident, actionType: e.target.value})}
-                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                      }"
+                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                     >
                       <option value="">Select Action</option>
                       {actionTypes.map((type) => (
@@ -4009,9 +3942,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       placeholder="Assigned Officer"
                       value={newIncident.assignedOfficer}
                       onChange={(e) => setNewIncident({...newIncident, assignedOfficer: e.target.value})}
-                      className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                      }"
+                      className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <Input
@@ -4019,16 +3950,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         placeholder="Action Date"
                         value={newIncident.actionDate}
                         onChange={(e) => setNewIncident({...newIncident, actionDate: e.target.value})}
-                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                        }"
+                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                       />
                       <select
                         value={newIncident.priority}
                         onChange={(e) => setNewIncident({...newIncident, priority: e.target.value})}
-                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                          bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                        }"
+                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                       >
                         {priorityLevels.map((level) => (
                           <option key={level} value={level}>
@@ -4042,16 +3969,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       value={newIncident.actionDescription}
                       onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
                       rows={2}
-                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                        bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                      }"
+                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="how" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="how" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     How
                   </Label>
                   <Input
@@ -4059,15 +3982,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     value={newIncident.actionDescription}
                     onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
                     placeholder="Method or procedure used..."
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <Label htmlFor="otherInfo" className="text-sm font-semibold transition-colors duration-300 ${
-                    text-gray-700
-                  }">
+                  <Label htmlFor="otherInfo" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Other Information
                   </Label>
                   <textarea
@@ -4076,17 +3995,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     onChange={(e) => setNewIncident({...newIncident, followUpNotes: e.target.value})}
                     placeholder="Additional details and notes..."
                     rows={4}
-                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none ${
-                      bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400
-                    }"
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
               </div>
             </div>
             {/* Footer with solid background */}
-            <div className="flex justify-end gap-4 p-6 border-t ${
-              border-gray-200 bg-gray-50
-            }">
+            <div className="flex justify-end gap-4 p-6 border-t border-gray-200 bg-gray-50">
               <button
                 onClick={() => setShowAddModal(false)}
                 className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
@@ -4795,9 +4710,9 @@ Top Location: ${insights.topLocation}`);
                     />
                   </div>
                   <div>
-                          <Label htmlFor="date" className="transition-colors duration-300 text-gray-700">DATE:</Label>
+                          <Label htmlFor="memo-date" className="transition-colors duration-300 text-gray-700">DATE:</Label>
                     <Input
-                      id="date"
+                      id="memo-date"
                       value={pdfReportData.memorandum.date}
                       onChange={(e) => setPdfReportData(prev => ({
                         ...prev,
@@ -4889,7 +4804,7 @@ Top Location: ${insights.topLocation}`);
                 }}
                 className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors duration-200 flex items-center"
               >
-                {pdfGenerating ? (
+                {isGeneratingPdf ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
                     Generating...

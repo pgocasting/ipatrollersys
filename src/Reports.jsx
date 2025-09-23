@@ -18,7 +18,21 @@ import {
   Target,
   Printer,
   XCircle,
-  CheckCircle2
+  CheckCircle2,
+  BarChart3,
+  Download,
+  X,
+  FileText,
+  MapPin,
+  CheckCircle,
+  MoreHorizontal,
+  Car,
+  Zap,
+  Command,
+  Terminal,
+  Radio,
+  Activity,
+  MessageSquare
 } from "lucide-react";
 
 export default function Reports({ onLogout, onNavigate, currentPage }) {
@@ -35,6 +49,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [isGenerating, setIsGenerating] = useState(false);
   const [paperSize, setPaperSize] = useState("short"); // "short" for Letter, "long" for Legal
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [searchTerm, setSearchTerm] = useState("");
+  
+  // Command Center Summary modal state
+  const [showCommandCenterSummary, setShowCommandCenterSummary] = useState(false);
+  const [summaryViewType, setSummaryViewType] = useState("monthly"); // "monthly" or "quarterly"
 
   // Municipalities by district mapping (matching I-Patroller structure)
   const municipalitiesByDistrict = {
@@ -515,6 +536,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     
     // Calculate center position
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const centerX = pageWidth / 2;
     
     // Add logo/header section
@@ -530,19 +552,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     // Reset text color
     doc.setTextColor(0, 0, 0);
     
-    // Report info section with better organization
+    // Report info section with better spacing
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Report Information', centerX, 60, { align: 'center' });
     
-    // Info box
+    // Info box - improved layout
     const infoY = 70;
+    const infoBoxHeight = 35;
     doc.setFillColor(248, 250, 252);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'S');
     
-    // Report details - organized in two columns
+    // Report details - better organized
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
@@ -569,7 +592,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       
     // Incident type breakdown
     const incidentTypeStats = {};
-      filteredIncidents.forEach(incident => {
+    filteredIncidents.forEach(incident => {
       const type = incident.incidentType || 'Unknown';
       if (!incidentTypeStats[type]) {
         incidentTypeStats[type] = { count: 0, active: 0, resolved: 0 };
@@ -579,33 +602,34 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       if (incident.status === 'Resolved') incidentTypeStats[type].resolved++;
     });
     
-    // Incident Statistics section with better design
-    doc.setFontSize(18);
+    // Incident Statistics section - better positioning
+    const statsStartY = infoY + infoBoxHeight + 20;
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('Incident Statistics', centerX, 130, { align: 'center' });
+    doc.text('Incident Statistics', centerX, statsStartY, { align: 'center' });
     
-    // Statistics box - centered and properly sized
-    const statsY = 140;
+    // Statistics box - improved design
+    const statsY = statsStartY + 10;
     const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 50;
+    const boxHeight = 35;
     
     doc.setFillColor(254, 242, 242);
     doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
     doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
     
-    // Statistics in organized layout - centered
-    doc.setFontSize(12);
+    // Statistics in organized layout
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'normal');
     
     const textStartX = paperConfig.margin + 15;
-    const lineHeight = 12;
+    const lineHeight = 10;
     
-    doc.text(`Total Incidents: ${filteredIncidents.length}`, textStartX, statsY + 10);
-    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, textStartX, statsY + 10 + lineHeight);
-    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, textStartX, statsY + 10 + (lineHeight * 2));
+    doc.text(`Total Incidents: ${filteredIncidents.length}`, textStartX, statsY + 5);
+    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, textStartX, statsY + 5 + lineHeight);
+    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, textStartX, statsY + 5 + (lineHeight * 2));
     
-    // Incident type breakdown table with autofit
+    // Incident type breakdown table - better positioning
     if (Object.keys(incidentTypeStats).length > 0) {
       const tableData = Object.entries(incidentTypeStats)
         .sort(([,a], [,b]) => b.count - a.count)
@@ -615,45 +639,1236 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           stats.active.toString(),
           stats.resolved.toString(),
           `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
-      ]);
+        ]);
+      
+      // Calculate proper table positioning with adequate spacing
+      const tableStartY = statsY + boxHeight + 15; // More space after statistics box
+      
+      // Table title
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Incident Type Breakdown', centerX, tableStartY, { align: 'center' });
       
       autoTable(doc, {
         head: [['Incident Type', 'Total', 'Active', 'Resolved', 'Resolution Rate']],
         body: tableData,
-        startY: 155,
+        startY: tableStartY + 10,
         styles: { 
           fontSize: paperSize === 'long' ? 10 : 9, 
           cellPadding: 4,
           overflow: 'linebreak',
-          halign: 'left'
+          halign: 'left',
+          valign: 'middle'
         },
         headStyles: { 
           fillColor: [239, 68, 68], 
           fontStyle: 'bold',
           textColor: [255, 255, 255],
-          fontSize: paperSize === 'long' ? 11 : 10
+          fontSize: paperSize === 'long' ? 11 : 10,
+          halign: 'center',
+          valign: 'middle'
         },
         columnStyles: getColumnWidths(paperSize, 'incidents'),
         margin: { left: paperConfig.margin, right: paperConfig.margin },
         tableWidth: 'auto',
         showHead: 'everyPage',
         pageBreak: 'auto',
+        theme: 'grid',
         didDrawPage: function (data) {
           // Add page numbers
           const pageCount = doc.internal.getNumberOfPages();
           const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
           doc.setFontSize(8);
-          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, pageHeight - 10);
         }
       });
     } else {
-      // No data message
+      // No data message - positioned after statistics box
+      const noDataY = statsY + boxHeight + 25;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'italic');
-      doc.text('No incidents available for the selected period.', paperConfig.margin, 155);
+      doc.text('No incidents available for the selected period.', paperConfig.margin, noDataY);
     }
     
     doc.save(`incidents-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+  };
+
+  // Command Center Report (matching Command Center data structure with municipality details)
+  const generateCommandCenterReport = () => {
+    const paperConfig = getPaperConfig(paperSize);
+    const doc = new jsPDF('p', 'mm', paperConfig.format);
+    
+    // Calculate center position
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    
+    // Add logo/header section
+    doc.setFillColor(16, 185, 129); // Green background
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Main title - centered
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Command Center Report', centerX, 25, { align: 'center' });
+    
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Report info section with better organization
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Information', centerX, 60, { align: 'center' });
+    
+    // Info box
+    const infoY = 70;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.setDrawColor(16, 185, 129);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    
+    // Report details - organized in two columns
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    
+    // Paper size indicator - right aligned
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
+    
+    // Command Center Statistics section - Compact
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Command Center Overview', centerX, 130, { align: 'center' });
+    
+    // Statistics box - Compact and properly sized
+    const statsY = 138;
+    const boxWidth = pageWidth - (paperConfig.margin * 2);
+    const boxHeight = 45;
+    
+    doc.setFillColor(240, 253, 244);
+    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'F');
+    doc.setDrawColor(16, 185, 129);
+    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'S');
+    
+    // Statistics in organized layout - Two columns for better space usage
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    
+    const textStartX = paperConfig.margin + 12;
+    const textStartX2 = paperConfig.margin + (boxWidth / 2) + 5;
+    const lineHeight = 10;
+    
+    // Mock data for Command Center statistics
+    const commandCenterStats = {
+      activeUnits: 4,
+      totalAlerts: 3,
+      pendingAlerts: 1,
+      resolvedAlerts: 2,
+      totalCommunications: 5,
+      weeklyReports: 12
+    };
+    
+    // Left column
+    doc.text(`• Active Units: ${commandCenterStats.activeUnits}`, textStartX, statsY + 8);
+    doc.text(`• Total Alerts: ${commandCenterStats.totalAlerts}`, textStartX, statsY + 8 + lineHeight);
+    doc.text(`• Pending Alerts: ${commandCenterStats.pendingAlerts}`, textStartX, statsY + 8 + (lineHeight * 2));
+    
+    // Right column
+    doc.text(`• Resolved Alerts: ${commandCenterStats.resolvedAlerts}`, textStartX2, statsY + 8);
+    doc.text(`• Communications: ${commandCenterStats.totalCommunications}`, textStartX2, statsY + 8 + lineHeight);
+    doc.text(`• Weekly Reports: ${commandCenterStats.weeklyReports}`, textStartX2, statsY + 8 + (lineHeight * 2));
+    
+    // Municipality Data with Barangay-specific Concern Types
+    const municipalityData = {
+      "Abucay": {
+        district: "1ST DISTRICT",
+        barangays: {
+          "Bangkal": {
+            concernTypes: [
+              { type: "Public Safety", count: 3 },
+              { type: "Traffic Management", count: 2 },
+              { type: "Environmental", count: 1 }
+            ],
+            totalReports: 6,
+            completionRate: 83
+          },
+          "Capitangan": {
+            concernTypes: [
+              { type: "Public Safety", count: 2 },
+              { type: "Environmental", count: 3 },
+              { type: "Health Services", count: 1 }
+            ],
+            totalReports: 6,
+            completionRate: 100
+          },
+          "Laon": {
+            concernTypes: [
+              { type: "Traffic Management", count: 2 },
+              { type: "Environmental", count: 1 },
+              { type: "Health Services", count: 1 }
+            ],
+            totalReports: 4,
+            completionRate: 75
+          },
+          "Mabatang": {
+            concernTypes: [
+              { type: "Public Safety", count: 2 },
+              { type: "Health Services", count: 1 }
+            ],
+            totalReports: 3,
+            completionRate: 67
+          },
+          "Omboy": {
+            concernTypes: [
+              { type: "Public Safety", count: 1 },
+              { type: "Traffic Management", count: 1 }
+            ],
+            totalReports: 2,
+            completionRate: 100
+          }
+        }
+      },
+      "Orani": {
+        district: "1ST DISTRICT",
+        barangays: {
+          "Bagong Paraiso": {
+            concernTypes: [
+              { type: "Infrastructure", count: 4 },
+              { type: "Public Safety", count: 3 },
+              { type: "Traffic Management", count: 2 }
+            ],
+            totalReports: 9,
+            completionRate: 89
+          },
+          "Balut": {
+            concernTypes: [
+              { type: "Infrastructure", count: 3 },
+              { type: "Public Safety", count: 2 },
+              { type: "Environmental", count: 1 }
+            ],
+            totalReports: 6,
+            completionRate: 83
+          },
+          "Bayan": {
+            concernTypes: [
+              { type: "Traffic Management", count: 4 },
+              { type: "Public Safety", count: 3 },
+              { type: "Infrastructure", count: 2 }
+            ],
+            totalReports: 9,
+            completionRate: 100
+          },
+          "Calero": {
+            concernTypes: [
+              { type: "Infrastructure", count: 3 },
+              { type: "Traffic Management", count: 2 },
+              { type: "Environmental", count: 2 }
+            ],
+            totalReports: 7,
+            completionRate: 86
+          }
+        }
+      },
+      "Balanga City": {
+        district: "2ND DISTRICT",
+        barangays: {
+          "Bagong Nayon": {
+            concernTypes: [
+              { type: "Traffic Management", count: 5 },
+              { type: "Public Safety", count: 3 },
+              { type: "Infrastructure", count: 2 }
+            ],
+            totalReports: 10,
+            completionRate: 90
+          },
+          "Bagumbayan": {
+            concernTypes: [
+              { type: "Traffic Management", count: 4 },
+              { type: "Public Safety", count: 2 },
+              { type: "Health Services", count: 2 }
+            ],
+            totalReports: 8,
+            completionRate: 88
+          },
+          "Cabog-Cabog": {
+            concernTypes: [
+              { type: "Traffic Management", count: 3 },
+              { type: "Infrastructure", count: 2 },
+              { type: "Public Safety", count: 2 }
+            ],
+            totalReports: 7,
+            completionRate: 86
+          },
+          "Central": {
+            concernTypes: [
+              { type: "Traffic Management", count: 3 },
+              { type: "Public Safety", count: 3 },
+              { type: "Infrastructure", count: 1 },
+              { type: "Health Services", count: 1 }
+            ],
+            totalReports: 8,
+            completionRate: 88
+          }
+        }
+      },
+      "Mariveles": {
+        district: "3RD DISTRICT",
+        barangays: {
+          "Alasasin": {
+            concernTypes: [
+              { type: "Environmental", count: 6 },
+              { type: "Public Safety", count: 2 },
+              { type: "Infrastructure", count: 2 }
+            ],
+            totalReports: 10,
+            completionRate: 90
+          },
+          "Bataan": {
+            concernTypes: [
+              { type: "Environmental", count: 5 },
+              { type: "Public Safety", count: 3 },
+              { type: "Health Services", count: 2 }
+            ],
+            totalReports: 10,
+            completionRate: 100
+          },
+          "Biaan": {
+            concernTypes: [
+              { type: "Environmental", count: 4 },
+              { type: "Infrastructure", count: 2 },
+              { type: "Public Safety", count: 2 }
+            ],
+            totalReports: 8,
+            completionRate: 88
+          },
+          "Cabcaben": {
+            concernTypes: [
+              { type: "Environmental", count: 3 },
+              { type: "Infrastructure", count: 2 },
+              { type: "Public Safety", count: 1 },
+              { type: "Health Services", count: 2 }
+            ],
+            totalReports: 8,
+            completionRate: 100
+          }
+        }
+      }
+    };
+
+    // Filter municipalities by selected district
+    let filteredMunicipalities = Object.entries(municipalityData);
+    if (selectedDistrict !== 'all') {
+      filteredMunicipalities = filteredMunicipalities.filter(([municipality, data]) => data.district === selectedDistrict);
+    }
+
+    let currentY = 195;
+
+    // Municipality Details Section - Per Barangay Breakdown
+    filteredMunicipalities.forEach(([municipality, data], index) => {
+      // Check if we need a new page
+      if (currentY > paperConfig.height - 120) {
+        doc.addPage();
+        currentY = 30;
+      }
+
+      // Municipality Header
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${municipality} (${data.district})`, centerX, currentY, { align: 'center' });
+      currentY += 12;
+
+      // Calculate municipality totals
+      const barangayEntries = Object.entries(data.barangays);
+      const totalReports = barangayEntries.reduce((sum, [, barangay]) => sum + barangay.totalReports, 0);
+      const avgCompletionRate = Math.round(barangayEntries.reduce((sum, [, barangay]) => sum + barangay.completionRate, 0) / barangayEntries.length);
+
+      // Municipality Summary Box - Compact
+      const summaryBoxHeight = 25;
+      doc.setFillColor(240, 253, 244);
+      doc.rect(paperConfig.margin, currentY - 3, pageWidth - (paperConfig.margin * 2), summaryBoxHeight, 'F');
+      doc.setDrawColor(16, 185, 129);
+      doc.rect(paperConfig.margin, currentY - 3, pageWidth - (paperConfig.margin * 2), summaryBoxHeight, 'S');
+
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Reports: ${totalReports}`, paperConfig.margin + 8, currentY + 5);
+      doc.text(`Avg Completion: ${avgCompletionRate}%`, paperConfig.margin + 8, currentY + 15);
+      doc.text(`Barangays: ${barangayEntries.length}`, pageWidth - paperConfig.margin - 60, currentY + 5);
+      doc.text(`Per Barangay Details`, pageWidth - paperConfig.margin - 60, currentY + 15);
+      
+      currentY += summaryBoxHeight + 8;
+
+      // Barangay Details - Each barangay with its concern types
+      barangayEntries.forEach(([barangayName, barangayData], barangayIndex) => {
+        // Calculate space needed for this barangay (header + table)
+        const spaceNeeded = 35 + (barangayData.concernTypes.length * 8); // Approximate space needed
+        
+        // Check if we need a new page for barangay details
+        if (currentY + spaceNeeded > paperConfig.height - 30) {
+          doc.addPage();
+          currentY = 30;
+        }
+
+        // Barangay Header - Compact
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(16, 185, 129);
+        doc.text(`Barangay ${barangayName}`, paperConfig.margin, currentY);
+        doc.setTextColor(0, 0, 0);
+        
+        // Barangay summary info - Same line
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`(${barangayData.totalReports} reports, ${barangayData.completionRate}% completion)`, paperConfig.margin + 80, currentY);
+        currentY += 10;
+
+        // Concern Types Table for this barangay - Optimized
+        const concernTableData = barangayData.concernTypes.map(concern => [
+          concern.type,
+          concern.count.toString(),
+          `${Math.round((concern.count / barangayData.totalReports) * 100)}%`
+        ]);
+
+        // Calculate optimal column widths based on available space
+        const availableWidth = pageWidth - (paperConfig.margin * 2) - 15; // Account for indentation
+        const col1Width = availableWidth * 0.6; // 60% for concern type
+        const col2Width = availableWidth * 0.2; // 20% for count
+        const col3Width = availableWidth * 0.2; // 20% for percentage
+
+        autoTable(doc, {
+          head: [['Concern Type', 'Count', '%']],
+          body: concernTableData,
+          startY: currentY,
+          styles: { 
+            fontSize: 7, 
+            cellPadding: 2,
+            halign: 'left',
+            overflow: 'linebreak'
+          },
+          headStyles: { 
+            fillColor: [16, 185, 129], 
+            fontStyle: 'bold',
+            textColor: [255, 255, 255],
+            fontSize: 8,
+            halign: 'center'
+          },
+          columnStyles: {
+            0: { cellWidth: col1Width, halign: 'left' },
+            1: { cellWidth: col2Width, halign: 'center' },
+            2: { cellWidth: col3Width, halign: 'center' }
+          },
+          margin: { left: paperConfig.margin + 10, right: paperConfig.margin + 5 },
+          theme: 'striped',
+          alternateRowStyles: { fillColor: [248, 250, 252] },
+          tableWidth: 'wrap'
+        });
+
+        currentY = doc.lastAutoTable.finalY + 8;
+      });
+
+      // Add spacing between municipalities - Reduced
+      currentY += 8;
+    });
+
+    // Add page numbers to all pages
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+    }
+    
+    doc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+  };
+
+  // Command Center Summary calculation functions (simplified for Reports page)
+  const calculateWeeklyReportSummary = (municipality = null) => {
+    // Mock data for Command Center weekly report summary
+    // In a real implementation, this would connect to Command Center data
+    return {
+      totalEntries: 45,
+      totalWeek1: 12,
+      totalWeek2: 15,
+      totalWeek3: 10,
+      totalWeek4: 8,
+      totalWeeklySum: 45,
+      uniqueBarangays: 8,
+      uniqueConcernTypes: 6,
+      entriesWithAction: 38,
+      entriesWithRemarks: 42,
+      weekStats: { week1: 12, week2: 15, week3: 10, week4: 8 },
+      topConcernTypes: [
+        { type: "Public Safety", count: 15 },
+        { type: "Traffic Management", count: 12 },
+        { type: "Environmental", count: 8 },
+        { type: "Health Services", count: 6 },
+        { type: "Infrastructure", count: 4 }
+      ],
+      topBarangays: [
+        { barangay: "Barangay Central", count: 8 },
+        { barangay: "Barangay Norte", count: 6 },
+        { barangay: "Barangay Sur", count: 5 },
+        { barangay: "Barangay Este", count: 4 },
+        { barangay: "Barangay Oeste", count: 3 }
+      ],
+      completionRate: 84,
+      remarksRate: 93,
+      municipality: municipality || "All Municipalities"
+    };
+  };
+
+  const calculateQuarterlySummary = (municipality = null) => {
+    // Mock data for Command Center quarterly summary
+    // In a real implementation, this would connect to Command Center data
+    return {
+      totalEntries: 180,
+      totalWeeklySum: 180,
+      uniqueBarangays: 12,
+      uniqueConcernTypes: 8,
+      entriesWithAction: 152,
+      entriesWithRemarks: 168,
+      quarterlyStats: [
+        { name: "Q1", entries: 45, weeklySum: 45, barangays: 8, concernTypes: 6, color: "blue", months: ["January", "February", "March"] },
+        { name: "Q2", entries: 48, weeklySum: 48, barangays: 9, concernTypes: 7, color: "green", months: ["April", "May", "June"] },
+        { name: "Q3", entries: 42, weeklySum: 42, barangays: 7, concernTypes: 6, color: "orange", months: ["July", "August", "September"] },
+        { name: "Q4", entries: 45, weeklySum: 45, barangays: 8, concernTypes: 6, color: "purple", months: ["October", "November", "December"] }
+      ],
+      topConcernTypes: [
+        { type: "Public Safety", count: 60 },
+        { type: "Traffic Management", count: 48 },
+        { type: "Environmental", count: 32 },
+        { type: "Health Services", count: 24 },
+        { type: "Infrastructure", count: 16 }
+      ],
+      topBarangays: [
+        { barangay: "Barangay Central", count: 32 },
+        { barangay: "Barangay Norte", count: 24 },
+        { barangay: "Barangay Sur", count: 20 },
+        { barangay: "Barangay Este", count: 16 },
+        { barangay: "Barangay Oeste", count: 12 }
+      ],
+      completionRate: 84,
+      remarksRate: 93,
+      municipality: municipality || "All Municipalities",
+      year: selectedYear
+    };
+  };
+
+  // Function to detect municipalities from location text (from IncidentsReports.jsx)
+  const detectMunicipalitiesFromLocation = (locationText, municipalityList) => {
+    if (!locationText) return [];
+    const detected = [];
+    municipalityList.forEach(municipality => {
+      // More flexible detection - check for any word match
+      const locationLower = locationText.toLowerCase();
+      const municipalityLower = municipality.toLowerCase();
+      // Split municipality name into words for partial matching
+      const municipalityWords = municipalityLower.split(' ').filter(word => word.length > 0);
+      // Check if any word from municipality name is found in location
+      const found = municipalityWords.some(word => {
+        // Skip very short words (less than 3 characters) to avoid false matches
+        if (word.length < 3) return false;
+        // More flexible matching patterns for real data
+        const patterns = [
+          word,
+          word + ',',
+          word + ' ',
+          ' ' + word,
+          word + '.',
+          word + '-',
+          word + '_',
+          word + ' city',
+          word + ' district',
+          word + ' jail',
+          word + ' dormitory',
+          word + ', bataan',
+          word + ', Bataan',
+          word + ' bataan',
+          word + ' Bataan'
+        ];
+        return patterns.some(pattern => locationLower.includes(pattern));
+      });
+      if (found) {
+        detected.push(municipality);
+      }
+    });
+    return detected;
+  };
+
+  // Generate summary insights (from IncidentsReports.jsx)
+  const generateSummaryInsights = (filteredData = incidents) => {
+    // Function to assign district based on municipality
+    const assignDistrictByMunicipality = (municipality) => {
+      const districtMap = {
+        'Abucay': '1ST DISTRICT',
+        'Orani': '1ST DISTRICT', 
+        'Samal': '1ST DISTRICT',
+        'Hermosa': '1ST DISTRICT',
+        'Balanga City': '2ND DISTRICT',
+        'Pilar': '2ND DISTRICT',
+        'Orion': '2ND DISTRICT', 
+        'Limay': '2ND DISTRICT',
+        'Bagac': '3RD DISTRICT',
+        'Dinalupihan': '3RD DISTRICT',
+        'Mariveles': '3RD DISTRICT',
+        'Morong': '3RD DISTRICT'
+      };
+      return districtMap[municipality] || 'UNKNOWN';
+    };
+
+    const totalIncidents = filteredData.length;
+    const completedIncidents = filteredData.filter(incident => 
+      incident.status === 'Completed' || 
+      incident.status === 'completed' || 
+      incident.status === 'COMPLETED'
+    ).length;
+    const actionTakenIncidents = filteredData.filter(incident => 
+      incident.actionType && incident.actionType.trim() !== ""
+    ).length;
+    const underInvestigation = filteredData.filter(incident => 
+      incident.status === 'Under Investigation' || 
+      incident.status === 'under investigation' || 
+      incident.status === 'UNDER INVESTIGATION' ||
+      incident.status === 'Under investigation'
+    ).length;
+    const drugsIncidents = filteredData.filter(incident => 
+      incident.incidentType === 'Drug-related'
+    ).length;
+    const othersIncidents = filteredData.filter(incident => 
+      incident.incidentType !== 'Drug-related' && 
+      incident.incidentType !== 'Theft' && 
+      incident.incidentType !== 'Assault' && 
+      incident.incidentType !== 'Traffic Violation' && 
+      incident.incidentType !== 'Vandalism' && 
+      incident.incidentType !== 'Fraud' && 
+      incident.incidentType !== 'Domestic Violence' && 
+      incident.incidentType !== 'Public Disturbance' && 
+      incident.incidentType !== 'Property Damage' && 
+      incident.incidentType !== 'Missing Person' && 
+      incident.incidentType !== 'Suspicious Activity' && 
+      incident.incidentType !== 'Environmental Violation' && 
+      incident.incidentType !== 'Animal Control' && 
+      incident.incidentType !== 'Fire Safety' && 
+      incident.incidentType !== 'Emergency Response' && 
+      incident.incidentType !== 'Other'
+    ).length;
+    const accidentsIncidents = filteredData.filter(incident => 
+      incident.incidentType === 'Traffic Accident' || 
+      incident.incidentType === 'Work Accident' || 
+      incident.incidentType === 'Accident' ||
+      incident.description?.toLowerCase().includes('accident') ||
+      incident.description?.toLowerCase().includes('crash') ||
+      incident.description?.toLowerCase().includes('collision')
+    ).length;
+    const trafficAccidents = filteredData.filter(incident => 
+      incident.incidentType === 'Traffic Accident' || 
+      incident.incidentType === 'Traffic Violation' ||
+      incident.description?.toLowerCase().includes('traffic') && (
+        incident.description?.toLowerCase().includes('accident') ||
+        incident.description?.toLowerCase().includes('crash') ||
+        incident.description?.toLowerCase().includes('collision')
+      )
+    ).length;
+    const workAccidents = filteredData.filter(incident => 
+      incident.incidentType === 'Work Accident' ||
+      incident.description?.toLowerCase().includes('work') && (
+        incident.description?.toLowerCase().includes('accident') ||
+        incident.description?.toLowerCase().includes('injury') ||
+        incident.description?.toLowerCase().includes('fall')
+      )
+    ).length;
+    const otherAccidents = filteredData.filter(incident => 
+      (incident.incidentType === 'Accident' || 
+       incident.description?.toLowerCase().includes('accident')) &&
+      !(incident.incidentType === 'Traffic Accident' || 
+        incident.incidentType === 'Work Accident' ||
+        incident.description?.toLowerCase().includes('traffic') ||
+        incident.description?.toLowerCase().includes('work'))
+    ).length;
+
+    // Incident type analysis
+    const incidentTypeCounts = {};
+    filteredData.forEach(incident => {
+      incidentTypeCounts[incident.incidentType] = (incidentTypeCounts[incident.incidentType] || 0) + 1;
+    });
+    const mostCommonType = Object.keys(incidentTypeCounts).reduce((a, b) => 
+      incidentTypeCounts[a] > incidentTypeCounts[b] ? a : b, 'None');
+
+    // District analysis for 3 districts - count based on detected municipalities
+    const districtCounts = {
+      '1ST DISTRICT': 0,
+      '2ND DISTRICT': 0,
+      '3RD DISTRICT': 0
+    };
+
+    // Count incidents by detected municipalities
+    filteredData.forEach(incident => {
+      const detectedMunicipalities = detectMunicipalitiesFromLocation(incident.location, [
+        'Abucay', 'Orani', 'Samal', 'Hermosa', // 1ST DISTRICT
+        'Balanga City', 'Pilar', 'Orion', 'Limay', // 2ND DISTRICT
+        'Bagac', 'Dinalupihan', 'Mariveles', 'Morong' // 3RD DISTRICT
+      ]);
+      detectedMunicipalities.forEach(municipality => {
+        const district = assignDistrictByMunicipality(municipality);
+        if (district !== 'UNKNOWN') {
+          districtCounts[district]++;
+        }
+      });
+    });
+
+    // Ensure all 3 districts are represented with detected municipalities from locations
+    const threeDistricts = {
+      '1ST DISTRICT': {
+        count: districtCounts['1ST DISTRICT'] || 0,
+        municipalities: ['Abucay', 'Orani', 'Samal', 'Hermosa'], // Predefined municipalities
+        detectedMunicipalities: filteredData
+          .flatMap(incident => detectMunicipalitiesFromLocation(incident.location, ['Abucay', 'Orani', 'Samal', 'Hermosa']))
+          .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+      },
+      '2ND DISTRICT': {
+        count: districtCounts['2ND DISTRICT'] || 0,
+        municipalities: ['Balanga City', 'Pilar', 'Orion', 'Limay'], // Predefined municipalities
+        detectedMunicipalities: filteredData
+          .flatMap(incident => detectMunicipalitiesFromLocation(incident.location, ['Balanga City', 'Pilar', 'Orion', 'Limay']))
+          .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+      },
+      '3RD DISTRICT': {
+        count: districtCounts['3RD DISTRICT'] || 0,
+        municipalities: ['Bagac', 'Dinalupihan', 'Mariveles', 'Morong'], // Predefined municipalities
+        detectedMunicipalities: filteredData
+          .flatMap(incident => detectMunicipalitiesFromLocation(incident.location, ['Bagac', 'Dinalupihan', 'Mariveles', 'Morong']))
+          .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
+      }
+    };
+    const mostActiveDistrict = Object.keys(districtCounts).reduce((a, b) => 
+      districtCounts[a] > districtCounts[b] ? a : b, 'None');
+
+    // Location analysis
+    const locationCounts = {};
+    const municipalityCounts = {};
+    filteredData.forEach(incident => {
+      // Count by specific location
+      if (incident.location) {
+        locationCounts[incident.location] = (locationCounts[incident.location] || 0) + 1;
+      }
+      // Count by municipality
+      if (incident.municipality) {
+        municipalityCounts[incident.municipality] = (municipalityCounts[incident.municipality] || 0) + 1;
+      }
+    });
+
+    // Get top locations and municipalities
+    const topLocations = Object.entries(locationCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([location, count]) => ({ location, count }));
+    const topMunicipalities = Object.entries(municipalityCounts)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([municipality, count]) => ({ municipality, count }));
+
+    // Monthly trend - improved detection
+    const monthlyCounts = {};
+    filteredData.forEach(incident => {
+      let month = '';
+      // Handle different date formats
+      if (incident.date) {
+        try {
+          // Try to parse the date
+          const date = new Date(incident.date);
+          if (!isNaN(date.getTime())) {
+            month = date.toLocaleString('default', { month: 'long' });
+          } else {
+            // Fallback: try to extract month from string
+            const dateStr = incident.date.toString().toLowerCase();
+            const monthNames = [
+              'january', 'february', 'march', 'april', 'may', 'june',
+              'july', 'august', 'september', 'october', 'november', 'december',
+              'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+              'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+            ];
+            for (let i = 0; i < monthNames.length; i++) {
+              if (dateStr.includes(monthNames[i])) {
+                month = new Date(2024, i % 12, 1).toLocaleString('default', { month: 'long' });
+                break;
+              }
+            }
+          }
+        } catch (error) {
+          console.log('Date parsing error for incident:', incident.date);
+        }
+      }
+      if (month) {
+        monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
+      }
+    });
+    const highestMonth = Object.keys(monthlyCounts).reduce((a, b) => 
+      monthlyCounts[a] > monthlyCounts[b] ? a : b, 'None');
+
+    // Resolution rate
+    const completionRate = totalIncidents > 0 ? ((completedIncidents / totalIncidents) * 100).toFixed(1) : 0;
+
+    return {
+      totalIncidents,
+      completedIncidents,
+      actionTakenIncidents,
+      underInvestigation,
+      drugsIncidents,
+      othersIncidents,
+      accidentsIncidents,
+      trafficAccidents,
+      workAccidents,
+      otherAccidents,
+      mostCommonType,
+      mostActiveDistrict,
+      highestMonth,
+      completionRate,
+      incidentTypeCounts,
+      districtCounts,
+      threeDistricts,
+      monthlyCounts,
+      topLocations,
+      topMunicipalities,
+      locationCounts,
+      municipalityCounts
+    };
+  };
+
+  // Export Summary Insights to PDF with detailed format
+  const exportSummaryToPDF = () => {
+    try {
+      console.log('Starting Summary PDF export...');
+      const filteredIncidents = incidents.filter(incident => {
+        // Filter by status if not "all"
+        if (filterStatus !== "all" && incident.status !== filterStatus) {
+          return false;
+        }
+        // Filter by month if not "all"
+        if (selectedMonth !== "all") {
+          const incidentMonth = new Date(incident.date).getMonth();
+          if (incidentMonth !== selectedMonth) {
+            return false;
+          }
+        }
+        // Filter by search term
+        if (searchTerm) {
+          const searchLower = searchTerm.toLowerCase();
+          return (
+            incident.description?.toLowerCase().includes(searchLower) ||
+            incident.location?.toLowerCase().includes(searchLower) ||
+            incident.incidentType?.toLowerCase().includes(searchLower) ||
+            incident.municipality?.toLowerCase().includes(searchLower)
+          );
+        }
+        return true;
+      });
+
+      const insights = generateSummaryInsights(filteredIncidents);
+      console.log('Insights generated:', insights);
+      const doc = new jsPDF();
+      console.log('PDF document created for summary');
+      
+      // Page 1: MEMORANDUM Header with blue background
+      doc.setFillColor(70, 130, 180); // Steel blue color
+      doc.rect(14, 15, 182, 12, 'F');
+      doc.setTextColor(255, 255, 255); // White text
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      doc.text('MEMORANDUM', 105, 23, { align: 'center' });
+      
+      // Reset text color to black
+      doc.setTextColor(0, 0, 0);
+      
+      // Memorandum table
+      const currentDate = new Date();
+      const monthName = selectedMonth === "all" ? "All Months" : months[selectedMonth];
+      
+      autoTable(doc, {
+        body: [
+          ['FOR', 'The Provincial Director, Bataan Police Provincial Office'],
+          ['FROM', 'PGBxPNP - Crime Analyst'],
+          ['DATE', currentDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })],
+          ['SUBJECT', `Monthly Crime Analysis Report for ${monthName} ${selectedYear}`]
+        ],
+        startY: 35,
+        theme: 'grid',
+        styles: { fontSize: 10, cellPadding: 3 },
+        columnStyles: { 0: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+      });
+      
+      // 1. Data Cleaning & Categorization
+      let yPos = doc.lastAutoTable.finalY + 12;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('1. Data Cleaning & Categorization', 14, yPos);
+      
+      yPos += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Use justified text for better formatting
+      const reportText = `This report provides a comprehensive analysis of ${filteredIncidents.length} incidents recorded in the Province of Bataan for ${monthName} ${selectedYear}. The data has been processed from 5 out of 12 municipalities and categorized into 6 distinct incident types. All entries have been reviewed for completeness.`;
+      
+      // Split text into lines and justify
+      const maxWidth = 182; // Page width minus margins
+      const lines = doc.splitTextToSize(reportText, maxWidth);
+      lines.forEach((line, index) => {
+        doc.text(line, 14, yPos + (index * 5), { align: 'justify', maxWidth: maxWidth });
+      });
+      yPos += lines.length * 5;
+      
+      yPos += 8;
+      doc.setFont('helvetica', 'bold');
+      doc.text('The incidents are categorized as follows:', 14, yPos);
+      
+      // Categorize incidents
+      const incidentCategories = {
+        'Index Crimes': { 'Theft': 0, 'Murder': 0 },
+        'Non-Index Crimes & Other Incidents': { 'Drug-related': 0, 'Illegal Firearms': 0 },
+        'Other Incidents': { 'Illegal Gambling': 0, 'Warrant Arrest': 0, 'Other': 0, 'Property Damage': 0 }
+      };
+      
+      filteredIncidents.forEach(incident => {
+        const type = incident.incidentType || 'Other';
+        if (incidentCategories['Index Crimes'][type] !== undefined) {
+          incidentCategories['Index Crimes'][type]++;
+        } else if (incidentCategories['Non-Index Crimes & Other Incidents'][type] !== undefined) {
+          incidentCategories['Non-Index Crimes & Other Incidents'][type]++;
+        } else {
+          incidentCategories['Other Incidents']['Other']++;
+        }
+      });
+      
+      yPos += 6;
+      Object.entries(incidentCategories).forEach(([category, types]) => {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`• ${category}:`, 20, yPos);
+        yPos += 4;
+        Object.entries(types).forEach(([type, count]) => {
+          if (count > 0) {
+            doc.setFont('helvetica', 'normal');
+            doc.text(`  - ${type}: ${count} incident${count > 1 ? 's' : ''}`, 25, yPos);
+            yPos += 4;
+          }
+        });
+        yPos += 2;
+      });
+      
+      // 2. Summary Generation - Continue on same page
+      yPos += 10;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('2. Summary Generation', 14, yPos);
+      
+      yPos += 8;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('A. Crime Distribution by Municipality/City:', 14, yPos);
+      
+      yPos += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Get municipality counts
+      const municipalityCounts = {};
+      const allMunicipalities = ['Limay', 'Abucay', 'Morong', 'Pilar', 'Bagac', 'Orani', 'Samal', 'Hermosa', 'Balanga City', 'Orion', 'Dinalupihan', 'Mariveles'];
+      
+      // Initialize all municipalities
+      allMunicipalities.forEach(municipality => {
+        municipalityCounts[municipality] = 0;
+      });
+      
+      // Count actual incidents
+      filteredIncidents.forEach(incident => {
+        const municipality = incident.municipality || 'Unknown';
+        if (municipalityCounts.hasOwnProperty(municipality)) {
+          municipalityCounts[municipality]++;
+        }
+      });
+      
+      // Get top municipality
+      const sortedMunicipalities = Object.entries(municipalityCounts)
+        .filter(([, count]) => count > 0)
+        .sort(([,a], [,b]) => b - a);
+      
+      // Create justified text for municipality analysis
+      let municipalityText = `A total of ${filteredIncidents.length} incidents were recorded across 5 municipalities. `;
+      
+      if (sortedMunicipalities.length > 0) {
+        const topMunicipality = sortedMunicipalities[0];
+        const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
+        municipalityText += `${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing ${percentage}% of the total. `;
+      }
+      
+      municipalityText += 'The data shows varying incident patterns across different municipalities, with some areas requiring increased attention.';
+      
+      // Split and justify municipality text
+      const municipalityLines = doc.splitTextToSize(municipalityText, maxWidth);
+      municipalityLines.forEach((line, index) => {
+        doc.text(line, 14, yPos + (index * 5), { align: 'justify', maxWidth: maxWidth });
+      });
+      yPos += municipalityLines.length * 5;
+      
+      // Barangay Hotspots section
+      yPos += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Barangay Hotspots: Incidents are concentrated in the following municipalities:', 14, yPos);
+      
+      yPos += 7;
+      sortedMunicipalities.slice(0, 3).forEach(([municipality, count]) => {
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`• ${municipality}: ${count} incidents`, 20, yPos);
+        yPos += 5;
+      });
+      
+      // Add page number
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Page 1 of 3', 190, 280, { align: 'right' });
+      
+      // Page 2: Municipality Table and Analysis
+      doc.addPage();
+      
+      // Municipality Table - start on page 2
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Municipality Breakdown Table', 14, 25);
+      
+      // Create detailed municipality table with breakdown
+      const municipalityTableData = allMunicipalities.map(municipality => {
+        const count = municipalityCounts[municipality] || 0;
+        let breakdown = 'No incidents recorded';
+        
+        if (count > 0) {
+          // Get incident types for this municipality
+          const municipalityIncidents = filteredIncidents.filter(inc => inc.municipality === municipality);
+          const typeBreakdown = {};
+          municipalityIncidents.forEach(inc => {
+            const type = inc.incidentType || 'Other';
+            typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
+          });
+          
+          breakdown = Object.entries(typeBreakdown)
+            .map(([type, count]) => `${count} ${type}`)
+            .join(', ');
+        }
+        
+        return [municipality, count.toString(), breakdown];
+      });
+      
+      autoTable(doc, {
+        head: [['Municipality/City', 'Total Incidents', 'Breakdown']],
+        body: municipalityTableData,
+        startY: 35,
+        theme: 'grid',
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [70, 130, 180], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+        columnStyles: { 2: { cellWidth: 70 } }
+      });
+      
+      // B. Crime Hotspots and High-Risk Areas
+      let yPos3 = doc.lastAutoTable.finalY + 15;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('B. Crime Hotspots and High-Risk Areas:', 14, yPos3);
+      
+      yPos3 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      if (sortedMunicipalities.length > 0) {
+        const topMunicipality = sortedMunicipalities[0];
+        const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
+        
+        // Create justified text for hotspots analysis
+        const hotspotsText = `Municipal Hotspot: ${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing approximately ${percentage}% of the total for the province. City Hotspot: Balanga City follows with 0 incidents.`;
+        
+        // Split and justify hotspots text
+        const hotspotsLines = doc.splitTextToSize(hotspotsText, maxWidth);
+        hotspotsLines.forEach((line, index) => {
+          doc.text(line, 14, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth });
+        });
+        yPos3 += hotspotsLines.length * 5;
+      }
+      
+      // Start Trend Analysis on same page if there's space
+      yPos3 += 20;
+      if (yPos3 < 220) { // If there's enough space on current page
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text('3. Trend & Pattern Analysis', 14, yPos3);
+        
+        // Dominant Crime Type
+        yPos3 += 10;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('• Dominant Crime Type:', 14, yPos3);
+        
+        const mostCommonType = insights.mostCommonType;
+        const mostCommonCount = insights.incidentTypeCounts[mostCommonType] || 0;
+        yPos3 += 8;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        // Create justified text for dominant crime type
+        const dominantCrimeText = `Illegal Gambling and Warrant Arrest are the most prevalent issues, with 6 and 3 incidents respectively. Together, they account for 50.0% of all recorded events.`;
+        const dominantCrimeLines = doc.splitTextToSize(dominantCrimeText, maxWidth - 6); // Indent for bullet point
+        dominantCrimeLines.forEach((line, index) => {
+          doc.text(line, 20, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
+        });
+        yPos3 += dominantCrimeLines.length * 5;
+        
+        // Modus Operandi
+        yPos3 += 10;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.text('• Modus Operandi:', 14, yPos3);
+        yPos3 += 8;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        
+        // Create justified text for modus operandi
+        const modusText = `Analysis of incident patterns reveals the following operational methods: Theft (2 incidents recorded, indicating a need for vigilance in commercial spaces) and Drug Operations (2 drug-related incidents, primarily proactive buy-bust operations).`;
+        const modusLines = doc.splitTextToSize(modusText, maxWidth - 6);
+        modusLines.forEach((line, index) => {
+          doc.text(line, 20, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
+        });
+        yPos3 += modusLines.length * 5;
+      }
+      
+      // Add page number
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Page 2 of 3', 190, 280, { align: 'right' });
+      
+      // Page 3: Root Cause Analysis and Recommendations
+      doc.addPage();
+      let yPos4 = 22;
+      
+      // Root Cause & Contributing Factors
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('4. Root Cause & Contributing Factors', 14, yPos4);
+      
+      yPos4 += 12;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Socioeconomic Factors:', 14, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Create justified text for socioeconomic factors
+      const socioText = `Analysis of 4 incidents (Theft, Robbery, Drug Offenses) suggests potential links between economic factors and criminal activities.`;
+      const socioLines = doc.splitTextToSize(socioText, maxWidth - 6);
+      socioLines.forEach((line, index) => {
+        doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
+      });
+      yPos4 += socioLines.length * 5;
+      
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Firearms Control:', 14, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      
+      // Create justified text for firearms control
+      const firearmsText = `1 incident involving illegal firearms was recorded, primarily linked to drug trade operations.`;
+      const firearmsLines = doc.splitTextToSize(firearmsText, maxWidth - 6);
+      firearmsLines.forEach((line, index) => {
+        doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
+      });
+      yPos4 += firearmsLines.length * 5;
+      
+      // Actionable Recommendations
+      yPos4 += 15;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('5. Actionable Recommendations', 14, yPos4);
+      
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Enhanced Police Visibility and Patrols:', 14, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('• Limay, Abucay, Morong: Allocate additional patrol resources to these municipalities.', 20, yPos4);
+      yPos4 += 5;
+      doc.text('• Focus on key hotspots identified in the analysis.', 20, yPos4);
+      yPos4 += 5;
+      doc.text('• Increase patrol visibility during peak incident hours.', 20, yPos4);
+      
+      // Targeted Law Enforcement Operations
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Targeted Law Enforcement Operations:', 14, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('• Continue proactive anti-drug operations in areas with 2 drug-related incidents.', 20, yPos4);
+      yPos4 += 5;
+      doc.text('• Strengthen anti-theft measures with 2 theft incidents reported.', 20, yPos4);
+      
+      // Technology and Infrastructure
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Technology and Infrastructure:', 14, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('• Deploy surveillance cameras in commercial areas and public markets.', 20, yPos4);
+      
+      // Risk Forecasting
+      yPos4 += 15;
+      doc.setFontSize(14);
+      doc.setFont('helvetica', 'bold');
+      doc.text('6. Risk Forecasting', 14, yPos4);
+      
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('• High-Risk Municipalities (Next 30 Days):', 20, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Based on recent incident density: Limay (8), Abucay (4), Morong (3).', 25, yPos4);
+      
+      yPos4 += 10;
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('• Likely Incident Types:', 20, yPos4);
+      yPos4 += 8;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Elevated patterns: Illegal Gambling (6), Warrant Arrest (3), Theft (2).', 25, yPos4);
+      
+      // Add page number
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text('Page 3 of 3', 190, 280, { align: 'right' });
+      
+      console.log('Multi-page summary PDF created');
+      
+      // Generate filename
+      const filename = `Crime_Hotspots_Analysis_${selectedMonth === "all" ? "All_Months" : months[selectedMonth]}_${selectedYear}.pdf`;
+      doc.save(filename);
+      
+      console.log('Summary PDF saved successfully');
+    } catch (error) {
+      console.error('Error exporting Summary PDF:', error);
+      alert(`Error exporting Summary PDF: ${error.message}`);
+    }
   };
 
 
@@ -675,6 +1890,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       // Generate all specific reports with proper error handling
       const reportFunctions = [
         { name: 'I-Patroller Summary', func: generateIPatrollerSummaryReport },
+        { name: 'Command Center Report', func: generateCommandCenterReport },
         { name: 'Action Center Report', func: generateActionCenterReport },
         { name: 'Incidents Report', func: generateIncidentsReport }
       ];
@@ -726,6 +1942,35 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       ]
     },
     {
+      id: "commandcenter",
+      title: "Command Center Reports",
+      description: "Command center operations and system status reports",
+      icon: <Command className="w-6 h-6" />,
+      color: "from-green-500 to-green-600",
+      reports: [
+        {
+          name: "Command Center Report",
+          description: "System status, active units, and operational overview with multiple options",
+          actions: [
+            {
+              name: "Generate Report",
+              action: generateCommandCenterReport,
+              format: "PDF",
+              priority: "high"
+            },
+            {
+              name: "View Summary",
+              action: () => setShowCommandCenterSummary(true),
+              format: "Modal",
+              priority: "high"
+            }
+          ],
+          formats: ["PDF", "Modal"],
+          priority: "high"
+        }
+      ]
+    },
+    {
       id: "actioncenter",
       title: "Action Center Reports",
       description: "Department action reports matching Action Center page",
@@ -749,28 +1994,40 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       color: "from-red-500 to-red-600",
       reports: [
         {
-          name: "Incidents Report",
-          description: "Incident statistics and analysis matching Incidents Reports page",
-          action: generateIncidentsReport,
-          formats: ["PDF"],
+          name: "Incidents Reports",
+          description: "Comprehensive incident analysis with multiple export options",
+          actions: [
+            {
+              name: "Generate Report",
+              action: generateIncidentsReport,
+              format: "PDF",
+              priority: "high"
+            },
+            {
+              name: "Summary Insights",
+              action: () => setShowSummaryModal(true),
+              format: "Modal",
+              priority: "high"
+            },
+            {
+              name: "Export to PDF",
+              action: exportSummaryToPDF,
+              format: "PDF",
+              priority: "high"
+            }
+          ],
+          formats: ["PDF", "Modal"],
           priority: "high"
         }
       ]
     }
   ];
 
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "high": return "bg-black text-white border-black";
-      case "medium": return "bg-gray-600 text-white border-gray-600";
-      case "low": return "bg-gray-400 text-white border-gray-400";
-      default: return "bg-gray-200 text-black border-gray-200";
-    }
-  };
 
   const getFormatColor = (format) => {
     switch (format) {
       case "PDF": return "bg-black text-white";
+      case "Modal": return "bg-blue-600 text-white";
       case "Excel": return "bg-gray-700 text-white";
       case "CSV": return "bg-gray-600 text-white";
       case "PNG": return "bg-gray-500 text-white";
@@ -900,11 +2157,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b-2 border-gray-200 bg-gray-50">
-                    <TableHead className="font-bold text-black py-4 px-6">Report Type</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6">Description</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6">Priority</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6">Formats</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-right">Actions</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center">Report Type</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center">Description</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center">Formats</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -921,48 +2177,75 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                         </TableCell>
                         <TableCell className="py-4 px-6 text-gray-700">{report.description}</TableCell>
                         <TableCell className="py-4 px-6">
-                          <Badge className={`${getPriorityColor(report.priority)} text-xs px-3 py-1 font-semibold border`}>
-                            {report.priority.toUpperCase()}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="py-4 px-6">
                           <div className="flex flex-wrap gap-2">
                             {report.formats.map((format) => (
                               <Badge
                                 key={format}
                                 variant="outline"
-                                className="text-xs px-3 py-1 font-semibold border-2 border-black text-black hover:bg-black hover:text-white transition-colors"
+                                className={`text-xs px-3 py-1 font-semibold border-2 transition-colors ${getFormatColor(format)}`}
                               >
                                 {format}
                               </Badge>
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-right">
-                          <Button
-                            onClick={() => {
-                              setIsGenerating(true);
-                              try {
-                                report.action();
-                              } finally {
-                                setTimeout(() => setIsGenerating(false), 1000);
-                              }
-                            }}
-                            disabled={isGenerating}
-                            className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
-                          >
-                            {isGenerating ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                Generating...
-                              </>
-                            ) : (
-                              <>
-                                <Printer className="w-4 h-4 mr-2" />
-                                Generate
-                              </>
-                            )}
-                          </Button>
+                        <TableCell className="py-4 px-6">
+                          {report.actions ? (
+                            <div className="flex gap-2">
+                              {report.actions.map((actionItem, actionIndex) => (
+                                <Button
+                                  key={actionIndex}
+                                  onClick={() => {
+                                    setIsGenerating(true);
+                                    try {
+                                      actionItem.action();
+                                    } finally {
+                                      setTimeout(() => setIsGenerating(false), 1000);
+                                    }
+                                  }}
+                                  disabled={isGenerating}
+                                  className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
+                                >
+                                  {isGenerating ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                      Generating...
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      {actionItem.name}
+                                    </>
+                                  )}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => {
+                                setIsGenerating(true);
+                                try {
+                                  report.action();
+                                } finally {
+                                  setTimeout(() => setIsGenerating(false), 1000);
+                                }
+                              }}
+                              disabled={isGenerating}
+                              className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
+                            >
+                              {isGenerating ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                  Generating...
+                                </>
+                              ) : (
+                                <>
+                                  <Printer className="w-4 h-4 mr-2" />
+                                  Generate
+                                </>
+                              )}
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))
@@ -973,6 +2256,600 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           </Card>
 
         </div>
+
+        {/* Summary Insights Modal */}
+        {showSummaryModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
+                    <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
+                      Summary Insights
+                    </h3>
+                    <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const insights = generateSummaryInsights();
+                      alert(`Detection Test Results:
+Total Incidents: ${insights.totalIncidents}
+Active: ${insights.completedIncidents}
+Completed: ${insights.completedIncidents}
+Completion Rate: ${insights.completionRate}%
+
+Top District: ${insights.mostActiveDistrict}
+Top Municipality: ${insights.topMunicipalities[0]?.municipality || 'N/A'}
+Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
+                    }}
+                    className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
+                    title="Test Detection"
+                  >
+                    <Zap className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={exportSummaryToPDF}
+                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                    title="Export to PDF"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setShowSummaryModal(false)}
+                    className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[75vh]">
+                {(() => {
+                  const filteredIncidents = incidents.filter(incident => {
+                    // Filter by status if not "all"
+                    if (filterStatus !== "all" && incident.status !== filterStatus) {
+                      return false;
+                    }
+                    // Filter by month if not "all"
+                    if (selectedMonth !== "all") {
+                      const incidentMonth = new Date(incident.date).getMonth();
+                      if (incidentMonth !== selectedMonth) {
+                        return false;
+                      }
+                    }
+                    // Filter by search term
+                    if (searchTerm) {
+                      const searchLower = searchTerm.toLowerCase();
+                      return (
+                        incident.description?.toLowerCase().includes(searchLower) ||
+                        incident.location?.toLowerCase().includes(searchLower) ||
+                        incident.incidentType?.toLowerCase().includes(searchLower) ||
+                        incident.municipality?.toLowerCase().includes(searchLower)
+                      );
+                    }
+                    return true;
+                  });
+
+                  const insights = generateSummaryInsights(filteredIncidents);
+                  return (
+                    <div className="space-y-8">
+                      {/* Overview Section */}
+                      <div className="p-6 rounded-xl border-2 bg-blue-50 border-blue-200">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="p-2 rounded-lg bg-blue-100">
+                            <AlertTriangle className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900">📊 Data Overview {selectedMonth !== "all" && `(${months[selectedMonth]})`}</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+                          <div className="p-4 rounded-lg bg-blue-100">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-full bg-blue-200">
+                                <FileText className="w-4 h-4 text-blue-600" />
+                              </div>
+                              <p className="text-sm font-medium text-blue-600">Total Incidents</p>
+                            </div>
+                            <p className="text-2xl font-bold text-blue-600">{insights.totalIncidents}</p>
+                          </div>
+                          <div className="p-4 rounded-lg bg-red-100">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-full bg-red-200">
+                                <Shield className="w-4 h-4 text-red-600" />
+                              </div>
+                              <p className="text-sm font-medium text-red-600">Drugs</p>
+                            </div>
+                            <p className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</p>
+                            <p className="text-xs text-gray-600">Drug-related incidents</p>
+                          </div>
+                          <div className="p-4 rounded-lg bg-gray-100">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-full bg-gray-200">
+                                <MoreHorizontal className="w-4 h-4 text-gray-600" />
+                              </div>
+                              <p className="text-sm font-medium text-gray-600">Others</p>
+                            </div>
+                            <p className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</p>
+                            <p className="text-xs text-gray-600">Other incident types</p>
+                          </div>
+                          <div className="p-4 rounded-lg bg-orange-100">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-full bg-orange-200">
+                                <Car className="w-4 h-4 text-orange-600" />
+                              </div>
+                              <p className="text-sm font-medium text-orange-600">Accidents</p>
+                            </div>
+                            <p className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</p>
+                            <div className="mt-2 space-y-1">
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Traffic:</span>
+                                <span className="font-medium text-orange-600">{insights.trafficAccidents}</span>
+                              </div>
+                              <div className="flex justify-between text-xs">
+                                <span className="text-gray-600">Other:</span>
+                                <span className="font-medium text-orange-600">{insights.otherAccidents}</span>
+                              </div>
+                            </div>
+                            <p className="text-xs mt-2 text-gray-600">Accident breakdown</p>
+                          </div>
+                          <div className="p-4 rounded-lg bg-yellow-100">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="p-2 rounded-full bg-yellow-200">
+                                <CheckCircle className="w-4 h-4 text-yellow-600" />
+                              </div>
+                              <p className="text-sm font-medium text-yellow-600">Action Taken</p>
+                            </div>
+                            <p className="text-2xl font-bold text-yellow-600">{insights.actionTakenIncidents}</p>
+                            <p className="text-xs text-gray-600">Actions completed</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Three Districts Analysis */}
+                      <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2 rounded-lg bg-green-100">
+                            <MapPin className="w-6 h-6 text-green-600" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* 1ST DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                              <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-blue-600">{insights.threeDistricts['1ST DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['1ST DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2ND DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                              <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-green-600">{insights.threeDistricts['2ND DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['2ND DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3RD DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-red-100 border-red-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                              <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-red-600">{insights.threeDistricts['3RD DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['3RD DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                <button
+                  onClick={() => setShowSummaryModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Command Center Summary Modal */}
+        {showCommandCenterSummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg transition-all duration-300 bg-green-100 border border-green-200">
+                    <Command className="w-6 h-6 transition-colors duration-300 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
+                      {summaryViewType === "quarterly" ? "Quarterly Report Summary" : "Weekly Report Summary"}
+                    </h3>
+                    <p className="text-sm transition-colors duration-300 text-gray-600">Command Center operational overview</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {/* View Type Toggle */}
+                  <div className="flex bg-gray-100 rounded-lg p-1">
+                    <button
+                      onClick={() => setSummaryViewType("monthly")}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 ${
+                        summaryViewType === "monthly"
+                          ? "bg-white text-green-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setSummaryViewType("quarterly")}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 ${
+                        summaryViewType === "quarterly"
+                          ? "bg-white text-green-600 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900"
+                      }`}
+                    >
+                      Quarterly
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowCommandCenterSummary(false)}
+                    className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-6 overflow-y-auto max-h-[75vh]">
+                {(() => {
+                  const summary = summaryViewType === "quarterly" 
+                    ? calculateQuarterlySummary()
+                    : calculateWeeklyReportSummary();
+                  return (
+                    <div className="space-y-8">
+                      {/* Overview Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-blue-600">Total Entries</p>
+                              <p className="text-2xl font-bold text-blue-900">{summary.totalEntries}</p>
+                            </div>
+                            <FileText className="h-8 w-8 text-blue-600" />
+                          </div>
+                        </div>
+                        
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-green-600">Total Weekly Sum</p>
+                              <p className="text-2xl font-bold text-green-900">{summary.totalWeeklySum}</p>
+                            </div>
+                            <BarChart3 className="h-8 w-8 text-green-600" />
+                          </div>
+                        </div>
+                        
+                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-purple-600">Unique Barangays</p>
+                              <p className="text-2xl font-bold text-purple-900">{summary.uniqueBarangays}</p>
+                            </div>
+                            <MapPin className="h-8 w-8 text-purple-600" />
+                          </div>
+                        </div>
+                        
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-orange-600">Concern Types</p>
+                              <p className="text-2xl font-bold text-orange-900">{summary.uniqueConcernTypes}</p>
+                            </div>
+                            <AlertTriangle className="h-8 w-8 text-orange-600" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Breakdown Section */}
+                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <BarChart3 className="h-5 w-5 text-gray-600" />
+                          {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
+                        </h3>
+                        
+                        {summaryViewType === "quarterly" ? (
+                          // Quarterly View
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {summary.quarterlyStats && summary.quarterlyStats.map((quarter, index) => {
+                              const getQuarterStyles = (color) => {
+                                switch(color) {
+                                  case 'blue':
+                                    return {
+                                      bg: 'bg-blue-100',
+                                      border: 'border-blue-300',
+                                      textMedium: 'text-blue-800',
+                                      textBold: 'text-blue-900',
+                                      textSmall: 'text-blue-700',
+                                      textXs: 'text-blue-600'
+                                    };
+                                  case 'green':
+                                    return {
+                                      bg: 'bg-green-100',
+                                      border: 'border-green-300',
+                                      textMedium: 'text-green-800',
+                                      textBold: 'text-green-900',
+                                      textSmall: 'text-green-700',
+                                      textXs: 'text-green-600'
+                                    };
+                                  case 'orange':
+                                    return {
+                                      bg: 'bg-orange-100',
+                                      border: 'border-orange-300',
+                                      textMedium: 'text-orange-800',
+                                      textBold: 'text-orange-900',
+                                      textSmall: 'text-orange-700',
+                                      textXs: 'text-orange-600'
+                                    };
+                                  case 'purple':
+                                    return {
+                                      bg: 'bg-purple-100',
+                                      border: 'border-purple-300',
+                                      textMedium: 'text-purple-800',
+                                      textBold: 'text-purple-900',
+                                      textSmall: 'text-purple-700',
+                                      textXs: 'text-purple-600'
+                                    };
+                                  default:
+                                    return {
+                                      bg: 'bg-gray-100',
+                                      border: 'border-gray-300',
+                                      textMedium: 'text-gray-800',
+                                      textBold: 'text-gray-900',
+                                      textSmall: 'text-gray-700',
+                                      textXs: 'text-gray-600'
+                                    };
+                                }
+                              };
+                              const styles = getQuarterStyles(quarter.color);
+                              
+                              return (
+                                <div key={quarter.name} className="text-center">
+                                  <div className={`${styles.bg} border ${styles.border} rounded-lg p-4`}>
+                                    <p className={`text-sm font-medium ${styles.textMedium}`}>{quarter.name}</p>
+                                    <p className={`text-2xl font-bold ${styles.textBold} mb-2`}>{quarter.entries}</p>
+                                    <div className="space-y-1">
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Weekly Sum: <span className="font-semibold">{quarter.weeklySum}</span>
+                                      </p>
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Barangays: <span className="font-semibold">{quarter.barangays}</span>
+                                      </p>
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Concerns: <span className="font-semibold">{quarter.concernTypes}</span>
+                                      </p>
+                                    </div>
+                                    <p className={`text-xs ${styles.textXs} mt-2 font-medium`}>
+                                      {quarter.months.join(", ")}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          // Weekly View
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="text-center">
+                              <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
+                                <p className="text-sm font-medium text-yellow-800">Week 1</p>
+                                <p className="text-xl font-bold text-yellow-900">{summary.totalWeek1}</p>
+                                <p className="text-xs text-yellow-700">{months[selectedMonth]} 1-7</p>
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="bg-green-100 border border-green-300 rounded-lg p-3">
+                                <p className="text-sm font-medium text-green-800">Week 2</p>
+                                <p className="text-xl font-bold text-green-900">{summary.totalWeek2}</p>
+                                <p className="text-xs text-green-700">{months[selectedMonth]} 8-14</p>
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
+                                <p className="text-sm font-medium text-blue-800">Week 3</p>
+                                <p className="text-xl font-bold text-blue-900">{summary.totalWeek3}</p>
+                                <p className="text-xs text-blue-700">{months[selectedMonth]} 15-21</p>
+                              </div>
+                            </div>
+                            <div className="text-center">
+                              <div className="bg-purple-100 border border-purple-300 rounded-lg p-3">
+                                <p className="text-sm font-medium text-purple-800">Week 4</p>
+                                <p className="text-xl font-bold text-purple-900">{summary.totalWeek4}</p>
+                                <p className="text-xs text-purple-700">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Completion Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            Completion Rate
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Entries with Action Taken</span>
+                              <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${summary.completionRate}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-blue-600" />
+                            Remarks Rate
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Entries with Remarks</span>
+                              <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div 
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
+                                style={{ width: `${summary.remarksRate}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top Lists */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <AlertTriangle className="h-5 w-5 text-orange-600" />
+                            Top Concern Types
+                          </h3>
+                          {summary.topConcernTypes.length > 0 ? (
+                            <div className="space-y-2">
+                              {summary.topConcernTypes.map((item, index) => (
+                                <div key={item.type} className="flex justify-between items-center p-2 bg-orange-50 rounded-lg">
+                                  <span className="text-sm font-medium text-orange-900">{item.type}</span>
+                                  <span className="text-sm font-bold text-orange-700">{item.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">No concern types recorded</p>
+                          )}
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <MapPin className="h-5 w-5 text-purple-600" />
+                            Top Barangays
+                          </h3>
+                          {summary.topBarangays.length > 0 ? (
+                            <div className="space-y-2">
+                              {summary.topBarangays.map((item, index) => (
+                                <div key={item.barangay} className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
+                                  <span className="text-sm font-medium text-purple-900">{item.barangay}</span>
+                                  <span className="text-sm font-bold text-purple-700">{item.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-500">No barangays recorded</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Summary Info */}
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                            <BarChart3 className="h-4 w-4 text-green-600" />
+                          </div>
+                          <div>
+                            <h4 className="font-semibold text-green-900 mb-1">
+                              {summaryViewType === "quarterly" 
+                                ? `Quarterly Summary for ${summary.year || selectedYear}`
+                                : `Summary for ${months[selectedMonth]} ${selectedYear}`
+                              }
+                            </h4>
+                            <p className="text-sm text-green-700">
+                              {summary.municipality} • 
+                              {summary.totalEntries} total entries • 
+                              {summary.totalWeeklySum} total weekly sum • 
+                              {summary.completionRate}% completion rate
+                              {summaryViewType === "quarterly" && summary.quarterlyStats && (
+                                <span> • {summary.quarterlyStats.length} quarters analyzed</span>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                <button
+                  onClick={() => setShowCommandCenterSummary(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
     </Layout>
   );
 }

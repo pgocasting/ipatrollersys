@@ -665,18 +665,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Refresh Data Button */}
-            <button
-              onClick={fetchAllActionData}
-              disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-            >
-              <RotateCcw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">
-                {loading ? 'Fetching...' : 'Refresh Data'}
-              </span>
-            </button>
-            
             {/* View Options Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
