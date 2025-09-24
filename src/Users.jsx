@@ -152,21 +152,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
       toast.success("User created successfully");
       
-      // Reset form
-      setNewUser({
-        email: "",
-        username: "",
-        password: "",
-        confirmPassword: "",
-        firstName: "",
-        lastName: "",
-        municipality: "",
-        phoneNumber: "",
-        role: "User",
-        accessLevel: "action-center",
-        department: "",
-      });
-
       // Close dialog and reset form
       setIsDialogOpen(false);
       setNewUser({

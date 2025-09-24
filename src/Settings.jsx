@@ -18,8 +18,6 @@ import {
   AlertCircle,
   LogOut,
   User,
-  Bell,
-  Palette,
   UserCircle
 } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
@@ -131,14 +129,6 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
             <TabsTrigger value="account" className="flex items-center gap-2">
               <UserCircle className="h-4 w-4" />
               Account
-            </TabsTrigger>
-            <TabsTrigger value="appearance" className="flex items-center gap-2">
-              <Palette className="h-4 w-4" />
-              Appearance
-            </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
-              <Bell className="h-4 w-4" />
-              Notifications
             </TabsTrigger>
           </TabsList>
 
@@ -313,73 +303,48 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
             </Card>
           </TabsContent>
 
-          <TabsContent value="appearance" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Appearance</CardTitle>
-                <CardDescription>
-                  Customize the appearance of the application
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Appearance settings coming soon...
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          <TabsContent value="notifications" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notifications</CardTitle>
-                <CardDescription>
-                  Configure how you receive notifications
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Notification settings coming soon...
-                </p>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         {/* Success Dialog */}
         <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
+          <DialogContent className="sm:max-w-[425px] bg-white border border-slate-200">
+            <DialogHeader className="text-center space-y-4">
+              <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </div>
+              <DialogTitle className="text-xl font-semibold text-gray-900">
                 Password Updated Successfully
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-gray-600">
                 Your password has been changed. For security reasons, you can choose to:
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-4 pt-4">
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setShowSuccessDialog(false);
-                  onLogout();
-                }}
-              >
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout Now
-              </Button>
-              <Button
-                variant="outline"
-                className="w-full"
-                onClick={() => setShowSuccessDialog(false)}
-              >
-                <User className="mr-2 h-4 w-4" />
-                Stay Logged In
-              </Button>
-              <p className="text-xs text-muted-foreground text-center">
-                Note: Staying logged in means you'll continue using your current session
-              </p>
+            <div className="space-y-3 pt-4">
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-gray-200 hover:bg-gray-50"
+                  onClick={() => {
+                    setShowSuccessDialog(false);
+                    onLogout();
+                  }}
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout Now
+                </Button>
+                <Button
+                  className="flex-1 bg-black hover:bg-black/90 text-white"
+                  onClick={() => setShowSuccessDialog(false)}
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Stay Logged In
+                </Button>
+              </div>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-xs text-blue-700 text-center font-medium">
+                  💡 Note: Staying logged in means you'll continue using your current session
+                </p>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

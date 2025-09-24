@@ -24,11 +24,24 @@ import "./mobile.css"; // Mobile responsive styles
 import { Toaster } from "sonner";
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState(() => {
-    // Get the current page from URL on initial load using utility function
-    return getCurrentPageFromURL();
-  });
+  const [currentPage, setCurrentPage] = useState('dashboard');
   const { user, loading, logout } = useFirebase();
+
+  // Set initial page based on URL only after user authentication is determined
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        // User is logged in, get page from URL
+        const pageFromURL = getCurrentPageFromURL();
+        setCurrentPage(pageFromURL);
+      } else {
+        // User is not logged in, ensure URL is root
+        if (window.location.pathname !== '/') {
+          window.history.replaceState({}, '', '/');
+        }
+      }
+    }
+  }, [user, loading]);
 
   // Initialize users collection when app starts
   useEffect(() => {
@@ -79,16 +92,25 @@ export default function App() {
     window.history.replaceState({}, '', `/${page}`);
   };
 
-  // Listen for browser back/forward buttons and URL changes using utility function
+  // Listen for browser back/forward buttons and URL changes using utility function, but only when logged in
   useEffect(() => {
-    const cleanup = handleBrowserNavigation(setCurrentPage);
-    return cleanup;
-  }, []);
+    if (user) {
+      const cleanup = handleBrowserNavigation(setCurrentPage);
+      return cleanup;
+    }
+  }, [user]);
 
-  // Ensure URL is always in sync with current page
+  // Ensure URL is always in sync with current page, but only when user is logged in
   useEffect(() => {
-    syncURLWithPage(currentPage);
-  }, [currentPage]);
+    if (user) {
+      syncURLWithPage(currentPage);
+    } else {
+      // When user is not logged in, set URL to root
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  }, [currentPage, user]);
 
   const renderPage = () => {
     switch (currentPage) {

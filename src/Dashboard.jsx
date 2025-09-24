@@ -6,6 +6,7 @@ import { Input } from './components/ui/input';
 import { Badge } from './components/ui/badge';
 import { Label } from './components/ui/label';
 import { useData } from './DataContext';
+import { useAuth } from './contexts/AuthContext';
 import { Bar } from 'react-chartjs-2';
 import { PieChart } from './components/ui/pie-chart';
 import { toast } from 'sonner';
@@ -41,6 +42,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     incidents,
     loading: dataLoading
   } = useData();
+  const { userAccessLevel } = useAuth();
 
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
   const { notifications, showSuccess, removeNotification } = useNotification();
@@ -383,7 +385,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
           <Card className="bg-white shadow-sm border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -416,37 +418,41 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
-                  </p>
-                </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Target className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {userAccessLevel !== 'ipatroller' && (
+            <>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Target className="w-6 h-6 text-blue-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
-                  </p>
-                </div>
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <AlertTriangle className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <AlertTriangle className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
         </div>
 
         {/* Analytics Section */}

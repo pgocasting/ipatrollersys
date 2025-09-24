@@ -97,7 +97,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   // Define all navigation items - moved outside component to prevent recreation
   const allNavigationItems = React.useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: 'all' },
-    { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: 'admin' },
+    { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
     { id: 'incidents', label: 'Incidents Reports', icon: AlertTriangle, showFor: 'admin' },
@@ -114,10 +114,12 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       // Show for all users
       if (item.showFor === 'all') return true;
       
-      // Show based on user access level
-      if (item.showFor === userAccessLevel) return true;
-      
-      return false;
+      // Show based on user access level - handle both string and array
+      if (Array.isArray(item.showFor)) {
+        return item.showFor.includes(userAccessLevel);
+      } else {
+        return item.showFor === userAccessLevel;
+      }
     }), [allNavigationItems, isAdmin, userAccessLevel]
   );
 
