@@ -112,7 +112,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin) return;
     
     // Validate form
-    if (!newUser.municipality && newUser.accessLevel !== "ipatroller") {
+    if (!newUser.municipality && newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents") {
       toast.error("Please select a municipality");
       return;
     }
@@ -207,7 +207,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin || !selectedUser) return;
     
     // Validate form
-    if (!editUser.municipality && editUser.accessLevel !== "ipatroller") {
+    if (!editUser.municipality && editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents") {
       toast.error("Please select a municipality");
       return;
     }
@@ -341,7 +341,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
                     </div>
-                    {newUser.accessLevel !== "ipatroller" && (
+                    {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && (
                       <div className="space-y-2">
                         <Label htmlFor="municipality">Municipality</Label>
                         <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
@@ -368,6 +368,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
+                          <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
+                          <SelectItem value="incidents">Incidents</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -488,7 +490,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         required 
                       />
                     </div>
-                    {editUser.accessLevel !== "ipatroller" && (
+                    {editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents" && (
                       <div className="space-y-2">
                         <Label htmlFor="editMunicipality">Municipality</Label>
                         <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
@@ -515,6 +517,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
+                          <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
+                          <SelectItem value="incidents">Incidents</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -652,7 +656,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
-                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : u.accessLevel === 'ipatroller' ? 'IPatroller' : 'N/A'}
+                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : u.accessLevel === 'ipatroller' ? 'IPatroller' : u.accessLevel === 'quarry-monitoring' ? 'Quarry Site Monitoring' : u.accessLevel === 'incidents' ? 'Incidents' : 'N/A'}
                         </span>
                       </TableCell>
                       <TableCell>

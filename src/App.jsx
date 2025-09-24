@@ -6,6 +6,7 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import CommandCenter from "./CommandCenter";
+import QuarryMonitoring from "./QuarryMonitoring";
 import Settings from "./Settings";
 import FirestoreTest from "./FirestoreTest";
 import Users from "./Users";
@@ -126,6 +127,8 @@ export default function App() {
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'actioncenter':
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'quarrymonitoring':
+        return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'users':

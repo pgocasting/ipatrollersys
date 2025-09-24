@@ -19,7 +19,8 @@ import {
   Bell,
   Activity,
   Command,
-  User
+  User,
+  Mountain
 } from "lucide-react";
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
@@ -100,7 +101,8 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
-    { id: 'incidents', label: 'Incidents Reports', icon: AlertTriangle, showFor: 'admin' },
+    { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: 'admin' },
+    { id: 'quarrymonitoring', label: 'Quarry Site Monitoring', icon: Mountain, showFor: 'admin' },
     { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
     { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
   ], []);
