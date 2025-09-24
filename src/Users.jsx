@@ -112,7 +112,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin) return;
     
     // Validate form
-    if (!newUser.municipality) {
+    if (!newUser.municipality && newUser.accessLevel !== "ipatroller") {
       toast.error("Please select a municipality");
       return;
     }
@@ -222,7 +222,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin || !selectedUser) return;
     
     // Validate form
-    if (!editUser.municipality) {
+    if (!editUser.municipality && editUser.accessLevel !== "ipatroller") {
       toast.error("Please select a municipality");
       return;
     }
@@ -356,19 +356,21 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="municipality">Municipality</Label>
-                      <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
-                        <SelectTrigger id="municipality" className="col-span-3 bg-white border border-slate-200">
-                          <SelectValue placeholder="Select municipality" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-slate-200">
-                          {municipalities.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {newUser.accessLevel !== "ipatroller" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="municipality">Municipality</Label>
+                        <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
+                          <SelectTrigger id="municipality" className="col-span-3 bg-white border border-slate-200">
+                            <SelectValue placeholder="Select municipality" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            {municipalities.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -380,6 +382,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         <SelectContent className="bg-white border border-slate-200">
                           <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
+                          <SelectItem value="ipatroller">IPatroller</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -500,19 +503,21 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         required 
                       />
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="editMunicipality">Municipality</Label>
-                      <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
-                        <SelectTrigger id="editMunicipality" className="col-span-3 bg-white border border-slate-200">
-                          <SelectValue placeholder="Select municipality" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-slate-200">
-                          {municipalities.map((m) => (
-                            <SelectItem key={m} value={m}>{m}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                    {editUser.accessLevel !== "ipatroller" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="editMunicipality">Municipality</Label>
+                        <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
+                          <SelectTrigger id="editMunicipality" className="col-span-3 bg-white border border-slate-200">
+                            <SelectValue placeholder="Select municipality" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            {municipalities.map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -524,6 +529,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         <SelectContent className="bg-white border border-slate-200">
                           <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
+                          <SelectItem value="ipatroller">IPatroller</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -661,7 +667,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       </TableCell>
                       <TableCell>
                         <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
-                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : 'N/A'}
+                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : u.accessLevel === 'ipatroller' ? 'IPatroller' : 'N/A'}
                         </span>
                       </TableCell>
                       <TableCell>
