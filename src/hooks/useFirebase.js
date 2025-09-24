@@ -5,6 +5,7 @@ import {
   signOut, 
   setPersistence,
   browserLocalPersistence,
+  browserSessionPersistence,
   EmailAuthProvider,
   reauthenticateWithCredential,
   updatePassword
@@ -55,8 +56,13 @@ export const useFirebase = () => {
         throw new Error('User not found');
       }
 
+      // Set authentication persistence
       if (keepLoggedIn) {
+        // Keep user logged in across browser sessions (persistent)
         await setPersistence(auth, browserLocalPersistence);
+      } else {
+        // Auto-logout when browser is closed (session only)
+        await setPersistence(auth, browserSessionPersistence);
       }
 
       // Now sign in with the email

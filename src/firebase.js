@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 // Your Firebase configuration
@@ -18,6 +18,11 @@ const app = initializeApp(firebaseConfig);
 
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
+
+// Set default session persistence (auto-logout when browser is closed)
+setPersistence(auth, browserSessionPersistence).catch((error) => {
+  console.warn('Failed to set default session persistence:', error);
+});
 
 // Initialize Cloud Firestore and get a reference to the service
 export const db = getFirestore(app);
