@@ -794,7 +794,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Monthly Department Breakdown Modal */}
         <Dialog open={showMonthlyBreakdownModal} onOpenChange={setShowMonthlyBreakdownModal}>
-          <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto bg-white border shadow-2xl">
+          <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto bg-white border shadow-2xl">
             <DialogHeader className="pb-4 border-b border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="p-3 bg-indigo-100 rounded-xl">
@@ -809,98 +809,120 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </DialogHeader>
             
-            <div className="mt-6 bg-white">
-              <div className="overflow-x-auto">
-                <div className="min-w-full bg-white">
-                  {/* Header Row */}
-                  <div className="grid grid-cols-5 gap-4 mb-6 p-4 bg-gradient-to-r from-gray-100 to-gray-50 rounded-xl font-semibold text-sm text-gray-800 shadow-sm">
-                    <div className="text-center font-bold">Month</div>
-                    <div className="text-center text-blue-700 font-bold">PNP</div>
-                    <div className="text-center text-green-700 font-bold">Agriculture</div>
-                    <div className="text-center text-emerald-700 font-bold">PG-ENRO</div>
-                    <div className="text-center text-gray-900 font-bold">Total</div>
-                  </div>
-                  
-                  {/* Data Rows */}
-                  <div className="space-y-3 bg-white">
-                    {monthlyData.map((data, index) => {
-                      const isCurrentMonth = data.monthIndex === new Date().getMonth();
-                      return (
-                        <div 
-                          key={data.month} 
-                          className={`grid grid-cols-5 gap-4 p-4 rounded-xl transition-all duration-200 hover:shadow-md bg-white border-2 ${
-                            isCurrentMonth 
-                              ? 'bg-blue-50 border-blue-300 shadow-md' 
-                              : 'border-gray-200 hover:border-gray-300'
-                          }`}
-                        >
-                          <div className={`text-sm font-semibold flex items-center ${
-                            isCurrentMonth ? 'text-blue-800' : 'text-gray-800'
-                          }`}>
+            <div className="mt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead className="font-bold text-foreground">Month</TableHead>
+                    <TableHead className="text-center font-bold text-blue-700">PNP</TableHead>
+                    <TableHead className="text-center font-bold text-green-700">Agriculture</TableHead>
+                    <TableHead className="text-center font-bold text-emerald-700">PG-ENRO</TableHead>
+                    <TableHead className="text-center font-bold text-foreground">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyData.map((data, index) => {
+                    const isCurrentMonth = data.monthIndex === new Date().getMonth();
+                    return (
+                      <TableRow 
+                        key={data.month} 
+                        className={`transition-colors hover:bg-muted/50 ${
+                          isCurrentMonth ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
+                        }`}
+                      >
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
                             {data.month}
                             {isCurrentMonth && (
-                              <span className="ml-3 text-xs bg-blue-600 text-white px-3 py-1 rounded-full font-bold">
+                              <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">
                                 Current
-                              </span>
+                              </Badge>
                             )}
                           </div>
-                          <div className="text-center flex justify-center">
-                            <span className="inline-flex items-center justify-center w-10 h-10 bg-blue-600 text-white rounded-full text-sm font-bold shadow-sm">
-                              {data.pnp}
-                            </span>
-                          </div>
-                          <div className="text-center flex justify-center">
-                            <span className="inline-flex items-center justify-center w-10 h-10 bg-green-600 text-white rounded-full text-sm font-bold shadow-sm">
-                              {data.agriculture}
-                            </span>
-                          </div>
-                          <div className="text-center flex justify-center">
-                            <span className="inline-flex items-center justify-center w-10 h-10 bg-emerald-600 text-white rounded-full text-sm font-bold shadow-sm">
-                              {data.pgEnro}
-                            </span>
-                          </div>
-                          <div className="text-center flex justify-center">
-                            <span className={`inline-flex items-center justify-center w-10 h-10 rounded-full text-sm font-bold shadow-sm ${
-                              data.total > 0 ? 'bg-gray-700 text-white' : 'bg-gray-300 text-gray-600'
-                            }`}>
-                              {data.total}
-                            </span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-blue-600 hover:bg-blue-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
+                          >
+                            {data.pnp}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-green-600 hover:bg-green-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
+                          >
+                            {data.agriculture}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant="secondary" 
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
+                          >
+                            {data.pgEnro}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant="secondary" 
+                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
+                              data.total > 0 
+                                ? 'bg-gray-700 hover:bg-gray-800 text-white' 
+                                : 'bg-gray-300 hover:bg-gray-400 text-gray-600'
+                            }`}
+                          >
+                            {data.total}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
                   
                   {/* Summary Row */}
-                  <div className="mt-8 p-6 bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 rounded-xl border-2 border-indigo-200 shadow-lg">
-                    <div className="grid grid-cols-5 gap-4 font-bold text-base">
-                      <div className="text-gray-900 font-black text-lg flex items-center">
-                        📊 Total (Year)
+                  <TableRow className="bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 border-t-2 border-indigo-200">
+                    <TableCell className="font-bold text-lg">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-5 h-5 text-indigo-600" />
+                        Total (Year)
                       </div>
-                      <div className="text-center flex justify-center">
-                        <span className="inline-flex items-center justify-center w-14 h-14 bg-blue-700 text-white rounded-full text-lg font-black shadow-lg ring-4 ring-blue-200">
-                          {monthlyData.reduce((sum, data) => sum + data.pnp, 0)}
-                        </span>
-                      </div>
-                      <div className="text-center flex justify-center">
-                        <span className="inline-flex items-center justify-center w-14 h-14 bg-green-700 text-white rounded-full text-lg font-black shadow-lg ring-4 ring-green-200">
-                          {monthlyData.reduce((sum, data) => sum + data.agriculture, 0)}
-                        </span>
-                      </div>
-                      <div className="text-center flex justify-center">
-                        <span className="inline-flex items-center justify-center w-14 h-14 bg-emerald-700 text-white rounded-full text-lg font-black shadow-lg ring-4 ring-emerald-200">
-                          {monthlyData.reduce((sum, data) => sum + data.pgEnro, 0)}
-                        </span>
-                      </div>
-                      <div className="text-center flex justify-center">
-                        <span className="inline-flex items-center justify-center w-14 h-14 bg-gray-800 text-white rounded-full text-lg font-black shadow-lg ring-4 ring-gray-300">
-                          {monthlyData.reduce((sum, data) => sum + data.total, 0)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-blue-700 hover:bg-blue-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-blue-200"
+                      >
+                        {monthlyData.reduce((sum, data) => sum + data.pnp, 0)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-green-700 hover:bg-green-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-green-200"
+                      >
+                        {monthlyData.reduce((sum, data) => sum + data.agriculture, 0)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-emerald-700 hover:bg-emerald-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-emerald-200"
+                      >
+                        {monthlyData.reduce((sum, data) => sum + data.pgEnro, 0)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge 
+                        variant="secondary" 
+                        className="bg-gray-800 hover:bg-gray-900 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-gray-300"
+                      >
+                        {monthlyData.reduce((sum, data) => sum + data.total, 0)}
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             </div>
           </DialogContent>
         </Dialog>
