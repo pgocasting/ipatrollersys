@@ -28,13 +28,9 @@ import {
   Download,
   PieChartIcon,
   AlertTriangle,
-  RefreshCw,
   List,
   Building2,
-  MapPin,
-  Menu,
-  RotateCcw,
-  FileText
+  MapPin
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -47,24 +43,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   } = useData();
 
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
-  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const { notifications, showSuccess, removeNotification } = useNotification();
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showMenuDropdown) {
-        const dropdown = document.getElementById('dashboard-menu-dropdown');
-        const button = document.getElementById('dashboard-menu-button');
-        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
-          setShowMenuDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenuDropdown]);
 
   const handleLogout = async () => {
     try {
@@ -400,67 +380,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </p>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* Refresh Data Button */}
-            <button
-              onClick={() => window.location.reload()}
-              disabled={dataLoading}
-              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-            >
-              <RotateCcw className={`w-5 h-5 ${dataLoading ? 'animate-spin' : ''}`} />
-              <span className="text-sm font-medium">
-                {dataLoading ? 'Loading...' : 'Refresh Data'}
-              </span>
-            </button>
-            
-            {/* View Options Dropdown */}
-            <div className="relative">
-              <button
-                id="dashboard-menu-button"
-                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-              >
-                <Menu className="w-5 h-5" />
-                <span className="text-sm font-medium">View Options</span>
-              </button>
-              
-              {showMenuDropdown && (
-                <div 
-                  id="dashboard-menu-dropdown"
-                  className="absolute right-0 mt-2 w-64 bg-white border border-gray-200 shadow-lg rounded-lg z-50 overflow-hidden"
-                >
-                  <div className="py-1">
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Report Options</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        // Export functionality can be added here
-                        showSuccess('Export feature coming soon!');
-                        setShowMenuDropdown(false);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200"
-                    >
-                      <FileText className="w-4 h-4 text-blue-600" />
-                      <span>Export Report</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        window.location.reload();
-                        setShowMenuDropdown(false);
-                      }}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200"
-                    >
-                      <RefreshCw className="w-4 h-4 text-green-600" />
-                      <span>Refresh Data</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
         {/* Quick Stats */}

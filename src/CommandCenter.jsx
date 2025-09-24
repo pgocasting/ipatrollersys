@@ -3502,25 +3502,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </button>
                 )}
 
-                {/* Divider */}
-                <div className="border-t border-gray-200 my-1"></div>
 
-                {/* Actions Section */}
-                <div className="px-3 py-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</h3>
-                </div>
-
-                {/* Summary Button */}
-                <button
-                  onClick={() => {
-                    setShowSummaryModal(true);
-                    setShowMenuDropdown(false);
-                  }}
-                  className="flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                >
-                  <BarChart3 className="w-4 h-4 text-blue-600" />
-                  <span>Summary</span>
-                </button>
                 </div>
               </div>
               )}

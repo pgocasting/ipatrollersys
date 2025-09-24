@@ -4023,9 +4023,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       {showSummaryModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            <div className="flex items-center justify-between p-6 border-b ${
-              border-gray-200
-            }">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
                 <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
@@ -4065,9 +4063,7 @@ Top Location: ${insights.topLocation}`);
                 </button>
                 <button
                   onClick={() => setShowSummaryModal(false)}
-                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 ${
-                    text-gray-500 hover:text-gray-700
-                  }"
+                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 hover:text-gray-700"
                 >
                   <X className="h-6 w-6" />
                 </button>
@@ -4080,86 +4076,50 @@ Top Location: ${insights.topLocation}`);
                   <div className="space-y-8">
                     {/* Overview Section */}
                     <div 
-                      className="p-6 rounded-xl border-2 ${enhancedClasses.hoverLift} ${
-                      bg-blue-50 border-blue-200
-                    }">
+                      className="p-6 rounded-xl border-2 bg-blue-50 border-blue-200">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 rounded-lg ${
-                          bg-blue-100
-                        }">
+                        <div className="p-2 rounded-lg bg-blue-100">
                           <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <h3 className="text-xl font-bold ${
-                          text-gray-900
-                        }">📊 Data Overview {selectedMonth !== "all" && `(${selectedMonth})`}</h3>
+                        <h3 className="text-xl font-bold text-gray-900">📊 Data Overview {selectedMonth !== "all" && `(${selectedMonth})`}</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                        <div className="p-4 rounded-lg ${enhancedClasses.hoverLift} ${
-                          bg-blue-100
-                        }">
+                        <div className="p-4 rounded-lg bg-blue-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 rounded-full ${
-                              bg-blue-200
-                            }">
+                            <div className="p-2 rounded-full bg-blue-200">
                               <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                             </div>
-                            <p className="text-sm font-medium ${
-                              text-blue-600
-                            }">Total Incidents</p>
+                            <p className="text-sm font-medium text-blue-600">Total Incidents</p>
                           </div>
                           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{insights.totalIncidents}</p>
-                          <p className="text-xs ${
-                            text-gray-600
-                          }"></p>
+                          <p className="text-xs text-gray-600"></p>
                         </div>
-                        <div className="p-4 rounded-lg ${
-                          bg-red-100
-                        }">
+                        <div className="p-4 rounded-lg bg-red-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 rounded-full ${
-                              bg-red-200
-                            }">
+                            <div className="p-2 rounded-full bg-red-200">
                               <Shield className="w-4 h-4 text-red-600 dark:text-red-400" />
                             </div>
-                            <p className="text-sm font-medium ${
-                              text-red-600
-                            }">Drugs</p>
+                            <p className="text-sm font-medium text-red-600">Drugs</p>
                           </div>
                           <p className="text-2xl font-bold text-red-600 dark:text-red-400">{insights.drugsIncidents}</p>
-                          <p className="text-xs ${
-                            text-gray-600
-                          }">Drug-related incidents</p>
+                          <p className="text-xs text-gray-600">Drug-related incidents</p>
                         </div>
-                        <div className="p-4 rounded-lg ${
-                          bg-gray-100
-                        }">
+                        <div className="p-4 rounded-lg bg-gray-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 rounded-full ${
-                              bg-gray-200
-                            }">
+                            <div className="p-2 rounded-full bg-gray-200">
                               <MoreHorizontal className="w-4 h-4 text-gray-600 dark:text-gray-400" />
                             </div>
-                            <p className="text-sm font-medium ${
-                              text-gray-600
-                            }">Others</p>
+                            <p className="text-sm font-medium text-gray-600">Others</p>
                           </div>
                           <p className="text-2xl font-bold text-gray-600 dark:text-gray-400">{insights.othersIncidents}</p>
-                          <p className="text-xs ${
-                            text-gray-600
-                          }">Other incident types</p>
+                          <p className="text-xs text-gray-600">Other incident types</p>
                         </div>
-                        <div className="p-4 rounded-lg ${
-                          bg-orange-100
-                        }">
+                        <div className="p-4 rounded-lg bg-orange-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 rounded-full ${
-                              bg-orange-200
-                            }">
+                            <div className="p-2 rounded-full bg-orange-200">
                               <Car className="w-4 h-4 text-orange-600 dark:text-orange-400" />
                             </div>
-                            <p className="text-sm font-medium ${
-                              text-orange-600
-                            }">Accidents</p>
+                            <p className="text-sm font-medium text-orange-600">Accidents</p>
                           </div>
                           <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{insights.accidentsIncidents}</p>
                           <div className="mt-2 space-y-1">
@@ -4176,79 +4136,51 @@ Top Location: ${insights.topLocation}`);
                         </div>
                         <div className="p-4 rounded-lg bg-yellow-100">
                           <div className="flex items-center gap-3 mb-2">
-                            <div className="p-2 rounded-full ${
-                              bg-yellow-200
-                            }">
+                            <div className="p-2 rounded-full bg-yellow-200">
                               <CheckCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400" />
                             </div>
-                            <p className="text-sm font-medium ${
-                              text-yellow-600
-                            }">Action Taken</p>
+                            <p className="text-sm font-medium text-yellow-600">Action Taken</p>
                           </div>
                           <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{insights.actionTakenIncidents}</p>
-                          <p className="text-xs ${
-                            text-gray-600
-                          }">Actions completed</p>
+                          <p className="text-xs text-gray-600">Actions completed</p>
                         </div>
                       </div>
                     </div>
                     {/* Three Districts Analysis */}
-                    <div className="p-6 rounded-xl border-2 ${
-                      bg-green-50 border-green-200
-                    }">
+                    <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
                       <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg ${
-                          bg-green-100
-                        }">
+                        <div className="p-2 rounded-lg bg-green-100">
                           <MapPin className="w-6 h-6 text-green-600 dark:text-green-400" />
                         </div>
-                        <h3 className="text-xl font-bold ${
-                          text-gray-900
-                        }">🗺️ Three Districts Analysis</h3>
+                        <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         {/* 1ST DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
-                          bg-blue-100 border-blue-200
-                        }">
+                        <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                            <h4 className="font-bold ${
-                              text-gray-900
-                            }">1ST DISTRICT</h4>
+                            <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                              <p className="text-sm ${
-                                text-gray-600
-                              }">Incidents Detected</p>
+                              <p className="text-sm text-gray-600">Incidents Detected</p>
                             </div>
-                            <div className="p-3 rounded-lg ${
-                              bg-blue-50
-                            }">
-                              <p className="text-sm font-semibold mb-2 ${
-                                text-blue-700
-                              }">📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg bg-blue-50">
+                              <p className="text-sm font-semibold mb-2 text-blue-700">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['1ST DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className="text-xs px-2 py-1 rounded ${
-                                      bg-blue-200 text-blue-800
-                                    }">
+                                    <div key={index} className="text-xs px-2 py-1 rounded bg-blue-200 text-blue-800">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-xs ${
-                                  text-gray-500
-                                }">No municipalities detected</p>
+                                <p className="text-xs text-gray-500">No municipalities detected</p>
                               )}
                             </div>
-                            <div className="text-xs p-2 rounded ${
-                              bg-gray-100 text-gray-600
-                            }">
+                            <div className="text-xs p-2 rounded bg-gray-100 text-gray-600">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Abucay, Orani, Samal, Hermosa</p>
                               <p>in location descriptions</p>
@@ -4256,47 +4188,31 @@ Top Location: ${insights.topLocation}`);
                           </div>
                         </div>
                         {/* 2ND DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 ${enhancedClasses.hoverScale} ${
-                          bg-green-100 border-green-200
-                        }">
+                        <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                            <h4 className="font-bold ${
-                              text-gray-900
-                            }">2ND DISTRICT</h4>
+                            <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-green-600 dark:text-green-400">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                              <p className="text-sm ${
-                                text-gray-600
-                              }">Incidents Detected</p>
+                              <p className="text-sm text-gray-600">Incidents Detected</p>
                             </div>
-                            <div className="p-3 rounded-lg ${
-                              bg-green-50
-                            }">
-                              <p className="text-sm font-semibold mb-2 ${
-                                text-green-700
-                              }">📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg bg-green-50">
+                              <p className="text-sm font-semibold mb-2 text-green-700">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['2ND DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className="text-xs px-2 py-1 rounded ${
-                                      bg-green-200 text-green-800
-                                    }">
+                                    <div key={index} className="text-xs px-2 py-1 rounded bg-green-200 text-green-800">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-xs ${
-                                  text-gray-500
-                                }">No municipalities detected</p>
+                                <p className="text-xs text-gray-500">No municipalities detected</p>
                               )}
                             </div>
-                            <div className="text-xs p-2 rounded ${
-                              bg-gray-100 text-gray-600
-                            }">
+                            <div className="text-xs p-2 rounded bg-gray-100 text-gray-600">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Balanga City, Pilar, Orion, Limay</p>
                               <p>in location descriptions</p>
@@ -4304,47 +4220,31 @@ Top Location: ${insights.topLocation}`);
                           </div>
                         </div>
                         {/* 3RD DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 ${
-                          bg-purple-100 border-purple-200
-                        }">
+                        <div className="p-4 rounded-lg border-2 bg-purple-100 border-purple-200">
                           <div className="flex items-center gap-2 mb-3">
                             <div className="w-3 h-3 rounded-full bg-purple-600"></div>
-                            <h4 className="font-bold ${
-                              text-gray-900
-                            }">3RD DISTRICT</h4>
+                            <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
                           </div>
                           <div className="space-y-3">
                             <div className="text-center">
                               <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                              <p className="text-sm ${
-                                text-gray-600
-                              }">Incidents Detected</p>
+                              <p className="text-sm text-gray-600">Incidents Detected</p>
                             </div>
-                            <div className="p-3 rounded-lg ${
-                              bg-purple-50
-                            }">
-                              <p className="text-sm font-semibold mb-2 ${
-                                text-purple-700
-                              }">📍 Detected Municipalities:</p>
+                            <div className="p-3 rounded-lg bg-purple-50">
+                              <p className="text-sm font-semibold mb-2 text-purple-700">📍 Detected Municipalities:</p>
                               {insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.length > 0 ? (
                                 <div className="space-y-1">
                                   {insights.threeDistricts['3RD DISTRICT'].detectedMunicipalities.map((municipality, index) => (
-                                    <div key={index} className="text-xs px-2 py-1 rounded ${
-                                      bg-purple-200 text-purple-800
-                                    }">
+                                    <div key={index} className="text-xs px-2 py-1 rounded bg-purple-200 text-purple-800">
                                       ✓ {municipality}
                                     </div>
                                   ))}
                                 </div>
                               ) : (
-                                <p className="text-xs ${
-                                  text-gray-500
-                                }">No municipalities detected</p>
+                                <p className="text-xs text-gray-500">No municipalities detected</p>
                               )}
                             </div>
-                            <div className="text-xs p-2 rounded ${
-                              bg-gray-100 text-gray-600
-                            }">
+                            <div className="text-xs p-2 rounded bg-gray-100 text-gray-600">
                               <p className="font-semibold mb-1">🔍 How it works:</p>
                               <p>Searches for: Bagac, Dinalupihan, Mariveles, Morong</p>
                               <p>in location descriptions</p>
@@ -4353,18 +4253,12 @@ Top Location: ${insights.topLocation}`);
                         </div>
                       </div>
                       {/* Explanation Section */}
-                      <div className="mt-6 p-4 rounded-lg ${
-                        bg-gray-50 border border-gray-200
-                      }">
+                      <div className="mt-6 p-4 rounded-lg bg-gray-50 border border-gray-200">
                         <div className="flex items-center gap-2 mb-3">
                           <AlertCircle className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                          <h4 className="font-bold ${
-                            text-gray-900
-                          }">💡 How Detection Works</h4>
+                          <h4 className="font-bold text-gray-900">💡 How Detection Works</h4>
                         </div>
-                        <div className="text-sm space-y-2 ${
-                          text-gray-600
-                        }">
+                        <div className="text-sm space-y-2 text-gray-600">
                           <p>• <strong>Location Analysis:</strong> The system reads the "Location" field from each incident</p>
                           <p>• <strong>Municipality Search:</strong> It searches for municipality names within the location text</p>
                           <p>• <strong>District Assignment:</strong> Each municipality is automatically assigned to its correct district</p>
@@ -4378,9 +4272,7 @@ Top Location: ${insights.topLocation}`);
                       bg-white/80
                     }">
                       <CardHeader>
-                        <CardTitle className="text-lg font-semibold transition-colors duration-300 ${
-                          text-gray-900
-                        }">Three Districts Overview</CardTitle>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">Three Districts Overview</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -4390,9 +4282,7 @@ Top Location: ${insights.topLocation}`);
                               <span className="font-semibold text-blue-700 dark:text-blue-300">1ST DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-blue-600 dark:text-blue-400">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                            <p className="text-sm transition-colors duration-300 ${
-                              text-gray-600
-                            }">Incidents</p>
+                            <p className="text-sm transition-colors duration-300 text-gray-600">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-blue-600 dark:text-blue-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -4410,9 +4300,7 @@ Top Location: ${insights.topLocation}`);
                               <span className="font-semibold text-green-700 dark:text-green-300">2ND DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-green-600 dark:text-green-400">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                            <p className="text-sm transition-colors duration-300 ${
-                              text-gray-600
-                            }">Incidents</p>
+                            <p className="text-sm transition-colors duration-300 text-gray-600">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-green-600 dark:text-green-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -4430,9 +4318,7 @@ Top Location: ${insights.topLocation}`);
                               <span className="font-semibold text-purple-700 dark:text-purple-300">3RD DISTRICT</span>
                             </div>
                             <p className="text-3xl font-bold text-purple-600 dark:text-purple-400">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                            <p className="text-sm transition-colors duration-300 ${
-                              text-gray-600
-                            }">Incidents</p>
+                            <p className="text-sm transition-colors duration-300 text-gray-600">Incidents</p>
                             <div className="mt-2 space-y-1">
                               <div className="text-xs text-purple-600 dark:text-purple-400">
                                 <p className="font-semibold">Detected Municipalities:</p>
@@ -5552,6 +5438,73 @@ Top Location: ${insights.topLocation}`);
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingIncident && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-red-100">
+                  <Trash2 className="h-6 w-6 text-red-600" />
+                </div>
+                <h3 className="text-xl font-bold text-gray-900">
+                  Delete Incident
+                </h3>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6">
+              <p className="text-gray-600 mb-4">
+                Are you sure you want to delete this incident? This action cannot be undone.
+              </p>
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm font-medium text-gray-900 mb-1">Incident Details:</p>
+                <p className="text-sm text-gray-600">
+                  <strong>Type:</strong> {deletingIncident.incidentType}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Location:</strong> {deletingIncident.location}
+                </p>
+                <p className="text-sm text-gray-600">
+                  <strong>Date:</strong> {deletingIncident.date}
+                </p>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-4 p-6 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletingIncident(null);
+                }}
+                className="px-6 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors duration-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await deleteIncident(deletingIncident.id);
+                    await loadIncidents();
+                    setShowDeleteModal(false);
+                    setDeletingIncident(null);
+                  } catch (error) {
+                    console.error('Error deleting incident:', error);
+                    alert('Error deleting incident. Please try again.');
+                  }
+                }}
+                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors duration-200"
+              >
+                Delete Incident
+              </button>
             </div>
           </div>
         </div>

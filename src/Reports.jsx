@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Layout from "./Layout";
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from ".
 import { Separator } from "./components/ui/separator";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { useData } from "./DataContext";
+import { useFirebase } from "./hooks/useFirebase";
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -32,7 +35,11 @@ import {
   Terminal,
   Radio,
   Activity,
-  MessageSquare
+  MessageSquare,
+  Clock,
+  Database,
+  Fish,
+  Trees
 } from "lucide-react";
 
 export default function Reports({ onLogout, onNavigate, currentPage }) {
@@ -56,6 +63,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Command Center Summary modal state
   const [showCommandCenterSummary, setShowCommandCenterSummary] = useState(false);
   const [summaryViewType, setSummaryViewType] = useState("monthly"); // "monthly" or "quarterly"
+  
+  // Action Center Summary modal state
+  const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
+  const [actionItems, setActionItems] = useState([]);
 
   // Municipalities by district mapping (matching I-Patroller structure)
   const municipalitiesByDistrict = {
@@ -71,6 +82,292 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.error('Logout error:', error);
     }
   };
+
+  // Translation and grammar correction function (from Action Center)
+  const translateAndCorrectGrammar = (text) => {
+    if (!text || typeof text !== 'string') return text;
+    
+    // Common Filipino to English translations for law enforcement actions
+    const translations = {
+      // Arrest related
+      'nahuli': 'arrested',
+      'naaresto': 'arrested', 
+      'nakuha': 'arrested',
+      'dinakip': 'arrested',
+      'nasakote': 'arrested',
+      'nakulong': 'arrested',
+      'kinuha': 'arrested',
+      
+      // Investigation related
+      'iniimbestigahan': 'under investigation',
+      'sinisiyasat': 'under investigation',
+      'tinitingnan': 'under investigation',
+      'pinag-aaralan': 'under investigation',
+      
+      // Pending related
+      'naghihintay': 'pending',
+      'pending pa': 'pending',
+      'hindi pa tapos': 'pending',
+      'patuloy': 'ongoing',
+      'tuloy-tuloy': 'ongoing',
+      
+      // Resolved related
+      'tapos na': 'resolved',
+      'natapos': 'resolved',
+      'naayos': 'resolved',
+      'naresolba': 'resolved',
+      'nakasuhan': 'filed charges',
+      'nasampa': 'filed charges',
+      
+      // Common words
+      'ang': 'the',
+      'sa': 'in',
+      'ng': 'of',
+      'na': 'already',
+      'pa': 'still',
+      'ay': 'is',
+      'mga': '',
+      'yung': 'the',
+      'nung': 'when',
+      'noong': 'on',
+      'kanina': 'earlier',
+      'kahapon': 'yesterday',
+      'ngayon': 'today',
+      'bukas': 'tomorrow'
+    };
+    
+    let result = text.toLowerCase().trim();
+    
+    // Apply translations
+    Object.entries(translations).forEach(([filipino, english]) => {
+      const regex = new RegExp(`\\b${filipino}\\b`, 'gi');
+      result = result.replace(regex, english);
+    });
+    
+    // Grammar corrections and improvements
+    result = result
+      .replace(/\s+/g, ' ') // Remove extra spaces
+      .replace(/\b(arrested|investigation|pending|resolved|ongoing)\b/gi, (match) => {
+        // Capitalize first letter of key status words
+        return match.charAt(0).toUpperCase() + match.slice(1).toLowerCase();
+      })
+      .replace(/^./, (match) => match.toUpperCase()) // Capitalize first letter
+      .replace(/\s+$/, '') // Remove trailing spaces
+      .replace(/^\s+/, ''); // Remove leading spaces
+    
+    // Handle common patterns
+    if (result.includes('arrested')) {
+      result = result.replace(/arrested.*/, 'Arrested');
+    }
+    
+    return result || text; // Return original if translation fails
+  };
+
+  // Comprehensive function to fetch ALL action data from Firestore (from Action Center)
+  const fetchAllActionData = useCallback(async () => {
+    if (!db) {
+      console.log('⚠️ Database not available');
+      return;
+    }
+
+    try {
+      console.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
+      
+      const allActionData = [];
+      
+      // List of possible collection names where action data might be stored
+      const possibleCollections = [
+        'actionReports',
+        'actionCenter', 
+        'actions',
+        'reports',
+        'actionData',
+        'departmentActions',
+        'pnpActions',
+        'agricultureActions',
+        'pgEnroActions'
+      ];
+      
+      console.log('📋 Checking collections:', possibleCollections);
+      
+      // Check each possible collection
+      for (const collectionName of possibleCollections) {
+        try {
+          console.log(`\n🔍 Checking collection: ${collectionName}`);
+          const collectionRef = collection(db, collectionName);
+          const snapshot = await getDocs(collectionRef);
+          
+          console.log(`📊 ${collectionName}: ${snapshot.size} documents found`);
+          
+          if (snapshot.size > 0) {
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              console.log(`📄 ${collectionName}/${doc.id}:`, Object.keys(data));
+              
+              // Handle different data structures
+              if (data.data && Array.isArray(data.data)) {
+                // Month-based structure with data array
+                console.log(`📅 Month-based document with ${data.data.length} reports`);
+                data.data.forEach((report, index) => {
+                  allActionData.push({
+                    ...report,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'month-based',
+                    reportIndex: index
+                  });
+                });
+              } else if (data.actions && Array.isArray(data.actions)) {
+                // Actions array structure
+                console.log(`📋 Actions array with ${data.actions.length} items`);
+                data.actions.forEach((action, index) => {
+                  allActionData.push({
+                    ...action,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'actions-array',
+                    reportIndex: index
+                  });
+                });
+              } else if (data.reports && Array.isArray(data.reports)) {
+                // Reports array structure
+                console.log(`📋 Reports array with ${data.reports.length} items`);
+                data.reports.forEach((report, index) => {
+                  allActionData.push({
+                    ...report,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'reports-array',
+                    reportIndex: index
+                  });
+                });
+              } else {
+                // Individual document structure
+                console.log(`📄 Individual document structure`);
+                allActionData.push({
+                  ...data,
+                  id: doc.id,
+                  sourceCollection: collectionName,
+                  sourceDocument: doc.id,
+                  sourceType: 'individual'
+                });
+              }
+            });
+          }
+        } catch (collectionError) {
+          console.log(`⚠️ Collection ${collectionName} not accessible:`, collectionError.message);
+        }
+      }
+      
+      console.log(`\n✅ TOTAL RAW DATA COLLECTED: ${allActionData.length} items`);
+      
+      if (allActionData.length > 0) {
+        console.log('📄 Sample raw data:', allActionData.slice(0, 3));
+        
+        // Transform and standardize all collected data
+        const transformedData = allActionData
+          .map((item, index) => {
+            // Handle different date formats
+            let dateValue = new Date();
+            if (item.when) {
+              if (item.when.toDate && typeof item.when.toDate === 'function') {
+                dateValue = item.when.toDate(); // Firestore Timestamp
+              } else if (item.when instanceof Date) {
+                dateValue = item.when;
+              } else if (typeof item.when === 'string' || typeof item.when === 'number') {
+                dateValue = new Date(item.when);
+              }
+            } else if (item.date) {
+              if (item.date.toDate && typeof item.date.toDate === 'function') {
+                dateValue = item.date.toDate();
+              } else {
+                dateValue = new Date(item.date);
+              }
+            } else if (item.createdAt) {
+              dateValue = new Date(item.createdAt);
+            }
+            
+            return {
+              id: item.id || `action_${index}_${Date.now()}`,
+              department: item.department || item.dept || item.agency || null,
+              municipality: item.municipality || item.city || item.location || null,
+              district: item.district || item.area || null,
+              what: item.what || item.action || item.description || item.activity || null,
+              when: dateValue,
+              where: item.where || item.place || item.venue || item.location || null,
+              actionTaken: translateAndCorrectGrammar(item.actionTaken || item.status || item.result || 'Pending'),
+              // Additional metadata
+              sourceCollection: item.sourceCollection,
+              sourceDocument: item.sourceDocument,
+              sourceType: item.sourceType,
+              reportIndex: item.reportIndex,
+              // Keep original data for debugging
+              originalData: item
+            };
+          })
+          .filter(item => {
+            // Filter out entries with missing critical information
+            const hasValidDepartment = item.department && 
+              item.department.toLowerCase() !== 'unknown' && 
+              item.department.trim() !== '';
+            
+            const hasValidMunicipality = item.municipality && 
+              item.municipality.toLowerCase() !== 'unknown' && 
+              item.municipality.trim() !== '';
+            
+            const hasValidDistrict = item.district && 
+              item.district.toLowerCase() !== 'unknown' && 
+              item.district.trim() !== '';
+            
+            const hasValidWhat = item.what && 
+              item.what.toLowerCase() !== 'no description' && 
+              item.what.trim() !== '';
+            
+            const hasValidWhere = item.where && 
+              item.where.toLowerCase() !== 'unknown location' && 
+              item.where.toLowerCase() !== 'unknown' && 
+              item.where.trim() !== '';
+            
+            // Only include entries that have valid data for critical fields
+            return hasValidDepartment && hasValidMunicipality && hasValidDistrict && hasValidWhat && hasValidWhere;
+          })
+          .map(item => {
+            // Set proper default values for remaining items
+            return {
+              ...item,
+              department: item.department || 'Not Specified',
+              municipality: item.municipality || 'Not Specified',
+              district: item.district || 'Not Specified',
+              what: item.what || 'No description available',
+              where: item.where || 'Location not specified'
+            };
+          });
+        
+        // Sort by date (newest first)
+        transformedData.sort((a, b) => new Date(b.when) - new Date(a.when));
+        
+        console.log('✅ DATA TRANSFORMATION COMPLETED');
+        console.log(`📊 Final dataset: ${transformedData.length} action reports (unknown entries filtered out)`);
+        console.log('📄 Sample transformed data:', transformedData.slice(0, 2));
+        
+        setActionItems(transformedData);
+      } else {
+        console.log('⚠️ NO ACTION DATA FOUND IN ANY COLLECTION');
+        setActionItems([]);
+      }
+      
+    } catch (error) {
+      console.error('❌ COMPREHENSIVE FETCH ERROR:', error);
+      setActionItems([]);
+    } finally {
+      console.log('🏁 COMPREHENSIVE ACTION DATA FETCH COMPLETED\n');
+    }
+  }, [db]);
+
+  // Fetch Action Center data on component mount
+  useEffect(() => {
+    fetchAllActionData();
+  }, [fetchAllActionData]);
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -1978,10 +2275,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       color: "from-purple-500 to-purple-600",
       reports: [
         {
-          name: "Action Center Report",
+          name: "Action Center Reports",
           description: "Department statistics and action reports matching Action Center page",
-          action: generateActionCenterReport,
-          formats: ["PDF"],
+          actions: [
+            {
+              name: "Generate Report",
+              action: generateActionCenterReport,
+              format: "PDF",
+              priority: "high"
+            },
+            {
+              name: "Summary Insights",
+              action: () => setShowActionCenterSummary(true),
+              format: "Modal",
+              priority: "high"
+            }
+          ],
+          formats: ["PDF", "Modal"],
           priority: "high"
         }
       ]
@@ -2213,7 +2523,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                     </>
                                   ) : (
                                     <>
-                                      <Printer className="w-4 h-4 mr-2" />
+                                      {actionItem.name === "Summary Insights" ? (
+                                        <Activity className="w-4 h-4 mr-2" />
+                                      ) : actionItem.name === "Export to PDF" ? (
+                                        <Download className="w-4 h-4 mr-2" />
+                                      ) : actionItem.name === "View Summary" ? (
+                                        <BarChart3 className="w-4 h-4 mr-2" />
+                                      ) : (
+                                        <Printer className="w-4 h-4 mr-2" />
+                                      )}
                                       {actionItem.name}
                                     </>
                                   )}
@@ -2241,7 +2559,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                               ) : (
                                 <>
                                   <Printer className="w-4 h-4 mr-2" />
-                                  Generate
+                                  Generate Report
                                 </>
                               )}
                             </Button>
@@ -2845,6 +3163,135 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Action Center Summary Insights Modal */}
+        {showActionCenterSummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Activity className="w-5 h-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Action Center Summary Insights</h3>
+                    <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowActionCenterSummary(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+              
+              {/* Content */}
+              <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold text-blue-800">Total Actions</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">{actionItems.length.toLocaleString()}</p>
+                  </div>
+                  
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-5 h-5 text-red-600" />
+                      <h4 className="font-semibold text-red-800">Arrested</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-red-600">
+                      {actionItems.filter(item => item.actionTaken === 'Arrested').length.toLocaleString()}
+                    </p>
+                  </div>
+                  
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                      <h4 className="font-semibold text-yellow-800">Pending</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {actionItems.filter(item => item.actionTaken !== 'Arrested').length.toLocaleString()}
+                    </p>
+                  </div>
+                  
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-purple-600" />
+                      <h4 className="font-semibold text-purple-800">Success Rate</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {actionItems.length > 0 ? Math.round((actionItems.filter(item => item.actionTaken === 'Arrested').length / actionItems.length) * 100) : 0}%
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Department Breakdown */}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Database className="w-4 h-4" />
+                    Department Breakdown
+                  </h4>
+                  <div className="space-y-3">
+                    {['pnp', 'agriculture', 'pg-enro'].map(dept => {
+                      const deptActions = actionItems.filter(item => item.department === dept);
+                      const percentage = actionItems.length > 0 ? Math.round((deptActions.length / actionItems.length) * 100) : 0;
+                      return (
+                        <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium capitalize flex items-center gap-2">
+                            {dept === 'pnp' && <Shield className="w-4 h-4 text-red-600" />}
+                            {dept === 'agriculture' && <Fish className="w-4 h-4 text-green-600" />}
+                            {dept === 'pg-enro' && <Trees className="w-4 h-4 text-emerald-600" />}
+                            {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">{percentage}%</span>
+                            <span className="font-semibold">{deptActions.length} actions</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                
+                {/* District Breakdown */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold mb-2 text-blue-800">District Distribution</h4>
+                  <div className="space-y-2">
+                    {['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'].map(district => {
+                      const districtActions = actionItems.filter(item => item.district === district);
+                      const percentage = actionItems.length > 0 ? Math.round((districtActions.length / actionItems.length) * 100) : 0;
+                      return (
+                        <div key={district} className="flex items-center justify-between text-sm">
+                          <span className="text-blue-700 font-medium">{district}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-600">{percentage}%</span>
+                            <span className="font-semibold text-blue-800">{districtActions.length}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-200">
+                <Button 
+                  onClick={() => setShowActionCenterSummary(false)} 
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close Summary
+                </Button>
               </div>
             </div>
           </div>

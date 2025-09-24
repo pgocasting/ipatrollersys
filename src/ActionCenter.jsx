@@ -67,7 +67,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
-  const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [showMonthlyBreakdownModal, setShowMonthlyBreakdownModal] = useState(false);
   
   // Form state for adding/editing actions
@@ -642,9 +641,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     showSuccess('Report exported successfully!');
   };
 
-  const handleSummaryInsights = () => {
-    setShowSummaryModal(true);
-  };
 
   const formatDate = (date) => {
     return date.toLocaleDateString('en-US', {
@@ -683,13 +679,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 >
                   <Plus className="w-4 h-4 text-black" />
                   <span>Add New Action</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleSummaryInsights}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
-                >
-                  <Activity className="w-4 h-4 text-black" />
-                  <span>Summary Insights</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setShowMonthlyBreakdownModal(true)}
@@ -2072,123 +2061,6 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         </div>
       )}
 
-      {/* Summary Insights Modal */}
-      {showSummaryModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Activity className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Action Center Summary Insights</h3>
-                  <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowSummaryModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-            
-            {/* Content */}
-            <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
-              {/* Key Metrics Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-semibold text-blue-800">Total Actions</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">{totalActions.toLocaleString()}</p>
-                </div>
-                
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-5 h-5 text-red-600" />
-                    <h4 className="font-semibold text-red-800">Arrested</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-red-600">{arrestedActions.toLocaleString()}</p>
-                </div>
-                
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                    <h4 className="font-semibold text-yellow-800">Pending</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-600">{pendingActions.toLocaleString()}</p>
-                </div>
-                
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-5 h-5 text-purple-600" />
-                    <h4 className="font-semibold text-purple-800">Success Rate</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {totalActions > 0 ? Math.round((arrestedActions / totalActions) * 100) : 0}%
-                  </p>
-                </div>
-              </div>
-              
-              {/* Department Breakdown */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Department Breakdown
-                </h4>
-                <div className="space-y-3">
-                  {['pnp', 'agriculture', 'pg-enro'].map(dept => {
-                    const deptActions = actionItems.filter(item => item.department === dept);
-                    const percentage = totalActions > 0 ? Math.round((deptActions.length / totalActions) * 100) : 0;
-                    return (
-                      <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
-                        <span className="font-medium capitalize">
-                          {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">{percentage}%</span>
-                          <span className="font-semibold">{deptActions.length} actions</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Monthly Filter Info */}
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold mb-2 text-blue-800">Current Filter</h4>
-                <p className="text-sm text-blue-700">
-                  Showing data for: {selectedMonth === 'all' ? 'All Months' : 
-                  ['January', 'February', 'March', 'April', 'May', 'June',
-                   'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
-                </p>
-                <p className="text-sm text-blue-700">
-                  Department: {activeTab === 'all' ? 'All Departments' : activeTab.toUpperCase()}
-                </p>
-                <p className="text-sm text-blue-700">
-                  District: {selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}
-                </p>
-              </div>
-            </div>
-            
-            {/* Footer */}
-            <div className="p-6 border-t border-gray-200">
-              <Button 
-                onClick={() => setShowSummaryModal(false)} 
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Close Summary
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </Layout>
   );
