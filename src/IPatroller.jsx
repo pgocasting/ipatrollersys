@@ -1376,44 +1376,48 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 { month: "long", year: "numeric" },
               )} Patrol Data ({filteredData.length} municipalities)
             </CardTitle>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setActiveTab("daily")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
-                  activeTab === "daily"
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Calendar className="w-4 h-4" />
-                Daily Counts
-              </button>
-              <button
-                onClick={() => setActiveTab("status")}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
-                  activeTab === "status"
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                Status
-              </button>
-              <button
-                onClick={() => setShowTopPerformersModal(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
-              >
-                <Target className="w-4 h-4" />
-                Top Performers
-              </button>
-              <button
-                onClick={() => syncToFirestore()}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Save className="w-4 h-4 text-green-600" />
-                Save Data
-              </button>
+            <div className="flex items-center justify-between w-full">
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setActiveTab("daily")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                    activeTab === "daily"
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <Calendar className="w-4 h-4" />
+                  Daily Counts
+                </button>
+                <button
+                  onClick={() => setActiveTab("status")}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
+                    activeTab === "status"
+                      ? 'bg-white text-blue-600 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  Status
+                </button>
+                <button
+                  onClick={() => setShowTopPerformersModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
+                >
+                  <Target className="w-4 h-4" />
+                  Top Performers
+                </button>
+              </div>
+              <div className="ml-auto">
+                <button
+                  onClick={() => syncToFirestore()}
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  <Save className="w-4 h-4" />
+                  Save Data
+                </button>
+              </div>
             </div>
             
             {/* Required Counts Information */}

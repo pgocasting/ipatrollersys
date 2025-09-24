@@ -2750,16 +2750,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               action: () => setShowIPatrollerPreview(true),
               format: "Modal",
               priority: "high"
-            },
-            {
-              name: "Generate PDF",
-              action: () => {
-                loadIPatrollerData().then(() => {
-                  generateIPatrollerMonthlySummaryReport();
-                });
-              },
-              format: "PDF",
-              priority: "high"
             }
           ],
           formats: ["PDF", "Modal"],
@@ -3069,7 +3059,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                     </>
                                   ) : (
                                     <>
-                                      {actionItem.name === "Summary Insights" ? (
+                                      {actionItem.name === "Generate Report" ? (
+                                        <FileText className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Daily Summary" ? (
+                                        <Calendar className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Preview Report" ? (
+                                        <Eye className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Summary Insights" ? (
                                         <Activity className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "Export to PDF" ? (
                                         <Download className="w-3 h-3 mr-1" />
