@@ -31,7 +31,11 @@ import {
   AlertTriangle,
   List,
   Building2,
-  MapPin
+  MapPin,
+  Mountain,
+  Shield,
+  Pickaxe,
+  FileCheck
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -355,6 +359,28 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const districtStats = getDistrictStats();
 
+  // Quarry-specific data for quarry-monitoring users
+  const getQuarryData = () => {
+    // Sample quarry data - in real implementation, this would come from API
+    return {
+      totalSites: 24,
+      activeSites: 18,
+      compliantSites: 15,
+      violations: 3,
+      sites: [
+        { name: 'Bagac Quarry Site A', operator: 'Bataan Mining Corp', location: 'Bagac, Bataan', status: 'Active', permitStatus: 'Valid', lastInspection: '2024-01-15', compliance: 'Compliant' },
+        { name: 'Morong Quarry Site B', operator: 'Peninsula Aggregates', location: 'Morong, Bataan', status: 'Active', permitStatus: 'Valid', lastInspection: '2024-01-10', compliance: 'Compliant' },
+        { name: 'Dinalupihan Quarry C', operator: 'Central Luzon Mining', location: 'Dinalupihan, Bataan', status: 'Inactive', permitStatus: 'Expired', lastInspection: '2023-12-20', compliance: 'Non-Compliant' },
+        { name: 'Hermosa Quarry Site D', operator: 'Bataan Stone Works', location: 'Hermosa, Bataan', status: 'Active', permitStatus: 'Valid', lastInspection: '2024-01-12', compliance: 'Compliant' },
+        { name: 'Orani Quarry Site E', operator: 'Provincial Quarry Inc', location: 'Orani, Bataan', status: 'Active', permitStatus: 'Pending', lastInspection: '2024-01-08', compliance: 'Under Review' }
+      ],
+      monthlyProduction: [1200, 1350, 1100, 1400, 1250, 1300, 1450, 1380, 1200, 1320, 1280, 1400],
+      complianceHistory: [85, 88, 82, 90, 87, 85, 92, 89, 86, 88, 91, 89]
+    };
+  };
+
+  const quarryData = getQuarryData();
+
   if (dataLoading) {
     return (
       <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
@@ -378,14 +404,86 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-gray-500 mt-2">
-              Overview of IPatroller system performance based on yesterday's patrol data
+              {userAccessLevel === 'quarry-monitoring' 
+                ? 'Overview of quarry site operations and compliance monitoring'
+                : 'Overview of IPatroller system performance based on yesterday\'s patrol data'
+              }
             </p>
           </div>
           
         </div>
 
         {/* Quick Stats */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+        {userAccessLevel === 'quarry-monitoring' ? (
+          /* Quarry Monitoring Stats */
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Sites</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {quarryData.totalSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Mountain className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Active Sites</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {quarryData.activeSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Compliant</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {quarryData.compliantSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <Shield className="w-6 h-6 text-emerald-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Violations</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {quarryData.violations.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          /* Regular Dashboard Stats */
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
           <Card className="bg-white shadow-sm border border-gray-200">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -453,10 +551,168 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </Card>
             </>
           )}
-        </div>
+          </div>
+        )}
 
         {/* Analytics Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {userAccessLevel === 'quarry-monitoring' ? (
+          /* Quarry Monitoring Analytics */
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Quarry Sites List */}
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Mountain className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Quarry Sites</CardTitle>
+                    <p className="text-sm text-gray-600">Active quarry operations and compliance status</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {quarryData.sites.map((site, index) => (
+                    <div key={index} className={`p-4 rounded-lg border transition-colors ${
+                      site.compliance === 'Compliant' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
+                      site.compliance === 'Non-Compliant' ? 'bg-red-50 border-red-200 hover:bg-red-100' :
+                      'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
+                    }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Pickaxe className={`w-4 h-4 ${
+                              site.status === 'Active' ? 'text-green-600' : 'text-gray-400'
+                            }`} />
+                            <h3 className="text-sm font-semibold text-gray-900">{site.name}</h3>
+                          </div>
+                          <p className="text-xs text-gray-600 mb-1">{site.operator}</p>
+                          <p className="text-xs text-gray-500 mb-2">{site.location}</p>
+                          <div className="flex items-center gap-3">
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              site.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {site.status}
+                            </span>
+                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                              site.permitStatus === 'Valid' ? 'bg-blue-100 text-blue-700' :
+                              site.permitStatus === 'Expired' ? 'bg-red-100 text-red-700' :
+                              'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {site.permitStatus}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right flex flex-col items-end">
+                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-1 ${
+                            site.compliance === 'Compliant' ? 'bg-green-100 text-green-700' :
+                            site.compliance === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            <Shield className={`w-3 h-3 ${
+                              site.compliance === 'Compliant' ? 'text-green-600' :
+                              site.compliance === 'Non-Compliant' ? 'text-red-600' :
+                              'text-yellow-600'
+                            }`} />
+                            <span>{site.compliance}</span>
+                          </div>
+                          <p className="text-xs text-gray-500">Last: {new Date(site.lastInspection).toLocaleDateString()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Compliance Overview */}
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Compliance Overview</CardTitle>
+                    <p className="text-sm text-gray-600">Environmental and operational compliance status</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="space-y-4">
+                  {/* Compliance Rate */}
+                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-emerald-800">Overall Compliance Rate</h3>
+                      <span className="text-2xl font-bold text-emerald-600">
+                        {Math.round((quarryData.compliantSites / quarryData.totalSites) * 100)}%
+                      </span>
+                    </div>
+                    <div className="w-full bg-emerald-200 rounded-full h-2">
+                      <div 
+                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${(quarryData.compliantSites / quarryData.totalSites) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+
+                  {/* Permit Status Breakdown */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Permit Status Breakdown</h3>
+                    <div className="grid grid-cols-1 gap-2">
+                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
+                          <span className="text-sm text-gray-700">Valid Permits</span>
+                        </div>
+                        <span className="text-sm font-semibold text-blue-600">18</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
+                          <span className="text-sm text-gray-700">Pending Renewal</span>
+                        </div>
+                        <span className="text-sm font-semibold text-yellow-600">3</span>
+                      </div>
+                      <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <div className="w-3 h-3 bg-red-600 rounded-full"></div>
+                          <span className="text-sm text-gray-700">Expired</span>
+                        </div>
+                        <span className="text-sm font-semibold text-red-600">3</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Recent Inspections */}
+                  <div className="space-y-3">
+                    <h3 className="text-sm font-semibold text-gray-900">Recent Inspections</h3>
+                    <div className="space-y-2">
+                      {quarryData.sites.slice(0, 3).map((site, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                          <div>
+                            <p className="text-xs font-medium text-gray-900">{site.name}</p>
+                            <p className="text-xs text-gray-500">{new Date(site.lastInspection).toLocaleDateString()}</p>
+                          </div>
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                            site.compliance === 'Compliant' ? 'bg-green-100 text-green-700' :
+                            site.compliance === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
+                            'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {site.compliance}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          /* Regular Dashboard Analytics */
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Municipality Lists */}
           <Card className="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-xl">
             <CardHeader className="p-6 pb-4">
@@ -621,7 +877,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        )}
 
       </div>
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />

@@ -10,7 +10,7 @@ import { Separator } from "./components/ui/separator";
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
 import { useData } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc } from 'firebase/firestore';
 import { db } from './firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -39,7 +39,11 @@ import {
   Clock,
   Database,
   Fish,
-  Trees
+  Trees,
+  Mountain,
+  Calendar,
+  ChevronDown,
+  Eye
 } from "lucide-react";
 
 export default function Reports({ onLogout, onNavigate, currentPage }) {
@@ -67,6 +71,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Action Center Summary modal state
   const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
   const [actionItems, setActionItems] = useState([]);
+  
+  // IPatroller Daily Summary modal state
+  const [showIPatrollerDailySummary, setShowIPatrollerDailySummary] = useState(false);
+  const [ipatrollerSelectedDayIndex, setIpatrollerSelectedDayIndex] = useState(0);
+  const [ipatrollerPatrolData, setIpatrollerPatrolData] = useState([]);
+  const [ipatrollerSelectedMonth, setIpatrollerSelectedMonth] = useState(new Date().getMonth());
+  const [ipatrollerSelectedYear, setIpatrollerSelectedYear] = useState(new Date().getFullYear());
+  
+  // IPatroller Preview Report modal state
+  const [showIPatrollerPreview, setShowIPatrollerPreview] = useState(false);
+  const [ipatrollerPreviewData, setIpatrollerPreviewData] = useState(null);
+  const [isGeneratingIPatrollerReport, setIsGeneratingIPatrollerReport] = useState(false);
 
   // Municipalities by district mapping (matching I-Patroller structure)
   const municipalitiesByDistrict = {
@@ -368,6 +384,360 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     fetchAllActionData();
   }, [fetchAllActionData]);
+
+  // IPatroller Daily Summary functions (moved from IPatroller.jsx)
+  
+  // Generate dates for selected month and year
+  const generateDates = (month, year) => {
+    const dates = [];
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const currentDate = new Date();
+    const isCurrentMonth =
+      month === currentDate.getMonth() && year === currentDate.getFullYear();
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const isCurrentDay = isCurrentMonth && day === currentDate.getDate();
+      dates.push({
+        date: date,
+        dayName: date.toLocaleDateString("en-US", { weekday: "short" }),
+        dayNumber: day,
+        fullDate: date.toLocaleDateString("en-US", {
+          weekday: "short",
+          month: "short",
+          day: "numeric",
+        }),
+        isCurrentDay: isCurrentDay,
+      });
+    }
+    return dates;
+  };
+
+  // Calculate daily summary data for a specific day
+  const getDailySummaryData = (dayIndex) => {
+    const summaryData = {};
+    
+    Object.keys(municipalitiesByDistrict).forEach(district => {
+      summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
+        const municipalityData = ipatrollerPatrolData.find(item => item.municipality === municipality);
+        const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
+        const isActive = dailyCount >= 5;
+        
+        return {
+          municipality,
+          dailyCount,
+          isActive,
+          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
+        };
+      });
+    });
+
+    return summaryData;
+  };
+
+  // Load patrol data from Firestore for IPatroller Daily Summary
+  const loadIPatrollerData = useCallback(async () => {
+    try {
+      const monthYearId = `${String(ipatrollerSelectedMonth + 1).padStart(2, "0")}-${ipatrollerSelectedYear}`;
+      
+      const monthDocRef = doc(db, 'patrolData', monthYearId);
+      const municipalitiesRef = collection(monthDocRef, 'municipalities');
+      const querySnapshot = await getDocs(municipalitiesRef);
+      
+      const firestoreData = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          firestoreData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
+
+      setIpatrollerPatrolData(firestoreData);
+    } catch (error) {
+      console.error('Error loading IPatroller data:', error);
+      setIpatrollerPatrolData([]);
+    }
+  }, [ipatrollerSelectedMonth, ipatrollerSelectedYear]);
+
+  // Load IPatroller data when modals are shown
+  useEffect(() => {
+    if (showIPatrollerDailySummary) {
+      loadIPatrollerData();
+    }
+  }, [showIPatrollerDailySummary, loadIPatrollerData]);
+
+  useEffect(() => {
+    if (showIPatrollerPreview) {
+      loadIPatrollerData();
+    }
+  }, [showIPatrollerPreview, loadIPatrollerData]);
+
+  // Generate preview data when patrol data is loaded and preview modal is shown
+  useEffect(() => {
+    if (showIPatrollerPreview && ipatrollerPatrolData.length > 0) {
+      generateIPatrollerPreviewData();
+    }
+  }, [showIPatrollerPreview, ipatrollerPatrolData]);
+
+  // Barangay counts per municipality (from IPatroller.jsx)
+  const barangayCounts = {
+    "Abucay": 9,
+    "Orani": 29,
+    "Samal": 14,
+    "Hermosa": 23,
+    "Balanga City": 25,
+    "Pilar": 19,
+    "Orion": 23,
+    "Limay": 12,
+    "Bagac": 14,
+    "Dinalupihan": 46,
+    "Mariveles": 18,
+    "Morong": 5
+  };
+
+  // Calculate overall summary (matching IPatroller logic)
+  const calculateIPatrollerOverallSummary = () => {
+    if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
+      return {
+        totalPatrols: 0,
+        totalActive: 0,
+        totalInactive: 0,
+        avgActivePercentage: 0,
+        municipalityCount: 0
+      };
+    }
+
+    // Calculate active and inactive days (matching IPatroller logic)
+    const { activeDays, inactiveDays } = ipatrollerPatrolData.reduce((acc, municipality) => {
+      municipality.data.forEach((patrols) => {
+        if (patrols !== null && patrols !== undefined && patrols !== '') {
+          if (patrols >= 5) {
+            acc.activeDays++;
+          } else {
+            acc.inactiveDays++;
+          }
+        }
+      });
+      return acc;
+    }, { activeDays: 0, inactiveDays: 0 });
+
+    const totalPatrols = ipatrollerPatrolData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0);
+    const avgActivePercentage = (activeDays + inactiveDays) > 0 
+      ? Math.round((activeDays / (activeDays + inactiveDays)) * 100)
+      : 0;
+
+    return {
+      totalPatrols,
+      totalActive: activeDays,
+      totalInactive: inactiveDays,
+      avgActivePercentage,
+      municipalityCount: ipatrollerPatrolData.length
+    };
+  };
+
+  // Get district summary (matching IPatroller logic)
+  const getIPatrollerDistrictSummary = (district) => {
+    const districtData = ipatrollerPatrolData.filter(
+      (item) => item.district === district,
+    );
+    const totalPatrols = districtData.reduce(
+      (sum, item) => sum + (item.totalPatrols || 0),
+      0,
+    );
+    const totalActive = districtData.reduce(
+      (sum, item) => sum + (item.activeDays || 0),
+      0,
+    );
+    const totalInactive = districtData.reduce(
+      (sum, item) => sum + (item.inactiveDays || 0),
+      0,
+    );
+    const avgActivePercentage =
+      districtData.length > 0
+        ? Math.round(
+            districtData.reduce((sum, item) => sum + (item.activePercentage || 0), 0) /
+              districtData.length,
+          )
+        : 0;
+    return {
+      totalPatrols,
+      totalActive,
+      totalInactive,
+      avgActivePercentage,
+      municipalityCount: districtData.length,
+    };
+  };
+
+  // Generate preview data for the report (moved from IPatroller.jsx)
+  const generateIPatrollerPreviewData = () => {
+    const selectedDates = generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear);
+    const overallSummary = calculateIPatrollerOverallSummary();
+    
+    // Group data by district
+    const groupedData = ipatrollerPatrolData.reduce((acc, item) => {
+      if (!acc[item.district]) {
+        acc[item.district] = [];
+      }
+      acc[item.district].push(item);
+      return acc;
+    }, {});
+
+    // Calculate additional statistics based on daily counts
+    const totalDaysInMonth = selectedDates.length;
+    const totalPossibleDays = ipatrollerPatrolData.length * totalDaysInMonth;
+    const daysWithData = ipatrollerPatrolData.reduce((acc, municipality) => {
+      return acc + municipality.data.filter(day => day !== null && day !== undefined && day !== '').length;
+    }, 0);
+
+    const previewData = {
+      title: "I-Patroller Monthly Summary Report",
+      generatedDate: new Date().toLocaleDateString(),
+      month: months[ipatrollerSelectedMonth],
+      year: ipatrollerSelectedYear,
+      reportPeriod: new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      dataSource: "Based on IPatroller Daily Counts",
+      totalDaysInMonth,
+      totalPossibleDays,
+      daysWithData,
+      dataCompleteness: totalPossibleDays > 0 ? Math.round((daysWithData / totalPossibleDays) * 100) : 0,
+      overallSummary: overallSummary,
+      districtSummary: Object.keys(groupedData).map(district => ({
+        district,
+        ...getIPatrollerDistrictSummary(district)
+      })),
+      municipalityPerformance: ipatrollerPatrolData.map(item => ({
+        municipality: item.municipality,
+        district: item.district,
+        requiredBarangays: barangayCounts[item.municipality] || 0,
+        totalPatrols: item.totalPatrols || 0,
+        activeDays: item.activeDays || 0,
+        inactiveDays: item.inactiveDays || 0,
+        activePercentage: item.activePercentage || 0,
+        dailyData: item.data || [] // Include daily data for reference
+      }))
+    };
+
+    setIpatrollerPreviewData(previewData);
+    setShowIPatrollerPreview(true);
+  };
+
+  // Generate Monthly Summary Report (moved from IPatroller.jsx)
+  const generateIPatrollerMonthlySummaryReport = () => {
+    setIsGeneratingIPatrollerReport(true);
+    
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const selectedDates = generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear);
+      const overallSummary = calculateIPatrollerOverallSummary();
+      
+      // Group data by district
+      const groupedData = ipatrollerPatrolData.reduce((acc, item) => {
+        if (!acc[item.district]) {
+          acc[item.district] = [];
+        }
+        acc[item.district].push(item);
+        return acc;
+      }, {});
+      
+      // Header - Centered with tighter top spacing
+      doc.setFontSize(20);
+      doc.setFont('helvetica', 'bold');
+      const pageWidth = doc.internal.pageSize.width;
+      const titleWidth = doc.getTextWidth('I-Patroller Monthly Summary Report');
+      doc.text('I-Patroller Monthly Summary Report', (pageWidth - titleWidth) / 2, 20);
+      
+      // Report details - tighter vertical spacing
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
+      const monthText = `Month: ${months[ipatrollerSelectedMonth]} ${ipatrollerSelectedYear}`;
+      const periodText = `Report Period: ${new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+      const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
+      
+      const generatedWidth = doc.getTextWidth(generatedText);
+      const monthWidth = doc.getTextWidth(monthText);
+      const periodWidth = doc.getTextWidth(periodText);
+      const dataSourceWidth = doc.getTextWidth(dataSourceText);
+      
+      doc.text(generatedText, (pageWidth - generatedWidth) / 2, 30);
+      doc.text(monthText, (pageWidth - monthWidth) / 2, 36);
+      doc.text(periodText, (pageWidth - periodWidth) / 2, 42);
+      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 48);
+      
+      // District Summary Table - matching preview format
+      if (Object.keys(groupedData).length > 0) {
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('District Summary', 20, 55);
+        
+        const districtTableData = Object.keys(groupedData).map(district => {
+          const summary = getIPatrollerDistrictSummary(district);
+          return [
+            district,
+            summary.municipalityCount.toString(),
+            summary.totalPatrols.toLocaleString(),
+            summary.totalActive.toString(),
+            summary.totalInactive.toString(),
+            `${summary.avgActivePercentage}%`
+          ];
+        });
+        
+        autoTable(doc, {
+          head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
+          body: districtTableData,
+          startY: 60,
+          styles: {
+            fontSize: 9,
+            cellPadding: 2,
+            overflow: 'linebreak',
+            halign: 'left',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: [59, 130, 246], // Blue background like preview
+            fontStyle: 'bold',
+            textColor: [255, 255, 255],
+            fontSize: 10,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252] // Light gray alternating rows like preview
+          },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'center' },
+            3: { cellWidth: 'auto', halign: 'center' },
+            4: { cellWidth: 'auto', halign: 'center' },
+            5: { cellWidth: 'auto', halign: 'center' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          showHead: 'everyPage',
+          pageBreak: 'auto',
+          didDrawPage: function (data) {
+            // Add page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            doc.setFontSize(8);
+            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
+          }
+        });
+      }
+      
+      // Save the PDF
+      doc.save(`ipatroller-monthly-summary-${months[ipatrollerSelectedMonth]}-${ipatrollerSelectedYear}.pdf`);
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+    } finally {
+      setIsGeneratingIPatrollerReport(false);
+    }
+  };
 
   const months = [
     "January", "February", "March", "April", "May", "June",
@@ -824,6 +1194,135 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
     
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+  };
+
+  // Quarry Site Monitoring Report
+  const generateQuarrySiteMonitoringReport = () => {
+    const paperConfig = getPaperConfig(paperSize);
+    const doc = new jsPDF('p', 'mm', paperConfig.format);
+    
+    // Calculate center position
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const centerX = pageWidth / 2;
+    
+    // Add logo/header section
+    doc.setFillColor(251, 146, 60); // Orange background
+    doc.rect(0, 0, pageWidth, 40, 'F');
+    
+    // Main title - centered
+    doc.setFontSize(24);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(255, 255, 255);
+    doc.text('Quarry Site Monitoring Report', centerX, 25, { align: 'center' });
+    
+    // Reset text color
+    doc.setTextColor(0, 0, 0);
+    
+    // Report info section with better organization
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Report Information', centerX, 60, { align: 'center' });
+    
+    // Info box
+    const infoY = 70;
+    doc.setFillColor(248, 250, 252);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
+    doc.setDrawColor(251, 146, 60);
+    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    
+    // Report details - organized in two columns
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
+    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    
+    // Paper size indicator - right aligned
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
+    
+    // Quarry Site Statistics section with better design
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Quarry Site Statistics', centerX, 130, { align: 'center' });
+    
+    // Statistics box - centered and properly sized
+    const statsY = 140;
+    const boxWidth = pageWidth - (paperConfig.margin * 2);
+    const boxHeight = 60;
+    
+    doc.setFillColor(255, 247, 237);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
+    doc.setDrawColor(251, 146, 60);
+    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
+    
+    // Sample quarry statistics in organized layout - centered
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'normal');
+    
+    const textStartX = paperConfig.margin + 15;
+    const lineHeight = 12;
+    
+    doc.text(`• Total Quarry Sites: 24`, textStartX, statsY + 10);
+    doc.text(`• Active Sites: 18`, textStartX, statsY + 10 + lineHeight);
+    doc.text(`• Compliant Sites: 15`, textStartX, statsY + 10 + (lineHeight * 2));
+    doc.text(`• Violations: 3`, textStartX, statsY + 10 + (lineHeight * 3));
+    doc.text(`• Compliance Rate: 83.3%`, textStartX, statsY + 10 + (lineHeight * 4));
+    
+    // Quarry Sites Table with better design
+    const quarrySites = [
+      ['Bataan Quarry Corp.', 'Bagac', 'Active', 'Valid', 'Compliant', '2024-01-15'],
+      ['Mountain Stone Mining', 'Mariveles', 'Active', 'Valid', 'Compliant', '2024-01-10'],
+      ['Pacific Aggregates', 'Morong', 'Active', 'Expired', 'Non-Compliant', '2023-12-20'],
+      ['Bataan Rock Industries', 'Bagac', 'Active', 'Valid', 'Compliant', '2024-01-08'],
+      ['Limestone Quarry Inc.', 'Mariveles', 'Inactive', 'Valid', 'Under Review', '2024-01-05']
+    ];
+    
+    // Table title
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Quarry Site Details', centerX, 210, { align: 'center' });
+    
+    autoTable(doc, {
+      head: [['Operator', 'Location', 'Status', 'Permit Status', 'Compliance', 'Last Inspection']],
+      body: quarrySites,
+      startY: 220,
+      styles: { 
+        fontSize: paperSize === 'long' ? 10 : 9, 
+        cellPadding: 4,
+        overflow: 'linebreak',
+        halign: 'left'
+      },
+      headStyles: { 
+        fillColor: [251, 146, 60], 
+        fontStyle: 'bold',
+        textColor: [255, 255, 255],
+        fontSize: paperSize === 'long' ? 11 : 10
+      },
+      columnStyles: {
+        0: { cellWidth: 45, halign: 'left' },
+        1: { cellWidth: 25, halign: 'left' },
+        2: { cellWidth: 20, halign: 'center' },
+        3: { cellWidth: 25, halign: 'center' },
+        4: { cellWidth: 25, halign: 'center' },
+        5: { cellWidth: 30, halign: 'center' }
+      },
+      margin: { left: paperConfig.margin, right: paperConfig.margin },
+      tableWidth: 'auto',
+      showHead: 'everyPage',
+      pageBreak: 'auto',
+      didDrawPage: function (data) {
+        // Add page numbers
+        const pageCount = doc.internal.getNumberOfPages();
+        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+        doc.setFontSize(8);
+        doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+      }
+    });
+    
+    doc.save(`quarry-site-monitoring-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
   // Incidents Report (matching Incidents Reports data structure)
@@ -2189,7 +2688,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         { name: 'I-Patroller Summary', func: generateIPatrollerSummaryReport },
         { name: 'Command Center Report', func: generateCommandCenterReport },
         { name: 'Action Center Report', func: generateActionCenterReport },
-        { name: 'Incidents Report', func: generateIncidentsReport }
+        { name: 'Incidents Report', func: generateIncidentsReport },
+        { name: 'Quarry Site Monitoring Report', func: generateQuarrySiteMonitoringReport }
       ];
 
       let successCount = 0;
@@ -2230,10 +2730,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       color: "from-blue-500 to-blue-600",
       reports: [
         {
-          name: "I-Patroller Summary",
-          description: "Complete patrol statistics matching I-Patroller page exactly",
-          action: generateIPatrollerSummaryReport,
-          formats: ["PDF"],
+          name: "I-Patroller Reports",
+          description: "Patrol data and performance reports with multiple export options",
+          actions: [
+            {
+              name: "Generate Report",
+              action: generateIPatrollerSummaryReport,
+              format: "PDF",
+              priority: "high"
+            },
+            {
+              name: "Daily Summary",
+              action: () => setShowIPatrollerDailySummary(true),
+              format: "Modal",
+              priority: "high"
+            },
+            {
+              name: "Preview Report",
+              action: () => setShowIPatrollerPreview(true),
+              format: "Modal",
+              priority: "high"
+            },
+            {
+              name: "Generate PDF",
+              action: () => {
+                loadIPatrollerData().then(() => {
+                  generateIPatrollerMonthlySummaryReport();
+                });
+              },
+              format: "PDF",
+              priority: "high"
+            }
+          ],
+          formats: ["PDF", "Modal"],
           priority: "high"
         }
       ]
@@ -2327,6 +2856,22 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             }
           ],
           formats: ["PDF", "Modal"],
+          priority: "high"
+        }
+      ]
+    },
+    {
+      id: "quarrymonitoring",
+      title: "Quarry Site Monitoring Reports",
+      description: "Quarry operations monitoring and compliance reports",
+      icon: <Mountain className="w-6 h-6" />,
+      color: "from-orange-500 to-orange-600",
+      reports: [
+        {
+          name: "Quarry Site Monitoring Report",
+          description: "Comprehensive quarry site monitoring with compliance tracking and permit status",
+          action: generateQuarrySiteMonitoringReport,
+          formats: ["PDF"],
           priority: "high"
         }
       ]
@@ -2467,10 +3012,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               <Table>
                 <TableHeader>
                   <TableRow className="border-b-2 border-gray-200 bg-gray-50">
-                    <TableHead className="font-bold text-black py-4 px-6 text-center">Report Type</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center">Description</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center">Formats</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center">Actions</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Report Type</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-2/5">Description</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/6">Formats</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -2478,16 +3023,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                     section.reports.map((report, index) => (
                       <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
                         <TableCell className="font-semibold py-4 px-6">
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center justify-start gap-3">
                             <div className="p-2 bg-black rounded-lg">
                               {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
                             </div>
                             <span className="text-black">{report.name}</span>
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-6 text-gray-700">{report.description}</TableCell>
-                        <TableCell className="py-4 px-6">
-                          <div className="flex flex-wrap gap-2">
+                        <TableCell className="py-4 px-4 text-gray-700 text-sm">{report.description}</TableCell>
+                        <TableCell className="py-4 px-4 text-center">
+                          <div className="flex flex-wrap gap-2 justify-center">
                             {report.formats.map((format) => (
                               <Badge
                                 key={format}
@@ -2499,9 +3044,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                             ))}
                           </div>
                         </TableCell>
-                        <TableCell className="py-4 px-6">
+                        <TableCell className="py-4 px-4 text-center">
                           {report.actions ? (
-                            <div className="flex gap-2">
+                            <div className="flex flex-wrap gap-1 justify-center">
                               {report.actions.map((actionItem, actionIndex) => (
                                 <Button
                                   key={actionIndex}
@@ -2514,25 +3059,32 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                     }
                                   }}
                                   disabled={isGenerating}
-                                  className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
+                                  size="sm"
+                                  className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-2 py-1 text-xs font-medium"
                                 >
                                   {isGenerating ? (
                                     <>
-                                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                      Generating...
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                      <span className="hidden sm:inline">Gen...</span>
                                     </>
                                   ) : (
                                     <>
                                       {actionItem.name === "Summary Insights" ? (
-                                        <Activity className="w-4 h-4 mr-2" />
+                                        <Activity className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "Export to PDF" ? (
-                                        <Download className="w-4 h-4 mr-2" />
+                                        <Download className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "View Summary" ? (
-                                        <BarChart3 className="w-4 h-4 mr-2" />
+                                        <BarChart3 className="w-3 h-3 mr-1" />
                                       ) : (
-                                        <Printer className="w-4 h-4 mr-2" />
+                                        <Printer className="w-3 h-3 mr-1" />
                                       )}
-                                      {actionItem.name}
+                                      <span className="hidden sm:inline">{actionItem.name}</span>
+                                      <span className="sm:hidden">
+                                        {actionItem.name === "Generate Report" ? "PDF" : 
+                                         actionItem.name === "Summary Insights" ? "Insights" :
+                                         actionItem.name === "Export to PDF" ? "Export" :
+                                         actionItem.name === "View Summary" ? "Summary" : "Gen"}
+                                      </span>
                                     </>
                                   )}
                                 </Button>
@@ -2549,17 +3101,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                 }
                               }}
                               disabled={isGenerating}
-                              className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-4 py-2 font-semibold"
+                              size="sm"
+                              className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-2 py-1 text-xs font-medium"
                             >
                               {isGenerating ? (
                                 <>
-                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                  Generating...
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                  <span className="hidden sm:inline">Generating...</span>
+                                  <span className="sm:hidden">Gen...</span>
                                 </>
                               ) : (
                                 <>
-                                  <Printer className="w-4 h-4 mr-2" />
-                                  Generate Report
+                                  <Printer className="w-3 h-3 mr-1" />
+                                  <span className="hidden sm:inline">Generate Report</span>
+                                  <span className="sm:hidden">PDF</span>
                                 </>
                               )}
                             </Button>
@@ -3292,6 +3847,280 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   <X className="w-4 h-4 mr-2" />
                   Close Summary
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* IPatroller Daily Summary Modal */}
+        {showIPatrollerDailySummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
+                    <p className="text-sm text-gray-600">
+                      {new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => setShowIPatrollerDailySummary(false)}
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Date Selector */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <select
+                      id="date-select"
+                      value={ipatrollerSelectedDayIndex}
+                      onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
+                      className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
+                      text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
+                      focus:border-blue-500 transition-all duration-200 min-w-[200px]"
+                    >
+                      {generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear).map((date, index) => (
+                        <option key={index} value={index} className="py-2">
+                          {date.fullDate}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <div className="space-y-6">
+                  {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
+                    <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {municipalities.map((data) => (
+                              <tr key={data.municipality}>
+                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
+                                <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
+                                <td className="px-4 py-2 text-center">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {data.isActive ? 'Active' : 'Inactive'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${
+                                          data.isActive ? 'bg-green-500' :
+                                          data.percentage >= 50 ? 'bg-yellow-500' :
+                                          'bg-red-500'
+                                        }`}
+                                        style={{ width: `${data.percentage}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* IPatroller Preview Report Modal */}
+        {showIPatrollerPreview && ipatrollerPreviewData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Eye className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Preview Report</h3>
+                    <p className="text-sm text-gray-600">
+                      {ipatrollerPreviewData.reportPeriod}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      setShowIPatrollerPreview(false);
+                      setIpatrollerPreviewData(null);
+                      generateIPatrollerMonthlySummaryReport();
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                    disabled={isGeneratingIPatrollerReport}
+                  >
+                    {isGeneratingIPatrollerReport ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <FileText className="w-4 h-4 mr-2" />
+                    )}
+                    Generate PDF
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowIPatrollerPreview(false);
+                      setIpatrollerPreviewData(null);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <div className="space-y-6">
+                  {/* Report Header */}
+                  <div className="text-center border-b border-gray-200 pb-4">
+                    <h1 className="text-2xl font-bold text-gray-900">{ipatrollerPreviewData.title}</h1>
+                    <p className="text-sm text-gray-600 mt-2">Generated: {ipatrollerPreviewData.generatedDate}</p>
+                    <p className="text-sm text-gray-600">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
+                    <p className="text-sm text-gray-600">Data Source: {ipatrollerPreviewData.dataSource}</p>
+                  </div>
+
+                  {/* Overall Summary */}
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3">Overall Summary</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-blue-600">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</p>
+                        <p className="text-sm text-gray-600">Total Patrols</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-green-600">{ipatrollerPreviewData.overallSummary.totalActive}</p>
+                        <p className="text-sm text-gray-600">Active Days</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-red-600">{ipatrollerPreviewData.overallSummary.totalInactive}</p>
+                        <p className="text-sm text-gray-600">Inactive Days</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-2xl font-bold text-purple-600">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</p>
+                        <p className="text-sm text-gray-600">Avg Active %</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* District Summary */}
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3">District Summary</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border border-gray-200 rounded-lg">
+                        <thead className="bg-blue-600 text-white">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-sm font-medium">District</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium">Municipalities</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium">Total Patrols</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium">Active Days</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium">Inactive Days</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium">Avg Active %</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {ipatrollerPreviewData.districtSummary.map((district, index) => (
+                            <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{district.district}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.municipalityCount}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalPatrols.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalActive}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalInactive}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.avgActivePercentage}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Municipality Performance */}
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-3">Municipality Performance</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border border-gray-200 rounded-lg">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">District</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Total Patrols</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Active Days</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Inactive Days</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Active %</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {ipatrollerPreviewData.municipalityPerformance.map((municipality, index) => (
+                            <tr key={municipality.municipality} className="hover:bg-gray-50">
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{municipality.municipality}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{municipality.district}</td>
+                              <td className="px-4 py-2 text-sm text-center text-gray-900">{municipality.totalPatrols}</td>
+                              <td className="px-4 py-2 text-sm text-center text-green-600 font-medium">{municipality.activeDays}</td>
+                              <td className="px-4 py-2 text-sm text-center text-red-600 font-medium">{municipality.inactiveDays}</td>
+                              <td className="px-4 py-2 text-sm text-center text-purple-600 font-medium">{municipality.activePercentage}%</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

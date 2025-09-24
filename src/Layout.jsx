@@ -101,8 +101,8 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
-    { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: 'admin' },
-    { id: 'quarrymonitoring', label: 'Quarry Site Monitoring', icon: Mountain, showFor: 'admin' },
+    { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: ['admin', 'incidents'] },
+    { id: 'quarrymonitoring', label: 'Quarry Site Monitoring', icon: Mountain, showFor: ['admin', 'quarry-monitoring'] },
     { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
     { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
   ], []);

@@ -38,7 +38,6 @@ import {
   Search,
   FileText,
   Printer,
-  Eye,
   Edit,
   Trash2,
   MoreHorizontal,
@@ -84,7 +83,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
   const [showPrintPreview, setShowPrintPreview] = useState(false);
   const [previewData, setPreviewData] = useState(null);
-  const [showDailySummary, setShowDailySummary] = useState(false);
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
@@ -119,7 +117,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
     return summaryData;
   };
-  const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   // Remove unused state
   const moreOptionsRef = useRef(null);
 
@@ -136,21 +133,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     };
   }, []);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (showMenuDropdown) {
-        const dropdown = document.getElementById('ipatroller-menu-dropdown');
-        const button = document.getElementById('ipatroller-menu-button');
-        if (dropdown && !dropdown.contains(event.target) && !button?.contains(event.target)) {
-          setShowMenuDropdown(false);
-        }
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [showMenuDropdown]);
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -1209,94 +1191,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* Menu Dropdown */}
-            <div className="relative">
-              <Button
-                id="ipatroller-menu-button"
-                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
-                title="I-Patroller Options"
-              >
-                <Menu className="w-5 h-5" />
-                <span className="text-sm font-medium">View Options</span>
-              </Button>
-              
-              {/* Dropdown Menu */}
-              {showMenuDropdown && (
-                <div 
-                  id="ipatroller-menu-dropdown"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
-                >
-                  <div className="py-1">
-                    {/* Report Options */}
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Report Options</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        generatePreviewData();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={isGeneratingReport || loading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Eye className="w-4 h-4 text-blue-600" />
-                      <span>Preview Report</span>
-                    </button>
-                    
-                    <button
-                      onClick={() => {
-                        generateMonthlySummaryReport();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={isGeneratingReport || loading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-purple-50 hover:text-purple-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isGeneratingReport ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
-                      ) : (
-                        <FileText className="w-4 h-4 text-purple-600" />
-                      )}
-                      <span>Generate PDF</span>
-                    </button>
-                    
-                     <button
-                       onClick={() => {
-                         setShowDailySummary(true);
-                         setShowMenuDropdown(false);
-                       }}
-                       disabled={isGeneratingReport || loading}
-                       className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       <BarChart3 className="w-4 h-4 text-orange-600" />
-                       <span>Daily Summary</span>
-                     </button>
-
-                     <div className="border-t border-gray-200 my-1"></div>
-                    
-                    {/* Data Management */}
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Data Management</h3>
-                    </div>
-                    
-                    <button
-                      onClick={() => {
-                        syncToFirestore();
-                        setShowMenuDropdown(false);
-                      }}
-                      disabled={loading}
-                      className="flex items-center gap-3 w-full px-4 py-3 text-sm text-gray-700 hover:bg-green-50 hover:text-green-700 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Save className="w-4 h-4 text-green-600" />
-                      <span>Save Data</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
         </div>
 
 
@@ -1511,6 +1405,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               >
                 <Target className="w-4 h-4" />
                 Top Performers
+              </button>
+              <button
+                onClick={() => syncToFirestore()}
+                disabled={loading}
+                className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Save className="w-4 h-4 text-green-600" />
+                Save Data
               </button>
             </div>
             
@@ -2038,135 +1940,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         </div>
       )}
 
-      {/* Daily Summary Modal */}
-      {showDailySummary && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
-                  <p className="text-sm text-gray-600">
-                    {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => setShowPdfPreview(true)}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 text-blue-600 border-blue-200 hover:bg-blue-50"
-                >
-                  <FileText className="w-4 h-4" />
-                  PDF Report
-                </Button>
-                <Button
-                  onClick={() => setShowDailySummary(false)}
-                  variant="outline"
-                  size="sm"
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-
-            {/* Date Selector */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {selectedDates[selectedDayIndex]?.fullDate}
-                    </p>
-                  </div>
-                </div>
-                <div className="relative">
-                  <select
-                    id="date-select"
-                    value={selectedDayIndex}
-                    onChange={(e) => setSelectedDayIndex(parseInt(e.target.value))}
-                    className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
-                    text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
-                    focus:border-blue-500 transition-all duration-200 min-w-[200px]"
-                  >
-                    {selectedDates.map((date, index) => (
-                      <option key={index} value={index} className="py-2">
-                        {date.fullDate}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <div className="space-y-6">
-                {Object.entries(getDailySummaryData(selectedDayIndex)).map(([district, municipalities]) => (
-                  <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
-                    </div>
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="bg-gray-50">
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {municipalities.map((data) => (
-                            <tr key={data.municipality}>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
-                              <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
-                              <td className="px-4 py-2 text-center">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                  ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                  {data.isActive ? 'Active' : 'Inactive'}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <div className="flex items-center gap-2">
-                                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                    <div
-                                      className={`h-full rounded-full ${
-                                        data.isActive ? 'bg-green-500' :
-                                        data.percentage >= 50 ? 'bg-yellow-500' :
-                                        'bg-red-500'
-                                      }`}
-                                      style={{ width: `${data.percentage}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Removed custom modal in favor of Sonner toast */}
 
