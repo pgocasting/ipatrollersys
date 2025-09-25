@@ -54,6 +54,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     summaryStats, 
     loading: dataLoading 
   } = useData();
+  
+  const { getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -67,6 +69,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Command Center Summary modal state
   const [showCommandCenterSummary, setShowCommandCenterSummary] = useState(false);
   const [summaryViewType, setSummaryViewType] = useState("monthly"); // "monthly" or "quarterly"
+  const [commandCenterData, setCommandCenterData] = useState({});
+  const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
   
   // Action Center Summary modal state
   const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
@@ -98,6 +102,46 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.error('Logout error:', error);
     }
   };
+
+  // Load Command Center data from Firebase
+  const loadCommandCenterData = async () => {
+    setIsLoadingCommandCenter(true);
+    try {
+      const monthYear = `${months[selectedMonth]}_${selectedYear}`;
+      const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
+      const commandCenterReports = {};
+      
+      // Load data for each municipality
+      for (const municipality of allMunicipalities) {
+        const reportKey = `${monthYear}_${municipality}`;
+        const result = await getWeeklyReport(reportKey);
+        
+        if (result.success && result.data && result.data.weeklyReportData) {
+          commandCenterReports[municipality] = result.data;
+        }
+      }
+      
+      // Load barangays and concern types
+      const barangaysResult = await getBarangays();
+      const concernTypesResult = await getConcernTypes();
+      
+      setCommandCenterData({
+        reports: commandCenterReports,
+        barangays: barangaysResult.success ? barangaysResult.data : [],
+        concernTypes: concernTypesResult.success ? concernTypesResult.data : []
+      });
+      
+    } catch (error) {
+      console.error('Error loading Command Center data:', error);
+    } finally {
+      setIsLoadingCommandCenter(false);
+    }
+  };
+
+  // Load Command Center data when month/year changes
+  useEffect(() => {
+    loadCommandCenterData();
+  }, [selectedMonth, selectedYear]);
 
   // Translation and grammar correction function (from Action Center)
   const translateAndCorrectGrammar = (text) => {
@@ -1489,7 +1533,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.save(`incidents-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  // Command Center Report (matching Command Center data structure with municipality details)
+  // Command Center Report (using real Firebase data with municipality details)
   const generateCommandCenterReport = () => {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
@@ -1559,207 +1603,140 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const textStartX2 = paperConfig.margin + (boxWidth / 2) + 5;
     const lineHeight = 10;
     
-    // Mock data for Command Center statistics
+    // Calculate real statistics from Command Center data
+    const reports = commandCenterData.reports || {};
+    const totalMunicipalities = Object.keys(reports).length;
+    const totalReports = Object.values(reports).reduce((sum, report) => {
+      if (report.weeklyReportData) {
+        return sum + Object.values(report.weeklyReportData).reduce((dateSum, dateEntries) => {
+          return dateSum + (Array.isArray(dateEntries) ? dateEntries.length : 0);
+        }, 0);
+      }
+      return sum;
+    }, 0);
+    
+    const totalBarangays = commandCenterData.barangays ? commandCenterData.barangays.length : 0;
+    const totalConcernTypes = commandCenterData.concernTypes ? commandCenterData.concernTypes.length : 0;
+    
     const commandCenterStats = {
-      activeUnits: 4,
-      totalAlerts: 3,
-      pendingAlerts: 1,
-      resolvedAlerts: 2,
-      totalCommunications: 5,
-      weeklyReports: 12
+      municipalities: totalMunicipalities,
+      totalReports: totalReports,
+      totalBarangays: totalBarangays,
+      concernTypes: totalConcernTypes,
+      reportingPeriod: `${months[selectedMonth]} ${selectedYear}`,
+      dataStatus: isLoadingCommandCenter ? 'Loading...' : 'Current'
     };
     
     // Left column
-    doc.text(`• Active Units: ${commandCenterStats.activeUnits}`, textStartX, statsY + 8);
-    doc.text(`• Total Alerts: ${commandCenterStats.totalAlerts}`, textStartX, statsY + 8 + lineHeight);
-    doc.text(`• Pending Alerts: ${commandCenterStats.pendingAlerts}`, textStartX, statsY + 8 + (lineHeight * 2));
+    doc.text(`• Municipalities: ${commandCenterStats.municipalities}`, textStartX, statsY + 8);
+    doc.text(`• Total Reports: ${commandCenterStats.totalReports}`, textStartX, statsY + 8 + lineHeight);
+    doc.text(`• Reporting Period: ${commandCenterStats.reportingPeriod}`, textStartX, statsY + 8 + (lineHeight * 2));
     
     // Right column
-    doc.text(`• Resolved Alerts: ${commandCenterStats.resolvedAlerts}`, textStartX2, statsY + 8);
-    doc.text(`• Communications: ${commandCenterStats.totalCommunications}`, textStartX2, statsY + 8 + lineHeight);
-    doc.text(`• Weekly Reports: ${commandCenterStats.weeklyReports}`, textStartX2, statsY + 8 + (lineHeight * 2));
+    doc.text(`• Total Barangays: ${commandCenterStats.totalBarangays}`, textStartX2, statsY + 8);
+    doc.text(`• Concern Types: ${commandCenterStats.concernTypes}`, textStartX2, statsY + 8 + lineHeight);
+    doc.text(`• Data Status: ${commandCenterStats.dataStatus}`, textStartX2, statsY + 8 + (lineHeight * 2));
     
-    // Municipality Data with Barangay-specific Concern Types
-    const municipalityData = {
-      "Abucay": {
-        district: "1ST DISTRICT",
-        barangays: {
-          "Bangkal": {
-            concernTypes: [
-              { type: "Public Safety", count: 3 },
-              { type: "Traffic Management", count: 2 },
-              { type: "Environmental", count: 1 }
-            ],
-            totalReports: 6,
-            completionRate: 83
-          },
-          "Capitangan": {
-            concernTypes: [
-              { type: "Public Safety", count: 2 },
-              { type: "Environmental", count: 3 },
-              { type: "Health Services", count: 1 }
-            ],
-            totalReports: 6,
-            completionRate: 100
-          },
-          "Laon": {
-            concernTypes: [
-              { type: "Traffic Management", count: 2 },
-              { type: "Environmental", count: 1 },
-              { type: "Health Services", count: 1 }
-            ],
-            totalReports: 4,
-            completionRate: 75
-          },
-          "Mabatang": {
-            concernTypes: [
-              { type: "Public Safety", count: 2 },
-              { type: "Health Services", count: 1 }
-            ],
-            totalReports: 3,
-            completionRate: 67
-          },
-          "Omboy": {
-            concernTypes: [
-              { type: "Public Safety", count: 1 },
-              { type: "Traffic Management", count: 1 }
-            ],
-            totalReports: 2,
-            completionRate: 100
+    // Process real Command Center data to create municipality structure
+    const processCommandCenterData = () => {
+      const municipalityData = {};
+      const reports = commandCenterData.reports || {};
+      const barangays = commandCenterData.barangays || [];
+      
+      // Get district mapping for municipalities
+      const getDistrictForMunicipality = (municipality) => {
+        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+          if (municipalities.includes(municipality)) {
+            return district;
           }
         }
-      },
-      "Orani": {
-        district: "1ST DISTRICT",
-        barangays: {
-          "Bagong Paraiso": {
-            concernTypes: [
-              { type: "Infrastructure", count: 4 },
-              { type: "Public Safety", count: 3 },
-              { type: "Traffic Management", count: 2 }
-            ],
-            totalReports: 9,
-            completionRate: 89
-          },
-          "Balut": {
-            concernTypes: [
-              { type: "Infrastructure", count: 3 },
-              { type: "Public Safety", count: 2 },
-              { type: "Environmental", count: 1 }
-            ],
-            totalReports: 6,
-            completionRate: 83
-          },
-          "Bayan": {
-            concernTypes: [
-              { type: "Traffic Management", count: 4 },
-              { type: "Public Safety", count: 3 },
-              { type: "Infrastructure", count: 2 }
-            ],
-            totalReports: 9,
-            completionRate: 100
-          },
-          "Calero": {
-            concernTypes: [
-              { type: "Infrastructure", count: 3 },
-              { type: "Traffic Management", count: 2 },
-              { type: "Environmental", count: 2 }
-            ],
-            totalReports: 7,
-            completionRate: 86
+        return "Unknown District";
+      };
+      
+      // Process each municipality's data
+      Object.entries(reports).forEach(([municipality, reportData]) => {
+        const district = getDistrictForMunicipality(municipality);
+        const weeklyData = reportData.weeklyReportData || {};
+        
+        // Get barangays for this municipality
+        const municipalityBarangays = barangays.filter(b => b.municipality === municipality);
+        
+        const barangayData = {};
+        
+        // Process each barangay's data
+        municipalityBarangays.forEach(barangay => {
+          const barangayName = barangay.name;
+          const concernTypeCounts = {};
+          let totalReports = 0;
+          let completedReports = 0;
+          
+          // Count concern types for this barangay across all dates
+          Object.values(weeklyData).forEach(dateEntries => {
+            if (Array.isArray(dateEntries)) {
+              dateEntries.forEach(entry => {
+                // Check if this entry is for the current barangay
+                if (entry.barangay && entry.barangay.includes(barangayName)) {
+                  totalReports++;
+                  
+                  // Count concern type
+                  if (entry.concernType) {
+                    concernTypeCounts[entry.concernType] = (concernTypeCounts[entry.concernType] || 0) + 1;
+                  }
+                  
+                  // Check if report is completed (has action taken or remarks)
+                  if (entry.actionTaken || entry.remarks) {
+                    completedReports++;
+                  }
+                }
+              });
+            }
+          });
+          
+          // Convert concern type counts to array format
+          const concernTypes = Object.entries(concernTypeCounts).map(([type, count]) => ({
+            type,
+            count
+          }));
+          
+          // Only include barangays that have data
+          if (totalReports > 0) {
+            barangayData[barangayName] = {
+              concernTypes,
+              totalReports,
+              completionRate: totalReports > 0 ? Math.round((completedReports / totalReports) * 100) : 0
+            };
           }
+        });
+        
+        // Only include municipalities that have barangay data
+        if (Object.keys(barangayData).length > 0) {
+          municipalityData[municipality] = {
+            district,
+            barangays: barangayData
+          };
         }
-      },
-      "Balanga City": {
-        district: "2ND DISTRICT",
-        barangays: {
-          "Bagong Nayon": {
-            concernTypes: [
-              { type: "Traffic Management", count: 5 },
-              { type: "Public Safety", count: 3 },
-              { type: "Infrastructure", count: 2 }
-            ],
-            totalReports: 10,
-            completionRate: 90
-          },
-          "Bagumbayan": {
-            concernTypes: [
-              { type: "Traffic Management", count: 4 },
-              { type: "Public Safety", count: 2 },
-              { type: "Health Services", count: 2 }
-            ],
-            totalReports: 8,
-            completionRate: 88
-          },
-          "Cabog-Cabog": {
-            concernTypes: [
-              { type: "Traffic Management", count: 3 },
-              { type: "Infrastructure", count: 2 },
-              { type: "Public Safety", count: 2 }
-            ],
-            totalReports: 7,
-            completionRate: 86
-          },
-          "Central": {
-            concernTypes: [
-              { type: "Traffic Management", count: 3 },
-              { type: "Public Safety", count: 3 },
-              { type: "Infrastructure", count: 1 },
-              { type: "Health Services", count: 1 }
-            ],
-            totalReports: 8,
-            completionRate: 88
-          }
-        }
-      },
-      "Mariveles": {
-        district: "3RD DISTRICT",
-        barangays: {
-          "Alasasin": {
-            concernTypes: [
-              { type: "Environmental", count: 6 },
-              { type: "Public Safety", count: 2 },
-              { type: "Infrastructure", count: 2 }
-            ],
-            totalReports: 10,
-            completionRate: 90
-          },
-          "Bataan": {
-            concernTypes: [
-              { type: "Environmental", count: 5 },
-              { type: "Public Safety", count: 3 },
-              { type: "Health Services", count: 2 }
-            ],
-            totalReports: 10,
-            completionRate: 100
-          },
-          "Biaan": {
-            concernTypes: [
-              { type: "Environmental", count: 4 },
-              { type: "Infrastructure", count: 2 },
-              { type: "Public Safety", count: 2 }
-            ],
-            totalReports: 8,
-            completionRate: 88
-          },
-          "Cabcaben": {
-            concernTypes: [
-              { type: "Environmental", count: 3 },
-              { type: "Infrastructure", count: 2 },
-              { type: "Public Safety", count: 1 },
-              { type: "Health Services", count: 2 }
-            ],
-            totalReports: 8,
-            completionRate: 100
-          }
-        }
-      }
+      });
+      
+      return municipalityData;
     };
+    
+    const municipalityData = processCommandCenterData();
 
     // Filter municipalities by selected district
     let filteredMunicipalities = Object.entries(municipalityData);
     if (selectedDistrict !== 'all') {
       filteredMunicipalities = filteredMunicipalities.filter(([municipality, data]) => data.district === selectedDistrict);
+    }
+    
+    // If no data available, show message
+    if (filteredMunicipalities.length === 0) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'normal');
+      doc.text('No Command Center data available for the selected period and district.', centerX, 200, { align: 'center' });
+      doc.text('Please ensure data has been entered in the Command Center module.', centerX, 215, { align: 'center' });
+      
+      doc.save(`command-center-no-data-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+      return;
     }
 
     let currentY = 195;

@@ -60,8 +60,15 @@ const Sidebar = React.memo(({
                     <img 
                       src="/images/Ipatroller_Logo.png" 
                       alt="IPatroller Logo" 
-                      className="h-8 w-8 rounded-lg"
+                      className="h-8 w-8 rounded-lg object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
                     />
+                    <div className="h-8 w-8 rounded-lg bg-blue-600 text-white font-bold text-lg flex items-center justify-center" style={{display: 'none'}}>
+                      IP
+                    </div>
                   </button>
                 </TooltipTrigger>
                 <TooltipContent side="right">
@@ -75,8 +82,15 @@ const Sidebar = React.memo(({
                     <img 
                       src="/images/Ipatroller_Logo.png" 
                       alt="IPatroller Logo" 
-                      className="h-8 w-8 rounded-lg"
+                      className="h-8 w-8 rounded-lg object-contain"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        e.target.nextSibling.style.display = 'flex';
+                      }}
                     />
+                    <div className="h-8 w-8 rounded-lg bg-blue-600 text-white font-bold text-lg flex items-center justify-center" style={{display: 'none'}}>
+                      IP
+                    </div>
                   </div>
                   <div className="flex flex-col">
                     <h1 className="text-xl font-bold leading-none tracking-tight whitespace-nowrap">
