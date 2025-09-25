@@ -794,30 +794,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Monthly Department Breakdown Modal */}
         <Dialog open={showMonthlyBreakdownModal} onOpenChange={setShowMonthlyBreakdownModal}>
-          <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto bg-white border shadow-2xl">
-            <DialogHeader className="pb-4 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Database className="w-6 h-6 text-indigo-600" />
-                </div>
-                <div>
-                  <DialogTitle className="text-2xl font-bold text-gray-900">Monthly Department Breakdown</DialogTitle>
-                  <DialogDescription className="text-sm text-gray-600 mt-1">
-                    Comprehensive actions count per month by department for the current year
-                  </DialogDescription>
-                </div>
-              </div>
+          <DialogContent className="max-w-[90vw] w-full max-h-[90vh] overflow-y-auto bg-white border shadow-lg">
+            <DialogHeader className="pb-4 border-b">
+              <DialogTitle className="text-xl font-bold">Monthly Department Breakdown</DialogTitle>
+              <DialogDescription>
+                Actions count per month by department for the current year
+              </DialogDescription>
             </DialogHeader>
             
-            <div className="mt-6">
+            <div className="mt-4">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead className="font-bold text-foreground">Month</TableHead>
-                    <TableHead className="text-center font-bold text-blue-700">PNP</TableHead>
-                    <TableHead className="text-center font-bold text-green-700">Agriculture</TableHead>
-                    <TableHead className="text-center font-bold text-emerald-700">PG-ENRO</TableHead>
-                    <TableHead className="text-center font-bold text-foreground">Total</TableHead>
+                  <TableRow>
+                    <TableHead className="font-semibold">Month</TableHead>
+                    <TableHead className="text-center font-semibold">PNP</TableHead>
+                    <TableHead className="text-center font-semibold">Agriculture</TableHead>
+                    <TableHead className="text-center font-semibold">PG-ENRO</TableHead>
+                    <TableHead className="text-center font-semibold">Total</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -826,53 +819,33 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     return (
                       <TableRow 
                         key={data.month} 
-                        className={`transition-colors hover:bg-muted/50 ${
-                          isCurrentMonth ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-                        }`}
+                        className={isCurrentMonth ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''}
                       >
                         <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            {data.month}
-                            {isCurrentMonth && (
-                              <Badge variant="default" className="bg-blue-600 hover:bg-blue-700">
-                                Current
-                              </Badge>
-                            )}
-                          </div>
+                          {data.month}
+                          {isCurrentMonth && (
+                            <Badge variant="default" className="ml-2 bg-blue-600">
+                              Current
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-blue-600 hover:bg-blue-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
-                          >
+                          <Badge variant="secondary" className="bg-blue-600 text-white">
                             {data.pnp}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-green-600 hover:bg-green-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
-                          >
+                          <Badge variant="secondary" className="bg-green-600 text-white">
                             {data.agriculture}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold"
-                          >
+                          <Badge variant="secondary" className="bg-emerald-600 text-white">
                             {data.pgEnro}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant="secondary" 
-                            className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                              data.total > 0 
-                                ? 'bg-gray-700 hover:bg-gray-800 text-white' 
-                                : 'bg-gray-300 hover:bg-gray-400 text-gray-600'
-                            }`}
-                          >
+                          <Badge variant="secondary" className="bg-gray-700 text-white">
                             {data.total}
                           </Badge>
                         </TableCell>
@@ -881,42 +854,30 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   })}
                   
                   {/* Summary Row */}
-                  <TableRow className="bg-gradient-to-r from-indigo-50 via-purple-50 to-blue-50 border-t-2 border-indigo-200">
-                    <TableCell className="font-bold text-lg">
+                  <TableRow className="bg-gray-50 border-t-2">
+                    <TableCell className="font-bold">
                       <div className="flex items-center gap-2">
-                        <Database className="w-5 h-5 text-indigo-600" />
+                        <Database className="w-4 h-4" />
                         Total (Year)
                       </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge 
-                        variant="secondary" 
-                        className="bg-blue-700 hover:bg-blue-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-blue-200"
-                      >
+                      <Badge variant="secondary" className="bg-blue-700 text-white font-bold">
                         {monthlyData.reduce((sum, data) => sum + data.pnp, 0)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge 
-                        variant="secondary" 
-                        className="bg-green-700 hover:bg-green-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-green-200"
-                      >
+                      <Badge variant="secondary" className="bg-green-700 text-white font-bold">
                         {monthlyData.reduce((sum, data) => sum + data.agriculture, 0)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge 
-                        variant="secondary" 
-                        className="bg-emerald-700 hover:bg-emerald-800 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-emerald-200"
-                      >
+                      <Badge variant="secondary" className="bg-emerald-700 text-white font-bold">
                         {monthlyData.reduce((sum, data) => sum + data.pgEnro, 0)}
                       </Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge 
-                        variant="secondary" 
-                        className="bg-gray-800 hover:bg-gray-900 text-white w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ring-2 ring-gray-300"
-                      >
+                      <Badge variant="secondary" className="bg-gray-800 text-white font-bold">
                         {monthlyData.reduce((sum, data) => sum + data.total, 0)}
                       </Badge>
                     </TableCell>
