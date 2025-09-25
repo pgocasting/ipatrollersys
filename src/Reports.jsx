@@ -1859,74 +1859,216 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  // Command Center Summary calculation functions (simplified for Reports page)
+  // Command Center Summary calculation functions (using real Firebase data)
   const calculateWeeklyReportSummary = (municipality = null) => {
-    // Mock data for Command Center weekly report summary
-    // In a real implementation, this would connect to Command Center data
+    const reports = commandCenterData.reports || {};
+    const barangays = commandCenterData.barangays || [];
+    const concernTypes = commandCenterData.concernTypes || [];
+    
+    // Initialize counters
+    let totalEntries = 0;
+    let totalWeek1 = 0, totalWeek2 = 0, totalWeek3 = 0, totalWeek4 = 0;
+    let entriesWithAction = 0;
+    let entriesWithRemarks = 0;
+    const barangayCount = {};
+    const concernTypeCount = {};
+    const uniqueBarangays = new Set();
+    const uniqueConcernTypes = new Set();
+    
+    // Process each municipality's data
+    Object.entries(reports).forEach(([municipalityName, reportData]) => {
+      // Filter by municipality if specified
+      if (municipality && municipalityName !== municipality) return;
+      
+      const weeklyData = reportData.weeklyReportData || {};
+      
+      // Process each date's entries
+      Object.entries(weeklyData).forEach(([date, dateEntries]) => {
+        if (!Array.isArray(dateEntries)) return;
+        
+        dateEntries.forEach(entry => {
+          totalEntries++;
+          
+          // Determine which week this entry belongs to
+          const entryDate = new Date(date);
+          const dayOfMonth = entryDate.getDate();
+          if (dayOfMonth <= 7) totalWeek1++;
+          else if (dayOfMonth <= 14) totalWeek2++;
+          else if (dayOfMonth <= 21) totalWeek3++;
+          else totalWeek4++;
+          
+          // Count entries with action taken
+          if (entry.actionTaken && entry.actionTaken.trim()) {
+            entriesWithAction++;
+          }
+          
+          // Count entries with remarks
+          if (entry.remarks && entry.remarks.trim()) {
+            entriesWithRemarks++;
+          }
+          
+          // Count barangays
+          if (entry.barangay) {
+            uniqueBarangays.add(entry.barangay);
+            barangayCount[entry.barangay] = (barangayCount[entry.barangay] || 0) + 1;
+          }
+          
+          // Count concern types
+          if (entry.concernType) {
+            uniqueConcernTypes.add(entry.concernType);
+            concernTypeCount[entry.concernType] = (concernTypeCount[entry.concernType] || 0) + 1;
+          }
+        });
+      });
+    });
+    
+    // Calculate rates
+    const completionRate = totalEntries > 0 ? Math.round((entriesWithAction / totalEntries) * 100) : 0;
+    const remarksRate = totalEntries > 0 ? Math.round((entriesWithRemarks / totalEntries) * 100) : 0;
+    
+    // Get top concern types (sorted by count, top 5)
+    const topConcernTypes = Object.entries(concernTypeCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([type, count]) => ({ type, count }));
+    
+    // Get top barangays (sorted by count, top 5)
+    const topBarangays = Object.entries(barangayCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([barangay, count]) => ({ barangay, count }));
+    
     return {
-      totalEntries: 45,
-      totalWeek1: 12,
-      totalWeek2: 15,
-      totalWeek3: 10,
-      totalWeek4: 8,
-      totalWeeklySum: 45,
-      uniqueBarangays: 8,
-      uniqueConcernTypes: 6,
-      entriesWithAction: 38,
-      entriesWithRemarks: 42,
-      weekStats: { week1: 12, week2: 15, week3: 10, week4: 8 },
-      topConcernTypes: [
-        { type: "Public Safety", count: 15 },
-        { type: "Traffic Management", count: 12 },
-        { type: "Environmental", count: 8 },
-        { type: "Health Services", count: 6 },
-        { type: "Infrastructure", count: 4 }
-      ],
-      topBarangays: [
-        { barangay: "Barangay Central", count: 8 },
-        { barangay: "Barangay Norte", count: 6 },
-        { barangay: "Barangay Sur", count: 5 },
-        { barangay: "Barangay Este", count: 4 },
-        { barangay: "Barangay Oeste", count: 3 }
-      ],
-      completionRate: 84,
-      remarksRate: 93,
+      totalEntries,
+      totalWeek1,
+      totalWeek2,
+      totalWeek3,
+      totalWeek4,
+      totalWeeklySum: totalEntries,
+      uniqueBarangays: uniqueBarangays.size,
+      uniqueConcernTypes: uniqueConcernTypes.size,
+      entriesWithAction,
+      entriesWithRemarks,
+      weekStats: { week1: totalWeek1, week2: totalWeek2, week3: totalWeek3, week4: totalWeek4 },
+      topConcernTypes,
+      topBarangays,
+      completionRate,
+      remarksRate,
       municipality: municipality || "All Municipalities"
     };
   };
 
   const calculateQuarterlySummary = (municipality = null) => {
-    // Mock data for Command Center quarterly summary
-    // In a real implementation, this would connect to Command Center data
+    const reports = commandCenterData.reports || {};
+    const barangays = commandCenterData.barangays || [];
+    const concernTypes = commandCenterData.concernTypes || [];
+    
+    // Initialize quarterly data
+    const quarters = {
+      Q1: { name: "Q1", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "blue", months: ["January", "February", "March"] },
+      Q2: { name: "Q2", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "green", months: ["April", "May", "June"] },
+      Q3: { name: "Q3", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "orange", months: ["July", "August", "September"] },
+      Q4: { name: "Q4", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "purple", months: ["October", "November", "December"] }
+    };
+    
+    let totalEntries = 0;
+    let entriesWithAction = 0;
+    let entriesWithRemarks = 0;
+    const barangayCount = {};
+    const concernTypeCount = {};
+    const uniqueBarangays = new Set();
+    const uniqueConcernTypes = new Set();
+    
+    // Process each municipality's data
+    Object.entries(reports).forEach(([municipalityName, reportData]) => {
+      // Filter by municipality if specified
+      if (municipality && municipalityName !== municipality) return;
+      
+      const weeklyData = reportData.weeklyReportData || {};
+      
+      // Process each date's entries
+      Object.entries(weeklyData).forEach(([date, dateEntries]) => {
+        if (!Array.isArray(dateEntries)) return;
+        
+        // Determine quarter from date
+        const entryDate = new Date(date);
+        const month = entryDate.getMonth(); // 0-11
+        let quarter;
+        if (month <= 2) quarter = 'Q1';
+        else if (month <= 5) quarter = 'Q2';
+        else if (month <= 8) quarter = 'Q3';
+        else quarter = 'Q4';
+        
+        dateEntries.forEach(entry => {
+          totalEntries++;
+          quarters[quarter].entries++;
+          
+          // Count entries with action taken
+          if (entry.actionTaken && entry.actionTaken.trim()) {
+            entriesWithAction++;
+          }
+          
+          // Count entries with remarks
+          if (entry.remarks && entry.remarks.trim()) {
+            entriesWithRemarks++;
+          }
+          
+          // Count barangays
+          if (entry.barangay) {
+            uniqueBarangays.add(entry.barangay);
+            quarters[quarter].barangays.add(entry.barangay);
+            barangayCount[entry.barangay] = (barangayCount[entry.barangay] || 0) + 1;
+          }
+          
+          // Count concern types
+          if (entry.concernType) {
+            uniqueConcernTypes.add(entry.concernType);
+            quarters[quarter].concernTypes.add(entry.concernType);
+            concernTypeCount[entry.concernType] = (concernTypeCount[entry.concernType] || 0) + 1;
+          }
+        });
+      });
+    });
+    
+    // Calculate rates
+    const completionRate = totalEntries > 0 ? Math.round((entriesWithAction / totalEntries) * 100) : 0;
+    const remarksRate = totalEntries > 0 ? Math.round((entriesWithRemarks / totalEntries) * 100) : 0;
+    
+    // Get top concern types (sorted by count, top 5)
+    const topConcernTypes = Object.entries(concernTypeCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([type, count]) => ({ type, count }));
+    
+    // Get top barangays (sorted by count, top 5)
+    const topBarangays = Object.entries(barangayCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 5)
+      .map(([barangay, count]) => ({ barangay, count }));
+    
+    // Convert quarters to array format
+    const quarterlyStats = Object.values(quarters).map(q => ({
+      name: q.name,
+      entries: q.entries,
+      weeklySum: q.entries,
+      barangays: q.barangays.size,
+      concernTypes: q.concernTypes.size,
+      color: q.color,
+      months: q.months
+    }));
+    
     return {
-      totalEntries: 180,
-      totalWeeklySum: 180,
-      uniqueBarangays: 12,
-      uniqueConcernTypes: 8,
-      entriesWithAction: 152,
-      entriesWithRemarks: 168,
-      quarterlyStats: [
-        { name: "Q1", entries: 45, weeklySum: 45, barangays: 8, concernTypes: 6, color: "blue", months: ["January", "February", "March"] },
-        { name: "Q2", entries: 48, weeklySum: 48, barangays: 9, concernTypes: 7, color: "green", months: ["April", "May", "June"] },
-        { name: "Q3", entries: 42, weeklySum: 42, barangays: 7, concernTypes: 6, color: "orange", months: ["July", "August", "September"] },
-        { name: "Q4", entries: 45, weeklySum: 45, barangays: 8, concernTypes: 6, color: "purple", months: ["October", "November", "December"] }
-      ],
-      topConcernTypes: [
-        { type: "Public Safety", count: 60 },
-        { type: "Traffic Management", count: 48 },
-        { type: "Environmental", count: 32 },
-        { type: "Health Services", count: 24 },
-        { type: "Infrastructure", count: 16 }
-      ],
-      topBarangays: [
-        { barangay: "Barangay Central", count: 32 },
-        { barangay: "Barangay Norte", count: 24 },
-        { barangay: "Barangay Sur", count: 20 },
-        { barangay: "Barangay Este", count: 16 },
-        { barangay: "Barangay Oeste", count: 12 }
-      ],
-      completionRate: 84,
-      remarksRate: 93,
+      totalEntries,
+      totalWeeklySum: totalEntries,
+      uniqueBarangays: uniqueBarangays.size,
+      uniqueConcernTypes: uniqueConcernTypes.size,
+      entriesWithAction,
+      entriesWithRemarks,
+      quarterlyStats,
+      topConcernTypes,
+      topBarangays,
+      completionRate,
+      remarksRate,
       municipality: municipality || "All Municipalities",
       year: selectedYear
     };
@@ -3027,12 +3169,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                   }}
                                   disabled={isGenerating}
                                   size="sm"
-                                  className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-2 py-1 text-xs font-medium"
+                                  className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
                                 >
                                   {isGenerating ? (
                                     <>
                                       <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                      <span className="hidden sm:inline">Gen...</span>
+                                      <span>Gen...</span>
                                     </>
                                   ) : (
                                     <>
@@ -3051,13 +3193,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                       ) : (
                                         <Printer className="w-3 h-3 mr-1" />
                                       )}
-                                      <span className="hidden sm:inline">{actionItem.name}</span>
-                                      <span className="sm:hidden">
-                                        {actionItem.name === "Generate Report" ? "PDF" : 
-                                         actionItem.name === "Summary Insights" ? "Insights" :
-                                         actionItem.name === "Export to PDF" ? "Export" :
-                                         actionItem.name === "View Summary" ? "Summary" : "Gen"}
-                                      </span>
+                                      <span>{actionItem.name}</span>
                                     </>
                                   )}
                                 </Button>
@@ -3075,19 +3211,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                               }}
                               disabled={isGenerating}
                               size="sm"
-                              className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-2 py-1 text-xs font-medium"
+                              className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
                             >
                               {isGenerating ? (
                                 <>
                                   <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                  <span className="hidden sm:inline">Generating...</span>
-                                  <span className="sm:hidden">Gen...</span>
+                                  <span>Gen...</span>
                                 </>
                               ) : (
                                 <>
                                   <Printer className="w-3 h-3 mr-1" />
-                                  <span className="hidden sm:inline">Generate Report</span>
-                                  <span className="sm:hidden">PDF</span>
+                                  <span>Generate Report</span>
                                 </>
                               )}
                             </Button>
@@ -3354,39 +3488,42 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
 
         {/* Command Center Summary Modal */}
         {showCommandCenterSummary && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg transition-all duration-300 bg-green-100 border border-green-200">
-                    <Command className="w-6 h-6 transition-colors duration-300 text-green-600" />
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-gray-200">
+              <div className="flex items-center justify-between p-8 border-b border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-sm"></div>
+                    <div className="relative p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <Command className="w-6 h-6 text-emerald-600" />
+                    </div>
                   </div>
                   <div>
-                    <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
-                      {summaryViewType === "quarterly" ? "Quarterly Report Summary" : "Weekly Report Summary"}
+                    <h3 className="text-3xl font-semibold tracking-tight text-gray-900">
+                      {summaryViewType === "quarterly" ? "Quarterly Report" : "Weekly Report"}
                     </h3>
-                    <p className="text-sm transition-colors duration-300 text-gray-600">Command Center operational overview</p>
+                    <p className="text-gray-500 mt-1">Command Center operational insights</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   {/* View Type Toggle */}
-                  <div className="flex bg-gray-100 rounded-lg p-1">
+                  <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-200">
                     <button
                       onClick={() => setSummaryViewType("monthly")}
-                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         summaryViewType === "monthly"
-                          ? "bg-white text-green-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
+                          ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                       }`}
                     >
                       Monthly
                     </button>
                     <button
                       onClick={() => setSummaryViewType("quarterly")}
-                      className={`px-3 py-1 text-sm font-medium rounded-md transition-colors duration-200 ${
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
                         summaryViewType === "quarterly"
-                          ? "bg-white text-green-600 shadow-sm"
-                          : "text-gray-600 hover:text-gray-900"
+                          ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
                       }`}
                     >
                       Quarterly
@@ -3394,68 +3531,92 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   </div>
                   <button
                     onClick={() => setShowCommandCenterSummary(false)}
-                    className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                    className="p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-gray-200"
                   >
-                    <X className="h-6 w-6" />
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
               </div>
-              <div className="p-6 overflow-y-auto max-h-[75vh]">
+              <div className="p-8 overflow-y-auto max-h-[75vh] bg-gray-50/30">
                 {(() => {
                   const summary = summaryViewType === "quarterly" 
                     ? calculateQuarterlySummary()
                     : calculateWeeklyReportSummary();
                   return (
-                    <div className="space-y-8">
+                    <div className="space-y-10">
                       {/* Overview Stats */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-blue-600">Total Entries</p>
-                              <p className="text-2xl font-bold text-blue-900">{summary.totalEntries}</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-blue-600/80 mb-2">Total Entries</p>
+                                <p className="text-3xl font-bold text-blue-900">{summary.totalEntries}</p>
+                              </div>
+                              <div className="p-3 bg-blue-100 rounded-xl">
+                                <FileText className="h-6 w-6 text-blue-600" />
+                              </div>
                             </div>
-                            <FileText className="h-8 w-8 text-blue-600" />
                           </div>
                         </div>
                         
-                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-green-600">Total Weekly Sum</p>
-                              <p className="text-2xl font-bold text-green-900">{summary.totalWeeklySum}</p>
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-emerald-600/80 mb-2">Total Weekly Sum</p>
+                                <p className="text-3xl font-bold text-emerald-900">{summary.totalWeeklySum}</p>
+                              </div>
+                              <div className="p-3 bg-emerald-100 rounded-xl">
+                                <BarChart3 className="h-6 w-6 text-emerald-600" />
+                              </div>
                             </div>
-                            <BarChart3 className="h-8 w-8 text-green-600" />
                           </div>
                         </div>
                         
-                        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-purple-600">Unique Barangays</p>
-                              <p className="text-2xl font-bold text-purple-900">{summary.uniqueBarangays}</p>
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-violet-600/80 mb-2">Unique Barangays</p>
+                                <p className="text-3xl font-bold text-violet-900">{summary.uniqueBarangays}</p>
+                              </div>
+                              <div className="p-3 bg-violet-100 rounded-xl">
+                                <MapPin className="h-6 w-6 text-violet-600" />
+                              </div>
                             </div>
-                            <MapPin className="h-8 w-8 text-purple-600" />
                           </div>
                         </div>
                         
-                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-orange-600">Concern Types</p>
-                              <p className="text-2xl font-bold text-orange-900">{summary.uniqueConcernTypes}</p>
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-amber-600/80 mb-2">Concern Types</p>
+                                <p className="text-3xl font-bold text-amber-900">{summary.uniqueConcernTypes}</p>
+                              </div>
+                              <div className="p-3 bg-amber-100 rounded-xl">
+                                <AlertTriangle className="h-6 w-6 text-amber-600" />
+                              </div>
                             </div>
-                            <AlertTriangle className="h-8 w-8 text-orange-600" />
                           </div>
                         </div>
                       </div>
 
                       {/* Breakdown Section */}
-                      <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <BarChart3 className="h-5 w-5 text-gray-600" />
-                          {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
-                        </h3>
+                      <div className="bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-8 shadow-sm">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="p-2 bg-gray-100 rounded-xl">
+                            <BarChart3 className="h-5 w-5 text-gray-600" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
+                          </h3>
+                        </div>
                         
                         {summaryViewType === "quarterly" ? (
                           // Quarterly View
@@ -3538,33 +3699,37 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                           </div>
                         ) : (
                           // Weekly View
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <div className="text-center">
-                              <div className="bg-yellow-100 border border-yellow-300 rounded-lg p-3">
-                                <p className="text-sm font-medium text-yellow-800">Week 1</p>
-                                <p className="text-xl font-bold text-yellow-900">{summary.totalWeek1}</p>
-                                <p className="text-xs text-yellow-700">{months[selectedMonth]} 1-7</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-yellow-700 mb-2">Week 1</p>
+                                <p className="text-2xl font-bold text-yellow-900 mb-1">{summary.totalWeek1}</p>
+                                <p className="text-xs text-yellow-600">{months[selectedMonth]} 1-7</p>
                               </div>
                             </div>
-                            <div className="text-center">
-                              <div className="bg-green-100 border border-green-300 rounded-lg p-3">
-                                <p className="text-sm font-medium text-green-800">Week 2</p>
-                                <p className="text-xl font-bold text-green-900">{summary.totalWeek2}</p>
-                                <p className="text-xs text-green-700">{months[selectedMonth]} 8-14</p>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 to-emerald-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-emerald-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-emerald-700 mb-2">Week 2</p>
+                                <p className="text-2xl font-bold text-emerald-900 mb-1">{summary.totalWeek2}</p>
+                                <p className="text-xs text-emerald-600">{months[selectedMonth]} 8-14</p>
                               </div>
                             </div>
-                            <div className="text-center">
-                              <div className="bg-blue-100 border border-blue-300 rounded-lg p-3">
-                                <p className="text-sm font-medium text-blue-800">Week 3</p>
-                                <p className="text-xl font-bold text-blue-900">{summary.totalWeek3}</p>
-                                <p className="text-xs text-blue-700">{months[selectedMonth]} 15-21</p>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-blue-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-blue-700 mb-2">Week 3</p>
+                                <p className="text-2xl font-bold text-blue-900 mb-1">{summary.totalWeek3}</p>
+                                <p className="text-xs text-blue-600">{months[selectedMonth]} 15-21</p>
                               </div>
                             </div>
-                            <div className="text-center">
-                              <div className="bg-purple-100 border border-purple-300 rounded-lg p-3">
-                                <p className="text-sm font-medium text-purple-800">Week 4</p>
-                                <p className="text-xl font-bold text-purple-900">{summary.totalWeek4}</p>
-                                <p className="text-xs text-purple-700">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-violet-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-violet-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-violet-700 mb-2">Week 4</p>
+                                <p className="text-2xl font-bold text-violet-900 mb-1">{summary.totalWeek4}</p>
+                                <p className="text-xs text-violet-600">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
                               </div>
                             </div>
                           </div>
@@ -3615,68 +3780,99 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                       </div>
 
                       {/* Top Lists */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <AlertTriangle className="h-5 w-5 text-orange-600" />
-                            Top Concern Types
-                          </h3>
-                          {summary.topConcernTypes.length > 0 ? (
-                            <div className="space-y-2">
-                              {summary.topConcernTypes.map((item, index) => (
-                                <div key={item.type} className="flex justify-between items-center p-2 bg-orange-50 rounded-lg">
-                                  <span className="text-sm font-medium text-orange-900">{item.type}</span>
-                                  <span className="text-sm font-bold text-orange-700">{item.count}</span>
-                                </div>
-                              ))}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-center gap-3 mb-6">
+                              <div className="p-2 bg-amber-100 rounded-xl">
+                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900">Top Concern Types</h3>
                             </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">No concern types recorded</p>
-                          )}
+                            {summary.topConcernTypes.length > 0 ? (
+                              <div className="space-y-3">
+                                {summary.topConcernTypes.map((item, index) => (
+                                  <div key={item.type} className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100/50 rounded-xl border border-amber-200/30 hover:shadow-sm transition-all duration-200">
+                                    <span className="text-sm font-medium text-amber-900">{item.type}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-bold text-amber-700 bg-amber-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <AlertTriangle className="h-6 w-6 text-gray-400" />
+                                </div>
+                                <p className="text-sm text-gray-500">No concern types recorded</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <MapPin className="h-5 w-5 text-purple-600" />
-                            Top Barangays
-                          </h3>
-                          {summary.topBarangays.length > 0 ? (
-                            <div className="space-y-2">
-                              {summary.topBarangays.map((item, index) => (
-                                <div key={item.barangay} className="flex justify-between items-center p-2 bg-purple-50 rounded-lg">
-                                  <span className="text-sm font-medium text-purple-900">{item.barangay}</span>
-                                  <span className="text-sm font-bold text-purple-700">{item.count}</span>
-                                </div>
-                              ))}
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-center gap-3 mb-6">
+                              <div className="p-2 bg-violet-100 rounded-xl">
+                                <MapPin className="h-5 w-5 text-violet-600" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900">Top Barangays</h3>
                             </div>
-                          ) : (
-                            <p className="text-sm text-gray-500">No barangays recorded</p>
-                          )}
+                            {summary.topBarangays.length > 0 ? (
+                              <div className="space-y-3">
+                                {summary.topBarangays.map((item, index) => (
+                                  <div key={item.barangay} className="flex justify-between items-center p-4 bg-gradient-to-r from-violet-50 to-violet-100/50 rounded-xl border border-violet-200/30 hover:shadow-sm transition-all duration-200">
+                                    <span className="text-sm font-medium text-violet-900">{item.barangay}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-bold text-violet-700 bg-violet-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <MapPin className="h-6 w-6 text-gray-400" />
+                                </div>
+                                <p className="text-sm text-gray-500">No barangays recorded</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Summary Info */}
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                        <div className="flex items-start gap-3">
-                          <div className="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                            <BarChart3 className="h-4 w-4 text-green-600" />
-                          </div>
-                          <div>
-                            <h4 className="font-semibold text-green-900 mb-1">
-                              {summaryViewType === "quarterly" 
-                                ? `Quarterly Summary for ${summary.year || selectedYear}`
-                                : `Summary for ${months[selectedMonth]} ${selectedYear}`
-                              }
-                            </h4>
-                            <p className="text-sm text-green-700">
-                              {summary.municipality} • 
-                              {summary.totalEntries} total entries • 
-                              {summary.totalWeeklySum} total weekly sum • 
-                              {summary.completionRate}% completion rate
-                              {summaryViewType === "quarterly" && summary.quarterlyStats && (
-                                <span> • {summary.quarterlyStats.length} quarters analyzed</span>
-                              )}
-                            </p>
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-8">
+                          <div className="flex items-start gap-4">
+                            <div className="p-3 bg-emerald-100 rounded-xl">
+                              <BarChart3 className="h-6 w-6 text-emerald-600" />
+                            </div>
+                            <div className="flex-1">
+                              <h4 className="text-xl font-semibold text-gray-900 mb-3">
+                                {summaryViewType === "quarterly" 
+                                  ? `Quarterly Summary for ${summary.year || selectedYear}`
+                                  : `Summary for ${months[selectedMonth]} ${selectedYear}`
+                                }
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                                <div className="space-y-2">
+                                  <p><span className="font-medium text-gray-900">Municipality:</span> {summary.municipality}</p>
+                                  <p><span className="font-medium text-gray-900">Total Entries:</span> {summary.totalEntries}</p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p><span className="font-medium text-gray-900">Weekly Sum:</span> {summary.totalWeeklySum}</p>
+                                  <p><span className="font-medium text-gray-900">Completion Rate:</span> {summary.completionRate}%</p>
+                                  {summaryViewType === "quarterly" && summary.quarterlyStats && (
+                                    <p><span className="font-medium text-gray-900">Quarters Analyzed:</span> {summary.quarterlyStats.length}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -3684,10 +3880,10 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   );
                 })()}
               </div>
-              <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <div className="flex justify-end gap-4 p-8 border-t border-gray-100 bg-gray-50/50">
                 <button
                   onClick={() => setShowCommandCenterSummary(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="px-6 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                 >
                   Close
                 </button>
