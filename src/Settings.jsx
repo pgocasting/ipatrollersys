@@ -157,31 +157,31 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div className="flex items-center gap-2">
                         {passwordValidation.isLongEnough ? 
-                          <CheckCircle2 className="h-4 w-4 text-primary" /> : 
+                          <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />}
                         <span>At least 8 characters</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {passwordValidation.hasUpperCase ? 
-                          <CheckCircle2 className="h-4 w-4 text-primary" /> : 
+                          <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />}
                         <span>Uppercase letter</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {passwordValidation.hasLowerCase ? 
-                          <CheckCircle2 className="h-4 w-4 text-primary" /> : 
+                          <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />}
                         <span>Lowercase letter</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {passwordValidation.hasNumbers ? 
-                          <CheckCircle2 className="h-4 w-4 text-primary" /> : 
+                          <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />}
                         <span>Number</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {passwordValidation.hasSpecialChar ? 
-                          <CheckCircle2 className="h-4 w-4 text-primary" /> : 
+                          <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
                           <AlertCircle className="h-4 w-4 text-muted-foreground" />}
                         <span>Special character</span>
                       </div>
