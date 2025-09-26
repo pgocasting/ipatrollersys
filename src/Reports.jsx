@@ -71,6 +71,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [summaryViewType, setSummaryViewType] = useState("monthly"); // "monthly" or "quarterly"
   const [commandCenterData, setCommandCenterData] = useState({});
   const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
+  const [isGeneratingCommandCenterReport, setIsGeneratingCommandCenterReport] = useState(false);
   
   // Action Center Summary modal state
   const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
@@ -142,6 +143,28 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     loadCommandCenterData();
   }, [selectedMonth, selectedYear]);
+
+  // Calculate total Command Center reports
+  const getTotalCommandCenterReports = () => {
+    const reports = commandCenterData.reports || {};
+    return Object.values(reports).reduce((sum, report) => {
+      if (report.weeklyReportData) {
+        return sum + Object.values(report.weeklyReportData).reduce((dateSum, dateEntries) => {
+          return dateSum + (Array.isArray(dateEntries) ? dateEntries.length : 0);
+        }, 0);
+      }
+      return sum;
+    }, 0);
+  };
+
+  // Calculate total Quarry Site Monitoring reports
+  const getTotalQuarryMonitoringReports = () => {
+    // TODO: Implement when Quarry Site Monitoring data structure is available
+    // For now, return 0 since the feature is in "Coming Soon" status
+    // In future implementation, this would fetch from quarry monitoring collection
+    // and count inspection reports, compliance reports, environmental assessments, etc.
+    return 0;
+  };
 
   // Translation and grammar correction function (from Action Center)
   const translateAndCorrectGrammar = (text) => {
@@ -464,13 +487,26 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = ipatrollerPatrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        const isActive = dailyCount >= 5;
+        
+        // Get the actual barangay count for this municipality
+        const totalBarangays = barangayCounts[municipality] || 0;
+        const isActive = totalBarangays > 0 ? dailyCount >= totalBarangays : dailyCount >= 5;
+        
+        // Calculate percentage based on actual barangay count
+        let percentage = 0;
+        if (totalBarangays > 0) {
+          percentage = Math.min(100, Math.round((dailyCount / totalBarangays) * 100));
+        } else {
+          // Fallback to old logic if barangay count is not available
+          percentage = dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100);
+        }
         
         return {
           municipality,
           dailyCount,
+          totalBarangays,
           isActive,
-          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
+          percentage
         };
       });
     });
@@ -1534,9 +1570,25 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   };
 
   // Command Center Report (using real Firebase data with municipality details)
-  const generateCommandCenterReport = () => {
-    const paperConfig = getPaperConfig(paperSize);
-    const doc = new jsPDF('p', 'mm', paperConfig.format);
+  const generateCommandCenterReport = async () => {
+    if (isGeneratingCommandCenterReport) {
+      console.log('Report generation already in progress...');
+      return;
+    }
+    
+    setIsGeneratingCommandCenterReport(true);
+    try {
+      console.log('Starting Command Center Report generation...');
+      console.log('Command Center Data:', commandCenterData);
+      
+      // Check if data is available
+      if (!commandCenterData.reports || Object.keys(commandCenterData.reports).length === 0) {
+        console.log('No Command Center data available, loading data first...');
+        await loadCommandCenterData();
+      }
+      
+      const paperConfig = getPaperConfig(paperSize);
+      const doc = new jsPDF('p', 'mm', paperConfig.format);
     
     // Calculate center position
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -1857,6 +1909,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
     
     doc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+    console.log('Command Center Report generated successfully!');
+    } catch (error) {
+      console.error('Error generating Command Center Report:', error);
+      alert('Error generating Command Center Report. Please check the console for details.');
+    } finally {
+      setIsGeneratingCommandCenterReport(false);
+    }
   };
 
   // Command Center Summary calculation functions (using real Firebase data)
@@ -2798,46 +2857,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
 
 
-  const generateAllReports = async () => {
-    setIsGenerating(true);
-    
-    try {
-      // Generate all specific reports with proper error handling
-      const reportFunctions = [
-        { name: 'I-Patroller Summary', func: generateIPatrollerSummaryReport },
-        { name: 'Command Center Report', func: generateCommandCenterReport },
-        { name: 'Action Center Report', func: generateActionCenterReport },
-        { name: 'Incidents Report', func: generateIncidentsReport },
-        { name: 'Quarry Site Monitoring Report', func: generateQuarrySiteMonitoringReport }
-      ];
-
-      let successCount = 0;
-      let errorCount = 0;
-
-      for (let i = 0; i < reportFunctions.length; i++) {
-        try {
-          await new Promise(resolve => setTimeout(resolve, 200)); // Small delay between reports
-          reportFunctions[i].func();
-          successCount++;
-        } catch (error) {
-          console.error(`Error generating ${reportFunctions[i].name}:`, error);
-          errorCount++;
-        }
-      }
-      
-      // Show success message with details
-      if (errorCount === 0) {
-        alert(`All ${successCount} reports generated successfully! Check your downloads folder.`);
-      } else {
-        alert(`${successCount} reports generated successfully, ${errorCount} failed. Check console for details.`);
-      }
-    } catch (error) {
-      console.error('Error generating reports:', error);
-      alert('Error generating reports. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   // Main report sections (matching exact data from each page)
   const reportSections = [
@@ -3024,86 +3043,101 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             <h1 className="text-3xl font-bold text-gray-900">Reports Center</h1>
             <p className="text-gray-500 mt-2">Generate comprehensive reports across all system modules</p>
           </div>
-          <Button
-            onClick={generateAllReports}
-            disabled={isGenerating}
-            className="bg-black hover:bg-gray-800 text-white border-2 border-black hover:border-gray-800 transition-all duration-200 px-6 py-3 text-base font-semibold"
-          >
-            {isGenerating ? (
-              <>
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                Generating All Reports...
-              </>
-            ) : (
-              <>
-                <Printer className="mr-3 h-5 w-5" />
-                Generate All Reports
-              </>
-            )}
-          </Button>
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
+        <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Total Action Reports</p>
-                  <p className="text-3xl font-bold text-blue-600">
-                    {(actionReports || []).length.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <Target className="w-8 h-8 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-3xl font-bold text-red-600">
-                    {(incidents || []).length.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Active Days</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Active Days</p>
                   <p className="text-3xl font-bold text-green-600">
                     {calculateOverallSummary().totalActive.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle2 className="w-8 h-8 text-green-600" />
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
                 <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Avg Active %</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Avg Active %</p>
                   <p className="text-3xl font-bold text-orange-600">
                     {calculateOverallSummary().avgActivePercentage}%
                   </p>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <Target className="w-8 h-8 text-orange-600" />
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Target className="w-5 h-5 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Command Center</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {getTotalCommandCenterReports().toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Action Reports</p>
+                  <p className="text-3xl font-bold text-blue-600">
+                    {(actionReports || []).length.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Target className="w-5 h-5 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {(incidents || []).length.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Quarry Monitoring</p>
+                  <p className="text-3xl font-bold text-red-600">
+                    {getTotalQuarryMonitoringReports().toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
                 </div>
               </div>
             </CardContent>
@@ -3159,19 +3193,24 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                               {report.actions.map((actionItem, actionIndex) => (
                                 <Button
                                   key={actionIndex}
-                                  onClick={() => {
-                                    setIsGenerating(true);
-                                    try {
-                                      actionItem.action();
-                                    } finally {
-                                      setTimeout(() => setIsGenerating(false), 1000);
+                                  onClick={async () => {
+                                    if (actionItem.name === "Generate Report" && section.id === "commandcenter") {
+                                      // Handle Command Center report generation with its own loading state
+                                      await actionItem.action();
+                                    } else {
+                                      setIsGenerating(true);
+                                      try {
+                                        await actionItem.action();
+                                      } finally {
+                                        setTimeout(() => setIsGenerating(false), 1000);
+                                      }
                                     }
                                   }}
-                                  disabled={isGenerating}
+                                  disabled={isGenerating || (actionItem.name === "Generate Report" && section.id === "commandcenter" && isGeneratingCommandCenterReport)}
                                   size="sm"
                                   className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
                                 >
-                                  {isGenerating ? (
+                                  {(isGenerating || (actionItem.name === "Generate Report" && section.id === "commandcenter" && isGeneratingCommandCenterReport)) ? (
                                     <>
                                       <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
                                       <span>Gen...</span>
@@ -4102,7 +4141,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                               <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
                               <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
                               <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
-                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Barangays)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
@@ -4117,18 +4156,23 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                   </span>
                                 </td>
                                 <td className="px-4 py-2">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full rounded-full ${
-                                          data.isActive ? 'bg-green-500' :
-                                          data.percentage >= 50 ? 'bg-yellow-500' :
-                                          'bg-red-500'
-                                        }`}
-                                        style={{ width: `${data.percentage}%` }}
-                                      />
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${
+                                            data.isActive ? 'bg-green-500' :
+                                            data.percentage >= 50 ? 'bg-yellow-500' :
+                                            'bg-red-500'
+                                          }`}
+                                          style={{ width: `${data.percentage}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
                                     </div>
-                                    <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                    <div className="text-xs text-gray-500 text-center">
+                                      {data.dailyCount} / {data.totalBarangays} barangays
+                                    </div>
                                   </div>
                                 </td>
                               </tr>
