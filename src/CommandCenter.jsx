@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
   Command, 
@@ -75,7 +75,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     saveWeeklyReportByMunicipality,
     getWeeklyReportsFromCollection,
     updateWeeklyReportInCollection,
-    deleteWeeklyReportFromCollection
+    deleteWeeklyReportFromCollection,
+    deleteAllWeeklyReports
   } = useFirebase();
 
   const [terminalInput, setTerminalInput] = useState("");
@@ -211,7 +212,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   ];
 
   const currentYear = new Date().getFullYear();
-  const years = [(currentYear - 1).toString(), currentYear.toString(), (currentYear + 1).toString()];
+  const years = [currentYear.toString(), (currentYear + 1).toString()];
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -260,10 +261,128 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   const currentDates = generateDates(selectedMonth, selectedYear);
 
+  // Enhanced debug function to check all Firestore collections and data
+  const debugFirestoreDocuments = async () => {
+    try {
+      console.log('🔍 COMPREHENSIVE FIRESTORE DEBUG - Starting analysis...');
+      const { collection, getDocs, listCollections } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      
+      // Check if database is available
+      if (!db) {
+        console.error('❌ Firestore database not available');
+        return;
+      }
+      
+      console.log('✅ Firestore database connection OK');
+      
+      // List all available collections
+      console.log('📂 Checking available collections...');
+      try {
+        // Check common collections that might contain Command Center data
+        const collectionsToCheck = ['commandCenter', 'weeklyReports', 'reports', 'barangays', 'concernTypes'];
+        
+        for (const collectionName of collectionsToCheck) {
+          try {
+            const querySnapshot = await getDocs(collection(db, collectionName));
+            const documents = [];
+            querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              documents.push({
+                id: doc.id,
+                dataKeys: Object.keys(data),
+                hasData: !!data.data,
+                hasWeeklyReportData: !!(data.data && data.data.weeklyReportData),
+                hasWeeklyData: !!data.weeklyReportData,
+                dataStructure: typeof data
+              });
+            });
+            
+            console.log(`📋 Collection "${collectionName}":`, {
+              exists: true,
+              documentCount: documents.length,
+              documents: documents
+            });
+            
+            // Check for pattern matches in this collection
+            if (selectedMonth && selectedYear) {
+              const currentPattern = `${selectedMonth}_${selectedYear}`;
+              const matchingDocs = documents.filter(doc => 
+                doc.id.includes(currentPattern) || 
+                doc.id.includes(selectedMonth) || 
+                doc.id.includes(selectedYear)
+              );
+              if (matchingDocs.length > 0) {
+                console.log(`🎯 Found potential matches in "${collectionName}":`, matchingDocs);
+              }
+            }
+            
+          } catch (collectionError) {
+            console.log(`📋 Collection "${collectionName}": Does not exist or no access`);
+          }
+        }
+        
+      } catch (error) {
+        console.error('❌ Error checking collections:', error);
+      }
+      
+    } catch (error) {
+      console.error('❌ Error in comprehensive Firestore debug:', error);
+    }
+  };
+
+  // Manual data loading function for testing different paths
+  const testDataLoading = async (collectionName, documentId) => {
+    try {
+      console.log(`🧪 TESTING: Loading from ${collectionName}/${documentId}`);
+      const { doc, getDoc } = await import('firebase/firestore');
+      const { db } = await import('./firebase');
+      
+      const docRef = doc(db, collectionName, documentId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        console.log(`✅ TEST SUCCESS: Found document ${collectionName}/${documentId}:`, {
+          dataKeys: Object.keys(data),
+          hasData: !!data.data,
+          hasWeeklyReportData: !!(data.data && data.data.weeklyReportData),
+          hasDirectWeeklyData: !!data.weeklyReportData,
+          fullData: data
+        });
+        
+        // Try to load this data into the Command Center
+        if (data.data && data.data.weeklyReportData) {
+          console.log('🔄 Loading nested data structure...');
+          setWeeklyReportData(data.data.weeklyReportData);
+        } else if (data.weeklyReportData) {
+          console.log('🔄 Loading direct data structure...');
+          setWeeklyReportData(data.weeklyReportData);
+        } else {
+          console.log('⚠️ No recognizable weekly report data structure found');
+        }
+        
+      } else {
+        console.log(`❌ TEST FAILED: Document ${collectionName}/${documentId} does not exist`);
+      }
+      
+    } catch (error) {
+      console.error(`❌ TEST ERROR: Error loading ${collectionName}/${documentId}:`, error);
+    }
+  };
+
+  // Add test function to window for manual testing
+  useEffect(() => {
+    window.testCommandCenterData = testDataLoading;
+    console.log('🧪 Test function available: window.testCommandCenterData("collectionName", "documentId")');
+  }, []);
+
   // Load data from Firestore on component mount
   useEffect(() => {
     loadBarangaysFromFirestore();
     loadConcernTypesFromFirestore();
+    // Add debug function call
+    debugFirestoreDocuments();
   }, []);
 
   // Set default active municipality tab when component loads
@@ -294,19 +413,24 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [selectedYear, activeMunicipalityTab, allMonthsData]); // Removed selectedMonth from dependencies
 
-  // Load all months data from local storage on component mount
+  // Load weekly report data when month changes
   useEffect(() => {
-    const storedData = localStorage.getItem('allMonthsWeeklyData');
-    if (storedData) {
-      try {
-        const parsedData = JSON.parse(storedData);
-        setAllMonthsData(parsedData);
-        console.log('📦 Loaded all months data from local storage:', Object.keys(parsedData));
-      } catch (error) {
-        console.error('❌ Error loading all months data from local storage:', error);
-      }
+    console.log('📅 Month changed, reloading data:', {
+      selectedMonth,
+      selectedYear,
+      activeMunicipalityTab
+    });
+    
+    // Only load if we have a valid month and year
+    if (selectedMonth && selectedYear) {
+      console.log('✅ Valid month selection, calling loadWeeklyReportData()');
+      loadWeeklyReportData();
+    } else {
+      console.log('❌ Invalid month/year for month change, skipping loadWeeklyReportData()');
     }
-  }, []);
+  }, [selectedMonth]); // Only watch selectedMonth changes
+
+  // Component initialization - removed local storage usage
 
   // Clear concern types when municipality changes
   useEffect(() => {
@@ -336,79 +460,111 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [activeMunicipalityTab]);
 
-  // Function to manually load data for any month from local storage
-  const loadMonthDataFromStorage = (monthName) => {
-    const monthKey = monthName.toLowerCase();
-    console.log(`🔍 Manually loading data for month: ${monthKey}`);
-    console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
-    console.log(`📊 Data for ${monthKey}:`, allMonthsData[monthKey] ? `${allMonthsData[monthKey].length} entries` : 'No data');
-    
-    if (allMonthsData[monthKey] && allMonthsData[monthKey].length > 0) {
-      console.log(`📦 Loading from local storage for ${monthName}`);
+  // Removed local storage functionality - data now comes from Firestore only
+
+  // Find and load available data from Firestore
+  const findAndLoadAvailableData = async () => {
+    try {
+      console.log('🔍 Searching for any available data in nested structure...');
       
-      // Convert the stored data to the format expected by weeklyReportData
-      const convertedData = {};
-      allMonthsData[monthKey].forEach(entry => {
-        // Filter by municipality if activeMunicipalityTab is set
-        if (activeMunicipalityTab && entry.municipality && entry.municipality !== activeMunicipalityTab) {
-          console.log(`⏭️ Skipping entry for municipality: ${entry.municipality} (current: ${activeMunicipalityTab})`);
-          return;
-        }
+      // Search in the nested structure: commandCenter > weeklyReports > [municipalities]
+      try {
+        const weeklyReportsRef = collection(db, 'commandCenter', 'weeklyReports');
+        const municipalitySnapshot = await getDocs(weeklyReportsRef);
         
-        const dateKey = entry.date;
-        if (!convertedData[dateKey]) {
-          convertedData[dateKey] = [];
-        }
-        
-        // Fix barangay name case sensitivity for dropdown matching
-        let fixedEntry = { ...entry };
-        if (entry.barangay && importedBarangays.length > 0) {
-          // Extract barangay name and municipality from the entry
-          const barangayParts = entry.barangay.split(',').map(part => part.trim());
-          const excelBarangayName = barangayParts[0] || '';
-          const excelMunicipality = barangayParts[1] || '';
+        if (!municipalitySnapshot.empty) {
+          console.log(`📊 Found ${municipalitySnapshot.size} municipalities in weeklyReports`);
           
-          // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
-          const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
-            if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
-              return null;
+          // Check each municipality
+          for (const municipalityDoc of municipalitySnapshot.docs) {
+            const municipalityName = municipalityDoc.id;
+            console.log(`🔍 Checking municipality: ${municipalityName}`);
+            
+            // Get all month/year documents for this municipality
+            const monthsRef = collection(db, 'commandCenter', 'weeklyReports', municipalityName);
+            const monthsSnapshot = await getDocs(monthsRef);
+            
+            if (!monthsSnapshot.empty) {
+              console.log(`📊 Found ${monthsSnapshot.size} month documents for ${municipalityName}`);
+              
+              // Check each month document
+              for (const monthDoc of monthsSnapshot.docs) {
+                const data = monthDoc.data();
+                const monthDocId = monthDoc.id;
+                
+                console.log(`🔍 Checking ${municipalityName}/${monthDocId}:`, Object.keys(data));
+                
+                if (data.weeklyReportData && Object.keys(data.weeklyReportData).length > 0) {
+                  console.log('✅ Found available data! Loading...', Object.keys(data.weeklyReportData).slice(0, 3));
+                  setWeeklyReportData(data.weeklyReportData);
+                  
+                  // Extract month/year from document ID or data
+                  const monthYearMatch = monthDocId.match(/([A-Za-z]+)_(\d{4})/);
+                  if (monthYearMatch) {
+                    const [, month, year] = monthYearMatch;
+                    console.log(`📅 Auto-setting month/year to: ${month} ${year}`);
+                    setSelectedMonth(month);
+                    setSelectedYear(year);
+                  } else if (data.selectedMonth && data.selectedYear) {
+                    console.log(`📅 Auto-setting from data: ${data.selectedMonth} ${data.selectedYear}`);
+                    setSelectedMonth(data.selectedMonth);
+                    setSelectedYear(data.selectedYear);
+                  }
+                  
+                  // Set the municipality tab
+                  if (municipalityName !== 'All') {
+                    console.log(`📍 Auto-setting municipality to: ${municipalityName}`);
+                    setActiveMunicipalityTab(municipalityName);
+                  }
+                  
+                  return true;
+                }
+              }
             }
-
-            const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const excelNameNorm = normalize(excelBarangayName);
-            const excelMuniNorm = normalize(excelMunicipality);
-
-            return barangayList.find(barangay => {
-              const barangayName = barangay.name.split(' (')[0].trim();
-              const municipality = barangay.municipality;
-              const nameNorm = normalize(barangayName);
-              const muniNorm = normalize(municipality);
-
-              const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
-              const municipalityMatch = muniNorm === excelMuniNorm;
-
-              return nameMatch && municipalityMatch;
-            });
-          };
-          
-          // Try to find a matching barangay with correct case
-          const matchingBarangay = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
-          if (matchingBarangay) {
-            // Use the correctly cased barangay name from the imported list
-            fixedEntry.barangay = `${matchingBarangay.name}, ${excelMunicipality}`;
-            console.log(`🔧 Fixed barangay case: "${entry.barangay}" -> "${fixedEntry.barangay}"`);
           }
         }
-        
-        convertedData[dateKey].push(fixedEntry);
-      });
+      } catch (error) {
+        console.log('❌ Error checking nested structure:', error);
+      }
       
-      setWeeklyReportData(convertedData);
-      console.log(`✅ Manually loaded ${allMonthsData[monthKey].length} entries from local storage for ${monthName}`);
-      console.log(`📊 Converted data structure:`, Object.keys(convertedData).length, 'dates');
-      return true;
-    } else {
-      console.log(`❌ No data found for ${monthName} in local storage`);
+      // Fallback to old structure search
+      console.log('🔄 Falling back to old structure search...');
+      const collections = ['commandCenter', 'weeklyReports'];
+      
+      for (const collectionName of collections) {
+        try {
+          const querySnapshot = await getDocs(collection(db, collectionName));
+          
+          if (!querySnapshot.empty) {
+            console.log(`📊 Found ${querySnapshot.size} documents in ${collectionName}`);
+            
+            for (const doc of querySnapshot.docs) {
+              const data = doc.data();
+              console.log(`🔍 Checking document ${doc.id}:`, Object.keys(data));
+              
+              let weeklyData = null;
+              if (data.weeklyReportData && Object.keys(data.weeklyReportData).length > 0) {
+                weeklyData = data.weeklyReportData;
+              } else if (data.data && data.data.weeklyReportData && Object.keys(data.data.weeklyReportData).length > 0) {
+                weeklyData = data.data.weeklyReportData;
+              }
+              
+              if (weeklyData) {
+                console.log('✅ Found available data in old structure! Loading...', Object.keys(weeklyData).slice(0, 3));
+                setWeeklyReportData(weeklyData);
+                return true;
+              }
+            }
+          }
+        } catch (error) {
+          console.log(`❌ Error checking collection ${collectionName}:`, error);
+        }
+      }
+      
+      console.log('❌ No available data found in any structure');
+      return false;
+    } catch (error) {
+      console.error('❌ Error searching for available data:', error);
       return false;
     }
   };
@@ -424,39 +580,120 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
     try {
-      // PRIORITY: Load from Firestore first (saved data takes precedence)
+      // NEW: Load from nested collection structure: commandCenter > weeklyReports > Municipality > MonthYear
       const monthYear = `${selectedMonth}_${selectedYear}`;
-      const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
-      const reportKey = `${monthYear}${municipalityKey}`;
+      const municipality = activeMunicipalityTab || 'All';
+      const reportKey = `${monthYear}${activeMunicipalityTab ? `_${activeMunicipalityTab}` : ''}`;
       
-      console.log('🔍 Checking Firestore for saved data first:', reportKey);
-      const result = await getWeeklyReport(reportKey);
+      console.log('🔍 Loading from nested collection structure:', {
+        selectedMonth,
+        selectedYear,
+        activeMunicipalityTab,
+        monthYear,
+        municipality,
+        expectedPath: `commandCenter/weeklyReports/${municipality}/${monthYear}`
+      });
       
-      if (result.success && result.data && result.data.weeklyReportData) {
-        console.log('📊 Loaded SAVED data from Firestore:', result.data);
-        setWeeklyReportData(result.data.weeklyReportData);
-        console.log('✅ Loaded weeklyReportData from Firestore:', Object.keys(result.data.weeklyReportData).length, 'dates');
-        
-        // Load form fields if they exist (for backward compatibility)
-        setSelectedBarangay(result.data.selectedBarangay || "");
-        setSelectedConcernType(result.data.selectedConcernType || "");
-        setActionTaken(result.data.actionTaken || "");
-        setRemarks(result.data.remarks || "");
-        console.log('✅ Loaded weekly report data for:', reportKey);
-        return;
+      // Try to load from the nested structure first
+      let result = null;
+      if (activeMunicipalityTab) {
+        try {
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            result = {
+              success: true,
+              data: docSnap.data()
+            };
+            console.log('✅ Found data in nested structure:', docSnap.data());
+          } else {
+            console.log('❌ No document found in nested structure');
+            result = { success: false, data: null };
+          }
+        } catch (error) {
+          console.error('❌ Error loading from nested structure:', error);
+          result = { success: false, data: null, error };
+        }
       }
       
-      // FALLBACK: If no saved data in Firestore, check local storage
-      console.log(`📦 No saved data found in Firestore, checking local storage for ${selectedMonth}`);
-      const loadedFromStorage = loadMonthDataFromStorage(selectedMonth);
+      // Fallback to old structure if nested doesn't work
+      if (!result || !result.success) {
+        console.log('🔄 Trying fallback to old structure...');
+        result = await getWeeklyReport(reportKey);
+      }
       
-      if (loadedFromStorage) {
-        // Clear form fields
-        setSelectedBarangay("");
-        setSelectedConcernType("");
-        setActionTaken("");
-        setRemarks("");
-        return;
+      console.log('🔍 Firestore Query Result:', {
+        success: result.success,
+        hasData: !!result.data,
+        dataKeys: result.data ? Object.keys(result.data) : [],
+        hasWeeklyReportData: !!(result.data && result.data.weeklyReportData),
+        weeklyReportDataKeys: result.data && result.data.weeklyReportData ? Object.keys(result.data.weeklyReportData) : [],
+        error: result.error
+      });
+      
+      if (result.success && result.data && Object.keys(result.data).length > 0) {
+        console.log('📊 Found data in Firestore:', result.data);
+        console.log('📋 Data structure keys:', Object.keys(result.data));
+        
+        let weeklyData = null;
+        
+        // Try different data structure patterns
+        if (result.data.weeklyReportData) {
+          // New structure: { weeklyReportData: {...}, selectedBarangay: "...", ... }
+          console.log('📊 Using new data structure (weeklyReportData)');
+          weeklyData = result.data.weeklyReportData;
+        } else if (result.data.data && result.data.data.weeklyReportData) {
+          // Nested structure: { data: { weeklyReportData: {...}, ... } }
+          console.log('📊 Using nested data structure (data.weeklyReportData)');
+          weeklyData = result.data.data.weeklyReportData;
+        } else if (result.data.data && typeof result.data.data === 'object') {
+          // Legacy structure: { data: { "January 1, 2024": [...], ... } }
+          console.log('📊 Using legacy data structure (direct data)');
+          weeklyData = result.data.data;
+        } else {
+          // Direct structure: { "January 1, 2024": [...], ... }
+          console.log('📊 Checking for direct date structure');
+          const dateKeys = Object.keys(result.data).filter(key => 
+            key.includes('January') || key.includes('February') || key.includes('March') ||
+            key.includes('April') || key.includes('May') || key.includes('June') ||
+            key.includes('July') || key.includes('August') || key.includes('September') ||
+            key.includes('October') || key.includes('November') || key.includes('December')
+          );
+          if (dateKeys.length > 0) {
+            console.log('📊 Using direct date structure');
+            weeklyData = result.data;
+          }
+        }
+        
+        if (weeklyData && Object.keys(weeklyData).length > 0) {
+          console.log('✅ Loading weekly data with', Object.keys(weeklyData).length, 'dates');
+          console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
+          console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
+          
+          setWeeklyReportData(weeklyData);
+          
+          // Force re-render by updating a dummy state
+          setIsLoadingWeeklyReports(false);
+          setTimeout(() => setIsLoadingWeeklyReports(false), 100);
+          
+          // Load form fields if they exist (for backward compatibility)
+          const formData = result.data.data || result.data;
+          setSelectedBarangay(formData.selectedBarangay || "");
+          setSelectedConcernType(formData.selectedConcernType || "");
+          setActionTaken(formData.actionTaken || "");
+          setRemarks(formData.remarks || "");
+          console.log('✅ Loaded weekly report data for:', reportKey);
+          return;
+        } else {
+          console.log('⚠️ Found document but no recognizable weekly data structure');
+        }
+      } else {
+        console.log('❌ No data found in Firestore for key:', reportKey);
+        
+        // Try to find data for other months/years if current selection has no data
+        console.log('🔍 Searching for available data in other months...');
+        await findAndLoadAvailableData();
       }
       
       // If no data anywhere, initialize empty structure
@@ -543,7 +780,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Get data for a specific date (returns array of entries)
   const getDateData = (date) => {
-    return weeklyReportData[date] || [];
+    const data = weeklyReportData[date] || [];
+    // Debug logging for data retrieval
+    if (Object.keys(weeklyReportData).length > 0 && data.length === 0) {
+      console.log(`🔍 getDateData Debug - Looking for: "${date}", Available keys:`, Object.keys(weeklyReportData).slice(0, 5), 'Found:', data.length, 'entries');
+    }
+    return data;
   };
 
   // Validate weekly report data
@@ -712,46 +954,78 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Clear all data (weekly reports, barangays, concern types)
+  // Clear all entries (weekly report data for ALL municipalities across ALL months, keep barangays and concern types)
   const handleClearAllData = async () => {
-    if (window.confirm(`Are you sure you want to clear ALL data including weekly reports, barangays, and concern types? This action cannot be undone.`)) {
-      try {
-        // Clear weekly report data
-        initializeWeeklyReportData();
-        setSelectedBarangay("");
-        setSelectedConcernType("");
-        setActionTaken("");
-        setRemarks("");
-        
-        // Clear barangays
-        const barangayResult = await saveBarangays([]);
-        if (barangayResult.success) {
-          setImportedBarangays([]);
-          setSelectedBarangays([]);
+    const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
+
+This will permanently DELETE ALL weekly reports from the database:
+• ALL municipalities
+• ALL months and years  
+• ALL weekly report data
+
+Barangays and concern types will be kept.
+This action CANNOT be undone.
+
+Are you absolutely sure you want to proceed?`;
+
+    if (window.confirm(confirmMessage)) {
+      // Double confirmation for safety
+      const doubleConfirm = window.prompt(
+        'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
+      );
+      
+      if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
+        try {
+          toast.loading('Deleting all weekly reports from database...', { duration: 0, id: 'clear-all-delete' });
+          
+          // Use the comprehensive delete function
+          const result = await deleteAllWeeklyReports();
+          
+          toast.dismiss('clear-all-delete');
+          
+          if (result.success) {
+            if (result.errors && result.errors.length > 0) {
+              toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
+              console.warn('❌ Deletion errors:', result.errors);
+            } else {
+              toast.success(`Successfully deleted all ${result.deletedCount} weekly reports from database`);
+              showSuccess(`All weekly reports deleted successfully! Deleted ${result.deletedCount} documents from database. Barangay and concern type options are preserved.`);
+            }
+            
+            // Clear local state
+            initializeWeeklyReportData();
+            setSelectedBarangay("");
+            setSelectedConcernType("");
+            setActionTaken("");
+            setRemarks("");
+            
+            // Reload collection view if open
+            if (showCollectionView) {
+              await loadWeeklyReportsCollection();
+            }
+            
+            // Add to terminal history
+            const newEntry = {
+              id: Date.now(),
+              command: "clear.all.data.delete",
+              output: `Deleted ${result.deletedCount} weekly reports from all database locations`,
+              type: "warning",
+              timestamp: new Date()
+            };
+            setTerminalHistory(prev => [...prev, newEntry]);
+            
+          } else {
+            toast.error(`Failed to delete weekly reports: ${result.error}`);
+            showError(`Failed to delete weekly reports: ${result.error}`);
+          }
+        } catch (error) {
+          toast.dismiss('clear-all-delete');
+          console.error('❌ Error in clear all data:', error);
+          toast.error('Error deleting weekly reports from database');
+          showError('Error deleting weekly reports from database');
         }
-        
-        // Clear concern types
-        const concernTypeResult = await saveConcernTypes([]);
-        if (concernTypeResult.success) {
-          setImportedConcernTypes([]);
-        }
-        
-        toast.success("All data cleared successfully");
-        showSuccess('All data cleared successfully!');
-        
-        // Add to terminal history
-        const newEntry = {
-          id: Date.now(),
-          command: "clear.all",
-          output: "All data cleared successfully",
-          type: "warning",
-          timestamp: new Date()
-        };
-        setTerminalHistory(prev => [...prev, newEntry]);
-      } catch (error) {
-        console.error("Error clearing all data:", error);
-        toast.error("Error clearing all data: " + error.message);
-        showError('Error clearing all data: ' + error.message);
+      } else {
+        toast.info('Clear all data cancelled - confirmation text did not match');
       }
     }
   };
@@ -1624,9 +1898,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const getSortedConcernTypes = () => {
-    // First filter by municipality if filter is set
+    // First filter by municipality if filter is set or if user is not admin
     let filteredConcernTypes = importedConcernTypes;
-    if (concernTypeFilterMunicipality) {
+    
+    // For non-admin users, automatically filter by their municipality
+    if (!isAdmin && userMunicipality) {
+      filteredConcernTypes = importedConcernTypes.filter(concernType => 
+        concernType.municipality.toLowerCase() === userMunicipality.toLowerCase()
+      );
+    } else if (concernTypeFilterMunicipality) {
       filteredConcernTypes = importedConcernTypes.filter(concernType => 
         concernType.municipality.toLowerCase() === concernTypeFilterMunicipality.toLowerCase()
       );
@@ -2762,12 +3042,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           
           console.log(`✅ Processed data for months:`, Object.keys(newAllMonthsData));
           
-          // Store in local storage
-          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(newAllMonthsData));
+          // Data stored in memory only (no local storage)
           setAllMonthsData(newAllMonthsData);
           
-          // Debug: Show what's being stored
-          console.log(`💾 Stored data in local storage:`, Object.keys(newAllMonthsData));
+          // Debug: Show what's being stored in memory
+          console.log(`💾 Stored data in memory:`, Object.keys(newAllMonthsData));
           Object.keys(newAllMonthsData).forEach(month => {
             console.log(`📊 ${month}: ${newAllMonthsData[month].length} entries`);
             if (newAllMonthsData[month].length > 0) {
@@ -3225,6 +3504,76 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
+  // Bulk delete ALL weekly reports from ALL locations in Firestore
+  const handleDeleteAllWeeklyReports = async () => {
+    const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
+
+This will permanently delete ALL weekly reports from:
+• weeklyReports collection
+• commandCenter legacy documents (weeklyReports_*)
+• Any other weekly report documents in the database
+
+This action affects ALL municipalities, ALL months, and ALL years.
+This action CANNOT be undone.
+
+Are you absolutely sure you want to proceed?`;
+
+    if (window.confirm(confirmMessage)) {
+      // Double confirmation for safety
+      const doubleConfirm = window.prompt(
+        'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
+      );
+      
+      if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
+        try {
+          toast.loading('Deleting all weekly reports...', { duration: 0, id: 'bulk-delete' });
+          
+          const result = await deleteAllWeeklyReports();
+          
+          toast.dismiss('bulk-delete');
+          
+          if (result.success) {
+            if (result.errors && result.errors.length > 0) {
+              toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
+              console.warn('❌ Deletion errors:', result.errors);
+            } else {
+              toast.success(`Successfully deleted all ${result.deletedCount} weekly reports`);
+            }
+            
+            // Clear local state
+            initializeWeeklyReportData();
+            setSelectedBarangay("");
+            setSelectedConcernType("");
+            setActionTaken("");
+            setRemarks("");
+            
+            // Reload collection view
+            await loadWeeklyReportsCollection();
+            
+            // Add to terminal history
+            const newEntry = {
+              id: Date.now(),
+              command: "bulk.delete.weekly.reports",
+              output: `Deleted ${result.deletedCount} weekly reports from all locations`,
+              type: "warning",
+              timestamp: new Date()
+            };
+            setTerminalHistory(prev => [...prev, newEntry]);
+            
+          } else {
+            toast.error(`Failed to delete weekly reports: ${result.error}`);
+          }
+        } catch (error) {
+          toast.dismiss('bulk-delete');
+          console.error('❌ Error in bulk delete:', error);
+          toast.error('Error deleting weekly reports');
+        }
+      } else {
+        toast.info('Bulk deletion cancelled - confirmation text did not match');
+      }
+    }
+  };
+
   // Save weekly report data to Firestore
   const handleSaveWeeklyReport = async () => {
     const monthYear = `${selectedMonth}_${selectedYear}`;
@@ -3268,23 +3617,36 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         sampleData: Object.keys(weeklyReportData).slice(0, 3)
       });
 
+      // Save to the nested structure: commandCenter > weeklyReports > Municipality > MonthYear
+      let nestedSaveResult = { success: false };
+      if (activeMunicipalityTab) {
+        try {
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
+          await setDoc(docRef, reportData);
+          nestedSaveResult = { success: true };
+          console.log('✅ Saved to nested structure successfully');
+        } catch (error) {
+          console.error('❌ Error saving to nested structure:', error);
+          nestedSaveResult = { success: false, error };
+        }
+      }
+      
       // Save to the original location (for backward compatibility)
       const saveResult = await saveWeeklyReport(reportKey, reportData);
       
       // Also save to the new weeklyReports collection
       const collectionSaveResult = await saveWeeklyReportToCollection(reportData);
       
-      if (saveResult.success && collectionSaveResult.success) {
+      if ((nestedSaveResult.success || saveResult.success) && collectionSaveResult.success) {
         toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
         
-        // CLEAR LOCAL STORAGE DATA: Remove any conflicting local storage data for this month
+        // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
         const monthKey = selectedMonth.toLowerCase();
         if (allMonthsData[monthKey]) {
-          console.log('🧹 Clearing local storage data for this month to prevent conflicts');
+          console.log('🧹 Clearing memory data for this month to prevent conflicts');
           const updatedAllMonthsData = { ...allMonthsData };
           delete updatedAllMonthsData[monthKey];
           setAllMonthsData(updatedAllMonthsData);
-          localStorage.setItem('allMonthsWeeklyData', JSON.stringify(updatedAllMonthsData));
         }
         
         // Add to terminal history
@@ -3406,9 +3768,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         setSaveAllProgress({ current: i + 1, total: monthKeys.length });
       }
 
-      // After batch save, clear local storage cache to avoid conflicts
+      // After batch save, clear memory cache
       setAllMonthsData({});
-      localStorage.removeItem('allMonthsWeeklyData');
       toast.success('Finished saving all imported months');
     } finally {
       setIsSavingAllMonths(false);
@@ -3484,23 +3845,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </button>
                 )}
 
-                {/* Show Concern Types only for admin */}
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      setActiveTab("concern-types");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "concern-types"
-                        ? "bg-orange-50 text-orange-700"
-                        : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
-                    }`}
-                  >
-                    <AlertTriangle className="w-4 h-4 text-orange-600" />
-                    <span>Concern Types</span>
-                  </button>
-                )}
+                {/* Show Concern Types for all users */}
+                <button
+                  onClick={() => {
+                    setActiveTab("concern-types");
+                    setShowMenuDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                    activeTab === "concern-types"
+                      ? "bg-orange-50 text-orange-700"
+                      : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                  <span>Concern Types</span>
+                </button>
 
 
                 </div>
@@ -3513,78 +3872,109 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       {/* Main Dashboard */}
       <div className="space-y-4">
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-            <div className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {isAdmin 
-                      ? importedBarangays.length 
-                      : importedBarangays.filter(b => b.municipality === userMunicipality).length}
-                  </p>
+        {/* Quick Stats - Administrator Only */}
+        {isAdmin && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {importedBarangays.length}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Building2 className="w-6 h-6 text-blue-600" />
+                  </div>
                 </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Building2 className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Type of Concerns</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {importedConcernTypes.length}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <AlertTriangle className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Municipalities</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {new Set(importedBarangays.map(b => b.municipality)).size}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <Building2 className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Districts</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {new Set(importedBarangays.map(b => b.district)).size}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <MapPin className="w-6 h-6 text-purple-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Reports</p>
+                    <p className="text-2xl font-bold text-orange-600">
+                      {Object.values(weeklyReportData).reduce((total, entries) => total + (Array.isArray(entries) ? entries.length : 0), 0)}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <FileText className="w-6 h-6 text-orange-600" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <div className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Action Taken</p>
+                    <p className="text-2xl font-bold text-teal-600">
+                      {Object.values(weeklyReportData).reduce((total, entries) => {
+                        if (!Array.isArray(entries)) return total;
+                        return total + entries.filter(entry => entry.actionTaken && entry.actionTaken.trim()).length;
+                      }, 0)}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-teal-100 rounded-lg">
+                    <CheckCircle className="w-6 h-6 text-teal-600" />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-
-          {isAdmin && (
-            <>
-              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Districts</p>
-                      <p className="text-2xl font-bold text-green-600">
-                        {new Set(importedBarangays.map(b => b.district)).size}
-                      </p>
-                    </div>
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <MapPin className="w-6 h-6 text-green-600" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Municipalities</p>
-                      <p className="text-2xl font-bold text-red-600">
-                        {new Set(importedBarangays.map(b => b.municipality)).size}
-                      </p>
-                    </div>
-                    <div className="p-2 bg-red-100 rounded-lg">
-                      <Building2 className="w-6 h-6 text-red-600" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-                <div className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Active Systems</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        4
-                      </p>
-                    </div>
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <Activity className="w-6 h-6 text-orange-600" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
+        )}
 
 
         {/* Weekly Report Section */}
@@ -3615,66 +4005,73 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                   <div className="flex flex-col gap-4">
-                    {/* Import Options */}
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 text-sm text-gray-700">
-                        <input
-                          type="checkbox"
-                          checked={importAllMonths}
-                          onChange={(e) => setImportAllMonths(e.target.checked)}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                        />
-                        <span>Import all months at once</span>
-                      </label>
-                    </div>
+                    {/* Import Options - Admin Only */}
+                    {isAdmin && (
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={importAllMonths}
+                            onChange={(e) => setImportAllMonths(e.target.checked)}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                          <span>Import all months at once</span>
+                        </label>
+                      </div>
+                    )}
                     
                     {/* Action Buttons */}
                     <div className="flex gap-3 overflow-x-auto">
                       
-                      <button 
-                        onClick={() => document.getElementById('excel-file-input').click()}
-                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0 disabled:opacity-50"
-                        title={importAllMonths ? "Import All Months" : "Import Excel"}
-                        disabled={isImportingExcel || isImportingAllMonths}
-                      >
+                      {isAdmin && (
+                        <button 
+                          onClick={() => document.getElementById('excel-file-input').click()}
+                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0 disabled:opacity-50"
+                          title={importAllMonths ? "Import All Months" : "Import Excel"}
+                          disabled={isImportingExcel || isImportingAllMonths}
+                        >
                         {(isImportingExcel || isImportingAllMonths) ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         ) : (
                           <FileSpreadsheet className="h-4 w-4" />
                         )}
-                        <span className="text-sm font-medium">
-                          {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
-                        </span>
-                      </button>
+                          <span className="text-sm font-medium">
+                            {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
+                          </span>
+                        </button>
+                      )}
                       
-                      <button
-                        onClick={handleSaveAllMonths}
-                        disabled={isSavingAllMonths || !Object.keys(allMonthsData || {}).length}
-                        className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                        title="Save All Imported Months"
-                      >
+                      {isAdmin && (
+                        <button
+                          onClick={handleSaveAllMonths}
+                          disabled={isSavingAllMonths || !Object.keys(allMonthsData || {}).length}
+                          className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                          title="Save All Imported Months"
+                        >
                         {isSavingAllMonths ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         ) : (
                           <Save className="h-4 w-4" />
                         )}
-                        <span className="text-sm font-medium">
-                          {isSavingAllMonths
-                            ? `Saving ${saveAllProgress.current}/${saveAllProgress.total}`
-                            : 'Save All Months'}
-                        </span>
-                      </button>
+                          <span className="text-sm font-medium">
+                            {isSavingAllMonths
+                              ? `Saving ${saveAllProgress.current}/${saveAllProgress.total}`
+                              : 'Save All Months'}
+                          </span>
+                        </button>
+                      )}
 
-                      <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
-                        <DialogTrigger asChild>
-                          <button 
-                            className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                            title="Clear Data"
-                          >
-                            <AlertTriangle className="h-4 w-4" />
-                            <span className="text-sm font-medium">Clear Data</span>
-                          </button>
-                        </DialogTrigger>
+                      {isAdmin && (
+                        <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
+                          <DialogTrigger asChild>
+                            <button 
+                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                              title="Clear Data"
+                            >
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">Clear Data</span>
+                            </button>
+                          </DialogTrigger>
                         
                         <DialogContent className="sm:max-w-md bg-white">
                           <DialogHeader>
@@ -3735,6 +4132,26 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                                 </button>
                               </div>
                             </div>
+                            
+                            {/* Clear All Entries */}
+                            <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                              <div className="flex items-center gap-3">
+                                <AlertTriangle className="h-5 w-5 text-red-700 flex-shrink-0" />
+                                <div className="flex-1">
+                                  <h4 className="text-sm font-medium text-red-900">Clear All Entries</h4>
+                                  <p className="text-xs text-red-700 mt-1">Reset ALL data for ALL municipalities across ALL months and years but keep dropdown options</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    handleClearAllData();
+                                    setShowClearModal(false);
+                                  }}
+                                  className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md text-sm font-medium transition-colors duration-200"
+                                >
+                                  Clear All
+                                </button>
+                              </div>
+                            </div>
                           </div>
                           
                           <DialogFooter>
@@ -3746,21 +4163,24 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                             </button>
                           </DialogFooter>
                         </DialogContent>
-                      </Dialog>
+                        </Dialog>
+                      )}
                       
-                      <button 
-                        onClick={handleSaveWeeklyReport}
-                        disabled={isLoadingWeeklyReports}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                        title="Save Data"
-                      >
-                        {isLoadingWeeklyReports ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <CheckCircle className="h-4 w-4" />
-                        )}
-                        <span className="text-sm font-medium">Save Data</span>
-                      </button>
+                      {isAdmin && (
+                        <button 
+                          onClick={handleSaveWeeklyReport}
+                          disabled={isLoadingWeeklyReports}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                          title="Save Data"
+                        >
+                          {isLoadingWeeklyReports ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                          <span className="text-sm font-medium">Save Data</span>
+                        </button>
+                      )}
                       
                     </div>
                     
@@ -3782,13 +4202,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <select 
                       value={selectedMonth}
                       onChange={(e) => {
-                        console.log('📅 Month dropdown changed to:', e.target.value);
-                        setSelectedMonth(e.target.value);
-                        // Automatically load data for the selected month
-                        setTimeout(() => {
-                          console.log('🔄 Auto-loading data for month:', e.target.value);
-                          loadMonthDataFromStorage(e.target.value);
-                        }, 100); // Small delay to ensure state is updated
+                        const newMonth = e.target.value;
+                        console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
+                        setSelectedMonth(newMonth);
+                        // Data will be loaded from Firestore via useEffect for month changes
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
                     >
@@ -3880,7 +4297,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     <thead>
                       <tr className="bg-white border-b-2 border-gray-300">
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32">
                           <div className="flex items-center gap-2">
                             <MapPinIcon className="h-4 w-4 text-blue-500" />
                             BARANGAY
@@ -3917,19 +4334,19 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                         <th className="px-4 py-3 border-r border-gray-200"></th>
                         <th className="px-4 py-3 border-r border-gray-200"></th>
                         <th className="px-4 py-3 border-r border-gray-200"></th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 1</div>
                           <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 2</div>
                           <div className="text-xs opacity-90">{selectedMonth} 8-14</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 3</div>
                           <div className="text-xs opacity-90">{selectedMonth} 15-21</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200">
+                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 4</div>
                           <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
                         </th>
@@ -3942,6 +4359,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                         const weekNumber = getWeekNumber(date);
                         const isWeekend = index % 7 >= 5; // Saturday and Sunday
                         const dateEntries = getDateData(date);
+                        
+                        // Debug logging for first few dates
+                        if (index < 3) {
+                          console.log(`🔍 Table Debug - Date: ${date}, Entries:`, dateEntries, 'WeeklyReportData keys:', Object.keys(weeklyReportData));
+                        }
                         
                         return (
                           <React.Fragment key={index}>
@@ -4874,7 +5296,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         {/* Type of Concern Management Section */}
         {activeTab === "concern-types" && (
           <div className="space-y-6">
-            {/* Concern Type Totals Section */}
+            {/* Concern Type Totals Card */}
             <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
               <div className="p-4 md:p-6 pb-0">
                 <div className="flex items-center gap-3">
@@ -4898,38 +5320,78 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {Object.keys(municipalitiesByDistrict).map((district) => {
-                      const districtConcernTypes = importedConcernTypes.filter(ct => ct.district === district);
-                      const municipalityCounts = districtConcernTypes.reduce((acc, concernType) => {
-                        acc[concernType.municipality] = (acc[concernType.municipality] || 0) + 1;
-                        return acc;
-                      }, {});
-
-                      return (
-                        <div key={district}>
-                          <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                            {district}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {municipalitiesByDistrict[district].map((municipality) => (
-                              <div key={municipality} className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                    {/* Show only user's municipality for non-admin users */}
+                    {!isAdmin && userMunicipality ? (
+                      // Non-admin users see only their municipality
+                      (() => {
+                        const userMunicipalityConcernTypes = importedConcernTypes.filter(ct => 
+                          ct.municipality.toLowerCase() === userMunicipality.toLowerCase()
+                        );
+                        const userDistrict = userMunicipalityConcernTypes.length > 0 ? userMunicipalityConcernTypes[0].district : null;
+                        
+                        return userDistrict ? (
+                          <div>
+                            <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                              {userDistrict}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
                                 <div className="flex items-center justify-between">
                                   <div>
-                                    <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
+                                    <h5 className="font-semibold text-gray-900 text-sm">{userMunicipality}</h5>
                                     <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
                                   </div>
                                   <div className="text-right">
-                                    <div className="text-2xl font-bold text-orange-600">{municipalityCounts[municipality] || 0}</div>
+                                    <div className="text-2xl font-bold text-orange-600">{userMunicipalityConcernTypes.length}</div>
                                     <div className="text-xs text-gray-500">types</div>
                                   </div>
                                 </div>
                               </div>
-                            ))}
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
+                        ) : (
+                          <div className="text-center py-8 text-gray-500">
+                            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                            <p>No concern types found for {userMunicipality}</p>
+                          </div>
+                        );
+                      })()
+                    ) : (
+                      // Admin users see all municipalities
+                      Object.keys(municipalitiesByDistrict).map((district) => {
+                        const districtConcernTypes = importedConcernTypes.filter(ct => ct.district === district);
+                        const municipalityCounts = districtConcernTypes.reduce((acc, concernType) => {
+                          acc[concernType.municipality] = (acc[concernType.municipality] || 0) + 1;
+                          return acc;
+                        }, {});
+
+                        return (
+                          <div key={district}>
+                            <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                              {district}
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {municipalitiesByDistrict[district].map((municipality) => (
+                                <div key={municipality} className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
+                                      <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-2xl font-bold text-orange-600">{municipalityCounts[municipality] || 0}</div>
+                                      <div className="text-xs text-gray-500">types</div>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
                   </div>
                 )}
               </div>
@@ -5025,9 +5487,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <div>
                         <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Concern Types</h3>
                         <p className="text-sm text-gray-600">
-                          {concernTypeFilterMunicipality 
-                            ? `${getSortedConcernTypes().length} of ${importedConcernTypes.length} types (${concernTypeFilterMunicipality})`
-                            : `${importedConcernTypes.length} types across ${Object.keys(getGroupedConcernTypes()).length} municipalities`
+                          {!isAdmin && userMunicipality 
+                            ? `${getSortedConcernTypes().length} types in ${userMunicipality}`
+                            : concernTypeFilterMunicipality 
+                              ? `${getSortedConcernTypes().length} of ${importedConcernTypes.length} types (${concernTypeFilterMunicipality})`
+                              : `${importedConcernTypes.length} types across ${Object.keys(getGroupedConcernTypes()).length} municipalities`
                           }
                         </p>
                       </div>
@@ -5036,19 +5500,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         {/* Filter and Sort Controls */}
                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Filter:</span>
-                        <select 
-                              value={concernTypeFilterMunicipality}
-                              onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                        >
-                          <option value="">All Municipalities</option>
-                              {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
-                            <option key={municipality} value={municipality}>{municipality}</option>
-                          ))}
-                        </select>
-                          </div>
+                          {/* Show filter dropdown only for admin users */}
+                          {isAdmin && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Filter:</span>
+                              <select 
+                                value={concernTypeFilterMunicipality}
+                                onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
+                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              >
+                                <option value="">All Municipalities</option>
+                                {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
+                                  <option key={municipality} value={municipality}>{municipality}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {/* Show municipality info for non-admin users */}
+                          {!isAdmin && userMunicipality && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Municipality:</span>
+                              <span className="text-sm font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">{userMunicipality}</span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-2">
                             <span className="text-sm text-gray-600">Sort by:</span>
                             <select
@@ -5084,13 +5558,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                             <Check className="h-4 w-4 mr-2" />
                             {selectedConcernTypes.length === getSortedConcernTypes().length ? 'Deselect All' : 'Select All'}
                           </button>
-                          <button
-                            onClick={handleExportConcernTypesCSV}
-                            className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Export CSV
-                          </button>
+                          {/* Show Export CSV button only for admin users */}
+                          {isAdmin && (
+                            <button
+                              onClick={handleExportConcernTypesCSV}
+                              className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Export CSV
+                            </button>
+                          )}
                         <button
                           onClick={handleEditSelectedConcernTypes}
                           disabled={selectedConcernTypes.length === 0}
@@ -5107,13 +5584,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                           <X className="h-4 w-4 mr-2" />
                           Clear Selected ({selectedConcernTypes.length})
                         </button>
-                        <button 
-                          onClick={handleClearConcernTypes} 
-                          className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                            Clear All
-                        </button>
+                        {/* Show Clear All Data button only for admin users */}
+                        {isAdmin && (
+                          <button 
+                            onClick={handleClearConcernTypes} 
+                            className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            Clear All Data
+                          </button>
+                        )}
                         </div>
                       </div>
                     )}
@@ -5324,22 +5804,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Actions</label>
-                    <button
-                      onClick={() => loadWeeklyReportsCollection({
-                        month: selectedMonth || undefined,
-                        year: selectedYear || undefined,
-                        municipality: activeMunicipalityTab || undefined
-                      })}
-                      disabled={isLoadingCollection}
-                      className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                    >
-                      {isLoadingCollection ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <CheckCircle className="w-4 h-4" />
-                      )}
-                      <span className="text-sm font-medium">Filter</span>
-                    </button>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => loadWeeklyReportsCollection({
+                          month: selectedMonth || undefined,
+                          year: selectedYear || undefined,
+                          municipality: activeMunicipalityTab || undefined
+                        })}
+                        disabled={isLoadingCollection}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                      >
+                        {isLoadingCollection ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <CheckCircle className="w-4 h-4" />
+                        )}
+                        <span className="text-sm font-medium">Filter</span>
+                      </button>
+                      
+                      <button
+                        onClick={handleDeleteAllWeeklyReports}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                        title="Delete ALL weekly reports from ALL locations in Firestore"
+                      >
+                        <AlertTriangle className="w-4 h-4" />
+                        <span className="text-sm font-medium">Delete All Reports</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>

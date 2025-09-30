@@ -257,9 +257,12 @@ export const useFirebase = () => {
       const docSnap = await getDoc(docRef);
 
       if (docSnap.exists()) {
-        const reportData = docSnap.data().data || {};
+        const fullDocData = docSnap.data();
         console.log('✅ Found weekly report in Firestore for:', monthYear);
-        return { success: true, data: reportData };
+        console.log('📊 Document structure:', Object.keys(fullDocData));
+        
+        // Return the full document data to match what the loading function expects
+        return { success: true, data: fullDocData };
       } else {
         console.log('📝 No weekly report found in Firestore for:', monthYear);
         return { success: true, data: {} };
@@ -1113,6 +1116,120 @@ export const useFirebase = () => {
     }
   };
 
+  // Bulk delete all weekly reports from all locations
+  const deleteAllWeeklyReports = async () => {
+    try {
+      console.log('🗑️ Starting bulk deletion of all weekly reports...');
+      
+      if (!db) {
+        console.warn('⚠️ Firestore database not available');
+        return { success: false, error: "Database not available" };
+      }
+      
+      if (!user) {
+        console.warn('⚠️ No user logged in');
+        return { success: false, error: "No user logged in" };
+      }
+
+      let deletedCount = 0;
+      const errors = [];
+
+      // 1. Delete from weeklyReports collection
+      try {
+        console.log('🔍 Deleting from weeklyReports collection...');
+        const weeklyReportsRef = collection(db, 'weeklyReports');
+        const weeklyReportsSnapshot = await getDocs(weeklyReportsRef);
+        
+        for (const docSnapshot of weeklyReportsSnapshot.docs) {
+          try {
+            await deleteDoc(doc(db, 'weeklyReports', docSnapshot.id));
+            deletedCount++;
+            console.log('✅ Deleted from weeklyReports collection:', docSnapshot.id);
+          } catch (error) {
+            console.error('❌ Error deleting from weeklyReports collection:', docSnapshot.id, error);
+            errors.push(`weeklyReports/${docSnapshot.id}: ${error.message}`);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error accessing weeklyReports collection:', error);
+        errors.push(`weeklyReports collection: ${error.message}`);
+      }
+
+      // 2. Delete from commandCenter legacy structure (weeklyReports_*)
+      try {
+        console.log('🔍 Deleting from commandCenter legacy structure...');
+        const commandCenterRef = collection(db, 'commandCenter');
+        const commandCenterSnapshot = await getDocs(commandCenterRef);
+        
+        for (const docSnapshot of commandCenterSnapshot.docs) {
+          if (docSnapshot.id.startsWith('weeklyReports_')) {
+            try {
+              await deleteDoc(doc(db, 'commandCenter', docSnapshot.id));
+              deletedCount++;
+              console.log('✅ Deleted from commandCenter legacy:', docSnapshot.id);
+            } catch (error) {
+              console.error('❌ Error deleting from commandCenter legacy:', docSnapshot.id, error);
+              errors.push(`commandCenter/${docSnapshot.id}: ${error.message}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error accessing commandCenter collection:', error);
+        errors.push(`commandCenter collection: ${error.message}`);
+      }
+
+      // 3. Check for any other weekly report documents in commandCenter collection
+      // This handles any other weekly report documents that might exist with different naming patterns
+      try {
+        console.log('🔍 Checking for additional weekly report documents in commandCenter...');
+        const commandCenterRef = collection(db, 'commandCenter');
+        const commandCenterSnapshot = await getDocs(commandCenterRef);
+        
+        for (const docSnapshot of commandCenterSnapshot.docs) {
+          // Look for any documents that contain weekly report data but weren't caught by the weeklyReports_ pattern
+          if (docSnapshot.id.includes('weekly') || docSnapshot.id.includes('Weekly')) {
+            try {
+              const docData = docSnapshot.data();
+              // Check if this document contains weekly report data
+              if (docData && (docData.weeklyReportData || docData.data)) {
+                await deleteDoc(doc(db, 'commandCenter', docSnapshot.id));
+                deletedCount++;
+                console.log('✅ Deleted additional weekly report document:', docSnapshot.id);
+              }
+            } catch (error) {
+              console.error('❌ Error deleting additional weekly report document:', docSnapshot.id, error);
+              errors.push(`commandCenter/${docSnapshot.id}: ${error.message}`);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('❌ Error checking for additional weekly report documents:', error);
+        errors.push(`Additional documents check: ${error.message}`);
+      }
+
+      console.log(`✅ Bulk deletion completed. Deleted ${deletedCount} documents.`);
+      
+      if (errors.length > 0) {
+        console.warn('⚠️ Some deletions failed:', errors);
+        return { 
+          success: true, 
+          deletedCount, 
+          errors,
+          message: `Deleted ${deletedCount} documents with ${errors.length} errors` 
+        };
+      }
+      
+      return { 
+        success: true, 
+        deletedCount,
+        message: `Successfully deleted all ${deletedCount} weekly reports` 
+      };
+    } catch (error) {
+      console.error('❌ Error in bulk deletion:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     user,
     loading,
@@ -1132,6 +1249,7 @@ export const useFirebase = () => {
     getWeeklyReportsFromCollection,
     updateWeeklyReportInCollection,
     deleteWeeklyReportFromCollection,
+    deleteAllWeeklyReports,
     createUserByAdmin,
     updateUser,
     deleteUser,

@@ -605,7 +605,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           if (data.column.index === 6 && data.section === 'body') {
             const status = data.cell.text[0];
             if (status === 'Very Satisfactory') {
-              data.cell.styles.fillColor = [16, 185, 129]; // Emerald
+              data.cell.styles.fillColor = [59, 130, 246]; // Blue
               data.cell.styles.textColor = [255, 255, 255];
             } else if (status === 'Very Good') {
               data.cell.styles.fillColor = [34, 197, 94]; // Green
@@ -1430,6 +1430,50 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">5 Below = Red</span>
               </div>
             </div>
+
+            {/* Daily Counts Tab Description */}
+            {activeTab === "daily" && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div className="w-full">
+                    <h4 className="font-semibold text-gray-900 mb-3">How Daily Counts Work</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div className="space-y-2">
+                        <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
+                        <p><strong>Color Coding:</strong> Green for 5+ patrols (Active), Red for below 5 (Inactive)</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p><strong>Minimum Requirement:</strong> At least 5 patrols per day to be considered active</p>
+                        <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Status Tab Description */}
+            {activeTab === "status" && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div className="w-full">
+                    <h4 className="font-semibold text-gray-900 mb-3">How Status System Works</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div className="space-y-2">
+                        <p><strong>Active Days:</strong> Days when patrol count is 5 or above (meets minimum requirement)</p>
+                        <p><strong>Inactive Days:</strong> Days when patrol count is below 5 (does not meet requirement)</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p><strong>% Active:</strong> Percentage of days that meet the minimum patrol requirement</p>
+                        <p><strong>Total:</strong> Sum of all patrol counts for the selected month</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -2031,6 +2075,26 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
             {/* Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
+              {/* Top Performers Description */}
+              <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Trophy className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div className="w-full">
+                    <h4 className="font-semibold text-gray-900 mb-3">How Top Performers Ranking Works</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div className="space-y-2">
+                        <p><strong>Ranking Criteria:</strong> Municipalities are ranked by active percentage first, then by total patrols</p>
+                        <p><strong>Performance Status:</strong> Very Satisfactory (100%), Very Good (75%+), Good (50%+), Needs Improvement (&lt;50%)</p>
+                      </div>
+                      <div className="space-y-2">
+                        <p><strong>Active Percentage:</strong> Calculated as (Active Days ÷ Total Days) × 100</p>
+                        <p><strong>Top 12 Display:</strong> Shows the best performing municipalities for the selected month</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {loadingTopPerformers ? (
                 <div className="text-center py-12">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
@@ -2156,7 +2220,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                 : 0;
                               
                               const getStatusStyle = () => {
-                                if (activePercentage === 100) return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                if (activePercentage === 100) return 'bg-blue-100 text-blue-800 border-blue-200';
                                 if (activePercentage >= 75) return 'bg-green-100 text-green-800 border-green-200';
                                 if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
                                 return 'bg-red-100 text-red-800 border-red-200';
