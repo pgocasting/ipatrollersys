@@ -69,9 +69,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     getBarangays, 
     saveConcernTypes, 
     getConcernTypes, 
-    saveWeeklyReport, 
     getWeeklyReport,
-    saveWeeklyReportToCollection,
     saveWeeklyReportByMunicipality,
     getWeeklyReportsFromCollection,
     updateWeeklyReportInCollection,
@@ -864,7 +862,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           clearedAt: new Date().toISOString()
         };
 
-        const saveResult = await saveWeeklyReport(reportKey, reportData);
+        // Save cleared data to nested structure
+        const saveResult = await saveWeeklyReportByMunicipality(reportData);
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
           showSuccess(`Weekly report data cleared for ${activeMunicipalityTab}`);
@@ -919,7 +918,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           clearedAt: new Date().toISOString()
         };
 
-        const saveResult = await saveWeeklyReport(reportKey, reportData);
+        // Save cleared data to nested structure
+        const saveResult = await saveWeeklyReportByMunicipality(reportData);
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${selectedClearMunicipality}`);
           showSuccess(`Weekly report data cleared for ${selectedClearMunicipality}`);
@@ -3631,13 +3631,8 @@ Are you absolutely sure you want to proceed?`;
         }
       }
       
-      // Save to the original location (for backward compatibility)
-      const saveResult = await saveWeeklyReport(reportKey, reportData);
-      
-      // Also save to the new weeklyReports collection
-      const collectionSaveResult = await saveWeeklyReportToCollection(reportData);
-      
-      if ((nestedSaveResult.success || saveResult.success) && collectionSaveResult.success) {
+      // Only use nested structure save - no more root level saves
+      if (nestedSaveResult.success) {
         toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
         
         // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
@@ -3746,17 +3741,12 @@ Are you absolutely sure you want to proceed?`;
           const reportKey = `${displayMonth}_${derivedYear}`;
 
           try {
-            const saveResult = await saveWeeklyReport(reportKey + `_${municipality}` , reportData);
-            const collectionSaveResult = await saveWeeklyReportToCollection(reportData);
+            // Only save to nested structure
             const muniSaveResult = await saveWeeklyReportByMunicipality(reportData);
-            if (saveResult.success && collectionSaveResult.success && muniSaveResult.success) {
+            if (muniSaveResult.success) {
               toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
             } else {
-              const msg = [
-                saveResult.success ? null : `legacy: ${saveResult.error || 'failed'}`,
-                collectionSaveResult.success ? null : `collection: ${collectionSaveResult.error || 'failed'}`,
-                muniSaveResult.success ? null : `byMunicipality: ${muniSaveResult.error || 'failed'}`
-              ].filter(Boolean).join(', ');
+              const msg = `byMunicipality: ${muniSaveResult.error || 'failed'}`;
               toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
             }
           } catch (err) {
