@@ -37,7 +37,9 @@ import {
   Menu,
   Filter,
   Car,
-  Activity
+  Activity,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 
 export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
@@ -1149,6 +1151,79 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </Table>
           </div>
         </div>
+        
+        {/* Pagination */}
+        {filteredItems.length > itemsPerPage && (
+          <div className="flex items-center justify-between px-4 py-3 bg-white border-t border-gray-200">
+            <div className="flex items-center text-sm text-gray-700">
+              <span>
+                Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredItems.length)} of {filteredItems.length} results
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {/* Previous Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(tablePage - 1)}
+                disabled={tablePage === 1}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+                Previous
+              </Button>
+              
+              {/* Page Numbers */}
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1)
+                  .filter(page => {
+                    // Show first page, last page, current page, and pages around current
+                    if (page === 1 || page === totalPages) return true;
+                    if (Math.abs(page - tablePage) <= 1) return true;
+                    return false;
+                  })
+                  .map((page, index, array) => {
+                    // Add ellipsis if there's a gap
+                    const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
+                    
+                    return (
+                      <React.Fragment key={page}>
+                        {showEllipsisBefore && (
+                          <span className="px-2 py-1 text-sm text-gray-500">...</span>
+                        )}
+                        <Button
+                          variant={page === tablePage ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => handlePageChange(page)}
+                          className={`px-3 py-1.5 text-sm min-w-[36px] ${
+                            page === tablePage 
+                              ? 'bg-blue-600 text-white border-blue-600 hover:bg-blue-700' 
+                              : 'border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {page}
+                        </Button>
+                      </React.Fragment>
+                    );
+                  })
+                }
+              </div>
+              
+              {/* Next Button */}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handlePageChange(tablePage + 1)}
+                disabled={tablePage === totalPages}
+                className="flex items-center gap-1 px-3 py-1.5 text-sm border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Add New Action Modal */}

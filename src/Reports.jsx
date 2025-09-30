@@ -3046,13 +3046,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-        <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Active Days</p>
-                  <p className="text-3xl font-bold text-green-600">
+                  <p className="text-2xl font-bold text-green-600">
                     {calculateOverallSummary().totalActive.toLocaleString()}
                   </p>
                 </div>
@@ -3063,12 +3063,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Avg Active %</p>
-                  <p className="text-3xl font-bold text-orange-600">
+                  <p className="text-2xl font-bold text-orange-600">
                     {calculateOverallSummary().avgActivePercentage}%
                   </p>
                 </div>
@@ -3079,28 +3079,28 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Command Center</p>
-                  <p className="text-3xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-600">
                     {getTotalCommandCenterReports().toLocaleString()}
                   </p>
                 </div>
                 <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <Command className="w-5 h-5 text-red-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Action Reports</p>
-                  <p className="text-3xl font-bold text-blue-600">
+                  <p className="text-2xl font-bold text-blue-600">
                     {(actionReports || []).length.toLocaleString()}
                   </p>
                 </div>
@@ -3111,12 +3111,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-3xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-600">
                     {(incidents || []).length.toLocaleString()}
                   </p>
                 </div>
@@ -3127,17 +3127,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36 flex items-center">
+          <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">Quarry Monitoring</p>
-                  <p className="text-3xl font-bold text-red-600">
+                  <p className="text-2xl font-bold text-red-600">
                     {getTotalQuarryMonitoringReports().toLocaleString()}
                   </p>
                 </div>
                 <div className="p-2 bg-red-100 rounded-lg">
-                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <Mountain className="w-5 h-5 text-red-600" />
                 </div>
               </div>
             </CardContent>
