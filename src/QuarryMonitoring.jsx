@@ -559,15 +559,68 @@ export default function QuarryMonitoring({ onLogout, onNavigate, currentPage }) 
                     <ChevronRight className="w-4 h-4" />
                   </Button>
                 </div>
-                <div>
-                  <Label htmlFor="date-picker">Select Date</Label>
-                  <Input
-                    id="date-picker"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="mt-1"
-                  />
+                
+                {/* Calendar Component */}
+                <div className="mt-4">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-center mb-3">
+                      <h4 className="font-semibold text-gray-900">
+                        {new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                      </h4>
+                    </div>
+                    
+                    {/* Calendar Grid */}
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {/* Day Headers */}
+                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                        <div key={day} className="text-xs font-medium text-gray-500 p-2">
+                          {day}
+                        </div>
+                      ))}
+                      
+                      {/* Calendar Days */}
+                      {(() => {
+                        const currentDate = new Date(selectedDate);
+                        const year = currentDate.getFullYear();
+                        const month = currentDate.getMonth();
+                        const firstDay = new Date(year, month, 1);
+                        const lastDay = new Date(year, month + 1, 0);
+                        const startDate = new Date(firstDay);
+                        startDate.setDate(startDate.getDate() - firstDay.getDay());
+                        
+                        const days = [];
+                        for (let i = 0; i < 42; i++) {
+                          const day = new Date(startDate);
+                          day.setDate(startDate.getDate() + i);
+                          
+                          const isCurrentMonth = day.getMonth() === month;
+                          const isSelected = day.toISOString().split('T')[0] === selectedDate;
+                          const isToday = day.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+                          
+                          days.push(
+                            <button
+                              key={i}
+                              onClick={() => setSelectedDate(day.toISOString().split('T')[0])}
+                              className={`
+                                p-2 text-sm rounded-md transition-colors
+                                ${isSelected 
+                                  ? 'bg-blue-600 text-white font-semibold' 
+                                  : isToday 
+                                    ? 'bg-blue-100 text-blue-600 font-medium'
+                                    : isCurrentMonth 
+                                      ? 'text-gray-900 hover:bg-gray-200' 
+                                      : 'text-gray-400 hover:bg-gray-100'
+                                }
+                              `}
+                            >
+                              {day.getDate()}
+                            </button>
+                          );
+                        }
+                        return days;
+                      })()}
+                    </div>
+                  </div>
                 </div>
               </CardContent>
             </Card>
