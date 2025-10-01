@@ -147,6 +147,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenuDropdown]);
 
+  // Auto-select district and municipality for Hermosa users when on concern types tab
+  useEffect(() => {
+    if (userMunicipality === 'Hermosa' && activeTab === 'concern-types') {
+      // Find the district that contains Hermosa
+      const hermosaDistrict = Object.entries(municipalitiesByDistrict).find(([district, municipalities]) => 
+        municipalities.includes('Hermosa')
+      );
+      
+      if (hermosaDistrict) {
+        setSelectedDistrict(hermosaDistrict[0]); // Set to "District 1"
+        setSelectedMunicipality('Hermosa');
+      }
+    }
+  }, [userMunicipality, activeTab]);
+
   // Weekly Report State
   const [weeklyReports, setWeeklyReports] = useState([]);
   const [selectedDate, setSelectedDate] = useState("");
@@ -5405,7 +5420,8 @@ Are you absolutely sure you want to proceed?`;
                       id="concern-district-select"
                       value={selectedDistrict} 
                       onChange={(e) => setSelectedDistrict(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      disabled={!!userMunicipality}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Choose district</option>
                       {Object.keys(municipalitiesByDistrict).map((district) => (
@@ -5422,7 +5438,7 @@ Are you absolutely sure you want to proceed?`;
                       id="concern-municipality-select"
                       value={selectedMunicipality} 
                       onChange={(e) => setSelectedMunicipality(e.target.value)}
-                      disabled={!selectedDistrict}
+                      disabled={!selectedDistrict || !!userMunicipality}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                     >
                       <option value="">Choose municipality</option>
