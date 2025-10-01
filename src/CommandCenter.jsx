@@ -53,8 +53,16 @@ import { Badge } from "./components/ui/badge";
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
-  const { isAdmin, userMunicipality } = useAuth();
+  const { isAdmin, userMunicipality, userAccessLevel } = useAuth();
   const { notifications, showSuccess, showError, removeNotification } = useNotification();
+  
+  // Access level check - only command-center users should access this page
+  useEffect(() => {
+    if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'admin') {
+      console.warn('⚠️ Unauthorized access attempt to Command Center. Access level:', userAccessLevel);
+      // Optionally redirect to dashboard or show error
+    }
+  }, [userAccessLevel]);
   
   // Municipality tabs state - moved here to be available for useEffect
   const [activeMunicipalityTab, setActiveMunicipalityTab] = useState("");
@@ -3877,103 +3885,109 @@ Are you absolutely sure you want to proceed?`;
       {/* Main Dashboard */}
       <div className="space-y-4">
 
-        {/* Quick Stats - Administrator Only */}
+        {/* Quick Stats - Modern shadcn Design */}
         {isAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
-                    <p className="text-2xl font-bold text-blue-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">Total Barangays</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {importedBarangays.length}
                     </p>
                   </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="w-6 h-6 text-blue-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <Building2 className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Type of Concerns</p>
-                    <p className="text-2xl font-bold text-green-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Concern Types</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {importedConcernTypes.length}
                     </p>
                   </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <AlertTriangle className="w-6 h-6 text-green-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <AlertTriangle className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Municipalities</p>
-                    <p className="text-2xl font-bold text-red-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-violet-500 via-violet-600 to-violet-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-violet-100 uppercase tracking-wider">Municipalities</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {new Set(importedBarangays.map(b => b.municipality)).size}
                     </p>
                   </div>
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <Building2 className="w-6 h-6 text-red-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <Building2 className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Districts</p>
-                    <p className="text-2xl font-bold text-purple-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-rose-500 via-rose-600 to-rose-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-rose-100 uppercase tracking-wider">Districts</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {new Set(importedBarangays.map(b => b.district)).size}
                     </p>
                   </div>
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <MapPin className="w-6 h-6 text-purple-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <MapPin className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Reports</p>
-                    <p className="text-2xl font-bold text-orange-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-orange-100 uppercase tracking-wider">Total Reports</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {Object.values(weeklyReportData).reduce((total, entries) => total + (Array.isArray(entries) ? entries.length : 0), 0)}
                     </p>
                   </div>
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <FileText className="w-6 h-6 text-orange-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <FileText className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Action Taken</p>
-                    <p className="text-2xl font-bold text-teal-600">
+            <div className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-teal-500 via-teal-600 to-teal-700 overflow-hidden relative group rounded-xl">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <div className="p-4 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-xs font-semibold text-teal-100 uppercase tracking-wider">Action Taken</p>
+                    <p className="text-3xl font-black text-white tracking-tight">
                       {Object.values(weeklyReportData).reduce((total, entries) => {
                         if (!Array.isArray(entries)) return total;
                         return total + entries.filter(entry => entry.actionTaken && entry.actionTaken.trim()).length;
                       }, 0)}
                     </p>
                   </div>
-                  <div className="p-2 bg-teal-100 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-teal-600" />
+                  <div className="p-2 bg-white/10 backdrop-blur-md rounded-lg border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <CheckCircle className="w-6 h-6 text-white" />
                   </div>
                 </div>
               </div>
