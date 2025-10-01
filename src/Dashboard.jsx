@@ -272,8 +272,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     weeklyReports: [],
     totalBarangays: 0,
     totalConcernTypes: 0,
-    totalReports: 0,
-    totalActionTaken: 0
+    totalReports: 0
   });
   const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
 
@@ -384,33 +383,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       });
       
       console.log(`✅ Loaded ${weeklyReports.length} documents successfully`);
-      
-      // Debug: Log sample of loaded data
-      if (weeklyReports.length > 0) {
-        console.log('📋 Sample weekly report structure:', {
-          firstReport: weeklyReports[0],
-          hasWeeklyReportData: !!weeklyReports[0]?.weeklyReportData,
-          weeklyReportDataKeys: weeklyReports[0]?.weeklyReportData ? Object.keys(weeklyReports[0].weeklyReportData).slice(0, 3) : []
-        });
-      } else {
-        console.warn('⚠️ No weekly reports loaded! Check Firebase path: commandCenter/weeklyReports/{municipality}/{monthYear}');
-        console.warn('⚠️ Expected municipalities:', municipalitiesToLoad);
-        console.warn('⚠️ Expected months:', monthsToLoad);
-      }
 
       // Calculate totals from actual weekly report data (monthly counts from Command Center table)
       // This counts ALL individual reports from each barangay on each date
       let totalReports = 0;
-      let totalActionTaken = 0;
       let reportBreakdown = {}; // For debugging
-      let actionBreakdown = {}; // For debugging
       
       weeklyReports.forEach(report => {
         if (report.weeklyReportData) {
           const monthKey = `${report.month} ${report.year}`;
           if (!reportBreakdown[monthKey]) {
             reportBreakdown[monthKey] = 0;
-            actionBreakdown[monthKey] = 0;
           }
           
           Object.entries(report.weeklyReportData).forEach(([dateKey, dateEntries]) => {
@@ -431,13 +414,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 
                 totalReports += entryTotal;
                 reportBreakdown[monthKey] += entryTotal;
-                
-                // Count action taken - if actionTaken field exists and is not empty
-                if (entry.actionTaken && entry.actionTaken.trim()) {
-                  // Count this as 1 action taken (regardless of how many weeks)
-                  totalActionTaken += 1;
-                  actionBreakdown[monthKey] += 1;
-                }
               });
             }
           });
@@ -445,14 +421,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       });
       
       console.log('📊 Dashboard: Total Reports Breakdown by Month:', reportBreakdown);
-      console.log('📊 Dashboard: Action Taken Breakdown by Month:', actionBreakdown);
 
       console.log('📊 Dashboard: Command Center data loaded:', {
         barangays: barangays.length,
         concernTypes: concernTypes.length,
         weeklyReports: weeklyReports.length,
-        totalReports,
-        totalActionTaken
+        totalReports
       });
 
       setRealCommandCenterData({
@@ -461,8 +435,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         weeklyReports,
         totalBarangays: barangays.length,
         totalConcernTypes: concernTypes.length,
-        totalReports,
-        totalActionTaken
+        totalReports
       });
 
     } catch (error) {
@@ -477,8 +450,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         weeklyReports: [],
         totalBarangays: 0,
         totalConcernTypes: 0,
-        totalReports: 0,
-        totalActionTaken: 0
+        totalReports: 0
       });
     } finally {
       setIsLoadingCommandCenter(false);
@@ -1394,7 +1366,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         totalBarangays: realCommandCenterData.totalBarangays,
         totalConcernTypes: realCommandCenterData.totalConcernTypes,
         totalReports: realCommandCenterData.totalReports,
-        totalActionTaken: realCommandCenterData.totalActionTaken,
         activeDistricts: 1,
         barangays: processedBarangays.length > 0 ? processedBarangays : getBarangaysForMunicipality(currentMunicipality),
         concernTypes: processedConcernTypes.length > 0 ? processedConcernTypes : getConcernTypesForMunicipality(currentMunicipality),
@@ -1440,7 +1411,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       totalBarangays: municipalityBarangays[currentMunicipality] || 23,
       totalConcernTypes: municipalityConcernTypes[currentMunicipality] || 35,
       totalReports: municipalityReports[currentMunicipality] || 45,
-      totalActionTaken: 0,
       activeDistricts: 1,
       barangays: getBarangaysForMunicipality(currentMunicipality),
       concernTypes: getConcernTypesForMunicipality(currentMunicipality),
@@ -1729,9 +1699,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats - Modern shadcn Design */
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* 1. Total Reports - Orange */}
-            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 overflow-hidden relative group">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* 1. Total Reports - FIRST */}
+            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-violet-500 via-violet-600 to-violet-700 overflow-hidden relative group">
               <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-start justify-between">
@@ -1740,12 +1710,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
                         <FileText className="w-5 h-5 text-white" />
                       </div>
-                      <p className="text-xs font-semibold text-orange-100 uppercase tracking-wider">Total Reports</p>
+                      <p className="text-xs font-semibold text-violet-100 uppercase tracking-wider">Total Reports</p>
                     </div>
                     <p className="text-5xl font-black text-white tracking-tight">
                       {commandCenterData.totalReports.toLocaleString()}
                     </p>
-                    <p className="text-sm text-orange-100/80">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
+                    <p className="text-sm text-violet-100/80">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
                   </div>
                   <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
                     <FileText className="w-10 h-10 text-white" />
@@ -1754,25 +1724,49 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
 
-            {/* 2. Action Taken - Teal */}
-            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-teal-500 via-teal-600 to-teal-700 overflow-hidden relative group">
+            {/* 2. Total Barangays - SECOND */}
+            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 overflow-hidden relative group">
               <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
                       <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                        <CheckCircle className="w-5 h-5 text-white" />
+                        <Building2 className="w-5 h-5 text-white" />
                       </div>
-                      <p className="text-xs font-semibold text-teal-100 uppercase tracking-wider">Action Taken</p>
+                      <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">Total Barangays</p>
                     </div>
                     <p className="text-5xl font-black text-white tracking-tight">
-                      {commandCenterData.totalActionTaken.toLocaleString()}
+                      {commandCenterData.totalBarangays.toLocaleString()}
                     </p>
-                    <p className="text-sm text-teal-100/80">Reports with actions completed</p>
+                    <p className="text-sm text-blue-100/80">In {userMunicipality || 'all municipalities'}</p>
                   </div>
                   <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                    <CheckCircle className="w-10 h-10 text-white" />
+                    <Building2 className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 3. Concern Types - THIRD */}
+            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                        <AlertTriangle className="w-5 h-5 text-white" />
+                      </div>
+                      <p className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Concern Types</p>
+                    </div>
+                    <p className="text-5xl font-black text-white tracking-tight">
+                      {commandCenterData.totalConcernTypes.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-emerald-100/80">Active categories</p>
+                  </div>
+                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <AlertTriangle className="w-10 h-10 text-white" />
                   </div>
                 </div>
               </CardContent>
