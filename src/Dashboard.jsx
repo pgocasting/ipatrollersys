@@ -5,6 +5,8 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Badge } from './components/ui/badge';
 import { Label } from './components/ui/label';
+import { Separator } from './components/ui/separator';
+import { Progress } from './components/ui/progress';
 import { useData } from './DataContext';
 import { useAuth } from './contexts/AuthContext';
 import { useFirebase } from './hooks/useFirebase';
@@ -29,17 +31,17 @@ import {
   CheckCircle,
   XCircle,
   Target,
-  Download,
-  PieChartIcon,
   AlertTriangle,
-  List,
   Building2,
   MapPin,
   Mountain,
   Shield,
   Pickaxe,
-  FileCheck,
-  FileText
+  FileText,
+  Users,
+  RefreshCw,
+  ArrowUpRight,
+  ArrowDownRight
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -708,231 +710,208 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-4 space-y-4 bg-gray-50 min-h-screen">
+      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex items-center justify-between space-y-2">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500 mt-2">
+            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
+            <p className="text-muted-foreground">
               {userAccessLevel === 'quarry-monitoring' 
-                ? 'Overview of quarry site operations and compliance monitoring'
+                ? 'Monitor quarry operations and compliance across all sites'
                 : userAccessLevel === 'command-center'
-                ? 'Overview of Command Center operations with barangay reports and concern types'
-                : 'Overview of IPatroller system performance based on yesterday\'s patrol data'
+                ? 'Command center operations with real-time barangay monitoring'
+                : 'Comprehensive system overview and performance analytics'
               }
             </p>
           </div>
-          
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Refresh
+            </Button>
+            <Button size="sm" onClick={() => onNavigate('reports')}>
+              <BarChart3 className="mr-2 h-4 w-4" />
+              View Reports
+            </Button>
+          </div>
         </div>
+        
+        <Separator />
 
-        {/* Quick Stats */}
+        {/* Statistics Cards */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Stats */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Sites</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {quarryData.totalSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Mountain className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Sites</CardTitle>
+                <Mountain className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{quarryData.totalSites.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-green-600">+12%</span> from last month
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Active Sites</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {quarryData.activeSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Sites</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{quarryData.activeSites.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-green-600">+8%</span> from last month
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Compliant</p>
-                    <p className="text-2xl font-bold text-emerald-600">
-                      {quarryData.compliantSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <Shield className="w-6 h-6 text-emerald-600" />
-                  </div>
-                </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Compliant</CardTitle>
+                <Shield className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{quarryData.compliantSites.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-green-600">+5%</span> from last month
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Violations</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {quarryData.violations.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
-                  </div>
-                </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Violations</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{quarryData.violations.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-red-600">-15%</span> from last month
+                </p>
               </CardContent>
             </Card>
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
-                    <p className="text-2xl font-bold text-blue-600">
-                      {commandCenterData.totalBarangays.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Barangays</CardTitle>
+                <Building2 className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{commandCenterData.totalBarangays.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  All monitored
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Concern Types</p>
-                    <p className="text-2xl font-bold text-green-600">
-                      {commandCenterData.totalConcernTypes.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <AlertTriangle className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Concern Types</CardTitle>
+                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{commandCenterData.totalConcernTypes.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  Active categories
+                </p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Reports</p>
-                    <p className="text-2xl font-bold text-red-600">
-                      {commandCenterData.totalReports.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <FileText className="w-6 h-6 text-red-600" />
-                  </div>
-                </div>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{commandCenterData.totalReports.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  This month
+                </p>
               </CardContent>
             </Card>
           </div>
         ) : (
           /* Regular Dashboard Stats */
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Municipalities</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {activeCount.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className={`grid gap-4 md:grid-cols-2 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Active Municipalities</CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{activeCount.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-green-600">{Math.round(activePercentage)}%</span> active
+                </p>
+              </CardContent>
+            </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Municipalities</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {inactiveCount.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Inactive Municipalities</CardTitle>
+                <XCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{inactiveCount.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-red-600">{Math.round(100 - activePercentage)}%</span> inactive
+                </p>
+              </CardContent>
+            </Card>
 
-          {userAccessLevel !== 'ipatroller' && (
-            <>
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
-                      <p className="text-2xl font-bold text-blue-600">
-                        {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
-                      </p>
+            {userAccessLevel !== 'ipatroller' && (
+              <>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
                     </div>
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Target className="w-6 h-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="text-green-600">+18%</span> this month
+                    </p>
+                  </CardContent>
+                </Card>
 
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
-                      <p className="text-2xl font-bold text-orange-600">
-                        {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
-                      </p>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
+                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">
+                      {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
                     </div>
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <AlertTriangle className="w-6 h-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
+                    <p className="text-xs text-muted-foreground">
+                      <span className="text-red-600">-8%</span> this month
+                    </p>
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
         )}
 
         {/* Analytics Section */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Analytics */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
             {/* Quarry Sites List */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Mountain className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Quarry Sites</CardTitle>
-                    <p className="text-sm text-gray-600">Active quarry operations and compliance status</p>
-                  </div>
-                </div>
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Quarry Sites</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Active quarry operations and compliance status
+                </p>
               </CardHeader>
               <CardContent className="p-6 pt-0">
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -990,34 +969,27 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </Card>
 
             {/* Compliance Overview */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <FileCheck className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Compliance Overview</CardTitle>
-                    <p className="text-sm text-gray-600">Environmental and operational compliance status</p>
-                  </div>
-                </div>
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>Compliance Overview</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Environmental and operational compliance status
+                </p>
               </CardHeader>
               <CardContent className="p-6 pt-0">
                 <div className="space-y-4">
                   {/* Compliance Rate */}
-                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-emerald-800">Overall Compliance Rate</h3>
-                      <span className="text-2xl font-bold text-emerald-600">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium">Overall Compliance Rate</h3>
+                      <span className="text-2xl font-bold">
                         {Math.round((quarryData.compliantSites / quarryData.totalSites) * 100)}%
                       </span>
                     </div>
-                    <div className="w-full bg-emerald-200 rounded-full h-2">
-                      <div 
-                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${(quarryData.compliantSites / quarryData.totalSites) * 100}%` }}
-                      ></div>
-                    </div>
+                    <Progress 
+                      value={(quarryData.compliantSites / quarryData.totalSites) * 100} 
+                      className="w-full" 
+                    />
                   </div>
 
                   {/* Permit Status Breakdown */}
@@ -1191,20 +1163,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : (
           /* Regular Dashboard Analytics */
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Municipality Lists */}
-          <Card className="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-xl">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <List className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Municipality List</CardTitle>
-                  <p className="text-sm text-gray-600">Active and inactive municipalities for yesterday</p>
-                </div>
-              </div>
-            </CardHeader>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+            {/* Municipality Lists */}
+            <Card className="col-span-4">
+              <CardHeader>
+                <CardTitle>Municipality Status</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Active and inactive municipalities for yesterday
+                </p>
+              </CardHeader>
             <CardContent className="p-6 pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-auto">
                   
@@ -1274,19 +1241,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-        {/* District Distribution Cards */}
-        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardHeader className="p-6 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold text-gray-900">District Distribution</CardTitle>
-                <p className="text-xs text-gray-600">Active municipalities by district</p>
-              </div>
-            </div>
-          </CardHeader>
+            {/* District Distribution Cards */}
+            <Card className="col-span-3">
+              <CardHeader>
+                <CardTitle>District Distribution</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Active municipalities by district
+                </p>
+              </CardHeader>
           <CardContent className="p-6 pt-0">
             <div className="space-y-3">
               {districtStats.map((district, index) => (
@@ -1336,13 +1298,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                         <span className="text-xs text-red-600 font-medium">{district.inactive}</span>
                       </div>
                     </div>
-                    <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      district.color === 'blue' ? 'bg-blue-100 text-blue-700' :
-                      district.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>
+                    <Badge variant="secondary">
                       {district.percentage}%
-                    </div>
+                    </Badge>
                   </div>
                 </div>
               ))}
@@ -1356,7 +1314,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </CardContent>
         </Card>
-          </div>
+        </div>
         )}
 
       </div>
