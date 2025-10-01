@@ -9,7 +9,7 @@ import { Bar } from 'react-chartjs-2';
 import { useData } from './DataContext';
 import { useAuth } from './contexts/AuthContext';
 import { useNotification, NotificationContainer } from './components/ui/notification';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   Chart as ChartJS,
@@ -37,7 +37,9 @@ import {
   Pickaxe,
   FileCheck,
   FileText,
-  RefreshCw
+  RefreshCw,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -242,6 +244,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   };
 
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
+  const [expandedLocations, setExpandedLocations] = useState({});
   const { notifications, showSuccess, removeNotification } = useNotification();
   
   // Command Center data states
@@ -791,6 +794,179 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const districtStats = getDistrictStats();
 
+  // State for real Action Center data
+  const [realActionCenterData, setRealActionCenterData] = useState([]);
+  const [isLoadingActionCenter, setIsLoadingActionCenter] = useState(false);
+
+  // Fetch real Action Center data from Firebase
+  const fetchActionCenterData = async () => {
+    setIsLoadingActionCenter(true);
+    try {
+      const actionCenterQuery = collection(db, 'actionReports');
+      const querySnapshot = await getDocs(actionCenterQuery);
+      const actionData = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          actionData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
+      
+      console.log('📊 Dashboard: Loaded Action Center data:', actionData.length, 'records');
+      setRealActionCenterData(actionData);
+    } catch (error) {
+      console.error('❌ Dashboard: Error loading Action Center data:', error);
+      setRealActionCenterData([]);
+    } finally {
+      setIsLoadingActionCenter(false);
+    }
+  };
+
+  // Load Action Center data when component mounts
+  useEffect(() => {
+    fetchActionCenterData();
+  }, []);
+
+  // Get action breakdown data from real Action Center data
+  const getActionBreakdown = () => {
+    const dataToUse = realActionCenterData.length > 0 ? realActionCenterData : actionReports || [];
+    
+    if (dataToUse.length === 0) {
+      return {
+        types: [
+          { name: 'Road Maintenance', count: 0 },
+          { name: 'Security Patrol', count: 0 },
+          { name: 'Traffic Control', count: 0 },
+          { name: 'Emergency Response', count: 0 }
+        ],
+        locations: [
+          { name: 'No data available', count: 0 }
+        ]
+      };
+    }
+
+    // Count by action type
+    const typeCount = {};
+    const municipalityCount = {};
+
+    dataToUse.forEach(report => {
+      // Filter by user's municipality if user is not admin
+      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
+        return; // Skip reports not from user's municipality
+      }
+
+      // Count by action type (using 'what' field)
+      const actionType = report.what || 'Other';
+      typeCount[actionType] = (typeCount[actionType] || 0) + 1;
+
+      // Use municipality directly from the report data
+      const municipality = report.municipality || 'Unknown';
+      municipalityCount[municipality] = (municipalityCount[municipality] || 0) + 1;
+    });
+
+    // Convert to arrays and sort by count
+    const types = Object.entries(typeCount)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count); // Show all types
+
+    const locations = Object.entries(municipalityCount)
+      .map(([name, count]) => ({ name, count, municipality: name }))
+      .sort((a, b) => b.count - a.count); // Show all municipalities
+
+    return { types, locations };
+  };
+
+  // Get municipality-specific illegal activities from real Action Center data
+  const getLocationIllegals = (municipalityName) => {
+    const dataToUse = realActionCenterData.length > 0 ? realActionCenterData : actionReports || [];
+    
+    if (dataToUse.length === 0) {
+      return [];
+    }
+
+    // Filter reports for this specific municipality
+    const municipalityReports = dataToUse.filter(report => 
+      report.municipality === municipalityName
+    );
+
+    // Count by action type for this municipality
+    const typeCount = {};
+    municipalityReports.forEach(report => {
+      const actionType = report.what || 'Other';
+      typeCount[actionType] = (typeCount[actionType] || 0) + 1;
+    });
+
+    // Convert to array and sort by count
+    const result = Object.entries(typeCount)
+      .map(([type, count]) => ({ type, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return result;
+  };
+
+  // Toggle location expansion
+  const toggleLocationExpansion = (locationName) => {
+    setExpandedLocations(prev => ({
+      ...prev,
+      [locationName]: !prev[locationName]
+    }));
+  };
+
+  // Get incident breakdown data
+  const getIncidentBreakdown = () => {
+    if (!incidents || incidents.length === 0) {
+      return {
+        types: [
+          { name: 'Traffic Accident', count: 0 },
+          { name: 'Criminal Activity', count: 0 },
+          { name: 'Natural Disaster', count: 0 },
+          { name: 'Public Disturbance', count: 0 }
+        ],
+        severity: [
+          { level: 'High', count: 0 },
+          { level: 'Medium', count: 0 },
+          { level: 'Low', count: 0 }
+        ]
+      };
+    }
+
+    // Count by incident type
+    const typeCount = {};
+    const severityCount = { 'High': 0, 'Medium': 0, 'Low': 0 };
+
+    incidents.forEach(incident => {
+      // Count by incident type
+      const incidentType = incident.incidentType || 'Other';
+      typeCount[incidentType] = (typeCount[incidentType] || 0) + 1;
+
+      // Count by severity (using priority or severity field)
+      const severity = incident.priority || incident.severity || 'Medium';
+      if (severityCount.hasOwnProperty(severity)) {
+        severityCount[severity]++;
+      } else {
+        severityCount['Medium']++; // Default to Medium if unknown
+      }
+    });
+
+    // Convert to arrays and sort by count
+    const types = Object.entries(typeCount)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count); // Show all types
+
+    const severity = Object.entries(severityCount)
+      .map(([level, count]) => ({ level, count }))
+      .sort((a, b) => {
+        const order = { 'High': 3, 'Medium': 2, 'Low': 1 };
+        return order[b.level] - order[a.level];
+      });
+
+    return { types, severity };
+  };
+
   // Quarry-specific data for quarry-monitoring users
   const getQuarryData = () => {
     // Sample quarry data - in real implementation, this would come from API
@@ -1031,7 +1207,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const commandCenterData = getCommandCenterData();
 
-  if (dataLoading || (userAccessLevel === 'command-center' && isLoadingCommandCenter) || ipatrollerLoading) {
+  if (dataLoading || (userAccessLevel === 'command-center' && isLoadingCommandCenter) || ipatrollerLoading || isLoadingActionCenter) {
     return (
       <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
         <div className="min-h-screen bg-white flex items-center justify-center">
@@ -1562,6 +1738,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : (
           /* Regular Dashboard Analytics */
+          <div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Municipality Lists */}
           <Card className="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-xl">
@@ -1737,6 +1914,147 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </CardContent>
         </Card>
+          </div>
+
+          {/* Actions and Incidents Breakdown */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* Actions Breakdown */}
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Target className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Actions Breakdown</CardTitle>
+                    <p className="text-sm text-gray-600">Recent action reports by type and location</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="space-y-4">
+                  {/* Two Column Layout for Action Types and Locations */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Action Types */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Most Reported</h4>
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                        {getActionBreakdown().types.map((type, index) => (
+                          <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                              <span className="text-sm text-gray-700">{type.name}</span>
+                            </div>
+                            <span className="text-sm font-semibold text-blue-600">{type.count}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Action Locations */}
+                    <div>
+                      <h4 className="text-sm font-semibold text-gray-700 mb-3">Most Reported Location</h4>
+                      <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                        {getActionBreakdown().locations.map((location, index) => (
+                          <div key={index} className="bg-blue-50 rounded-lg">
+                            {/* Location Header - Clickable */}
+                            <div 
+                              className="flex items-center justify-between p-2 cursor-pointer hover:bg-blue-100 transition-colors rounded-lg"
+                              onClick={() => toggleLocationExpansion(location.name)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <MapPin className="w-3 h-3 text-blue-500" />
+                                <span className="text-sm text-gray-700">{location.name}</span>
+                                {expandedLocations[location.name] ? 
+                                  <ChevronDown className="w-3 h-3 text-gray-500" /> : 
+                                  <ChevronRight className="w-3 h-3 text-gray-500" />
+                                }
+                              </div>
+                              <span className="text-sm font-semibold text-blue-600">{location.count}</span>
+                            </div>
+                            
+                            {/* Expandable Content */}
+                            {expandedLocations[location.name] && (
+                              <div className="px-4 pb-2 space-y-1">
+                                <div className="border-t border-blue-200 pt-2">
+                                  <p className="text-xs font-medium text-gray-600 mb-2">Illegal Activities:</p>
+                                  <div className="max-h-48 overflow-y-auto pr-2 space-y-1">
+                                    {getLocationIllegals(location.name).map((illegal, illegalIndex) => (
+                                      <div key={illegalIndex} className="flex items-center justify-between py-1 px-2 bg-white rounded text-xs">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                                          <span className="text-gray-700">{illegal.type}</span>
+                                        </div>
+                                        <span className="text-red-600 font-medium">{illegal.count}</span>
+                                      </div>
+                                    ))}
+                                    {getLocationIllegals(location.name).length === 0 && (
+                                      <div className="text-xs text-gray-500 py-1 px-2">No specific data available</div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Total Actions */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">Total Actions</span>
+                      <span className="text-lg font-bold text-blue-600">{actionReports?.length || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Incidents Breakdown */}
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Incidents Breakdown</CardTitle>
+                    <p className="text-sm text-gray-600">Recent incidents by type and severity</p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6 pt-0">
+                <div className="space-y-4">
+                  {/* Incident Types */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">By Incident Type</h4>
+                    <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
+                      {getIncidentBreakdown().types.map((type, index) => (
+                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
+                            <span className="text-sm text-gray-700">{type.name}</span>
+                          </div>
+                          <span className="text-sm font-semibold text-red-600">{type.count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+
+                  {/* Total Incidents */}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-semibold text-gray-700">Total Incidents</span>
+                      <span className="text-lg font-bold text-red-600">{incidents?.length || 0}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
           </div>
         )}
 
