@@ -5,17 +5,12 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { Badge } from './components/ui/badge';
 import { Label } from './components/ui/label';
-import { Separator } from './components/ui/separator';
-import { Progress } from './components/ui/progress';
+import { Bar } from 'react-chartjs-2';
 import { useData } from './DataContext';
 import { useAuth } from './contexts/AuthContext';
-import { useFirebase } from './hooks/useFirebase';
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import { db } from './firebase';
-import { Bar } from 'react-chartjs-2';
-import { PieChart } from './components/ui/pie-chart';
-import { toast } from 'sonner';
 import { useNotification, NotificationContainer } from './components/ui/notification';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from './firebase';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -31,17 +26,18 @@ import {
   CheckCircle,
   XCircle,
   Target,
+  Download,
+  PieChartIcon,
   AlertTriangle,
+  List,
   Building2,
   MapPin,
   Mountain,
   Shield,
   Pickaxe,
+  FileCheck,
   FileText,
-  Users,
-  RefreshCw,
-  ArrowUpRight,
-  ArrowDownRight
+  RefreshCw
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -50,9 +46,200 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     ipatrollerData,
     actionReports,
     incidents,
-    loading: dataLoading
+    loading: dataLoading,
+    refreshIPatrollerData,
+    createSampleData
   } = useData();
   const { userAccessLevel, userMunicipality } = useAuth();
+
+  // Use the same municipalities structure as IPatroller
+  const municipalitiesByDistrict = {
+    "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
+    "2ND DISTRICT": ["Balanga City", "Pilar", "Orion", "Limay"],
+    "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"],
+  };
+
+  // State for IPatroller data (same as IPatroller page)
+  const [ipatrollerPatrolData, setIpatrollerPatrolData] = useState([]);
+  const [ipatrollerLoading, setIpatrollerLoading] = useState(false);
+
+  // Generate dates for current month (same as IPatroller)
+  const generateDates = (month, year) => {
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    return Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  };
+
+  // Load patrol data directly from IPatroller's Firebase structure
+  const loadIPatrollerData = async () => {
+    setIpatrollerLoading(true);
+    
+    try {
+      // Since yesterday (Sep 30) data is in September, we need to load from September 2025
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayMonth = yesterday.getMonth(); // September = 8
+      const yesterdayYear = yesterday.getFullYear(); // 2025
+      const monthYearId = `${String(yesterdayMonth + 1).padStart(2, "0")}-${yesterdayYear}`;
+      
+      console.log('📅 Dashboard: Yesterday was', yesterday.toDateString());
+      console.log('📅 Dashboard: Loading IPatroller data for', monthYearId, '(yesterday\'s month)');
+      console.log('📅 Dashboard: Firebase path:', `patrolData/${monthYearId}/municipalities`);
+      
+      // Load from the same Firebase path as IPatroller
+      const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+      const querySnapshot = await getDocs(municipalitiesRef);
+      
+      const firestoreData = [];
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          firestoreData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
+
+      console.log('📊 Dashboard: Loaded', firestoreData.length, 'municipalities from Firebase');
+      console.log('📊 Dashboard: Raw Firebase data:', firestoreData);
+
+      // Create complete data structure (same as IPatroller)
+      const selectedDates = generateDates(yesterdayMonth, yesterdayYear);
+      const allMunicipalitiesData = [];
+      
+      Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+        municipalities.forEach((municipality) => {
+          // Check if this municipality has data in Firestore
+          const existingData = firestoreData.find(item => 
+            item.municipality === municipality && item.district === district
+          );
+          
+          if (existingData) {
+            // Check if the existing data has any actual values (not all zeros/nulls)
+            const hasActualData = existingData.data && existingData.data.some(val => val !== null && val !== undefined && val !== 0);
+            
+            if (hasActualData) {
+              // Use Firestore data if it has actual patrol counts
+              allMunicipalitiesData.push(existingData);
+            } else {
+              // Even if data exists in Firestore, if it's all zeros/nulls, treat as "No Entry"
+              const dailyData = selectedDates.map(() => null);
+              const itemData = {
+                id: `${district}-${municipality}`,
+                municipality,
+                district,
+                data: dailyData,
+                totalPatrols: 0,
+                activeDays: 0,
+                inactiveDays: 0,
+                activePercentage: 0,
+              };
+              allMunicipalitiesData.push(itemData);
+            }
+          } else {
+            // Create "No Entry" data for municipalities without Firestore data
+            const dailyData = selectedDates.map(() => null);
+            const itemData = {
+              id: `${district}-${municipality}`,
+              municipality,
+              district,
+              data: dailyData,
+              totalPatrols: 0,
+              activeDays: 0,
+              inactiveDays: 0,
+              activePercentage: 0,
+            };
+            allMunicipalitiesData.push(itemData);
+          }
+        });
+      });
+
+      setIpatrollerPatrolData(allMunicipalitiesData);
+      console.log('✅ Dashboard: IPatroller data loaded successfully');
+      
+    } catch (error) {
+      console.error('❌ Dashboard: Error loading IPatroller data:', error);
+      // Create fallback data for yesterday's month
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const selectedDates = generateDates(yesterday.getMonth(), yesterday.getFullYear());
+      const fallbackData = [];
+      
+      Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+        municipalities.forEach((municipality) => {
+          const dailyData = selectedDates.map(() => null);
+          const itemData = {
+            id: `${district}-${municipality}`,
+            municipality,
+            district,
+            data: dailyData,
+            totalPatrols: 0,
+            activeDays: 0,
+            inactiveDays: 0,
+            activePercentage: 0,
+          };
+          fallbackData.push(itemData);
+        });
+      });
+      
+      setIpatrollerPatrolData(fallbackData);
+    } finally {
+      setIpatrollerLoading(false);
+    }
+  };
+
+  // Create sample IPatroller data for testing
+  const createSampleIPatrollerData = () => {
+    console.log('🧪 Creating sample IPatroller data...');
+    
+    // Use yesterday's month for sample data
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayMonth = yesterday.getMonth();
+    const yesterdayYear = yesterday.getFullYear();
+    const selectedDates = generateDates(yesterdayMonth, yesterdayYear);
+    
+    const sampleData = [];
+    
+    Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+      municipalities.forEach((municipality, index) => {
+        // Create sample data with some municipalities having high patrol counts yesterday
+        const dailyData = selectedDates.map((day, dayIndex) => {
+          // For yesterday (Sept 30 = index 29), create varied data
+          if (dayIndex === 29) { // Yesterday's index
+            // Make some municipalities active (>=5) and some inactive (<5)
+            if (index % 3 === 0) return 8; // Every 3rd municipality: Active
+            if (index % 3 === 1) return 3; // Every 3rd municipality: Inactive  
+            return null; // Every 3rd municipality: No Entry (Inactive)
+          }
+          // For other days, create random data
+          return Math.floor(Math.random() * 10);
+        });
+        
+        const totalPatrols = dailyData.reduce((sum, val) => sum + (val || 0), 0);
+        const activeDays = dailyData.filter(val => val >= 5).length;
+        const inactiveDays = dailyData.filter(val => val !== null && val < 5).length;
+        const activePercentage = dailyData.length > 0 ? Math.round((activeDays / dailyData.length) * 100) : 0;
+        
+        const itemData = {
+          id: `${district}-${municipality}`,
+          municipality,
+          district,
+          data: dailyData,
+          totalPatrols,
+          activeDays,
+          inactiveDays,
+          activePercentage,
+        };
+        
+        sampleData.push(itemData);
+      });
+    });
+    
+    setIpatrollerPatrolData(sampleData);
+    console.log('✅ Sample IPatroller data created:', sampleData.length, 'municipalities');
+    console.log('📊 Sample data preview:', sampleData.slice(0, 3));
+  };
 
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
   const { notifications, showSuccess, removeNotification } = useNotification();
@@ -145,6 +332,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       fetchCommandCenterData();
     }
   }, [userAccessLevel, userMunicipality]);
+
+  // Load IPatroller data when component mounts
+  useEffect(() => {
+    console.log('🚀 Dashboard: Component mounted, loading IPatroller data...');
+    loadIPatrollerData();
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -295,11 +488,70 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Calculate active/inactive municipalities based on yesterday's data
-  const totalMunicipalities = ipatrollerData ? ipatrollerData.length : 12;
-  const activeCount = summaryStats.activeMunicipalities || 0;
-  const inactiveCount = summaryStats.inactiveMunicipalities || 12;
+  // Calculate active/inactive municipalities based on yesterday's data (using IPatroller data)
+  const calculateActiveInactiveCounts = () => {
+    if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
+      console.log('⚠️ Dashboard: No ipatrollerPatrolData for counting');
+      return { activeCount: 0, inactiveCount: 0, totalMunicipalities: 0 };
+    }
+
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayIndex = yesterday.getDate() - 1;
+
+    console.log('📊 Dashboard: Calculating counts for', yesterday.toDateString(), 'at index', yesterdayIndex);
+    console.log('📊 Dashboard: Processing', ipatrollerPatrolData.length, 'municipalities');
+
+    let activeCount = 0;
+    let inactiveCount = 0;
+
+    ipatrollerPatrolData.forEach(item => {
+      let yesterdayPatrols = 0;
+      
+      if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+        const rawValue = item.data[yesterdayIndex];
+        if (rawValue === null || rawValue === undefined) {
+          yesterdayPatrols = 0; // Treat "No Entry" as 0
+        } else {
+          yesterdayPatrols = rawValue;
+        }
+        console.log(`📊 ${item.municipality}: ${rawValue} → ${yesterdayPatrols >= 5 ? 'ACTIVE' : 'INACTIVE'}`);
+      } else {
+        console.log(`📊 ${item.municipality}: No data at index ${yesterdayIndex} → INACTIVE`);
+      }
+
+      // Use IPatroller logic: Active if >= 5, Inactive if < 5
+      if (yesterdayPatrols >= 5) {
+        activeCount++;
+      } else {
+        inactiveCount++;
+      }
+    });
+
+    console.log('📊 Dashboard: Final counts - Active:', activeCount, 'Inactive:', inactiveCount);
+
+    return {
+      activeCount,
+      inactiveCount,
+      totalMunicipalities: ipatrollerPatrolData.length
+    };
+  };
+
+  const { activeCount, inactiveCount, totalMunicipalities } = calculateActiveInactiveCounts();
   const activePercentage = totalMunicipalities > 0 ? (activeCount / totalMunicipalities) * 100 : 0;
+
+  // Debug logging for admin users
+  useEffect(() => {
+    if (userAccessLevel === 'admin' && ipatrollerPatrolData.length > 0) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      console.log('📊 Dashboard Active/Inactive Counts for', yesterday.toDateString());
+      console.log('✅ Active Municipalities:', activeCount);
+      console.log('❌ Inactive Municipalities:', inactiveCount);
+      console.log('📈 Total Municipalities:', totalMunicipalities);
+      console.log('📅 Data Source: IPatroller Firebase data');
+    }
+  }, [activeCount, inactiveCount, totalMunicipalities, ipatrollerPatrolData, userAccessLevel]);
 
   // Calculate district distribution with fallback data
   const getDistrictData = () => {
@@ -358,9 +610,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const districtData = getDistrictData();
 
-  // Get municipality lists for yesterday's data
+  // Get municipality lists for yesterday's data (using IPatroller data source)
   const getMunicipalityLists = () => {
-    if (!ipatrollerData || ipatrollerData.length === 0) {
+    console.log('🏛️ Dashboard getMunicipalityLists - ipatrollerPatrolData:', ipatrollerPatrolData);
+    
+    if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
+      console.log('⚠️ Dashboard: No ipatrollerPatrolData available');
       return {
         active: [],
         inactive: []
@@ -371,14 +626,33 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayIndex = yesterday.getDate() - 1;
 
+    console.log(`📅 Dashboard: Yesterday was ${yesterday.toDateString()}, looking at index ${yesterdayIndex}`);
+
     const active = [];
     const inactive = [];
 
-    ipatrollerData.forEach(item => {
+    ipatrollerPatrolData.forEach(item => {
       let yesterdayPatrols = 0;
       
+      console.log(`🏛️ Processing ${item.municipality}:`, {
+        hasData: !!item.data,
+        isArray: Array.isArray(item.data),
+        dataLength: item.data ? item.data.length : 0,
+        yesterdayIndex,
+        rawData: item.data
+      });
+      
       if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-        yesterdayPatrols = item.data[yesterdayIndex] || 0;
+        const rawValue = item.data[yesterdayIndex];
+        // Use IPatroller logic: null/undefined = "No Entry" = Inactive, 0 = Inactive, >= 5 = Active, < 5 = Inactive
+        if (rawValue === null || rawValue === undefined) {
+          yesterdayPatrols = 0; // Treat "No Entry" as 0 for counting purposes
+        } else {
+          yesterdayPatrols = rawValue;
+        }
+        console.log(`📊 ${item.municipality}: Found ${rawValue} (${yesterdayPatrols}) patrols at index ${yesterdayIndex}`);
+      } else {
+        console.log(`❌ ${item.municipality}: No data at index ${yesterdayIndex}`);
       }
 
       const municipalityInfo = {
@@ -387,11 +661,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         patrols: yesterdayPatrols
       };
 
+      // Use IPatroller logic: Active if >= 5, Inactive if < 5 (including null/undefined/0)
       if (yesterdayPatrols >= 5) {
         active.push(municipalityInfo);
+        console.log(`✅ ${item.municipality}: ACTIVE (${yesterdayPatrols} patrols)`);
       } else {
         inactive.push(municipalityInfo);
+        console.log(`❌ ${item.municipality}: INACTIVE (${yesterdayPatrols} patrols)`);
       }
+    });
+
+    console.log('📈 Dashboard Final Lists:', {
+      active: active.length,
+      inactive: inactive.length,
+      activeList: active,
+      inactiveList: inactive
     });
 
     // Sort by district and then by municipality name
@@ -409,6 +693,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   };
 
   const municipalityLists = getMunicipalityLists();
+
+  // If no data is available, create some sample data for testing
+  useEffect(() => {
+    if (userAccessLevel === 'admin' && (!ipatrollerData || ipatrollerData.length === 0)) {
+      console.log('🧪 No real data found, consider using sample data for testing');
+      console.log('💡 You can call refreshIPatrollerData() or check if Firebase has data for the current month');
+    }
+  }, [ipatrollerData, userAccessLevel]);
 
   // Get district statistics for yesterday's data
   const getDistrictStats = () => {
@@ -693,7 +985,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const commandCenterData = getCommandCenterData();
 
-  if (dataLoading || (userAccessLevel === 'command-center' && isLoadingCommandCenter)) {
+  if (dataLoading || (userAccessLevel === 'command-center' && isLoadingCommandCenter) || ipatrollerLoading) {
     return (
       <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
         <div className="min-h-screen bg-white flex items-center justify-center">
@@ -710,208 +1002,262 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="flex-1 space-y-4 p-4 md:p-8 pt-6">
+      <div className="container mx-auto p-4 space-y-4 bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="flex items-center justify-between space-y-2">
+        <div className="flex justify-between items-center">
           <div>
-            <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-gray-500 mt-2">
               {userAccessLevel === 'quarry-monitoring' 
-                ? 'Monitor quarry operations and compliance across all sites'
+                ? 'Overview of quarry site operations and compliance monitoring'
                 : userAccessLevel === 'command-center'
-                ? 'Command center operations with real-time barangay monitoring'
-                : 'Comprehensive system overview and performance analytics'
+                ? 'Overview of Command Center operations with barangay reports and concern types'
+                : `Overview of IPatroller system performance based on ${summaryStats.yesterdayDate ? `patrol data from ${summaryStats.yesterdayDate}` : 'yesterday\'s patrol data'}`
               }
             </p>
           </div>
-          <div className="flex items-center space-x-2">
-            <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Refresh
-            </Button>
-            <Button size="sm" onClick={() => onNavigate('reports')}>
-              <BarChart3 className="mr-2 h-4 w-4" />
-              View Reports
-            </Button>
-          </div>
+          
+          {/* Action Buttons for Admin Users */}
+          {userAccessLevel === 'admin' && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  console.log('🔄 Refreshing dashboard data...');
+                  loadIPatrollerData(); // Load from IPatroller source
+                  refreshIPatrollerData(); // Also refresh DataContext
+                  showSuccess('Dashboard data refreshed');
+                }}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Refresh Data
+              </Button>
+              
+              {(!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) && (
+                <Button
+                  onClick={() => {
+                    console.log('🧪 Creating sample IPatroller data for testing...');
+                    createSampleIPatrollerData();
+                    showSuccess('Sample IPatroller data created for testing');
+                  }}
+                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  <FileText className="w-4 h-4" />
+                  Create Sample Data
+                </Button>
+              )}
+            </div>
+          )}
         </div>
-        
-        <Separator />
 
-        {/* Statistics Cards */}
+        {/* Quick Stats */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Stats */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Sites</CardTitle>
-                <Mountain className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{quarryData.totalSites.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">+12%</span> from last month
-                </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Sites</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {quarryData.totalSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Mountain className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Sites</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{quarryData.activeSites.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">+8%</span> from last month
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Active Sites</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {quarryData.activeSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Compliant</CardTitle>
-                <Shield className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{quarryData.compliantSites.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">+5%</span> from last month
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Compliant</p>
+                    <p className="text-2xl font-bold text-emerald-600">
+                      {quarryData.compliantSites.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <Shield className="w-6 h-6 text-emerald-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Violations</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{quarryData.violations.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-red-600">-15%</span> from last month
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Violations</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {quarryData.violations.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Barangays</CardTitle>
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{commandCenterData.totalBarangays.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  All monitored
-                </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {commandCenterData.totalBarangays.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Building2 className="w-6 h-6 text-blue-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Concern Types</CardTitle>
-                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{commandCenterData.totalConcernTypes.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  Active categories
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Concern Types</p>
+                    <p className="text-2xl font-bold text-green-600">
+                      {commandCenterData.totalConcernTypes.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <AlertTriangle className="w-6 h-6 text-green-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Reports</CardTitle>
-                <FileText className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{commandCenterData.totalReports.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  This month
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">Total Reports</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      {commandCenterData.totalReports.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="p-2 bg-red-100 rounded-lg">
+                    <FileText className="w-6 h-6 text-red-600" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
         ) : (
           /* Regular Dashboard Stats */
-          <div className={`grid gap-4 md:grid-cols-2 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Active Municipalities</CardTitle>
-                <CheckCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{activeCount.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-green-600">{Math.round(activePercentage)}%</span> active
-                </p>
-              </CardContent>
-            </Card>
+          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Active Municipalities</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {activeCount.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Inactive Municipalities</CardTitle>
-                <XCircle className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{inactiveCount.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">
-                  <span className="text-red-600">{Math.round(100 - activePercentage)}%</span> inactive
-                </p>
-              </CardContent>
-            </Card>
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Municipalities</p>
+                  <p className="text-2xl font-bold text-red-600">
+                    {inactiveCount.toLocaleString()}
+                  </p>
+                </div>
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <XCircle className="w-6 h-6 text-red-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {userAccessLevel !== 'ipatroller' && (
-              <>
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Actions</CardTitle>
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
+          {userAccessLevel !== 'ipatroller' && (
+            <>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="text-green-600">+18%</span> this month
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Incidents</CardTitle>
-                    <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Target className="w-6 h-6 text-blue-600" />
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      <span className="text-red-600">-8%</span> this month
-                    </p>
-                  </CardContent>
-                </Card>
-              </>
-            )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <AlertTriangle className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
           </div>
         )}
 
         {/* Analytics Section */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Analytics */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Quarry Sites List */}
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Quarry Sites</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Active quarry operations and compliance status
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Mountain className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Quarry Sites</CardTitle>
+                    <p className="text-sm text-gray-600">Active quarry operations and compliance status</p>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-6 pt-0">
                 <div className="space-y-3 max-h-96 overflow-y-auto">
@@ -969,27 +1315,34 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </Card>
 
             {/* Compliance Overview */}
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>Compliance Overview</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Environmental and operational compliance status
-                </p>
+            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+              <CardHeader className="p-6 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-100 rounded-lg">
+                    <FileCheck className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg font-semibold text-gray-900">Compliance Overview</CardTitle>
+                    <p className="text-sm text-gray-600">Environmental and operational compliance status</p>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-6 pt-0">
                 <div className="space-y-4">
                   {/* Compliance Rate */}
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium">Overall Compliance Rate</h3>
-                      <span className="text-2xl font-bold">
+                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="text-sm font-semibold text-emerald-800">Overall Compliance Rate</h3>
+                      <span className="text-2xl font-bold text-emerald-600">
                         {Math.round((quarryData.compliantSites / quarryData.totalSites) * 100)}%
                       </span>
                     </div>
-                    <Progress 
-                      value={(quarryData.compliantSites / quarryData.totalSites) * 100} 
-                      className="w-full" 
-                    />
+                    <div className="w-full bg-emerald-200 rounded-full h-2">
+                      <div 
+                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
+                        style={{ width: `${(quarryData.compliantSites / quarryData.totalSites) * 100}%` }}
+                      ></div>
+                    </div>
                   </div>
 
                   {/* Permit Status Breakdown */}
@@ -1163,15 +1516,25 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : (
           /* Regular Dashboard Analytics */
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-            {/* Municipality Lists */}
-            <Card className="col-span-4">
-              <CardHeader>
-                <CardTitle>Municipality Status</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Active and inactive municipalities for yesterday
-                </p>
-              </CardHeader>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Municipality Lists */}
+          <Card className="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-xl">
+            <CardHeader className="p-6 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <List className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg font-semibold text-gray-900">Municipality List</CardTitle>
+                  <p className="text-sm text-gray-600">
+                    {summaryStats.yesterdayDate 
+                      ? `Active and inactive municipalities for ${summaryStats.yesterdayDate}`
+                      : 'Active and inactive municipalities for yesterday'
+                    }
+                  </p>
+                </div>
+              </div>
+            </CardHeader>
             <CardContent className="p-6 pt-0">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-auto">
                   
@@ -1241,14 +1604,24 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-            {/* District Distribution Cards */}
-            <Card className="col-span-3">
-              <CardHeader>
-                <CardTitle>District Distribution</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Active municipalities by district
+        {/* District Distribution Cards */}
+        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+          <CardHeader className="p-6 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <MapPin className="w-4 h-4 text-emerald-600" />
+              </div>
+              <div>
+                <CardTitle className="text-sm font-semibold text-gray-900">District Distribution</CardTitle>
+                <p className="text-xs text-gray-600">
+                  {summaryStats.yesterdayDate 
+                    ? `Active municipalities by district (${summaryStats.yesterdayDate})`
+                    : 'Active municipalities by district (yesterday)'
+                  }
                 </p>
-              </CardHeader>
+              </div>
+            </div>
+          </CardHeader>
           <CardContent className="p-6 pt-0">
             <div className="space-y-3">
               {districtStats.map((district, index) => (
@@ -1298,9 +1671,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                         <span className="text-xs text-red-600 font-medium">{district.inactive}</span>
                       </div>
                     </div>
-                    <Badge variant="secondary">
+                    <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      district.color === 'blue' ? 'bg-blue-100 text-blue-700' :
+                      district.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
+                      'bg-orange-100 text-orange-700'
+                    }`}>
                       {district.percentage}%
-                    </Badge>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -1314,7 +1691,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           </CardContent>
         </Card>
-        </div>
+          </div>
         )}
 
       </div>
