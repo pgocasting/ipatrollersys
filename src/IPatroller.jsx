@@ -204,13 +204,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       // Create month-year ID for the selected month
       const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
       
-      // Define months that should show "No Entry" (0-based: 0=Jan, 1=Feb)
-      const noEntryMonths = [0, 1]; // January, February only
+      // Define months that should be locked "No Entry" for 2025 (0-based: 0=Jan, 1=Feb)
+      const lockedNoEntryMonths = [0, 1]; // January, February 2025
+      const isLockedNoEntry = lockedNoEntryMonths.includes(selectedMonth) && selectedYear === 2025;
       
-      // Check if current month should show "No Entry"
-      if (noEntryMonths.includes(selectedMonth)) {
-        // Create "No Entry" data for all municipalities
-        const noEntryData = [];
+      // If it's a locked "No Entry" month in 2025, create locked data
+      if (isLockedNoEntry) {
+        const lockedData = [];
         Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
           municipalities.forEach((municipality) => {
             const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
@@ -223,18 +223,19 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               activeDays: 0,
               inactiveDays: 0,
               activePercentage: 0,
+              isLocked: true, // Mark as locked
             };
-            noEntryData.push(itemData);
+            lockedData.push(itemData);
           });
         });
         
-        setPatrolData(noEntryData);
+        setPatrolData(lockedData);
         setFirestoreStatus('connected');
         setLoading(false);
         return;
       }
       
-      // Try to get data from Firestore for months that should have data
+      // Try to get data from Firestore for other months
       const monthDocRef = doc(db, 'patrolData', monthYearId);
       const municipalitiesRef = collection(monthDocRef, 'municipalities');
       
@@ -253,16 +254,57 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           }
         });
 
-        // If we have data from Firestore, use it
-        if (firestoreData.length > 0) {
-          setPatrolData(firestoreData);
-          setFirestoreStatus('connected');
-        } else {
-          // If no data exists, don't create initial structure
-          // Only show municipalities that actually have data
-          setPatrolData([]);
-          setFirestoreStatus('connected');
-        }
+        // Always create initial structure for all municipalities first
+        const allMunicipalitiesData = [];
+        Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+          municipalities.forEach((municipality) => {
+            // Check if this municipality has data in Firestore
+            const existingData = firestoreData.find(item => 
+              item.municipality === municipality && item.district === district
+            );
+            
+            if (existingData) {
+              // Check if the existing data has any actual values (not all zeros/nulls)
+              const hasActualData = existingData.data && existingData.data.some(val => val !== null && val !== undefined && val !== 0);
+              
+              if (hasActualData) {
+                // Use Firestore data if it has actual patrol counts
+                allMunicipalitiesData.push(existingData);
+              } else {
+                // Even if data exists in Firestore, if it's all zeros/nulls, treat as "No Entry"
+                const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
+                const itemData = {
+                  id: `${district}-${municipality}`,
+                  municipality,
+                  district,
+                  data: dailyData,
+                  totalPatrols: 0,
+                  activeDays: 0,
+                  inactiveDays: 0,
+                  activePercentage: 0,
+                };
+                allMunicipalitiesData.push(itemData);
+              }
+            } else {
+              // Create "No Entry" data for municipalities without Firestore data
+              const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
+              const itemData = {
+                id: `${district}-${municipality}`,
+                municipality,
+                district,
+                data: dailyData,
+                totalPatrols: 0,
+                activeDays: 0,
+                inactiveDays: 0,
+                activePercentage: 0,
+              };
+              allMunicipalitiesData.push(itemData);
+            }
+          });
+        });
+
+        setPatrolData(allMunicipalitiesData);
+        setFirestoreStatus('connected');
       }, (error) => {
         console.error('❌ Firestore error:', error);
         setFirestoreStatus('error');
@@ -289,14 +331,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       
       Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
         municipalities.forEach((municipality) => {
-          const dailyData = selectedDates.map(() => 0); // Initialize with 0
-          const totalPatrols = dailyData.reduce((sum, val) => sum + (val || 0), 0);
+          const dailyData = selectedDates.map(() => null); // Initialize with null for "No Entry"
+          const totalPatrols = 0; // Keep as 0 for "No Entry" state
           
           // Calculate active/inactive days based on barangay count for this municipality
           const requiredBarangays = barangayCounts[municipality] || 0;
-          const activeDays = dailyData.filter((val) => val >= requiredBarangays).length;
-          const inactiveDays = dailyData.filter((val) => val > 0 && val < requiredBarangays).length;
-          const activePercentage = Math.round((activeDays / dailyData.length) * 100);
+          const activeDays = 0; // No active days for "No Entry" state
+          const inactiveDays = 0; // No inactive days for "No Entry" state
+          const activePercentage = 0; // 0% for "No Entry" state
           
           const itemData = {
             id: `${district}-${municipality}`,
@@ -337,10 +379,32 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     }
   };
 
+  const createInitialNoEntryStructure = () => {
+    // Create "No Entry" data for all municipalities when no Firestore data exists
+    const noEntryData = [];
+    Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+      municipalities.forEach((municipality) => {
+        const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
+        const itemData = {
+          id: `${district}-${municipality}`,
+          municipality,
+          district,
+          data: dailyData,
+          totalPatrols: 0,
+          activeDays: 0,
+          inactiveDays: 0,
+          activePercentage: 0,
+        };
+        noEntryData.push(itemData);
+      });
+    });
+    
+    setPatrolData(noEntryData);
+  };
+
   const createLocalFallbackData = () => {
-    // Don't create fallback data for all municipalities
-    // Only show municipalities that actually have data in Firestore
-    setPatrolData([]);
+    // Create fallback data with "No Entry" for all municipalities
+    createInitialNoEntryStructure();
     setFirestoreStatus('offline');
   };
 
@@ -411,11 +475,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   };
 
   const handleAddPatrolData = (municipality, district, dayIndex, value) => {
-    // Define months that should show "No Entry" (0-based: 0=Jan, 1=Feb)
-    const noEntryMonths = [0, 1]; // January, February only
+    // Check if this is a locked "No Entry" month (January/February 2025)
+    const lockedNoEntryMonths = [0, 1]; // January, February 2025
+    const isLockedNoEntry = lockedNoEntryMonths.includes(selectedMonth) && selectedYear === 2025;
     
-    // Prevent editing in "No Entry" months
-    if (noEntryMonths.includes(selectedMonth)) {
+    // Prevent editing in locked "No Entry" months
+    if (isLockedNoEntry) {
       return;
     }
     
@@ -423,13 +488,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     const updatedData = patrolData.map((item) => {
       if (item.municipality === municipality && item.district === district) {
         const newData = [...item.data];
-        newData[dayIndex] = parseInt(value) || 0;
+        newData[dayIndex] = value; // Keep null values as null, numbers as numbers
         const totalPatrols = newData.reduce((sum, val) => sum + (val || 0), 0);
         
         // Calculate active/inactive days based on barangay count for this municipality
         const requiredBarangays = barangayCounts[municipality] || 0;
-        const activeDays = newData.filter((val) => val >= requiredBarangays).length;
-        const inactiveDays = newData.filter((val) => val > 0 && val < requiredBarangays).length;
+        const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= requiredBarangays).length;
+        const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
         const activePercentage = Math.round((activeDays / newData.length) * 100);
         
         return {
@@ -1632,12 +1697,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                           item.municipality,
                                           item.district,
                                           index,
-                                          parseInt(e.target.value) || 0,
+                                          e.target.value === "" ? null : parseInt(e.target.value) || 0,
                                         )
                                       }
-                                      disabled={[0, 1].includes(selectedMonth)} // Disable for No Entry months (Jan, Feb only)
+                                      disabled={item.isLocked || ([0, 1].includes(selectedMonth) && selectedYear === 2025)}
                                       className={`w-16 h-8 text-center text-xs border transition-all duration-300 ${
-                                        [0, 1].includes(selectedMonth) 
+                                        item.isLocked || ([0, 1].includes(selectedMonth) && selectedYear === 2025)
                                           ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
                                           : 'focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300 bg-white text-gray-900'
                                       }`}
