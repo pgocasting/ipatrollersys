@@ -553,8 +553,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   }, [activeCount, inactiveCount, totalMunicipalities, ipatrollerPatrolData, userAccessLevel]);
 
-  // Calculate district distribution with fallback data
+  // Calculate district distribution with fallback data (using IPatroller data source)
   const getDistrictData = () => {
+    console.log('📊 Dashboard getDistrictData - ipatrollerPatrolData:', ipatrollerPatrolData);
+    
     const districtCounts = {
       '1ST DISTRICT': 0,
       '2ND DISTRICT': 0,
@@ -562,13 +564,37 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     };
 
     // Count active municipalities per district from IPatroller data
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      ipatrollerData.forEach(item => {
-        if (item.district && item.isActive) {
-          districtCounts[item.district] = (districtCounts[item.district] || 0) + 1;
+    if (ipatrollerPatrolData && ipatrollerPatrolData.length > 0) {
+      const yesterday = new Date();
+      yesterday.setDate(yesterday.getDate() - 1);
+      const yesterdayIndex = yesterday.getDate() - 1;
+
+      console.log(`📊 Dashboard: Counting active municipalities by district for ${yesterday.toDateString()}`);
+
+      ipatrollerPatrolData.forEach(item => {
+        if (item.district && districtCounts.hasOwnProperty(item.district)) {
+          let yesterdayPatrols = 0;
+          
+          if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
+            const rawValue = item.data[yesterdayIndex];
+            if (rawValue === null || rawValue === undefined) {
+              yesterdayPatrols = 0;
+            } else {
+              yesterdayPatrols = rawValue;
+            }
+          }
+
+          // Count as active if >= 5 patrols yesterday
+          if (yesterdayPatrols >= 5) {
+            districtCounts[item.district]++;
+            console.log(`✅ ${item.municipality} (${item.district}): Active - adding to district count`);
+          } else {
+            console.log(`❌ ${item.municipality} (${item.district}): Inactive - not counting`);
+          }
         }
       });
     } else {
+      console.log('⚠️ Dashboard: No ipatrollerPatrolData, using fallback data');
       // Fallback data when no real data is available
       districtCounts['1ST DISTRICT'] = 3;
       districtCounts['2ND DISTRICT'] = 3;
@@ -577,12 +603,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
     // If we have data but zero active across all districts, fallback to sample so the pie isn't empty
     let totalActive = Object.values(districtCounts).reduce((sum, count) => sum + count, 0);
-    if (ipatrollerData && ipatrollerData.length > 0 && totalActive === 0) {
+    if (ipatrollerPatrolData && ipatrollerPatrolData.length > 0 && totalActive === 0) {
+      console.log('⚠️ Dashboard: No active municipalities found, using fallback data for pie chart');
       districtCounts['1ST DISTRICT'] = 3;
       districtCounts['2ND DISTRICT'] = 3;
       districtCounts['3RD DISTRICT'] = 2;
       totalActive = 8;
     }
+    
+    console.log('📊 Dashboard: District counts:', districtCounts, 'Total active:', totalActive);
     
     // Calculate percentages
     const labels = Object.keys(districtCounts).map(district => {
@@ -702,9 +731,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   }, [ipatrollerData, userAccessLevel]);
 
-  // Get district statistics for yesterday's data
+  // Get district statistics for yesterday's data (using IPatroller data source)
   const getDistrictStats = () => {
-    if (!ipatrollerData || ipatrollerData.length === 0) {
+    console.log('🏛️ Dashboard getDistrictStats - ipatrollerPatrolData:', ipatrollerPatrolData);
+    
+    if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
+      console.log('⚠️ Dashboard: No ipatrollerPatrolData for district stats');
       return [];
     }
 
@@ -712,28 +744,39 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayIndex = yesterday.getDate() - 1;
 
+    console.log(`📊 Dashboard: Calculating district stats for ${yesterday.toDateString()} at index ${yesterdayIndex}`);
+
     const districtStats = {
       '1ST DISTRICT': { active: 0, total: 0, color: 'blue' },
       '2ND DISTRICT': { active: 0, total: 0, color: 'emerald' },
       '3RD DISTRICT': { active: 0, total: 0, color: 'orange' }
     };
 
-    ipatrollerData.forEach(item => {
+    ipatrollerPatrolData.forEach(item => {
       if (item.district && districtStats[item.district]) {
         districtStats[item.district].total++;
         
         let yesterdayPatrols = 0;
         if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-          yesterdayPatrols = item.data[yesterdayIndex] || 0;
+          const rawValue = item.data[yesterdayIndex];
+          // Use IPatroller logic: null/undefined = "No Entry" = Inactive, >= 5 = Active
+          if (rawValue === null || rawValue === undefined) {
+            yesterdayPatrols = 0;
+          } else {
+            yesterdayPatrols = rawValue;
+          }
         }
 
         if (yesterdayPatrols >= 5) {
           districtStats[item.district].active++;
+          console.log(`✅ ${item.municipality} (${item.district}): ACTIVE with ${yesterdayPatrols} patrols`);
+        } else {
+          console.log(`❌ ${item.municipality} (${item.district}): INACTIVE with ${yesterdayPatrols} patrols`);
         }
       }
     });
 
-    return Object.entries(districtStats).map(([district, stats]) => ({
+    const result = Object.entries(districtStats).map(([district, stats]) => ({
       name: district,
       active: stats.active,
       total: stats.total,
@@ -741,6 +784,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       percentage: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0,
       color: stats.color
     }));
+
+    console.log('📊 Dashboard: District stats calculated:', result);
+    return result;
   };
 
   const districtStats = getDistrictStats();
