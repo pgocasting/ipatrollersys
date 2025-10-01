@@ -204,7 +204,37 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       // Create month-year ID for the selected month
       const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
       
-      // Try to get data from Firestore
+      // Define months that should show "No Entry" (0-based: 0=Jan, 1=Feb)
+      const noEntryMonths = [0, 1]; // January, February only
+      
+      // Check if current month should show "No Entry"
+      if (noEntryMonths.includes(selectedMonth)) {
+        // Create "No Entry" data for all municipalities
+        const noEntryData = [];
+        Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+          municipalities.forEach((municipality) => {
+            const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
+            const itemData = {
+              id: `${district}-${municipality}`,
+              municipality,
+              district,
+              data: dailyData,
+              totalPatrols: 0,
+              activeDays: 0,
+              inactiveDays: 0,
+              activePercentage: 0,
+            };
+            noEntryData.push(itemData);
+          });
+        });
+        
+        setPatrolData(noEntryData);
+        setFirestoreStatus('connected');
+        setLoading(false);
+        return;
+      }
+      
+      // Try to get data from Firestore for months that should have data
       const monthDocRef = doc(db, 'patrolData', monthYearId);
       const municipalitiesRef = collection(monthDocRef, 'municipalities');
       
@@ -381,6 +411,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   };
 
   const handleAddPatrolData = (municipality, district, dayIndex, value) => {
+    // Define months that should show "No Entry" (0-based: 0=Jan, 1=Feb)
+    const noEntryMonths = [0, 1]; // January, February only
+    
+    // Prevent editing in "No Entry" months
+    if (noEntryMonths.includes(selectedMonth)) {
+      return;
+    }
+    
     // Only update local state, don't save to Firestore
     const updatedData = patrolData.map((item) => {
       if (item.municipality === municipality && item.district === district) {
@@ -1597,7 +1635,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                           parseInt(e.target.value) || 0,
                                         )
                                       }
-                                      className="w-16 h-8 text-center text-xs border transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300 bg-white text-gray-900"
+                                      disabled={[0, 1].includes(selectedMonth)} // Disable for No Entry months (Jan, Feb only)
+                                      className={`w-16 h-8 text-center text-xs border transition-all duration-300 ${
+                                        [0, 1].includes(selectedMonth) 
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed border-gray-200' 
+                                          : 'focus:ring-2 focus:ring-blue-500 focus:border-transparent border-gray-300 bg-white text-gray-900'
+                                      }`}
                                     />
                                     <Badge className={getStatusColor(item.data[index], item.municipality)}>
                                       {getStatusText(item.data[index], item.municipality)}
