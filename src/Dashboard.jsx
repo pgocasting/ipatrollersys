@@ -1099,8 +1099,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     
     // Use real data if available, otherwise fallback to sample data
     if (realCommandCenterData.totalBarangays > 0 || realCommandCenterData.totalConcernTypes > 0) {
-      // Process real barangays data for display
-      const processedBarangays = realCommandCenterData.barangays.slice(0, 5).map(barangay => ({
+      // Process real barangays data for display - show ALL barangays
+      const processedBarangays = realCommandCenterData.barangays.map(barangay => ({
         name: barangay.name || barangay.barangay,
         municipality: barangay.municipality,
         district: barangay.district || '1ST DISTRICT',
@@ -1342,50 +1342,50 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <Card className="bg-white shadow-sm border border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Barangays</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide mb-2">Total Barangays</p>
+                    <p className="text-4xl font-bold text-blue-600">
                       {commandCenterData.totalBarangays.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="w-6 h-6 text-blue-600" />
+                  <div className="p-3 bg-blue-500 rounded-xl shadow-md">
+                    <Building2 className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Concern Types</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide mb-2">Concern Types</p>
+                    <p className="text-4xl font-bold text-green-600">
                       {commandCenterData.totalConcernTypes.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <AlertTriangle className="w-6 h-6 text-green-600" />
+                  <div className="p-3 bg-green-500 rounded-xl shadow-md">
+                    <AlertTriangle className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
+            <Card className="bg-gradient-to-br from-red-50 to-red-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Reports</p>
-                    <p className="text-2xl font-bold text-red-600">
+                    <p className="text-xs font-medium text-red-700 uppercase tracking-wide mb-2">Total Reports</p>
+                    <p className="text-4xl font-bold text-red-600">
                       {commandCenterData.totalReports.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <FileText className="w-6 h-6 text-red-600" />
+                  <div className="p-3 bg-red-500 rounded-xl shadow-md">
+                    <FileText className="w-8 h-8 text-white" />
                   </div>
                 </div>
               </CardContent>
@@ -1624,38 +1624,43 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           /* Command Center Analytics */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Barangay Reports */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
+            <Card className="bg-white shadow-lg border-none rounded-2xl overflow-hidden">
+              <CardHeader className="p-6 pb-4 bg-gradient-to-r from-blue-500 to-blue-600">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Building2 className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <Building2 className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Top Barangays</CardTitle>
-                    <p className="text-sm text-gray-600">Barangays with most reports and activity</p>
+                    <CardTitle className="text-lg font-bold text-white">All Barangays</CardTitle>
+                    <p className="text-sm text-blue-100">Complete list of barangays with reports and activity</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="space-y-3 max-h-96 overflow-y-auto">
+              <CardContent className="p-6 pt-4">
+                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
                   {commandCenterData.barangays.map((barangay, index) => (
-                    <div key={index} className="p-4 rounded-lg border bg-gray-50 border-gray-200 hover:bg-gray-100 transition-colors">
+                    <div key={index} className="group p-4 rounded-xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50 hover:border-blue-300 hover:shadow-md transition-all duration-300">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <MapPin className="w-4 h-4 text-blue-600" />
-                            <h3 className="text-sm font-semibold text-gray-900">{barangay.name}</h3>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                            </div>
+                            <h3 className="text-sm font-bold text-gray-900">{barangay.name}</h3>
                           </div>
-                          <p className="text-xs text-gray-600 mb-1">{barangay.municipality}</p>
-                          <p className="text-xs text-gray-500 mb-2">{barangay.district}</p>
-                          <div className="flex items-center gap-3">
-                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                          <p className="text-xs text-gray-600 mb-1 ml-8">{barangay.municipality}</p>
+                          <p className="text-xs text-gray-500 mb-3 ml-8">{barangay.district}</p>
+                          <div className="flex items-center gap-3 ml-8">
+                            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-blue-500 text-white shadow-sm">
                               {barangay.reports} Reports
                             </span>
                           </div>
                         </div>
                         <div className="text-right flex flex-col items-end">
-                          <p className="text-xs text-gray-500">Last: {new Date(barangay.lastReport).toLocaleDateString()}</p>
+                          <div className="px-2 py-1 bg-gray-100 rounded-lg mb-1">
+                            <p className="text-xs font-medium text-gray-700">Last Report</p>
+                          </div>
+                          <p className="text-xs text-gray-600 font-semibold">{new Date(barangay.lastReport).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
                         </div>
                       </div>
                     </div>
@@ -1665,68 +1670,73 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </Card>
 
             {/* Concern Types Overview */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
+            <Card className="bg-white shadow-lg border-none rounded-2xl overflow-hidden">
+              <CardHeader className="p-6 pb-4 bg-gradient-to-r from-green-500 to-green-600">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-green-600" />
+                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                    <AlertTriangle className="w-5 h-5 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Concern Types</CardTitle>
-                    <p className="text-sm text-gray-600">Most reported concern categories</p>
+                    <CardTitle className="text-lg font-bold text-white">Concern Types</CardTitle>
+                    <p className="text-sm text-green-100">Most reported concern categories</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent className="p-6 pt-0">
+              <CardContent className="p-6 pt-4">
                 <div className="space-y-4">
                   {/* Top Concern Types */}
                   <div className="space-y-3">
                     {commandCenterData.concernTypes.map((concern, index) => (
-                      <div key={index} className={`p-4 rounded-lg border ${
-                        concern.color === 'green' ? 'bg-green-50 border-green-200' :
-                        concern.color === 'blue' ? 'bg-blue-50 border-blue-200' :
-                        concern.color === 'red' ? 'bg-red-50 border-red-200' :
-                        concern.color === 'orange' ? 'bg-orange-50 border-orange-200' :
-                        'bg-purple-50 border-purple-200'
+                      <div key={index} className={`group p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
+                        concern.color === 'green' ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:border-green-400' :
+                        concern.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400' :
+                        concern.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-400' :
+                        concern.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:border-orange-400' :
+                        'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400'
                       }`}>
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className={`w-3 h-3 rounded-full ${
+                          <div className="flex items-center gap-3 flex-1">
+                            <div className={`w-2 h-2 rounded-full shadow-sm ${
                               concern.color === 'green' ? 'bg-green-600' :
                               concern.color === 'blue' ? 'bg-blue-600' :
                               concern.color === 'red' ? 'bg-red-600' :
                               concern.color === 'orange' ? 'bg-orange-600' :
                               'bg-purple-600'
                             }`}></div>
-                            <span className="text-sm font-medium text-gray-900">{concern.type}</span>
+                            <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">{concern.type}</span>
                           </div>
-                          <span className={`text-sm font-semibold ${
-                            concern.color === 'green' ? 'text-green-600' :
-                            concern.color === 'blue' ? 'text-blue-600' :
-                            concern.color === 'red' ? 'text-red-600' :
-                            concern.color === 'orange' ? 'text-orange-600' :
-                            'text-purple-600'
+                          <div className={`px-3 py-1.5 rounded-lg font-bold text-sm shadow-sm ${
+                            concern.color === 'green' ? 'bg-green-600 text-white' :
+                            concern.color === 'blue' ? 'bg-blue-600 text-white' :
+                            concern.color === 'red' ? 'bg-red-600 text-white' :
+                            concern.color === 'orange' ? 'bg-orange-600 text-white' :
+                            'bg-purple-600 text-white'
                           }`}>
                             {concern.count}
-                          </span>
+                          </div>
                         </div>
                       </div>
                     ))}
                   </div>
 
                   {/* District Breakdown */}
-                  <div className="space-y-3 mt-6">
-                    <h3 className="text-sm font-semibold text-gray-900">District Breakdown</h3>
+                  <div className="space-y-3 mt-6 pt-6 border-t-2 border-gray-200">
+                    <div className="flex items-center gap-2 mb-3">
+                      <MapPin className="w-4 h-4 text-gray-700" />
+                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">District Breakdown</h3>
+                    </div>
                     <div className="space-y-2">
                       {commandCenterData.districtBreakdown.map((district, index) => (
-                        <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-300">
                           <div>
-                            <p className="text-xs font-medium text-gray-900">{district.district}</p>
-                            <p className="text-xs text-gray-500">{district.barangays} barangays</p>
+                            <p className="text-xs font-bold text-gray-900">{district.district}</p>
+                            <p className="text-xs text-gray-600 mt-1">{district.barangays} barangays</p>
                           </div>
                           <div className="text-right">
-                            <p className="text-xs font-semibold text-gray-900">{district.reports}</p>
-                            <p className="text-xs text-gray-500">{district.percentage}%</p>
+                            <div className="px-3 py-1 bg-blue-500 rounded-lg shadow-sm mb-1">
+                              <p className="text-sm font-bold text-white">{district.reports}</p>
+                            </div>
+                            <p className="text-xs text-gray-600 font-semibold">{district.percentage}%</p>
                           </div>
                         </div>
                       ))}
