@@ -9,7 +9,7 @@ import { Bar } from 'react-chartjs-2';
 import { useData } from './DataContext';
 import { useAuth } from './contexts/AuthContext';
 import { useNotification, NotificationContainer } from './components/ui/notification';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   Chart as ChartJS,
@@ -39,7 +39,9 @@ import {
   FileText,
   RefreshCw,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  X,
+  Database
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -53,6 +55,22 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     createSampleData
   } = useData();
   const { userAccessLevel, userMunicipality } = useAuth();
+
+  // Instruction Modal State
+  const [showInstructions, setShowInstructions] = useState(false);
+
+  // Show instructions on first visit
+  useEffect(() => {
+    const hasSeenInstructions = localStorage.getItem('hasSeenDashboardInstructions');
+    if (!hasSeenInstructions && userAccessLevel) {
+      setShowInstructions(true);
+    }
+  }, [userAccessLevel]);
+
+  const handleCloseInstructions = () => {
+    setShowInstructions(false);
+    localStorage.setItem('hasSeenDashboardInstructions', 'true');
+  };
 
   // Use the same municipalities structure as IPatroller
   const municipalitiesByDistrict = {
@@ -254,54 +272,187 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     weeklyReports: [],
     totalBarangays: 0,
     totalConcernTypes: 0,
-    totalReports: 0
+    totalReports: 0,
+    totalActionTaken: 0
   });
   const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
 
   // Fetch real Command Center data from Firebase
   const fetchCommandCenterData = async () => {
-    if (userAccessLevel !== 'command-center') return;
+    console.log('🔄 Dashboard fetchCommandCenterData called:', {
+      userAccessLevel,
+      userMunicipality,
+      shouldFetch: userAccessLevel === 'command-center'
+    });
+    
+    if (userAccessLevel !== 'command-center') {
+      console.log('⚠️ Dashboard: Not fetching Command Center data - user access level is:', userAccessLevel);
+      return;
+    }
     
     setIsLoadingCommandCenter(true);
+    console.log('📡 Dashboard: Starting Command Center data fetch...');
     try {
-      // Fetch barangays
+      // Fetch barangays for the user's municipality
+      // Command center users should see all barangays from their municipality
       const barangaysQuery = userMunicipality 
         ? query(collection(db, 'barangays'), where('municipality', '==', userMunicipality))
         : collection(db, 'barangays');
       const barangaysSnapshot = await getDocs(barangaysQuery);
       const barangays = barangaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      console.log(`📍 Dashboard: Loaded ${barangays.length} barangays from Firebase for ${userMunicipality || 'all municipalities'}`);
+      
+      // Log barangays by municipality for verification
+      const barangaysByMunicipality = {};
+      barangays.forEach(b => {
+        const muni = b.municipality || 'Unknown';
+        if (!barangaysByMunicipality[muni]) {
+          barangaysByMunicipality[muni] = [];
+        }
+        barangaysByMunicipality[muni].push(b.name || b.barangay);
+      });
+      console.log('📍 Barangays by Municipality:', Object.entries(barangaysByMunicipality).map(([m, bs]) => `${m}: ${bs.length}`).join(', '));
+      
+      // Log all barangay names for debugging
+      if (userMunicipality) {
+        console.log(`📍 ${userMunicipality} Barangays:`, barangays.map(b => b.name || b.barangay).join(', '));
+      }
 
-      // Fetch concern types
-      const concernTypesQuery = userMunicipality
-        ? query(collection(db, 'concernTypes'), where('municipality', 'in', [userMunicipality, 'All Municipalities']))
-        : collection(db, 'concernTypes');
+      // Fetch ALL concern types (not filtered by municipality for command-center dashboard)
+      const concernTypesQuery = collection(db, 'concernTypes');
       const concernTypesSnapshot = await getDocs(concernTypesQuery);
       const concernTypes = concernTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      
+      console.log(`📋 Dashboard: Loaded ${concernTypes.length} concern types from Firebase`);
 
-      // Fetch weekly reports
-      const reportsQuery = userMunicipality
-        ? query(collection(db, 'weeklyReports'), where('municipality', '==', userMunicipality))
-        : collection(db, 'weeklyReports');
-      const reportsSnapshot = await getDocs(reportsQuery);
-      const weeklyReports = reportsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      // Fetch weekly reports from nested structure for March-September 2025 only
+      // OPTIMIZED: Load data in parallel using Promise.all
+      const weeklyReports = [];
+      const currentYear = new Date().getFullYear();
+      const monthsToLoad = ['March', 'April', 'May', 'June', 'July', 'August', 'September'];
+      
+      // Load data only for user's municipality (or all if no municipality specified)
+      const municipalitiesToLoad = userMunicipality 
+        ? [userMunicipality] 
+        : Object.values(municipalitiesByDistrict).flat();
+      
+      console.log('📅 Dashboard: Loading Command Center data for months:', monthsToLoad);
+      console.log('🏘️ Dashboard: Loading data for municipality:', userMunicipality || 'all municipalities');
+      console.log('⚡ Using parallel loading for faster performance...');
+      
+      // Create all promises for parallel loading
+      const loadPromises = [];
+      
+      for (const municipality of municipalitiesToLoad) {
+        for (const month of monthsToLoad) {
+          const monthYear = `${month}_${currentYear}`;
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          
+          // Add promise to array
+          loadPromises.push(
+            getDoc(docRef)
+              .then(docSnap => {
+                if (docSnap.exists()) {
+                  return {
+                    id: `${municipality}_${monthYear}`,
+                    municipality,
+                    month,
+                    year: currentYear,
+                    ...docSnap.data()
+                  };
+                }
+                return null;
+              })
+              .catch(error => {
+                console.error(`❌ Error loading ${month} ${currentYear} for ${municipality}:`, error);
+                return null;
+              })
+          );
+        }
+      }
+      
+      // Load all data in parallel
+      console.log(`⚡ Loading ${loadPromises.length} documents in parallel...`);
+      const results = await Promise.all(loadPromises);
+      
+      // Filter out null results and add to weeklyReports
+      results.forEach(result => {
+        if (result) {
+          weeklyReports.push(result);
+        }
+      });
+      
+      console.log(`✅ Loaded ${weeklyReports.length} documents successfully`);
+      
+      // Debug: Log sample of loaded data
+      if (weeklyReports.length > 0) {
+        console.log('📋 Sample weekly report structure:', {
+          firstReport: weeklyReports[0],
+          hasWeeklyReportData: !!weeklyReports[0]?.weeklyReportData,
+          weeklyReportDataKeys: weeklyReports[0]?.weeklyReportData ? Object.keys(weeklyReports[0].weeklyReportData).slice(0, 3) : []
+        });
+      } else {
+        console.warn('⚠️ No weekly reports loaded! Check Firebase path: commandCenter/weeklyReports/{municipality}/{monthYear}');
+        console.warn('⚠️ Expected municipalities:', municipalitiesToLoad);
+        console.warn('⚠️ Expected months:', monthsToLoad);
+      }
 
       // Calculate totals from actual weekly report data (monthly counts from Command Center table)
+      // This counts ALL individual reports from each barangay on each date
       let totalReports = 0;
+      let totalActionTaken = 0;
+      let reportBreakdown = {}; // For debugging
+      let actionBreakdown = {}; // For debugging
+      
       weeklyReports.forEach(report => {
         if (report.weeklyReportData) {
-          Object.values(report.weeklyReportData).forEach(dateEntries => {
+          const monthKey = `${report.month} ${report.year}`;
+          if (!reportBreakdown[monthKey]) {
+            reportBreakdown[monthKey] = 0;
+            actionBreakdown[monthKey] = 0;
+          }
+          
+          Object.entries(report.weeklyReportData).forEach(([dateKey, dateEntries]) => {
             if (Array.isArray(dateEntries)) {
+              // Log if multiple barangays on same date
+              if (dateEntries.length > 1) {
+                console.log(`📅 ${dateKey}: ${dateEntries.length} barangays reported (${dateEntries.map(e => e.barangay).join(', ')})`);
+              }
+              
               dateEntries.forEach(entry => {
                 // Sum up the weekly counts (week1, week2, week3, week4) from each entry
+                // Each entry represents one barangay's reports for that date
                 const week1 = parseInt(entry.week1) || 0;
                 const week2 = parseInt(entry.week2) || 0;
                 const week3 = parseInt(entry.week3) || 0;
                 const week4 = parseInt(entry.week4) || 0;
-                totalReports += week1 + week2 + week3 + week4;
+                const entryTotal = week1 + week2 + week3 + week4;
+                
+                totalReports += entryTotal;
+                reportBreakdown[monthKey] += entryTotal;
+                
+                // Count action taken - if actionTaken field exists and is not empty
+                if (entry.actionTaken && entry.actionTaken.trim()) {
+                  // Count this as 1 action taken (regardless of how many weeks)
+                  totalActionTaken += 1;
+                  actionBreakdown[monthKey] += 1;
+                }
               });
             }
           });
         }
+      });
+      
+      console.log('📊 Dashboard: Total Reports Breakdown by Month:', reportBreakdown);
+      console.log('📊 Dashboard: Action Taken Breakdown by Month:', actionBreakdown);
+
+      console.log('📊 Dashboard: Command Center data loaded:', {
+        barangays: barangays.length,
+        concernTypes: concernTypes.length,
+        weeklyReports: weeklyReports.length,
+        totalReports,
+        totalActionTaken
       });
 
       setRealCommandCenterData({
@@ -310,19 +461,24 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         weeklyReports,
         totalBarangays: barangays.length,
         totalConcernTypes: concernTypes.length,
-        totalReports
+        totalReports,
+        totalActionTaken
       });
 
     } catch (error) {
-      console.error('Error fetching Command Center data:', error);
-      // Fallback to sample data if Firebase fails
+      console.error('❌ Error fetching Command Center data:', error);
+      console.error('Error details:', error.message, error.stack);
+      // Show error notification
+      showError(`Failed to load Command Center data: ${error.message}`);
+      // Set empty data on error
       setRealCommandCenterData({
         barangays: [],
         concernTypes: [],
         weeklyReports: [],
-        totalBarangays: userMunicipality === 'Hermosa' ? 23 : 12,
-        totalConcernTypes: userMunicipality === 'Hermosa' ? 35 : 10,
-        totalReports: userMunicipality === 'Hermosa' ? 45 : 25
+        totalBarangays: 0,
+        totalConcernTypes: 0,
+        totalReports: 0,
+        totalActionTaken: 0
       });
     } finally {
       setIsLoadingCommandCenter(false);
@@ -1097,16 +1253,108 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     // Get current user's municipality (from auth context or default to Hermosa for demo)
     const currentMunicipality = userMunicipality || 'Hermosa';
     
+    console.log('📊 Dashboard getCommandCenterData called:', {
+      userAccessLevel,
+      userMunicipality: currentMunicipality,
+      hasRealData: realCommandCenterData.totalBarangays > 0 || realCommandCenterData.totalConcernTypes > 0,
+      realCommandCenterData
+    });
+    
     // Use real data if available, otherwise fallback to sample data
     if (realCommandCenterData.totalBarangays > 0 || realCommandCenterData.totalConcernTypes > 0) {
-      // Process real barangays data for display - show ALL barangays
-      const processedBarangays = realCommandCenterData.barangays.map(barangay => ({
-        name: barangay.name || barangay.barangay,
-        municipality: barangay.municipality,
-        district: barangay.district || '1ST DISTRICT',
-        reports: Math.floor(Math.random() * 20) + 5, // Random reports count for demo
-        lastReport: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-      }));
+      // Calculate barangay reports and last report dates from actual weekly report data
+      const barangayStats = {};
+      
+      realCommandCenterData.weeklyReports.forEach(report => {
+        if (report.weeklyReportData) {
+          const reportMonth = report.month; // e.g., "March", "April", etc.
+          const reportYear = report.year || 2025;
+          
+          // weeklyReportData structure: { "date": [entries] }
+          Object.entries(report.weeklyReportData).forEach(([dateKey, dateEntries]) => {
+            if (Array.isArray(dateEntries)) {
+              dateEntries.forEach(entry => {
+                const barangayName = entry.barangay;
+                if (barangayName) {
+                  if (!barangayStats[barangayName]) {
+                    barangayStats[barangayName] = {
+                      totalReports: 0,
+                      lastReportDate: null,
+                      lastReportMonth: null
+                    };
+                  }
+                  
+                  // Count reports from weekly data
+                  const week1 = parseInt(entry.week1) || 0;
+                  const week2 = parseInt(entry.week2) || 0;
+                  const week3 = parseInt(entry.week3) || 0;
+                  const week4 = parseInt(entry.week4) || 0;
+                  const totalWeeklyReports = week1 + week2 + week3 + week4;
+                  
+                  // Only count if there are actual reports
+                  if (totalWeeklyReports > 0) {
+                    barangayStats[barangayName].totalReports += totalWeeklyReports;
+                    
+                    // Track the most recent report date using the report's month and year
+                    // Parse the dateKey (which might be just a day or a full date string)
+                    let reportDate;
+                    try {
+                      // If dateKey is a full date string, use it
+                      if (dateKey.includes('-') || dateKey.includes('/')) {
+                        reportDate = new Date(dateKey);
+                      } else {
+                        // Otherwise, construct date from report month/year and dateKey
+                        const monthIndex = ['January', 'February', 'March', 'April', 'May', 'June', 
+                                          'July', 'August', 'September', 'October', 'November', 'December']
+                                          .indexOf(reportMonth);
+                        reportDate = new Date(reportYear, monthIndex, parseInt(dateKey) || 1);
+                      }
+                    } catch (e) {
+                      // Fallback: use first day of the report month
+                      const monthIndex = ['January', 'February', 'March', 'April', 'May', 'June', 
+                                        'July', 'August', 'September', 'October', 'November', 'December']
+                                        .indexOf(reportMonth);
+                      reportDate = new Date(reportYear, monthIndex, 1);
+                    }
+                    
+                    if (!barangayStats[barangayName].lastReportDate || reportDate > barangayStats[barangayName].lastReportDate) {
+                      barangayStats[barangayName].lastReportDate = reportDate;
+                      barangayStats[barangayName].lastReportMonth = reportMonth;
+                    }
+                  }
+                }
+              });
+            }
+          });
+        }
+      });
+
+      // Process real barangays data for display - show ALL barangays with actual stats
+      const processedBarangays = realCommandCenterData.barangays.map(barangay => {
+        const barangayName = barangay.name || barangay.barangay;
+        const stats = barangayStats[barangayName] || { totalReports: 0, lastReportDate: null };
+        
+        return {
+          name: barangayName,
+          municipality: barangay.municipality,
+          district: barangay.district || '1ST DISTRICT',
+          reports: stats.totalReports,
+          lastReport: stats.lastReportDate 
+            ? stats.lastReportDate.toISOString().split('T')[0]
+            : 'No reports'
+        };
+      }).sort((a, b) => {
+        // Sort by district first, then by municipality, then by barangay name
+        if (a.district !== b.district) {
+          return a.district.localeCompare(b.district);
+        }
+        if (a.municipality !== b.municipality) {
+          return a.municipality.localeCompare(b.municipality);
+        }
+        return a.name.localeCompare(b.name);
+      });
+      
+      console.log('📊 Dashboard: Processed', processedBarangays.length, 'barangays with stats');
 
       // Process real concern types data for display with actual counts from weekly reports
       let concernTypesCounts = {};
@@ -1130,23 +1378,23 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
 
-      // Convert to array and get top 5
+      // Convert to array and show ALL concern types (sorted by count)
       const processedConcernTypes = Object.entries(concernTypesCounts)
         .map(([type, count], index) => {
-          const colors = ['green', 'blue', 'red', 'orange', 'purple'];
+          const colors = ['green', 'blue', 'red', 'orange', 'purple', 'emerald', 'violet', 'teal', 'rose', 'amber'];
           return {
             type,
             count,
             color: colors[index % colors.length]
           };
         })
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5);
+        .sort((a, b) => b.count - a.count); // Show ALL, sorted by count (no slice)
 
       return {
         totalBarangays: realCommandCenterData.totalBarangays,
         totalConcernTypes: realCommandCenterData.totalConcernTypes,
         totalReports: realCommandCenterData.totalReports,
+        totalActionTaken: realCommandCenterData.totalActionTaken,
         activeDistricts: 1,
         barangays: processedBarangays.length > 0 ? processedBarangays : getBarangaysForMunicipality(currentMunicipality),
         concernTypes: processedConcernTypes.length > 0 ? processedConcernTypes : getConcernTypesForMunicipality(currentMunicipality),
@@ -1192,6 +1440,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       totalBarangays: municipalityBarangays[currentMunicipality] || 23,
       totalConcernTypes: municipalityConcernTypes[currentMunicipality] || 35,
       totalReports: municipalityReports[currentMunicipality] || 45,
+      totalActionTaken: 0,
       activeDistricts: 1,
       barangays: getBarangaysForMunicipality(currentMunicipality),
       concernTypes: getConcernTypesForMunicipality(currentMunicipality),
@@ -1222,8 +1471,128 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     );
   }
 
+  // Get instruction content based on user access level
+  const getInstructionContent = () => {
+    if (userAccessLevel === 'command-center') {
+      return {
+        title: 'Welcome to Command Center Dashboard!',
+        icon: <Building2 className="w-12 h-12 text-blue-600" />,
+        steps: [
+          {
+            title: 'Dashboard Overview',
+            description: 'View total reports, barangays, and concern types across all municipalities (March-September 2025).',
+            icon: <BarChart3 className="w-5 h-5 text-blue-600" />
+          },
+          {
+            title: 'All Barangays Section',
+            description: 'See complete list of all barangays with their report counts and last report dates.',
+            icon: <MapPin className="w-5 h-5 text-emerald-600" />
+          },
+          {
+            title: 'Top Concern Types',
+            description: 'Monitor the most reported concern categories with visual progress bars.',
+            icon: <AlertTriangle className="w-5 h-5 text-orange-600" />
+          },
+          {
+            title: 'Command Center Page',
+            description: 'Navigate to Command Center page to manage weekly reports, barangays, and concern types for your municipality.',
+            icon: <FileText className="w-5 h-5 text-violet-600" />
+          },
+          {
+            title: 'Refresh Data',
+            description: 'Use the "Refresh Data" button to reload the latest information from the database.',
+            icon: <RefreshCw className="w-5 h-5 text-teal-600" />
+          }
+        ]
+      };
+    } else if (userAccessLevel === 'admin') {
+      return {
+        title: 'Welcome to Admin Dashboard!',
+        icon: <Shield className="w-12 h-12 text-purple-600" />,
+        steps: [
+          {
+            title: 'Full System Access',
+            description: 'You have access to all features including IPatroller data, district statistics, and municipality lists.',
+            icon: <CheckCircle className="w-5 h-5 text-green-600" />
+          },
+          {
+            title: 'Data Management',
+            description: 'Refresh IPatroller data, create sample data for testing, and monitor all municipalities.',
+            icon: <Database className="w-5 h-5 text-blue-600" />
+          },
+          {
+            title: 'Command Center Access',
+            description: 'Access Command Center page to manage all municipalities, barangays, and concern types.',
+            icon: <Building2 className="w-5 h-5 text-orange-600" />
+          }
+        ]
+      };
+    }
+    return null;
+  };
+
+  const instructionContent = getInstructionContent();
+
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
+      {/* Instruction Modal */}
+      {showInstructions && instructionContent && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-slate-200 bg-gradient-to-r from-blue-50 to-violet-50">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-white rounded-xl shadow-md">
+                    {instructionContent.icon}
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-900">{instructionContent.title}</h2>
+                    <p className="text-sm text-slate-600 mt-1">Quick guide to get you started</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleCloseInstructions}
+                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-500" />
+                </button>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {instructionContent.steps.map((step, index) => (
+                <div key={index} className="flex gap-4 p-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200 bg-white">
+                  <div className="flex-shrink-0">
+                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
+                      <span className="text-lg font-black text-slate-700">{index + 1}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      {step.icon}
+                      <h3 className="text-sm font-bold text-slate-900">{step.title}</h3>
+                    </div>
+                    <p className="text-sm text-slate-600">{step.description}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            <div className="p-6 border-t border-slate-200 bg-slate-50">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-slate-500">You can view this guide anytime from Settings</p>
+                <Button
+                  onClick={handleCloseInstructions}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+                >
+                  Got it, Let's Start!
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="container mx-auto p-4 space-y-4 bg-gray-50 min-h-screen">
         {/* Header */}
         <div className="flex justify-between items-center">
@@ -1268,6 +1637,24 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   Create Sample Data
                 </Button>
               )}
+            </div>
+          )}
+          
+          {/* Action Buttons for Command Center Users */}
+          {userAccessLevel === 'command-center' && (
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => {
+                  console.log('🔄 Refreshing Command Center data...');
+                  fetchCommandCenterData();
+                  showSuccess('Command Center data refreshed');
+                }}
+                disabled={isLoadingCommandCenter}
+                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoadingCommandCenter ? 'animate-spin' : ''}`} />
+                {isLoadingCommandCenter ? 'Refreshing...' : 'Refresh Data'}
+              </Button>
             </div>
           )}
         </div>
@@ -1341,51 +1728,51 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </Card>
           </div>
         ) : userAccessLevel === 'command-center' ? (
-          /* Command Center Stats */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-blue-700 uppercase tracking-wide mb-2">Total Barangays</p>
-                    <p className="text-4xl font-bold text-blue-600">
-                      {commandCenterData.totalBarangays.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-blue-500 rounded-xl shadow-md">
-                    <Building2 className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-green-700 uppercase tracking-wide mb-2">Concern Types</p>
-                    <p className="text-4xl font-bold text-green-600">
-                      {commandCenterData.totalConcernTypes.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-green-500 rounded-xl shadow-md">
-                    <AlertTriangle className="w-8 h-8 text-white" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-gradient-to-br from-red-50 to-red-100 border-none shadow-md hover:shadow-lg transition-all duration-300">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-red-700 uppercase tracking-wide mb-2">Total Reports</p>
-                    <p className="text-4xl font-bold text-red-600">
+          /* Command Center Stats - Modern shadcn Design */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* 1. Total Reports - Orange */}
+            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-orange-500 via-orange-600 to-orange-700 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                        <FileText className="w-5 h-5 text-white" />
+                      </div>
+                      <p className="text-xs font-semibold text-orange-100 uppercase tracking-wider">Total Reports</p>
+                    </div>
+                    <p className="text-5xl font-black text-white tracking-tight">
                       {commandCenterData.totalReports.toLocaleString()}
                     </p>
+                    <p className="text-sm text-orange-100/80">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
                   </div>
-                  <div className="p-3 bg-red-500 rounded-xl shadow-md">
-                    <FileText className="w-8 h-8 text-white" />
+                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <FileText className="w-10 h-10 text-white" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* 2. Action Taken - Teal */}
+            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-teal-500 via-teal-600 to-teal-700 overflow-hidden relative group">
+              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+              <CardContent className="p-6 relative z-10">
+                <div className="flex items-start justify-between">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
+                        <CheckCircle className="w-5 h-5 text-white" />
+                      </div>
+                      <p className="text-xs font-semibold text-teal-100 uppercase tracking-wider">Action Taken</p>
+                    </div>
+                    <p className="text-5xl font-black text-white tracking-tight">
+                      {commandCenterData.totalActionTaken.toLocaleString()}
+                    </p>
+                    <p className="text-sm text-teal-100/80">Reports with actions completed</p>
+                  </div>
+                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
+                    <CheckCircle className="w-10 h-10 text-white" />
                   </div>
                 </div>
               </CardContent>
@@ -1621,126 +2008,164 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </Card>
           </div>
         ) : userAccessLevel === 'command-center' ? (
-          /* Command Center Analytics */
+          /* Command Center Analytics - Modern shadcn Design */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Barangay Reports */}
-            <Card className="bg-white shadow-lg border-none rounded-2xl overflow-hidden">
-              <CardHeader className="p-6 pb-4 bg-gradient-to-r from-blue-500 to-blue-600">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                    <Building2 className="w-5 h-5 text-white" />
+            {/* All Barangays - Modern Card */}
+            <Card className="border border-slate-200 shadow-xl hover:shadow-2xl transition-all duration-300 bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-blue-500 rounded-xl shadow-lg">
+                      <Building2 className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900">All Barangays</CardTitle>
+                      <p className="text-sm text-slate-500 mt-0.5">Complete registry with activity tracking</p>
+                    </div>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg font-bold text-white">All Barangays</CardTitle>
-                    <p className="text-sm text-blue-100">Complete list of barangays with reports and activity</p>
-                  </div>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold">
+                    {commandCenterData.barangays.length}
+                  </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-6 pt-4">
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
-                  {commandCenterData.barangays.map((barangay, index) => (
-                    <div key={index} className="group p-4 rounded-xl border-2 border-gray-100 bg-gradient-to-br from-white to-gray-50 hover:border-blue-300 hover:shadow-md transition-all duration-300">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <CardContent className="p-0">
+                <div className="max-h-[650px] overflow-y-auto">
+                  <div className="divide-y divide-slate-100">
+                    {commandCenterData.barangays.length > 0 ? (
+                      commandCenterData.barangays.map((barangay, index) => (
+                        <div key={index} className="group p-5 hover:bg-slate-50/80 transition-all duration-200 cursor-pointer">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2.5 mb-2">
+                                <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
+                                  <MapPin className="w-4 h-4 text-blue-600" />
+                                </div>
+                                <h3 className="text-sm font-bold text-slate-900 truncate">{barangay.name}</h3>
+                              </div>
+                              <div className="ml-8 space-y-1">
+                                <p className="text-xs text-slate-600 font-medium">{barangay.municipality}</p>
+                                <p className="text-xs text-slate-400">{barangay.district}</p>
+                              </div>
+                              <div className="ml-8 mt-3">
+                                <Badge 
+                                  variant={barangay.reports > 0 ? "default" : "secondary"}
+                                  className={barangay.reports > 0 ? "bg-blue-500 hover:bg-blue-600" : "bg-slate-200 text-slate-600"}
+                                >
+                                  {barangay.reports} {barangay.reports === 1 ? 'Report' : 'Reports'}
+                                </Badge>
+                              </div>
                             </div>
-                            <h3 className="text-sm font-bold text-gray-900">{barangay.name}</h3>
-                          </div>
-                          <p className="text-xs text-gray-600 mb-1 ml-8">{barangay.municipality}</p>
-                          <p className="text-xs text-gray-500 mb-3 ml-8">{barangay.district}</p>
-                          <div className="flex items-center gap-3 ml-8">
-                            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-blue-500 text-white shadow-sm">
-                              {barangay.reports} Reports
-                            </span>
+                            <div className="text-right flex flex-col items-end gap-1">
+                              <div className="text-xs font-medium text-slate-500">Last Report</div>
+                              <div className="text-xs font-semibold text-slate-700">
+                                {barangay.lastReport === 'No reports' 
+                                  ? <span className="text-slate-400">No reports</span>
+                                  : new Date(barangay.lastReport).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                                }
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="text-right flex flex-col items-end">
-                          <div className="px-2 py-1 bg-gray-100 rounded-lg mb-1">
-                            <p className="text-xs font-medium text-gray-700">Last Report</p>
-                          </div>
-                          <p className="text-xs text-gray-600 font-semibold">{new Date(barangay.lastReport).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</p>
+                      ))
+                    ) : (
+                      <div className="p-8 text-center">
+                        <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-sm text-slate-500">No barangays found</p>
+                        <p className="text-xs text-slate-400 mt-1">Please check Firebase data</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {commandCenterData.barangays.length > 0 && (
+                  <div className="p-4 border-t border-slate-100 bg-slate-50">
+                    <p className="text-xs text-center text-slate-500">
+                      Showing <span className="font-semibold text-slate-700">all barangays</span> in {userMunicipality || 'all municipalities'}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* All Concern Types - Modern Card */}
+            <Card className="border border-slate-200 shadow-xl hover:shadow-2xl transition-all duration-300 bg-white overflow-hidden">
+              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-500 rounded-xl shadow-lg">
+                      <AlertTriangle className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-bold text-slate-900">All Concern Types</CardTitle>
+                      <p className="text-sm text-slate-500 mt-0.5">Complete list of reported categories</p>
+                    </div>
+                  </div>
+                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold">
+                    {commandCenterData.concernTypes.length}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  {commandCenterData.concernTypes.map((concern, index) => (
+                    <div key={index} className="group relative">
+                      <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200">
+                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 transition-all">
+                          <span className="text-lg font-black text-slate-700">#{index + 1}</span>
                         </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold text-slate-900 truncate uppercase tracking-wide">
+                            {concern.type}
+                          </p>
+                          <div className="mt-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full transition-all duration-500 ${
+                                concern.color === 'green' ? 'bg-emerald-500' :
+                                concern.color === 'blue' ? 'bg-blue-500' :
+                                concern.color === 'red' ? 'bg-red-500' :
+                                concern.color === 'orange' ? 'bg-orange-500' :
+                                'bg-violet-500'
+                              }`}
+                              style={{ width: `${Math.min((concern.count / Math.max(...commandCenterData.concernTypes.map(c => c.count))) * 100, 100)}%` }}
+                            ></div>
+                          </div>
+                        </div>
+                        <Badge 
+                          className={`font-bold text-sm px-3 py-1.5 ${
+                            concern.color === 'green' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                            concern.color === 'blue' ? 'bg-blue-500 hover:bg-blue-600' :
+                            concern.color === 'red' ? 'bg-red-500 hover:bg-red-600' :
+                            concern.color === 'orange' ? 'bg-orange-500 hover:bg-orange-600' :
+                            'bg-violet-500 hover:bg-violet-600'
+                          }`}
+                        >
+                          {concern.count}
+                        </Badge>
                       </div>
                     </div>
                   ))}
                 </div>
-              </CardContent>
-            </Card>
 
-            {/* Concern Types Overview */}
-            <Card className="bg-white shadow-lg border-none rounded-2xl overflow-hidden">
-              <CardHeader className="p-6 pb-4 bg-gradient-to-r from-green-500 to-green-600">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-white" />
+                {/* District Breakdown */}
+                <div className="space-y-3 mt-6 pt-6 border-t-2 border-slate-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="w-4 h-4 text-slate-700" />
+                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">District Breakdown</h3>
                   </div>
-                  <div>
-                    <CardTitle className="text-lg font-bold text-white">Concern Types</CardTitle>
-                    <p className="text-sm text-green-100">Most reported concern categories</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-4">
-                <div className="space-y-4">
-                  {/* Top Concern Types */}
-                  <div className="space-y-3">
-                    {commandCenterData.concernTypes.map((concern, index) => (
-                      <div key={index} className={`group p-4 rounded-xl border-2 transition-all duration-300 hover:shadow-md ${
-                        concern.color === 'green' ? 'bg-gradient-to-br from-green-50 to-green-100 border-green-200 hover:border-green-400' :
-                        concern.color === 'blue' ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-blue-200 hover:border-blue-400' :
-                        concern.color === 'red' ? 'bg-gradient-to-br from-red-50 to-red-100 border-red-200 hover:border-red-400' :
-                        concern.color === 'orange' ? 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-200 hover:border-orange-400' :
-                        'bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200 hover:border-purple-400'
-                      }`}>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3 flex-1">
-                            <div className={`w-2 h-2 rounded-full shadow-sm ${
-                              concern.color === 'green' ? 'bg-green-600' :
-                              concern.color === 'blue' ? 'bg-blue-600' :
-                              concern.color === 'red' ? 'bg-red-600' :
-                              concern.color === 'orange' ? 'bg-orange-600' :
-                              'bg-purple-600'
-                            }`}></div>
-                            <span className="text-xs font-bold text-gray-900 uppercase tracking-wide">{concern.type}</span>
-                          </div>
-                          <div className={`px-3 py-1.5 rounded-lg font-bold text-sm shadow-sm ${
-                            concern.color === 'green' ? 'bg-green-600 text-white' :
-                            concern.color === 'blue' ? 'bg-blue-600 text-white' :
-                            concern.color === 'red' ? 'bg-red-600 text-white' :
-                            concern.color === 'orange' ? 'bg-orange-600 text-white' :
-                            'bg-purple-600 text-white'
-                          }`}>
-                            {concern.count}
-                          </div>
+                  <div className="space-y-2">
+                    {commandCenterData.districtBreakdown.map((district, index) => (
+                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200">
+                        <div>
+                          <p className="text-sm font-bold text-slate-900">{district.district}</p>
+                          <p className="text-xs text-slate-500 mt-1">{district.barangays} barangays</p>
+                        </div>
+                        <div className="text-right flex flex-col items-end gap-1">
+                          <Badge className="bg-blue-500 hover:bg-blue-600">
+                            {district.reports} reports
+                          </Badge>
+                          <p className="text-xs text-slate-600 font-semibold">{district.percentage}%</p>
                         </div>
                       </div>
                     ))}
-                  </div>
-
-                  {/* District Breakdown */}
-                  <div className="space-y-3 mt-6 pt-6 border-t-2 border-gray-200">
-                    <div className="flex items-center gap-2 mb-3">
-                      <MapPin className="w-4 h-4 text-gray-700" />
-                      <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">District Breakdown</h3>
-                    </div>
-                    <div className="space-y-2">
-                      {commandCenterData.districtBreakdown.map((district, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl border-2 border-gray-200 hover:border-gray-300 hover:shadow-md transition-all duration-300">
-                          <div>
-                            <p className="text-xs font-bold text-gray-900">{district.district}</p>
-                            <p className="text-xs text-gray-600 mt-1">{district.barangays} barangays</p>
-                          </div>
-                          <div className="text-right">
-                            <div className="px-3 py-1 bg-blue-500 rounded-lg shadow-sm mb-1">
-                              <p className="text-sm font-bold text-white">{district.reports}</p>
-                            </div>
-                            <p className="text-xs text-gray-600 font-semibold">{district.percentage}%</p>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
                   </div>
                 </div>
               </CardContent>
