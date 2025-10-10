@@ -1,0 +1,13 @@
+# SPA Fallback - All routes should serve index.html
+/*    /index.html   200
+
+# Specific page redirects for better SEO
+/dashboard    /index.html   200
+/ipatroller   /index.html   200
+/reports      /index.html   200
+/incidents    /index.html   200
+/actioncenter /index.html   200
+/settings     /index.html   200
+
+# Handle trailing slashes
+/*/    /index.html   200 
