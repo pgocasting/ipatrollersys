@@ -1608,7 +1608,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                         <p><strong>Minimum Reports/Week:</strong> 98 (14 × 7).</p>
                         <p><strong>Actual Reports/Week:</strong> Displays Week 1-4 breakdown of patrol reports for the month.</p>
                         <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports (currently 0 - awaiting data).</p>
-                        <p><strong>% Efficiency:</strong> (Actual No. of Report / Week) ÷ (No. of Report Attended / Week) × 100.</p>
+                        <p><strong>% Efficiency:</strong> (Minimum Number of Reports (constant) / Week) ÷ (No. of Report Attended / Week) × 100.</p>
                       </div>
                     </div>
                   </div>
@@ -1667,7 +1667,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             <span>Week 4</span>
                           </div>
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">% of Efficiency (Actual No. of Report / Week) / (No. of Report Attended / Week) * 100</th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">% of Efficiency (Minimum Number of Reports (constant) / Week) / (No. of Report Attended / Week) * 100</th>
                       </>
                     )}
                   </tr>
@@ -1797,10 +1797,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   }
                                 }
                                 
-                                // Calculate efficiency based on actual reports vs attended reports
+                                // Calculate efficiency based on minimum reports (constant) vs attended reports
                                 const totalAttended = weeklyAttended.reduce((sum, v) => sum + v, 0);
                                 const totalActual = weeklyActual.reduce((sum, v) => sum + v, 0);
-                                const efficiency = totalAttended > 0 ? Math.round((totalActual / totalAttended) * 100) : 0;
+                                const efficiency = totalAttended > 0 ? Math.round((WEEKLY_MIN / totalAttended) * 100) : 0;
                                 return (
                                   <>
                                     <td className="px-3 py-4 text-center text-sm text-gray-700">{idx + 1}</td>

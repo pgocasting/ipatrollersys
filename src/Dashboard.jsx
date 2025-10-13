@@ -464,6 +464,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   }, [userAccessLevel, userMunicipality]);
 
+  // Auto-refresh Command Center data every 30 seconds for command-center users
+  useEffect(() => {
+    if (userAccessLevel === 'command-center') {
+      const refreshInterval = setInterval(() => {
+        console.log('🔄 Auto-refreshing Command Center data...');
+        fetchCommandCenterData();
+      }, 30000); // 30 seconds
+
+      return () => clearInterval(refreshInterval);
+    }
+  }, [userAccessLevel]);
+
   // Load IPatroller data when component mounts
   useEffect(() => {
     console.log('🚀 Dashboard: Component mounted, loading IPatroller data...');
@@ -925,27 +937,121 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   // State for real Action Center data
   const [realActionCenterData, setRealActionCenterData] = useState([]);
   const [isLoadingActionCenter, setIsLoadingActionCenter] = useState(false);
+  const [lastDataUpdate, setLastDataUpdate] = useState(null);
+  
+  // State for real Incidents data
+  const [realIncidentsData, setRealIncidentsData] = useState([]);
+  const [isLoadingIncidents, setIsLoadingIncidents] = useState(false);
 
-  // Fetch real Action Center data from Firebase
+  // Fetch real Action Center data from Firebase (same approach as Action Center page)
   const fetchActionCenterData = async () => {
     setIsLoadingActionCenter(true);
     try {
-      const actionCenterQuery = collection(db, 'actionReports');
-      const querySnapshot = await getDocs(actionCenterQuery);
-      const actionData = [];
+      console.log('🚀 Dashboard: COMPREHENSIVE ACTION DATA FETCH STARTED');
+      const allActionData = [];
       
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data) {
-          actionData.push({
-            id: doc.id,
-            ...data
-          });
+      // List of possible collection names where action data might be stored (same as Action Center page)
+      const possibleCollections = [
+        'actionReports',
+        'actionCenter', 
+        'actions',
+        'reports',
+        'actionData',
+        'departmentActions',
+        'pnpActions',
+        'agricultureActions',
+        'pgEnroActions'
+      ];
+      
+      console.log('📋 Dashboard: Checking collections:', possibleCollections);
+      
+      // Check each possible collection (same logic as Action Center page)
+      for (const collectionName of possibleCollections) {
+        try {
+          console.log(`🔍 Dashboard: Checking collection: ${collectionName}`);
+          const collectionRef = collection(db, collectionName);
+          const snapshot = await getDocs(collectionRef);
+          
+          console.log(`📊 Dashboard: ${collectionName}: ${snapshot.size} documents found`);
+          
+          if (snapshot.size > 0) {
+            snapshot.forEach((doc) => {
+              const data = doc.data();
+              
+              // Handle different data structures (same as Action Center page)
+              if (data.data && Array.isArray(data.data)) {
+                // Month-based structure with data array
+                data.data.forEach((report, index) => {
+                  allActionData.push({
+                    ...report,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'month-based',
+                    reportIndex: index
+                  });
+                });
+              } else if (data.actions && Array.isArray(data.actions)) {
+                // Actions array structure
+                data.actions.forEach((action, index) => {
+                  allActionData.push({
+                    ...action,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'actions-array',
+                    reportIndex: index
+                  });
+                });
+              } else if (data.reports && Array.isArray(data.reports)) {
+                // Reports array structure
+                data.reports.forEach((report, index) => {
+                  allActionData.push({
+                    ...report,
+                    sourceCollection: collectionName,
+                    sourceDocument: doc.id,
+                    sourceType: 'reports-array',
+                    reportIndex: index
+                  });
+                });
+              } else {
+                // Individual document structure
+                allActionData.push({
+                  ...data,
+                  id: doc.id,
+                  sourceCollection: collectionName,
+                  sourceDocument: doc.id,
+                  sourceType: 'individual'
+                });
+              }
+            });
+          }
+        } catch (collectionError) {
+          console.log(`⚠️ Dashboard: Collection ${collectionName} not accessible:`, collectionError.message);
         }
-      });
+      }
       
-      console.log('📊 Dashboard: Loaded Action Center data:', actionData.length, 'records');
-      setRealActionCenterData(actionData);
+      console.log(`✅ Dashboard: TOTAL RAW ACTION DATA COLLECTED: ${allActionData.length} items`);
+      
+      // Transform and standardize all collected data (simplified version of Action Center transformation)
+      const transformedData = allActionData
+        .filter(item => item && (item.what || item.action || item.description))
+        .map(item => ({
+          id: item.id || `${item.sourceDocument}_${item.reportIndex || 0}`,
+          department: item.department || item.dept || 'pnp',
+          municipality: item.municipality || item.mun || item.location || null,
+          district: item.district || null,
+          what: item.what || item.action || item.description || item.activity || null,
+          when: item.when || item.date || item.timestamp || null,
+          where: item.where || item.place || item.venue || item.location || null,
+          actionTaken: item.actionTaken || item.status || item.result || 'Pending',
+          sourceCollection: item.sourceCollection,
+          sourceDocument: item.sourceDocument,
+          sourceType: item.sourceType,
+          reportIndex: item.reportIndex
+        }));
+      
+      console.log('📊 Dashboard: Loaded Action Center data:', transformedData.length, 'records');
+      setRealActionCenterData(transformedData);
+      setLastDataUpdate(new Date());
     } catch (error) {
       console.error('❌ Dashboard: Error loading Action Center data:', error);
       setRealActionCenterData([]);
@@ -954,9 +1060,73 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Load Action Center data when component mounts
+  // Fetch real Incidents data from Firebase (same approach as Incidents page)
+  const fetchIncidentsData = async () => {
+    setIsLoadingIncidents(true);
+    try {
+      console.log('🚀 Dashboard: Loading Incidents data from Firebase');
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const incidentsData = [];
+      const seenIds = new Set();
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          // Clean the data when loading from Firestore (same as Incidents page)
+          const incidentData = {
+            id: doc.id,
+            ...data
+          };
+          
+          // Only include non-duplicate incidents (same logic as Incidents page)
+          if (!seenIds.has(incidentData.id)) {
+            seenIds.add(incidentData.id);
+            incidentsData.push(incidentData);
+          }
+        }
+      });
+      
+      console.log('📊 Dashboard: Loaded Incidents data:', incidentsData.length, 'records');
+      console.log('📄 Dashboard: Sample incident data:', incidentsData.slice(0, 2));
+      setRealIncidentsData(incidentsData);
+      setLastDataUpdate(new Date());
+    } catch (error) {
+      console.error('❌ Dashboard: Error loading Incidents data:', error);
+      setRealIncidentsData([]);
+    } finally {
+      setIsLoadingIncidents(false);
+    }
+  };
+
+  // Load Action Center data when component mounts and when user changes
   useEffect(() => {
     fetchActionCenterData();
+  }, [userAccessLevel, userMunicipality]);
+
+  // Load Incidents data when component mounts and when user changes
+  useEffect(() => {
+    fetchIncidentsData();
+  }, [userAccessLevel, userMunicipality]);
+
+  // Auto-refresh Action Center data every 30 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing Action Center data...');
+      fetchActionCenterData();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
+  }, []);
+
+  // Auto-refresh Incidents data every 30 seconds
+  useEffect(() => {
+    const refreshInterval = setInterval(() => {
+      console.log('🔄 Auto-refreshing Incidents data...');
+      fetchIncidentsData();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(refreshInterval);
   }, []);
 
   // Get action breakdown data from real Action Center data
@@ -977,16 +1147,31 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       };
     }
 
+    // Filter actions by current month and user municipality
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    const filteredActions = dataToUse.filter(report => {
+      // Filter by user's municipality if user is not admin
+      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
+        return false;
+      }
+      
+      // Filter by current month
+      if (report.when) {
+        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+        return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
+      }
+      
+      return true; // Include actions without date for now
+    });
+
     // Count by action type
     const typeCount = {};
     const municipalityCount = {};
 
-    dataToUse.forEach(report => {
-      // Filter by user's municipality if user is not admin
-      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
-        return; // Skip reports not from user's municipality
-      }
-
+    filteredActions.forEach(report => {
       // Count by action type (using 'what' field)
       const actionType = report.what || 'Other';
       typeCount[actionType] = (typeCount[actionType] || 0) + 1;
@@ -1016,10 +1201,25 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       return [];
     }
 
-    // Filter reports for this specific municipality
-    const municipalityReports = dataToUse.filter(report => 
-      report.municipality === municipalityName
-    );
+    // Filter reports for this specific municipality and current month
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    const municipalityReports = dataToUse.filter(report => {
+      // Filter by municipality
+      if (report.municipality !== municipalityName) {
+        return false;
+      }
+      
+      // Filter by current month
+      if (report.when) {
+        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+        return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
+      }
+      
+      return true; // Include actions without date for now
+    });
 
     // Count by action type for this municipality
     const typeCount = {};
@@ -1044,15 +1244,100 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }));
   };
 
-  // Get incident breakdown data
+  // Get current month total actions count
+  const getCurrentMonthActionsCount = () => {
+    const dataToUse = realActionCenterData.length > 0 ? realActionCenterData : actionReports || [];
+    const currentDate = new Date();
+    const currentMonth = currentDate.getMonth();
+    const currentYear = currentDate.getFullYear();
+    
+    const filteredActions = dataToUse.filter(report => {
+      // Filter by user's municipality if user is not admin
+      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
+        return false;
+      }
+      
+      // Filter by current month
+      if (report.when) {
+        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+        return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
+      }
+      
+      return true; // Include actions without date for now
+    });
+    
+    return filteredActions.length;
+  };
+
+  // Get current month total incidents count (EXACT same filtering as Incidents page)
+  const getCurrentMonthIncidentsCount = () => {
+    // Use real incidents data if available, otherwise fall back to DataContext
+    const dataToUse = realIncidentsData.length > 0 ? realIncidentsData : incidents || [];
+    
+    // Remove duplicates by ID, keeping the most recent one (same as Incidents page)
+    const uniqueIncidents = dataToUse.reduce((acc, incident) => {
+      const existingIndex = acc.findIndex(existing => existing.id === incident.id);
+      if (existingIndex === -1) {
+        acc.push(incident);
+      } else {
+        // Replace with the more recent version (based on updatedAt or createdAt)
+        const existing = acc[existingIndex];
+        const existingTime = existing.updatedAt || existing.createdAt || '';
+        const newTime = incident.updatedAt || incident.createdAt || '';
+        if (newTime > existingTime) {
+          acc[existingIndex] = incident;
+        }
+      }
+      return acc;
+    }, []);
+    
+    // Apply EXACT same filtering logic as Incidents page
+    const currentDate = new Date();
+    const currentMonth = currentDate.toLocaleString('en-US', { month: 'long' }); // October
+    
+    // Default filter values (same as Incidents page defaults)
+    const filterStatus = "all";
+    const filterDistrict = "all";
+    const filterMunicipality = userAccessLevel !== 'admin' && userMunicipality ? userMunicipality : "all";
+    const searchTerm = "";
+    
+    const filteredIncidents = uniqueIncidents.filter((incident) => {
+      // Filter out incidents with "No description available" (same as Incidents page)
+      const hasValidDescription = incident.description && 
+                                 incident.description.trim() !== "" && 
+                                 incident.description !== "No description available";
+      
+      const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
+      const matchesMonth = incident.month === currentMonth; // Filter by current month only
+      const matchesDistrict = filterDistrict === "all" || incident.district === filterDistrict;
+      const matchesMunicipality = filterMunicipality === "all" || incident.municipality === filterMunicipality;
+      const matchesSearch = searchTerm === "" || 
+                           (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
+    });
+    
+    console.log(`📊 Dashboard: Incidents count for ${currentMonth} (same logic as Incidents page):`, filteredIncidents.length);
+    
+    // Return actual count of filtered incidents (same as Incidents page stats.total)
+    return filteredIncidents.length;
+  };
+
+  // Get incident breakdown data with current month filtering (EXACT same as Incidents page)
   const getIncidentBreakdown = () => {
-    if (!incidents || incidents.length === 0) {
+    // Use real incidents data if available, otherwise fall back to DataContext
+    const dataToUse = realIncidentsData.length > 0 ? realIncidentsData : incidents || [];
+    
+    if (dataToUse.length === 0) {
       return {
         types: [
+          { name: 'Traffic Violation', count: 0 },
           { name: 'Traffic Accident', count: 0 },
           { name: 'Criminal Activity', count: 0 },
-          { name: 'Natural Disaster', count: 0 },
-          { name: 'Public Disturbance', count: 0 }
+          { name: 'Public Disturbance', count: 0 },
+          { name: 'Other', count: 0 }
         ],
         severity: [
           { level: 'High', count: 0 },
@@ -1062,19 +1347,66 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       };
     }
 
-    // Count by incident type
+    // Remove duplicates by ID, keeping the most recent one (same as Incidents page)
+    const uniqueIncidents = dataToUse.reduce((acc, incident) => {
+      const existingIndex = acc.findIndex(existing => existing.id === incident.id);
+      if (existingIndex === -1) {
+        acc.push(incident);
+      } else {
+        // Replace with the more recent version (based on updatedAt or createdAt)
+        const existing = acc[existingIndex];
+        const existingTime = existing.updatedAt || existing.createdAt || '';
+        const newTime = incident.updatedAt || incident.createdAt || '';
+        if (newTime > existingTime) {
+          acc[existingIndex] = incident;
+        }
+      }
+      return acc;
+    }, []);
+
+    // Apply EXACT same filtering logic as Incidents page
+    const currentDate = new Date();
+    const currentMonth = currentDate.toLocaleString('en-US', { month: 'long' }); // October
+    
+    // Default filter values (same as Incidents page defaults)
+    const filterStatus = "all";
+    const filterDistrict = "all";
+    const filterMunicipality = userAccessLevel !== 'admin' && userMunicipality ? userMunicipality : "all";
+    const searchTerm = "";
+    
+    const filteredIncidents = uniqueIncidents.filter((incident) => {
+      // Filter out incidents with "No description available" (same as Incidents page)
+      const hasValidDescription = incident.description && 
+                                 incident.description.trim() !== "" && 
+                                 incident.description !== "No description available";
+      
+      const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
+      const matchesMonth = incident.month === currentMonth; // Filter by current month only
+      const matchesDistrict = filterDistrict === "all" || incident.district === filterDistrict;
+      const matchesMunicipality = filterMunicipality === "all" || incident.municipality === filterMunicipality;
+      const matchesSearch = searchTerm === "" || 
+                           (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
+                           (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
+      
+      return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
+    });
+
+    console.log(`📊 Dashboard: Filtered incidents for breakdown (${currentMonth}):`, filteredIncidents.length);
+
+    // Count by incident type (using exact field names from Incidents page)
     const typeCount = {};
     const severityCount = { 'High': 0, 'Medium': 0, 'Low': 0 };
 
-    incidents.forEach(incident => {
-      // Count by incident type
+    filteredIncidents.forEach(incident => {
+      // Count by incident type (same field as Incidents page)
       const incidentType = incident.incidentType || 'Other';
       typeCount[incidentType] = (typeCount[incidentType] || 0) + 1;
 
-      // Count by severity (using priority or severity field)
-      const severity = incident.priority || incident.severity || 'Medium';
-      if (severityCount.hasOwnProperty(severity)) {
-        severityCount[severity]++;
+      // Count by priority (same field as Incidents page)
+      const priority = incident.priority || 'Medium';
+      if (severityCount.hasOwnProperty(priority)) {
+        severityCount[priority]++;
       } else {
         severityCount['Medium']++; // Default to Medium if unknown
       }
@@ -1092,6 +1424,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         return order[b.level] - order[a.level];
       });
 
+    console.log('📊 Dashboard: Incident breakdown calculated:', { types, severity });
     return { types, severity };
   };
 
@@ -1576,6 +1909,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 : `Overview of IPatroller system performance based on ${summaryStats.yesterdayDate ? `patrol data from ${summaryStats.yesterdayDate}` : 'yesterday\'s patrol data'}`
               }
             </p>
+            {lastDataUpdate && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />
+                Last updated: {lastDataUpdate.toLocaleTimeString()} - Showing data for October 2025
+              </p>
+            )}
           </div>
           
           {/* Action Buttons for Admin Users */}
@@ -1583,15 +1922,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
-                  console.log('🔄 Refreshing dashboard data...');
+                  console.log('🔄 Refreshing all dashboard data...');
+                  // Refresh all data sources
                   loadIPatrollerData(); // Load from IPatroller source
                   refreshIPatrollerData(); // Also refresh DataContext
-                  showSuccess('Dashboard data refreshed');
+                  fetchActionCenterData(); // Refresh Action Center data
+                  fetchIncidentsData(); // Refresh Incidents data
+                  if (userAccessLevel === 'command-center') {
+                    fetchCommandCenterData(); // Refresh Command Center data
+                  }
+                  showSuccess('All dashboard data refreshed for current month (October 2025)');
                 }}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <RefreshCw className="w-4 h-4" />
-                Refresh Data
+                Refresh All Data
               </Button>
               
               {(!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) && (
@@ -1615,15 +1960,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
-                  console.log('🔄 Refreshing Command Center data...');
+                  console.log('🔄 Refreshing Command Center, Action, and Incidents data...');
                   fetchCommandCenterData();
-                  showSuccess('Command Center data refreshed');
+                  fetchActionCenterData(); // Also refresh action data
+                  fetchIncidentsData(); // Also refresh incidents data
+                  showSuccess('Command Center data refreshed for current month (October 2025)');
                 }}
-                disabled={isLoadingCommandCenter}
+                disabled={isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
               >
-                <RefreshCw className={`w-4 h-4 ${isLoadingCommandCenter ? 'animate-spin' : ''}`} />
-                {isLoadingCommandCenter ? 'Refreshing...' : 'Refresh Data'}
+                <RefreshCw className={`w-4 h-4 ${(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'animate-spin' : ''}`} />
+                {(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'Refreshing...' : 'Refresh Data'}
               </Button>
             </div>
           )}
@@ -1813,9 +2160,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions (October 2025)</p>
                       <p className="text-2xl font-bold text-blue-600">
-                        {actionReports && actionReports.length > 0 ? actionReports.length.toLocaleString() : '420'}
+                        {getCurrentMonthActionsCount().toLocaleString()}
                       </p>
                     </div>
                     <div className="p-2 bg-blue-100 rounded-lg">
@@ -1829,9 +2176,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents</p>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents (October 2025)</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {incidents && incidents.length > 0 ? incidents.length.toLocaleString() : '127'}
+                        {getCurrentMonthIncidentsCount().toLocaleString()}
                       </p>
                     </div>
                     <div className="p-2 bg-orange-100 rounded-lg">
@@ -2487,8 +2834,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {/* Total Actions */}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Total Actions</span>
-                      <span className="text-lg font-bold text-blue-600">{actionReports?.length || 0}</span>
+                      <span className="text-sm font-semibold text-gray-700">Total Actions (October 2025)</span>
+                      <span className="text-lg font-bold text-blue-600">{getCurrentMonthActionsCount()}</span>
                     </div>
                   </div>
                 </div>
@@ -2548,8 +2895,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {/* Total Incidents */}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Total Incidents</span>
-                      <span className="text-lg font-bold text-red-600">{incidents?.length || 0}</span>
+                      <span className="text-sm font-semibold text-gray-700">Total Incidents (October 2025)</span>
+                      <span className="text-lg font-bold text-red-600">{getCurrentMonthIncidentsCount()}</span>
                     </div>
                   </div>
                 </div>
