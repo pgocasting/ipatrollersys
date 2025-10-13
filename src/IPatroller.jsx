@@ -1797,10 +1797,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   }
                                 }
                                 
-                                // Calculate efficiency based on minimum reports (constant) vs attended reports
+                                // Calculate efficiency: (Actual No. of Report / Week) ÷ (No. of Report Attended / Week) × 100
                                 const totalAttended = weeklyAttended.reduce((sum, v) => sum + v, 0);
                                 const totalActual = weeklyActual.reduce((sum, v) => sum + v, 0);
-                                const efficiency = totalAttended > 0 ? Math.round((WEEKLY_MIN / totalAttended) * 100) : 0;
+                                const efficiency = totalAttended > 0 ? Math.round((totalActual / totalAttended) * 100) : 0;
                                 return (
                                   <>
                                     <td className="px-3 py-4 text-center text-sm text-gray-700">{idx + 1}</td>
