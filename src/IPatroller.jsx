@@ -11,6 +11,7 @@ import {
   collection, 
   query, 
   getDocs, 
+  getDoc,
   doc, 
   setDoc, 
   updateDoc, 
@@ -88,6 +89,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showPdfPreview, setShowPdfPreview] = useState(false);
   const [selectedDayIndex, setSelectedDayIndex] = useState(0);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Command Center Action Taken data state
+  const [commandCenterActionData, setCommandCenterActionData] = useState({});
 
   // Top Performers state variables
   const [showTopPerformersModal, setShowTopPerformersModal] = useState(false);
@@ -221,6 +225,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   // Load patrol data from Firestore
   useEffect(() => {
     loadPatrolDataFromFirestore();
+    loadCommandCenterActionData();
   }, [selectedMonth, selectedYear]);
 
   // Load Top Performers data when modal is shown
@@ -356,6 +361,78 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       createLocalFallbackData();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load Command Center Action Taken data for weekly attended reports
+  const loadCommandCenterActionData = async () => {
+    try {
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      const selectedMonthName = monthNames[selectedMonth];
+      const monthYear = `${selectedMonthName}_${selectedYear}`;
+      
+      console.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
+      
+      const actionData = {};
+      
+      // Load data for all municipalities
+      const municipalities = [
+        "Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa", 
+        "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
+      ];
+      
+      for (const municipality of municipalities) {
+        try {
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            const weeklyReportData = data.weeklyReportData || {};
+            
+            // Count Action Taken entries by week for this municipality
+            const weeklyActionCounts = [0, 0, 0, 0]; // Week 1, 2, 3, 4
+            
+            Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
+              if (Array.isArray(dateEntries)) {
+                dateEntries.forEach(entry => {
+                  // Check if actionTaken field has content
+                  if (entry.actionTaken && entry.actionTaken.trim()) {
+                    // Determine which week this date falls into
+                    const entryDate = new Date(dateKey);
+                    const dayOfMonth = entryDate.getDate();
+                    const weekIndex = Math.floor((dayOfMonth - 1) / 7);
+                    
+                    // Ensure weekIndex is within bounds (0-3)
+                    if (weekIndex >= 0 && weekIndex < 4) {
+                      weeklyActionCounts[weekIndex]++;
+                    }
+                  }
+                });
+              }
+            });
+            
+            actionData[municipality] = weeklyActionCounts;
+            console.log(`✅ ${municipality}: Action Taken counts by week:`, weeklyActionCounts);
+          } else {
+            // No data for this municipality
+            actionData[municipality] = [0, 0, 0, 0];
+          }
+        } catch (error) {
+          console.error(`❌ Error loading data for ${municipality}:`, error);
+          actionData[municipality] = [0, 0, 0, 0];
+        }
+      }
+      
+      setCommandCenterActionData(actionData);
+      console.log('📊 Command Center Action Taken data loaded:', actionData);
+      
+    } catch (error) {
+      console.error('❌ Error loading Command Center Action Taken data:', error);
+      setCommandCenterActionData({});
     }
   };
 
@@ -1568,6 +1645,23 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
 
+            {/* Action Taken Data Status */}
+            {Object.keys(commandCenterActionData).length > 0 && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-green-800">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="font-medium">Command Center Integration:</span>
+                  <span className="text-gray-600">
+                    Action Taken data loaded for {Object.keys(commandCenterActionData).length} municipalities
+                  </span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-xs text-gray-600">
+                    "No. of Report Attended / Week" now shows Action Taken counts from Command Center
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Daily Counts Tab Description */}
             {activeTab === "daily" && (
               <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
@@ -1782,6 +1876,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                 // Calculate weekly data for each of the 4 weeks
                                 const weeklyActual = [];
                                 const weeklyAttended = [];
+                                
+                                // Get Action Taken counts from Command Center data for this municipality
+                                const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+                                
+                                // Debug logging for Action Taken integration
+                                if (municipalityActionCounts.some(count => count > 0)) {
+                                  console.log(`📊 ${item.municipality}: Using Action Taken counts:`, municipalityActionCounts);
+                                }
+                                
                                 for (let week = 0; week < 4; week++) {
                                   const weekStart = week * 7;
                                   const weekEnd = Math.min(weekStart + 7, totalDays);
@@ -1790,7 +1893,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     const weekData = item.data.slice(weekStart, weekEnd);
                                     const weekSum = weekData.reduce((sum, v) => sum + (v || 0), 0);
                                     weeklyActual.push(weekSum);
-                                    weeklyAttended.push(0); // placeholder - set all to 0 for now
+                                    // Use Action Taken count from Command Center data
+                                    weeklyAttended.push(municipalityActionCounts[week] || 0);
                                   } else {
                                     weeklyActual.push(0);
                                     weeklyAttended.push(0);
@@ -1828,6 +1932,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     {weeklyAttended.map((value, weekIndex) => (
                                       <td key={`attended-${weekIndex}`} className={`px-3 py-4 text-center text-sm font-semibold text-red-600 ${weekIndex === 0 ? 'border-l-2 border-gray-300' : ''}`}>
                                         {value}
+                                        {value > 0 && (
+                                          <div className="text-xs text-green-600 mt-1" title="Data from Command Center Action Taken">
+                                            ✓
+                                          </div>
+                                        )}
                                       </td>
                                     ))}
                                     <td className="px-6 py-4 text-center text-sm font-semibold text-purple-600 border-l-2 border-gray-300">{efficiency}%</td>

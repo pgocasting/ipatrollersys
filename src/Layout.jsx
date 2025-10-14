@@ -97,7 +97,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
 
   // Define all navigation items - moved outside component to prevent recreation
   const allNavigationItems = React.useMemo(() => [
-    { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: 'all' },
+    { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: ['admin', 'action-center', 'ipatroller', 'incidents', 'quarry-monitoring'] },
     { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },

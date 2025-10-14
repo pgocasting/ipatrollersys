@@ -14,7 +14,7 @@ import Users from "./Users";
 
 import { PatrolDataProvider } from "./PatrolDataContext";
 import { DataProvider } from "./DataContext";
-import { AuthProvider } from "./contexts/AuthContext";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import { initializeUsers } from "./utils/initUsers";
@@ -24,9 +24,11 @@ import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 import { Toaster } from "sonner";
 
-export default function App() {
+// Component that has access to AuthContext
+function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { user, loading, logout } = useFirebase();
+  const { isAdmin, userAccessLevel } = useAuth();
 
   // Set initial page based on URL only after user authentication is determined
   useEffect(() => {
@@ -114,6 +116,13 @@ export default function App() {
   }, [currentPage, user]);
 
   const renderPage = () => {
+    // Access control for dashboard - command-center users cannot access dashboard
+    if (currentPage === 'dashboard' && userAccessLevel === 'command-center' && !isAdmin) {
+      // Redirect command-center users to their command center page
+      setCurrentPage('commandcenter');
+      return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+    }
+
     switch (currentPage) {
       case 'dashboard':
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -137,6 +146,11 @@ export default function App() {
         return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       // Firebase test routes removed
       default:
+        // For default case, also check access control
+        if (userAccessLevel === 'command-center' && !isAdmin) {
+          setCurrentPage('commandcenter');
+          return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        }
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }
   };
@@ -154,15 +168,22 @@ export default function App() {
   }
 
   return (
+    <PatrolDataProvider>
+      <DataProvider>
+        <div className="App">
+          {user ? renderPage() : <Login onLogin={() => {}} />}
+          <Toaster position="top-right" richColors closeButton />
+        </div>
+      </DataProvider>
+    </PatrolDataProvider>
+  );
+}
+
+// Main App component that provides AuthContext
+export default function App() {
+  return (
     <AuthProvider>
-      <PatrolDataProvider>
-        <DataProvider>
-          <div className="App">
-            {user ? renderPage() : <Login onLogin={() => {}} />}
-            <Toaster position="top-right" richColors closeButton />
-          </div>
-        </DataProvider>
-      </PatrolDataProvider>
+      <AppContent />
     </AuthProvider>
   );
 }
