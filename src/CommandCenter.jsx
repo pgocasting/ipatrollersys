@@ -56,6 +56,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
   const { isAdmin, userMunicipality, userAccessLevel } = useAuth();
   const { notifications, showSuccess, showError, removeNotification } = useNotification();
+  const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
   
   // Access level check - only command-center users should access this page
   useEffect(() => {
@@ -73,6 +74,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       setActiveMunicipalityTab(userMunicipality);
     }
   }, [userMunicipality]);
+
+  // Show instructions panel for command-center users on first visit
+  useEffect(() => {
+    if (userAccessLevel === 'command-center' && !isAdmin) {
+      const dismissed = localStorage.getItem('ccHelpDismissed') === '1';
+      if (!dismissed) setShowCommandCenterHelp(true);
+    } else {
+      setShowCommandCenterHelp(false);
+    }
+  }, [userAccessLevel, isAdmin]);
   const { 
     saveBarangays, 
     getBarangays, 
@@ -139,6 +150,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Active Tab State
   const [activeTab, setActiveTab] = useState("weekly-report");
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
+  const [showCommandCenterHelp, setShowCommandCenterHelp] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(true);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -3792,7 +3805,77 @@ Are you absolutely sure you want to proceed?`;
 
   return (
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout}>
-      <section className="flex-1 p-3 md:p-6 space-y-4 md:space-y-6">
+      <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
+        {isCommandUser && (
+          <style>{`
+            /* Compact table for command-center users */
+            .cc-compact table thead th { padding: 0.5rem 0.5rem; }
+            .cc-compact table tbody td { padding: 0.375rem 0.5rem; }
+            .cc-compact table input,
+            .cc-compact table select {
+              height: 2rem;
+              padding: 0.25rem 0.5rem;
+              font-size: 0.875rem;
+            }
+            .cc-compact .add-entry-row td { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+          `}</style>
+        )}
+        <Dialog open={showCommandCenterHelp} onOpenChange={(open) => {
+          if (!open && dontShowAgain) {
+            localStorage.setItem('ccHelpDismissed', '1');
+          }
+          setShowCommandCenterHelp(open);
+        }}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader className="gap-3">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Shield className="h-5 w-5" />
+                </div>
+                <div>
+                  <DialogTitle className="text-2xl">Welcome to Command Center</DialogTitle>
+                  <DialogDescription className="text-base">Quick tips to get you started</DialogDescription>
+                </div>
+              </div>
+            </DialogHeader>
+            <div className="space-y-4 text-base text-gray-700">
+              <p>
+                Use <span className="font-semibold">View Options</span> (top-right) to switch between:
+              </p>
+              <ul className="space-y-3">
+                <li className="flex items-start gap-3">
+                  <Check className="mt-1 h-5 w-5 text-green-600" />
+                  <span><span className="font-semibold">Weekly Report</span>: record daily incidents per barangay, then save per municipality.</span>
+                </li>
+                <li className="flex items-start gap-3">
+                  <Check className="mt-1 h-5 w-5 text-green-600" />
+                  <span><span className="font-semibold">Concern Types</span>: manage the selectable categories used in reports.</span>
+                </li>
+              </ul>
+              <p>Your municipality tab is auto-selected. Barangay Management is visible to admins only.</p>
+              <label className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  checked={dontShowAgain}
+                  onChange={(e) => setDontShowAgain(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300"
+                />
+                Don't show this again
+              </label>
+            </div>
+            <DialogFooter>
+              <button
+                onClick={() => {
+                  if (dontShowAgain) localStorage.setItem('ccHelpDismissed', '1');
+                  setShowCommandCenterHelp(false);
+                }}
+                className="inline-flex items-center rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800"
+              >
+                Got it
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -3893,7 +3976,7 @@ Are you absolutely sure you want to proceed?`;
           <div className="space-y-6">
             {/* Weekly Report Header */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className="p-6 pb-0">
+              <div className={`${isCommandUser ? 'p-4' : 'p-6'} pb-0`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-100 rounded-lg">
@@ -4077,7 +4160,18 @@ Are you absolutely sure you want to proceed?`;
                         </Dialog>
                       )}
                       
-                      {isAdmin && (
+                      {/* Municipality Badge - moved before Save button */}
+                      {(activeMunicipalityTab || userMunicipality) && (
+                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0">
+                          <Building2 className="h-4 w-4 text-green-600" />
+                          <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
+                            {importedBarangays.filter(b => (activeMunicipalityTab || userMunicipality) ? b.municipality === (activeMunicipalityTab || userMunicipality) : true).length} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
+                          </span>
+                        </div>
+                      )}
+
+                      {(isAdmin || userAccessLevel === 'command-center') && (
                         <button 
                           onClick={handleSaveWeeklyReport}
                           disabled={isLoadingWeeklyReports}
@@ -4105,7 +4199,7 @@ Are you absolutely sure you want to proceed?`;
                   </div>
                 </div>
               </div>
-              <div className="p-4 md:p-6 pt-0">
+              <div className={`${isCommandUser ? 'p-4' : 'p-4 md:p-6'} pt-0`}>
                 {/* Month/Year Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
@@ -4139,13 +4233,12 @@ Are you absolutely sure you want to proceed?`;
                   </div>
                 </div>
 
-                {/* Municipality Selection */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
-                  <div className="flex flex-wrap gap-3">
-                    {isAdmin ? (
-                      // Show all municipalities for admin
-                      Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                {/* Municipality Selection - Admin only */}
+                {isAdmin && (
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
+                    <div className="flex flex-wrap gap-3">
+                      {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
                         const isActive = activeMunicipalityTab === municipality;
                         const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
                         const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
@@ -4175,37 +4268,17 @@ Are you absolutely sure you want to proceed?`;
                             </Badge>
                           </Badge>
                         );
-                      })
-                    ) : (
-                      // Show only user's municipality
-                      userMunicipality ? (
-                        <Badge
-                          variant="default"
-                          className="px-4 py-2 h-auto cursor-pointer bg-green-600 hover:bg-green-700 text-white shadow-lg border-green-600 flex items-center gap-2"
-                          onClick={() => handleMunicipalityTabChange(userMunicipality)}
-                        >
-                          <Building2 className="h-4 w-4" />
-                          <span className="font-medium">{userMunicipality}</span>
-                          <Badge 
-                            variant="outline" 
-                            className="text-xs ml-1 bg-green-500 border-green-400 text-white hover:bg-green-400"
-                          >
-                            {importedBarangays.filter(b => b.municipality === userMunicipality).length} brgy • {getConcernTypesForMunicipality(userMunicipality).length} types
-                          </Badge>
-                        </Badge>
-                      ) : (
-                        <div className="text-gray-500">No municipality assigned</div>
-                      )
-                    )}
+                      })}
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
               
               
-              <div className="p-4 md:p-6 pt-0">
-                <div className="overflow-x-auto rounded-lg border border-gray-200 bg-white shadow-sm">
+              <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
+                <div className={`overflow-x-auto h-[60vh] md:h-[70vh] overflow-y-auto relative rounded-lg border border-gray-200 bg-white shadow-sm ${isCommandUser ? 'cc-compact' : ''}`}>
                   <table className="w-full min-w-[1200px]">
-                    <thead>
+                    <thead className="sticky top-0 z-20">
                       <tr className="bg-white border-b-2 border-gray-300">
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32">
