@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { ChevronLeft, ChevronRight, Settings, X, User, LogOut, Menu } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, X, User, LogOut, Menu, Shield } from "lucide-react";
 import { useFirebase } from "../hooks/useFirebase";
 import { useAuth } from "../contexts/AuthContext";
 
@@ -278,6 +278,7 @@ const Sidebar = React.memo(({
                   </Button>
                 );
               })()}
+              
               
               {/* Logout Button */}
               <Button

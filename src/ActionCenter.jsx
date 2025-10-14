@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
-import { collection, getDocs, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, writeBatch, doc } from 'firebase/firestore';
 import { db } from './firebase';
+import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -63,6 +64,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [tablePage, setTablePage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
   
+  // File input ref for Excel import
+  const fileInputRef = useRef(null);
+  
   // Modal states for different actions
   const [showAddModal, setShowAddModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -70,6 +74,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [selectedAction, setSelectedAction] = useState(null);
   const [showMonthlyBreakdownModal, setShowMonthlyBreakdownModal] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [selectedImportDepartment, setSelectedImportDepartment] = useState('');
   
   // Form state for adding/editing actions
   const [formData, setFormData] = useState({
@@ -487,6 +493,180 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setTablePage(tablePage - 1);
     }
   };
+
+  // Excel import functionality
+  const handleImportExcel = () => {
+    setShowImportDialog(true);
+  };
+
+  const handleDepartmentSelection = (department) => {
+    setSelectedImportDepartment(department);
+    setShowImportDialog(false);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check file type
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    const isCSV = file.name.endsWith('.csv');
+    if (!isExcel && !isCSV) {
+      alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
+      return;
+    }
+
+    const reader = new FileReader();
+    
+    if (isCSV) {
+      // Handle CSV files
+      reader.onload = async (e) => {
+        try {
+          const text = e.target.result;
+          const lines = text.split('\n');
+          const headers = lines[0].split(',').map(header => header.trim());
+          const importedActions = [];
+
+          for (let i = 1; i < lines.length; i++) {
+            if (lines[i].trim() === '') continue;
+            const values = lines[i].split(',').map(value => value.trim());
+
+            const action = {
+              department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
+              municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
+              district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
+              what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
+              when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
+              where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
+              actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+              who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+              why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+              how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
+              gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+              source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+              otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+              photos: []
+            };
+
+            // Only add actions that have at least some basic data
+            if (action.what || action.where || action.who) {
+              importedActions.push(action);
+            }
+          }
+
+          if (importedActions.length > 0) {
+            // Save imported actions to Firestore
+            try {
+              setLoading(true);
+              const batch = writeBatch(db);
+              const actionsRef = collection(db, 'actionReports');
+              importedActions.forEach(action => {
+                const docRef = doc(actionsRef);
+                batch.set(docRef, {
+                  ...action,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+              });
+              await batch.commit();
+              await fetchAllActionData(); // Reload from Firestore
+              showSuccess(`Successfully imported ${importedActions.length} action reports!`);
+            } catch (error) {
+              console.error('Error saving imported actions:', error);
+              alert('Error saving imported actions to database. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            alert('No valid data found in the CSV file.');
+          }
+        } catch (error) {
+          alert('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
+        }
+      };
+      reader.readAsText(file);
+    } else {
+      // Handle Excel files using XLSX library
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const importedActions = [];
+
+          // Process each sheet in the workbook
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            if (jsonData.length === 0) return;
+
+            // Get headers from first row
+            const headers = jsonData[0].map(header => header ? header.toString().trim() : '');
+
+            // Process data rows
+            for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length === 0) continue;
+              const values = row.map(value => value ? value.toString().trim() : '');
+
+              const action = {
+                department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
+                municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
+                district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
+                what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
+                when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
+                where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
+                actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+                who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
+                gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+                photos: []
+              };
+
+              // Only add actions that have at least some basic data
+              if (action.what || action.where || action.who) {
+                importedActions.push(action);
+              }
+            }
+          });
+
+          if (importedActions.length > 0) {
+            // Save imported actions to Firestore
+            try {
+              setLoading(true);
+              const batch = writeBatch(db);
+              const actionsRef = collection(db, 'actionReports');
+              importedActions.forEach(action => {
+                const docRef = doc(actionsRef);
+                batch.set(docRef, {
+                  ...action,
+                  createdAt: new Date().toISOString(),
+                  updatedAt: new Date().toISOString()
+                });
+              });
+              await batch.commit();
+              await fetchAllActionData(); // Reload from Firestore
+              showSuccess(`Successfully imported ${importedActions.length} action reports!`);
+            } catch (error) {
+              console.error('Error saving imported actions:', error);
+              alert('Error saving imported actions to database. Please try again.');
+            } finally {
+              setLoading(false);
+            }
+          } else {
+            alert('No valid data found in the Excel file.');
+          }
+        } catch (error) {
+          console.error('Error reading Excel file:', error);
+          alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+  };
   
   // Reset to first page when filters change
   useEffect(() => {
@@ -726,6 +906,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 >
                   <Download className="w-4 h-4 text-black" />
                   <span>Export Report</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleImportExcel}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-green-50 hover:text-green-700 focus:bg-green-50 focus:text-green-700"
+                >
+                  <Download className="w-4 h-4 text-green-600" />
+                  <span>Import Excel/CSV</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -2122,6 +2309,83 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       )}
 
       {/* Delete Confirmation Modal */}
+      {/* Import Department Selection Dialog */}
+      {showImportDialog && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-xl font-bold text-gray-900">Select Department</h3>
+                <button
+                  onClick={() => setShowImportDialog(false)}
+                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <p className="text-gray-600 mb-6">Choose which department the Excel/CSV file is for:</p>
+              
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleDepartmentSelection('pnp')}
+                  className="w-full p-4 text-left border border-gray-200 rounded-lg hover:bg-red-50 hover:border-red-300 transition-all duration-200 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
+                      <Shield className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">PNP (Philippine National Police)</h4>
+                      <p className="text-sm text-gray-600">Law enforcement and security actions</p>
+                    </div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => handleDepartmentSelection('agriculture')}
+                  className="w-full p-4 text-left border border-gray-200 rounded-lg hover:bg-green-50 hover:border-green-300 transition-all duration-200 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg group-hover:bg-green-200 transition-colors">
+                      <Fish className="w-5 h-5 text-green-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">Agriculture (Bantay Dagat)</h4>
+                      <p className="text-sm text-gray-600">Fisheries and agricultural monitoring</p>
+                    </div>
+                  </div>
+                </button>
+                
+                <button
+                  onClick={() => handleDepartmentSelection('pg-enro')}
+                  className="w-full p-4 text-left border border-gray-200 rounded-lg hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200 group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
+                      <Trees className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900">PG-ENRO</h4>
+                      <p className="text-sm text-gray-600">Environmental protection and natural resources</p>
+                    </div>
+                  </div>
+                </button>
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setShowImportDialog(false)}
+                  className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showDeleteModal && selectedAction && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
@@ -2205,6 +2469,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       )}
 
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      
+      {/* Hidden file input for Excel import */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileUpload}
+        accept=".csv,.xlsx,.xls"
+        style={{ display: 'none' }}
+      />
     </Layout>
   );
 }

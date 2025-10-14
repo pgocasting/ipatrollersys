@@ -1645,8 +1645,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
 
-            {/* Action Taken Data Status */}
-            {Object.keys(commandCenterActionData).length > 0 && (
+            {/* Action Taken Data Status - HIDDEN */}
+            {/* {Object.keys(commandCenterActionData).length > 0 && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center gap-2 text-sm text-green-800">
                   <CheckCircle className="w-4 h-4" />
@@ -1660,7 +1660,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   </span>
                 </div>
               </div>
-            )}
+            )} */}
 
             {/* Daily Counts Tab Description */}
             {activeTab === "daily" && (

@@ -23,12 +23,13 @@ import "./utils/authTest"; // Load authentication test functions
 import "./firebase"; // Initialize Firebase
 import "./mobile.css"; // Mobile responsive styles
 import { Toaster } from "sonner";
+import { logPageNavigation, logAdminLogout } from './utils/adminLogger';
 
 // Component that has access to AuthContext
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { user, loading, logout } = useFirebase();
-  const { isAdmin, userAccessLevel } = useAuth();
+  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
   // Set initial page based on URL only after user authentication is determined
   useEffect(() => {
@@ -66,6 +67,21 @@ function AppContent() {
       console.log('🚪 Logout initiated...');
       console.log('👤 Current user before logout:', user?.email);
       
+      // Log admin logout before logging out
+      if (isAdmin || userAccessLevel === 'admin') {
+        const userInfo = {
+          email: user?.email || '',
+          firstName: userFirstName,
+          lastName: userLastName,
+          username: userUsername,
+          accessLevel: userAccessLevel,
+          municipality: userMunicipality,
+          department: userDepartment,
+          isAdmin: isAdmin
+        };
+        await logAdminLogout(userInfo);
+      }
+      
       // First, call Firebase logout to clear authentication
       await logout();
       console.log('✅ Firebase logout completed');
@@ -89,8 +105,25 @@ function AppContent() {
     }
   };
 
-  const handleNavigate = (page) => {
+  const handleNavigate = async (page) => {
+    const previousPage = currentPage;
     setCurrentPage(page);
+    
+    // Log page navigation for administrators
+    if (isAdmin || userAccessLevel === 'admin') {
+      const userInfo = {
+        email: user?.email || '',
+        firstName: userFirstName,
+        lastName: userLastName,
+        username: userUsername,
+        accessLevel: userAccessLevel,
+        municipality: userMunicipality,
+        department: userDepartment,
+        isAdmin: isAdmin
+      };
+      await logPageNavigation(previousPage, page, userInfo);
+    }
+    
     // Use utility function to update URL
     window.history.replaceState({}, '', `/${page}`);
   };
@@ -122,6 +155,7 @@ function AppContent() {
       setCurrentPage('commandcenter');
       return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }
+
 
     switch (currentPage) {
       case 'dashboard':

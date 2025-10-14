@@ -12,6 +12,8 @@ import { useData } from "./DataContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { logReportAccess } from './utils/adminLogger';
+import { useAuth } from './contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { 
@@ -55,7 +57,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     loading: dataLoading 
   } = useData();
   
-  const { getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
+  const { user, getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
+  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -2450,9 +2453,33 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   };
 
   // Export Summary Insights to PDF with detailed format
-  const exportSummaryToPDF = () => {
+  const exportSummaryToPDF = async () => {
     try {
       console.log('Starting Summary PDF export...');
+      
+      // Log report access for administrators
+      if (isAdmin || userAccessLevel === 'admin') {
+        const userInfo = {
+          email: user?.email || '',
+          firstName: userFirstName,
+          lastName: userLastName,
+          username: userUsername,
+          accessLevel: userAccessLevel,
+          municipality: userMunicipality,
+          department: userDepartment,
+          isAdmin: isAdmin
+        };
+        
+        const reportFilters = {
+          month: selectedMonth,
+          year: selectedYear,
+          district: selectedDistrict,
+          status: filterStatus,
+          searchTerm: searchTerm
+        };
+        
+        await logReportAccess('SUMMARY_PDF_EXPORT', userInfo, reportFilters);
+      }
       const filteredIncidents = incidents.filter(incident => {
         // Filter by status if not "all"
         if (filterStatus !== "all" && incident.status !== filterStatus) {

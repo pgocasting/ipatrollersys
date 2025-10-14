@@ -13,12 +13,12 @@ import {
   Save, 
   Eye, 
   EyeOff,
-  Shield,
   CheckCircle2,
   AlertCircle,
   LogOut,
   User,
-  UserCircle
+  UserCircle,
+  Shield
 } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "./components/ui/dialog";

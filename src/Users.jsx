@@ -11,15 +11,17 @@ import { doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, User, UserPlus } from "lucide-react";
+import { logUserManagementAction, logAdminAccess } from './utils/adminLogger';
+import { useAuth } from './contexts/AuthContext';
 
 export default function Users({ onLogout, onNavigate, currentPage }) {
   const { user, getUsers, createUserByAdmin, updateUser, deleteUser } = useFirebase();
+  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
   const [tableLoading, setTableLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [users, setUsers] = useState([]);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -65,18 +67,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     department: "",
   });
 
-  useEffect(() => {
-    // Directly set admin status based on role in users array
-    const docRef = doc(db, 'users', 'management');
-    getDoc(docRef).then(docSnap => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        const users = data.users || [];
-        const currentUser = users.find(u => u.email === user?.email);
-        setIsAdmin(currentUser?.role === "Admin");
-      }
-    });
-  }, [user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -148,6 +138,29 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
       if (!response.success) {
         throw new Error(response.error || "Failed to create user");
+      }
+
+      // Log user creation for administrators
+      if (isAdmin || userAccessLevel === 'admin') {
+        const adminUserInfo = {
+          email: user?.email || '',
+          firstName: userFirstName,
+          lastName: userLastName,
+          username: userUsername,
+          accessLevel: userAccessLevel,
+          municipality: userMunicipality,
+          department: userDepartment,
+          isAdmin: isAdmin
+        };
+        
+        const targetUser = {
+          email: newUser.email,
+          username: newUser.username || newUser.email.split('@')[0],
+          accessLevel: newUser.accessLevel,
+          municipality: newUser.municipality
+        };
+        
+        await logUserManagementAction('CREATE_USER', adminUserInfo, targetUser);
       }
 
       toast.success("User created successfully");
@@ -236,6 +249,29 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         throw new Error(response.error || "Failed to update user");
       }
 
+      // Log user update for administrators
+      if (isAdmin || userAccessLevel === 'admin') {
+        const adminUserInfo = {
+          email: user?.email || '',
+          firstName: userFirstName,
+          lastName: userLastName,
+          username: userUsername,
+          accessLevel: userAccessLevel,
+          municipality: userMunicipality,
+          department: userDepartment,
+          isAdmin: isAdmin
+        };
+        
+        const targetUser = {
+          email: selectedUser.email,
+          username: editUser.username,
+          accessLevel: editUser.accessLevel,
+          municipality: editUser.municipality
+        };
+        
+        await logUserManagementAction('UPDATE_USER', adminUserInfo, targetUser);
+      }
+
       toast.success("User updated successfully");
       
       // Close dialog and reset form
@@ -277,6 +313,29 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
       if (!response.success) {
         throw new Error(response.error || "Failed to delete user");
+      }
+
+      // Log user deletion for administrators
+      if (isAdmin || userAccessLevel === 'admin') {
+        const adminUserInfo = {
+          email: user?.email || '',
+          firstName: userFirstName,
+          lastName: userLastName,
+          username: userUsername,
+          accessLevel: userAccessLevel,
+          municipality: userMunicipality,
+          department: userDepartment,
+          isAdmin: isAdmin
+        };
+        
+        const targetUser = {
+          email: userToDelete.email,
+          username: userToDelete.username,
+          accessLevel: userToDelete.accessLevel,
+          municipality: userToDelete.municipality
+        };
+        
+        await logUserManagementAction('DELETE_USER', adminUserInfo, targetUser);
       }
 
       toast.success("User deleted successfully");

@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useFirebase } from '../hooks/useFirebase';
+import { logAdminLogin } from '../utils/adminLogger';
+import { logUserLogin } from '../utils/universalLogger';
 
 const AuthContext = createContext();
 
@@ -30,13 +32,38 @@ export function AuthProvider({ children }) {
           const data = docSnap.data();
           const users = data.users || [];
           const currentUser = users.find(u => u.email === user.email);
-          setIsAdmin(currentUser?.role === "Admin");
+          const isAdminUser = currentUser?.role === "Admin";
+          const userAccessLevelValue = currentUser?.accessLevel || "";
+          
+          setIsAdmin(isAdminUser);
           setUserMunicipality(currentUser?.municipality || "");
-          setUserAccessLevel(currentUser?.accessLevel || "");
+          setUserAccessLevel(userAccessLevelValue);
           setUserDepartment(currentUser?.department || "");
           setUserFirstName(currentUser?.firstName || "");
           setUserLastName(currentUser?.lastName || "");
           setUserUsername(currentUser?.username || "");
+
+          // Log user access for all users
+          const userInfo = {
+            email: user.email,
+            firstName: currentUser?.firstName || "",
+            lastName: currentUser?.lastName || "",
+            username: currentUser?.username || "",
+            userAccessLevel: userAccessLevelValue,
+            accessLevel: userAccessLevelValue,
+            municipality: currentUser?.municipality || "",
+            department: currentUser?.department || "",
+            isAdmin: isAdminUser,
+            role: currentUser?.role || ""
+          };
+          
+          // Log user login for all users
+          await logUserLogin(userInfo);
+          
+          // Also log admin login if user is admin
+          if (isAdminUser || userAccessLevelValue === 'admin') {
+            await logAdminLogin(userInfo);
+          }
         }
       }
       setLoading(false);
