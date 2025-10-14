@@ -78,6 +78,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedImportDepartment, setSelectedImportDepartment] = useState('');
   
+  // Helper: extract one or more URLs from a cell string (e.g., Google Drive links)
+  const extractLinksFromCell = (text) => {
+    if (!text || typeof text !== 'string') return [];
+    // Split by common delimiters, then filter by URL-looking strings
+    const roughParts = text
+      .split(/\s|,|;|\n|\r|\t/)
+      .map(part => part.trim())
+      .filter(Boolean);
+    const urlRegex = /^(https?:\/\/[^\s]+)$/i;
+    const links = roughParts.filter(part => urlRegex.test(part));
+    // De-duplicate while preserving order
+    const seen = new Set();
+    const unique = [];
+    for (const link of links) {
+      if (!seen.has(link)) {
+        seen.add(link);
+        unique.push(link);
+      }
+    }
+    return unique;
+  };
+
   // Form state for adding/editing actions
   const [formData, setFormData] = useState({
     department: userDepartment || 'pnp',
@@ -549,8 +571,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
               gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
               source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
-              otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
-              photos: []
+              otherInformation: 
+                values[headers.indexOf('Other Information')] ||
+                values[headers.indexOf('OTHER_INFORMATION')] ||
+                values[headers.indexOf('Observation / Findings')] ||
+                values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+                '',
+              photos: extractLinksFromCell(
+                values[headers.indexOf('Documents')] ||
+                values[headers.indexOf('DOCUMENTS')] ||
+                values[headers.indexOf('Document Links')] ||
+                values[headers.indexOf('DOCUMENT LINKS')] ||
+                ''
+              )
             };
 
             // Only add actions that have at least some basic data
@@ -626,8 +659,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
                 gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
                 source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
-                otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
-                photos: []
+                otherInformation: 
+                  values[headers.indexOf('Other Information')] ||
+                  values[headers.indexOf('OTHER_INFORMATION')] ||
+                  values[headers.indexOf('Observation / Findings')] ||
+                  values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+                  '',
+                photos: extractLinksFromCell(
+                  values[headers.indexOf('Documents')] ||
+                  values[headers.indexOf('DOCUMENTS')] ||
+                  values[headers.indexOf('Document Links')] ||
+                  values[headers.indexOf('DOCUMENT LINKS')] ||
+                  ''
+                )
               };
 
               // Only add actions that have at least some basic data
