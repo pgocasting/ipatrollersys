@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from './Layout';
+import { quarryLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
@@ -419,7 +420,7 @@ export default function QuarryMonitoring({ onLogout, onNavigate, currentPage }) 
     }
 
     // Here you would typically send the data to your backend
-    console.log('New permit to be added:', newPermit);
+    quarryLog('New permit to be added:', newPermit);
     alert('Quarry permit added successfully! (This would be saved to the database in a real implementation)');
     
     handleCloseAddPermit();

@@ -16,6 +16,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableCap
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/ui/dialog";
 import { useNotification, NotificationContainer } from './components/ui/notification';
+import { actionCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 // import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "./components/ui/sheet";
 
 import { 
@@ -179,16 +180,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   // Comprehensive function to fetch ALL action data from Firestore
   const fetchAllActionData = useCallback(async () => {
     if (!db || !user) {
-      console.log('⚠️ Database or user not available');
+      actionCenterLog('⚠️ Database or user not available');
       setLoading(false);
       return;
     }
 
     try {
       setLoading(true);
-      console.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
-      console.log('🔍 Database available:', !!db);
-      console.log('🔍 User logged in:', !!user);
+      const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+      actionCenterGroup.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
+      actionCenterGroup.log('🔍 Database available:', !!db);
+      actionCenterGroup.log('🔍 User logged in:', !!user);
       
       const allActionData = [];
       
@@ -205,26 +207,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         'pgEnroActions'
       ];
       
-      console.log('📋 Checking collections:', possibleCollections);
+      actionCenterGroup.log('📋 Checking collections:', possibleCollections);
       
       // Check each possible collection
       for (const collectionName of possibleCollections) {
         try {
-          console.log(`\n🔍 Checking collection: ${collectionName}`);
+          actionCenterGroup.log(`🔍 Checking collection: ${collectionName}`);
           const collectionRef = collection(db, collectionName);
           const snapshot = await getDocs(collectionRef);
           
-          console.log(`📊 ${collectionName}: ${snapshot.size} documents found`);
+          actionCenterGroup.log(`📊 ${collectionName}: ${snapshot.size} documents found`);
           
           if (snapshot.size > 0) {
             snapshot.forEach((doc) => {
               const data = doc.data();
-              console.log(`📄 ${collectionName}/${doc.id}:`, Object.keys(data));
+              actionCenterGroup.log(`📄 ${collectionName}/${doc.id}:`, Object.keys(data));
               
               // Handle different data structures
               if (data.data && Array.isArray(data.data)) {
                 // Month-based structure with data array
-                console.log(`📅 Month-based document with ${data.data.length} reports`);
+                actionCenterGroup.log(`📅 Month-based document with ${data.data.length} reports`);
                 data.data.forEach((report, index) => {
                   allActionData.push({
                     ...report,
@@ -236,7 +238,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 });
               } else if (data.actions && Array.isArray(data.actions)) {
                 // Actions array structure
-                console.log(`📋 Actions array with ${data.actions.length} items`);
+                actionCenterGroup.log(`📋 Actions array with ${data.actions.length} items`);
                 data.actions.forEach((action, index) => {
                   allActionData.push({
                     ...action,
@@ -248,7 +250,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 });
               } else if (data.reports && Array.isArray(data.reports)) {
                 // Reports array structure
-                console.log(`📋 Reports array with ${data.reports.length} items`);
+                actionCenterGroup.log(`📋 Reports array with ${data.reports.length} items`);
                 data.reports.forEach((report, index) => {
                   allActionData.push({
                     ...report,
@@ -260,7 +262,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 });
               } else {
                 // Individual document structure
-                console.log(`📄 Individual document structure`);
+                actionCenterGroup.log(`📄 Individual document structure`);
                 allActionData.push({
                   ...data,
                   id: doc.id,
@@ -272,14 +274,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             });
           }
         } catch (collectionError) {
-          console.log(`⚠️ Collection ${collectionName} not accessible:`, collectionError.message);
+          actionCenterGroup.log(`⚠️ Collection ${collectionName} not accessible:`, collectionError.message);
         }
       }
       
-      console.log(`\n✅ TOTAL RAW DATA COLLECTED: ${allActionData.length} items`);
+      actionCenterGroup.log(`✅ TOTAL RAW DATA COLLECTED: ${allActionData.length} items`);
       
       if (allActionData.length > 0) {
-        console.log('📄 Sample raw data:', allActionData.slice(0, 3));
+        actionCenterGroup.log('📄 Sample raw data:', allActionData.slice(0, 3));
         
         // Transform and standardize all collected data
         const transformedData = allActionData
@@ -363,9 +365,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Sort by date (newest first)
         transformedData.sort((a, b) => new Date(b.when) - new Date(a.when));
         
-        console.log('✅ DATA TRANSFORMATION COMPLETED');
-        console.log(`📊 Final dataset: ${transformedData.length} action reports (unknown entries filtered out)`);
-        console.log('📄 Sample transformed data:', transformedData.slice(0, 2));
+        actionCenterGroup.log('✅ DATA TRANSFORMATION COMPLETED');
+        actionCenterGroup.log(`📊 Final dataset: ${transformedData.length} action reports (unknown entries filtered out)`);
+        actionCenterGroup.log('📄 Sample transformed data:', transformedData.slice(0, 2));
         
         // Group by source for debugging
         const sourceGroups = transformedData.reduce((groups, item) => {
@@ -373,20 +375,22 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           groups[key] = (groups[key] || 0) + 1;
           return groups;
         }, {});
-        console.log('📊 Data sources breakdown:', sourceGroups);
+        actionCenterGroup.log('📊 Data sources breakdown:', sourceGroups);
         
         setActionItems(transformedData);
       } else {
-        console.log('⚠️ NO ACTION DATA FOUND IN ANY COLLECTION');
+        actionCenterGroup.log('⚠️ NO ACTION DATA FOUND IN ANY COLLECTION');
         setActionItems([]);
       }
       
     } catch (error) {
-      console.error('❌ COMPREHENSIVE FETCH ERROR:', error);
+      actionCenterGroup.error('❌ COMPREHENSIVE FETCH ERROR:', error);
+      actionCenterGroup.end();
       setActionItems([]);
     } finally {
       setLoading(false);
-      console.log('🏁 COMPREHENSIVE ACTION DATA FETCH COMPLETED\n');
+      actionCenterGroup.log('🏁 COMPREHENSIVE ACTION DATA FETCH COMPLETED');
+      actionCenterGroup.end();
     }
   }, [db, user]);
 
@@ -573,7 +577,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               await fetchAllActionData(); // Reload from Firestore
               showSuccess(`Successfully imported ${importedActions.length} action reports!`);
             } catch (error) {
-              console.error('Error saving imported actions:', error);
+              actionCenterLog('Error saving imported actions:', error, 'error');
               alert('Error saving imported actions to database. Please try again.');
             } finally {
               setLoading(false);
@@ -651,7 +655,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               await fetchAllActionData(); // Reload from Firestore
               showSuccess(`Successfully imported ${importedActions.length} action reports!`);
             } catch (error) {
-              console.error('Error saving imported actions:', error);
+              actionCenterLog('Error saving imported actions:', error, 'error');
               alert('Error saving imported actions to database. Please try again.');
             } finally {
               setLoading(false);
@@ -660,7 +664,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             alert('No valid data found in the Excel file.');
           }
         } catch (error) {
-          console.error('Error reading Excel file:', error);
+          actionCenterLog('Error reading Excel file:', error, 'error');
           alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
         }
       };
@@ -748,7 +752,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         handleDeleteAction(actionId);
         break;
       default:
-        console.log(`Action ${action} performed on item ${actionId}`);
+        actionCenterLog(`Action ${action} performed on item ${actionId}`);
     }
   };
 
@@ -760,28 +764,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Update existing action
         const result = await updateActionReport(selectedAction.id, selectedAction.monthKey, formData);
         if (result.success) {
-          console.log('✅ Action updated successfully');
+          actionCenterLog('✅ Action updated successfully');
           await fetchAllActionData(); // Refresh data
           setShowEditModal(false);
           setSelectedAction(null);
         } else {
-          console.error('❌ Failed to update action:', result.error);
+          actionCenterLog('❌ Failed to update action:', result.error, 'error');
           alert('Failed to update action: ' + result.error);
         }
       } else {
         // Add new action
         const result = await addActionReport(formData);
         if (result.success) {
-          console.log('✅ Action added successfully');
+          actionCenterLog('✅ Action added successfully');
           await fetchAllActionData(); // Refresh data
           setShowAddModal(false);
         } else {
-          console.error('❌ Failed to add action:', result.error);
+          actionCenterLog('❌ Failed to add action:', result.error, 'error');
           alert('Failed to add action: ' + result.error);
         }
       }
     } catch (error) {
-      console.error('❌ Error saving action:', error);
+      actionCenterLog('❌ Error saving action:', error, 'error');
       alert('Error saving action: ' + error.message);
     } finally {
       setLoading(false);
@@ -795,16 +799,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       setLoading(true);
       const result = await deleteActionReport(selectedAction.id, selectedAction.monthKey);
       if (result.success) {
-        console.log('✅ Action deleted successfully');
+        actionCenterLog('✅ Action deleted successfully');
         await fetchAllActionData(); // Refresh data
         setShowDeleteModal(false);
         setSelectedAction(null);
       } else {
-        console.error('❌ Failed to delete action:', result.error);
+        actionCenterLog('❌ Failed to delete action:', result.error, 'error');
         alert('Failed to delete action: ' + result.error);
       }
     } catch (error) {
-      console.error('❌ Error deleting action:', error);
+      actionCenterLog('❌ Error deleting action:', error, 'error');
       alert('Error deleting action: ' + error.message);
     } finally {
       setLoading(false);
@@ -841,7 +845,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
     
-    console.log('📄 Report exported successfully');
+    actionCenterLog('📄 Report exported successfully');
     showSuccess('Report exported successfully!');
   };
 

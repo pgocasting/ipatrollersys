@@ -24,6 +24,7 @@ import {
 import { db } from './firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import {
   Plus,
   Save,
@@ -345,7 +346,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         setPatrolData(allMunicipalitiesData);
         setFirestoreStatus('connected');
       }, (error) => {
-        console.error('❌ Firestore error:', error);
+        ipatrollerLog('❌ Firestore error:', error, 'error');
         setFirestoreStatus('error');
         // Fallback to local data if Firestore fails
         createLocalFallbackData();
@@ -355,7 +356,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       return () => unsubscribe();
       
     } catch (error) {
-      console.error('❌ Error loading from Firestore:', error);
+      ipatrollerLog('❌ Error loading from Firestore:', error, 'error');
       setFirestoreStatus('error');
       // Fallback to local data
       createLocalFallbackData();
@@ -374,7 +375,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const selectedMonthName = monthNames[selectedMonth];
       const monthYear = `${selectedMonthName}_${selectedYear}`;
       
-      console.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
+      const actionDataGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+      actionDataGroup.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
       
       const actionData = {};
       
@@ -416,22 +418,25 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             });
             
             actionData[municipality] = weeklyActionCounts;
-            console.log(`✅ ${municipality}: Action Taken counts by week:`, weeklyActionCounts);
+            actionDataGroup.log(`✅ ${municipality}: Action Taken counts by week:`, weeklyActionCounts);
           } else {
             // No data for this municipality
             actionData[municipality] = [0, 0, 0, 0];
           }
         } catch (error) {
-          console.error(`❌ Error loading data for ${municipality}:`, error);
+          actionDataGroup.error(`❌ Error loading data for ${municipality}:`, error);
           actionData[municipality] = [0, 0, 0, 0];
         }
       }
       
       setCommandCenterActionData(actionData);
-      console.log('📊 Command Center Action Taken data loaded:', actionData);
+      actionDataGroup.log('📊 Command Center Action Taken data loaded:', actionData);
+      actionDataGroup.log('✅ Action Center data loading completed successfully');
+      actionDataGroup.end();
       
     } catch (error) {
-      console.error('❌ Error loading Command Center Action Taken data:', error);
+      actionDataGroup.error('❌ Error loading Command Center Action Taken data:', error);
+      actionDataGroup.end();
       setCommandCenterActionData({});
     }
   };
@@ -483,7 +488,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       setFirestoreStatus('connected');
       
     } catch (error) {
-      console.error('❌ Error creating Firestore structure:', error);
+      ipatrollerLog('❌ Error creating Firestore structure:', error, 'error');
       setFirestoreStatus('error');
       // Fallback to local data
       createLocalFallbackData();
@@ -570,7 +575,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       });
       showSuccess('Changes saved successfully!');
     } catch (error) {
-      console.error('❌ Error syncing to Firestore:', error);
+      ipatrollerLog('❌ Error syncing to Firestore:', error, 'error');
       setFirestoreStatus('error');
       // Show error toast with more details
       toast.error('Failed to save changes', {
@@ -675,7 +680,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       
       setFilteredTopPerformersData(topPerformersData);
     } catch (error) {
-      console.error('Error loading top performers data:', error);
+      ipatrollerLog('Error loading top performers data:', error, 'error');
       setFilteredTopPerformersData([]);
     } finally {
       setLoadingTopPerformers(false);
@@ -934,7 +939,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       showSuccess('PDF report generated successfully!');
       
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      ipatrollerLog('Error generating PDF:', error, 'error');
       toast.error('Failed to generate PDF report', {
         description: 'Please try again or contact support if the issue persists',
         duration: 4000,
@@ -1353,7 +1358,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       showSuccess('Monthly Summary Report Generated!');
       
     } catch (error) {
-      console.error('Error generating report:', error);
+      ipatrollerLog('Error generating report:', error, 'error');
       toast.error('Failed to generate report', {
         description: error.message || 'An error occurred while generating the report',
         duration: 4000,
@@ -1882,7 +1887,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                 
                                 // Debug logging for Action Taken integration
                                 if (municipalityActionCounts.some(count => count > 0)) {
-                                  console.log(`📊 ${item.municipality}: Using Action Taken counts:`, municipalityActionCounts);
+                                  ipatrollerLog(`📊 ${item.municipality}: Using Action Taken counts:`, municipalityActionCounts);
                                 }
                                 
                                 for (let week = 0; week < 4; week++) {
@@ -2198,7 +2203,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       });
                       showSuccess('PDF Generated Successfully!');
                     } catch (error) {
-                      console.error('Error generating PDF:', error);
+                      ipatrollerLog('Error generating PDF:', error, 'error');
                       toast.error('Failed to generate PDF', {
                         description: error.message,
                         duration: 3000

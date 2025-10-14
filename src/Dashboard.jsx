@@ -11,6 +11,7 @@ import { useAuth } from './contexts/AuthContext';
 import { useNotification, NotificationContainer } from './components/ui/notification';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { dashboardLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -101,9 +102,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       const yesterdayYear = yesterday.getFullYear(); // 2025
       const monthYearId = `${String(yesterdayMonth + 1).padStart(2, "0")}-${yesterdayYear}`;
       
-      console.log('📅 Dashboard: Yesterday was', yesterday.toDateString());
-      console.log('📅 Dashboard: Loading IPatroller data for', monthYearId, '(yesterday\'s month)');
-      console.log('📅 Dashboard: Firebase path:', `patrolData/${monthYearId}/municipalities`);
+      const dashboardGroup = createSectionGroup(CONSOLE_GROUPS.DASHBOARD, false);
+      dashboardGroup.log('📅 Yesterday was', yesterday.toDateString());
+      dashboardGroup.log('📅 Loading IPatroller data for', monthYearId, '(yesterday\'s month)');
+      dashboardGroup.log('📅 Firebase path:', `patrolData/${monthYearId}/municipalities`);
       
       // Load from the same Firebase path as IPatroller
       const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
@@ -120,8 +122,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
 
-      console.log('📊 Dashboard: Loaded', firestoreData.length, 'municipalities from Firebase');
-      console.log('📊 Dashboard: Raw Firebase data:', firestoreData);
+      dashboardGroup.log('📊 Loaded', firestoreData.length, 'municipalities from Firebase');
+      dashboardGroup.log('📊 Raw Firebase data:', firestoreData);
 
       // Create complete data structure (same as IPatroller)
       const selectedDates = generateDates(yesterdayMonth, yesterdayYear);
@@ -175,10 +177,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       });
 
       setIpatrollerPatrolData(allMunicipalitiesData);
-      console.log('✅ Dashboard: IPatroller data loaded successfully');
+      dashboardGroup.log('✅ IPatroller data loaded successfully');
+      dashboardGroup.end();
       
     } catch (error) {
-      console.error('❌ Dashboard: Error loading IPatroller data:', error);
+      dashboardLog('❌ Error loading IPatroller data:', error, 'error');
       // Create fallback data for yesterday's month
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
@@ -210,7 +213,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Create sample IPatroller data for testing
   const createSampleIPatrollerData = () => {
-    console.log('🧪 Creating sample IPatroller data...');
+    dashboardLog('🧪 Creating sample IPatroller data...');
     
     // Use yesterday's month for sample data
     const yesterday = new Date();
@@ -257,8 +260,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     });
     
     setIpatrollerPatrolData(sampleData);
-    console.log('✅ Sample IPatroller data created:', sampleData.length, 'municipalities');
-    console.log('📊 Sample data preview:', sampleData.slice(0, 3));
+    dashboardLog('✅ Sample IPatroller data created:', sampleData.length, 'municipalities');
+    dashboardLog('📊 Sample data preview:', sampleData.slice(0, 3));
   };
 
   const [selectedTimePeriod, setSelectedTimePeriod] = useState('weekly');
@@ -278,19 +281,21 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Fetch real Command Center data from Firebase
   const fetchCommandCenterData = async () => {
-    console.log('🔄 Dashboard fetchCommandCenterData called:', {
+    const commandCenterGroup = createSectionGroup(CONSOLE_GROUPS.COMMAND_CENTER, false);
+    commandCenterGroup.log('🔄 Dashboard fetchCommandCenterData called:', {
       userAccessLevel,
       userMunicipality,
       shouldFetch: userAccessLevel === 'command-center'
     });
     
     if (userAccessLevel !== 'command-center') {
-      console.log('⚠️ Dashboard: Not fetching Command Center data - user access level is:', userAccessLevel);
+      commandCenterGroup.log('⚠️ Not fetching Command Center data - user access level is:', userAccessLevel);
+      commandCenterGroup.end();
       return;
     }
     
     setIsLoadingCommandCenter(true);
-    console.log('📡 Dashboard: Starting Command Center data fetch...');
+    commandCenterGroup.log('📡 Starting Command Center data fetch...');
     try {
       // Fetch barangays for the user's municipality
       // Command center users should see all barangays from their municipality
@@ -300,7 +305,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       const barangaysSnapshot = await getDocs(barangaysQuery);
       const barangays = barangaysSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`📍 Dashboard: Loaded ${barangays.length} barangays from Firebase for ${userMunicipality || 'all municipalities'}`);
+      commandCenterGroup.log(`📍 Loaded ${barangays.length} barangays from Firebase for ${userMunicipality || 'all municipalities'}`);
       
       // Log barangays by municipality for verification
       const barangaysByMunicipality = {};
@@ -311,11 +316,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
         barangaysByMunicipality[muni].push(b.name || b.barangay);
       });
-      console.log('📍 Barangays by Municipality:', Object.entries(barangaysByMunicipality).map(([m, bs]) => `${m}: ${bs.length}`).join(', '));
+      commandCenterGroup.log('📍 Barangays by Municipality:', Object.entries(barangaysByMunicipality).map(([m, bs]) => `${m}: ${bs.length}`).join(', '));
       
       // Log all barangay names for debugging
       if (userMunicipality) {
-        console.log(`📍 ${userMunicipality} Barangays:`, barangays.map(b => b.name || b.barangay).join(', '));
+        commandCenterGroup.log(`📍 ${userMunicipality} Barangays:`, barangays.map(b => b.name || b.barangay).join(', '));
       }
 
       // Fetch ALL concern types (not filtered by municipality for command-center dashboard)
@@ -323,7 +328,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       const concernTypesSnapshot = await getDocs(concernTypesQuery);
       const concernTypes = concernTypesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       
-      console.log(`📋 Dashboard: Loaded ${concernTypes.length} concern types from Firebase`);
+      commandCenterGroup.log(`📋 Loaded ${concernTypes.length} concern types from Firebase`);
 
       // Fetch weekly reports from nested structure for March-September 2025 only
       // OPTIMIZED: Load data in parallel using Promise.all
@@ -336,9 +341,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         ? [userMunicipality] 
         : Object.values(municipalitiesByDistrict).flat();
       
-      console.log('📅 Dashboard: Loading Command Center data for months:', monthsToLoad);
-      console.log('🏘️ Dashboard: Loading data for municipality:', userMunicipality || 'all municipalities');
-      console.log('⚡ Using parallel loading for faster performance...');
+      commandCenterGroup.log('📅 Loading Command Center data for months:', monthsToLoad);
+      commandCenterGroup.log('🏘️ Loading data for municipality:', userMunicipality || 'all municipalities');
+      commandCenterGroup.log('⚡ Using parallel loading for faster performance...');
       
       // Create all promises for parallel loading
       const loadPromises = [];
@@ -364,7 +369,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 return null;
               })
               .catch(error => {
-                console.error(`❌ Error loading ${month} ${currentYear} for ${municipality}:`, error);
+                commandCenterGroup.error(`❌ Error loading ${month} ${currentYear} for ${municipality}:`, error);
                 return null;
               })
           );
@@ -372,7 +377,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       }
       
       // Load all data in parallel
-      console.log(`⚡ Loading ${loadPromises.length} documents in parallel...`);
+      commandCenterGroup.log(`⚡ Loading ${loadPromises.length} documents in parallel...`);
       const results = await Promise.all(loadPromises);
       
       // Filter out null results and add to weeklyReports
@@ -382,7 +387,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
       
-      console.log(`✅ Loaded ${weeklyReports.length} documents successfully`);
+      commandCenterGroup.log(`✅ Loaded ${weeklyReports.length} documents successfully`);
 
       // Calculate totals from actual weekly report data (monthly counts from Command Center table)
       // This counts ALL individual reports from each barangay on each date
@@ -400,7 +405,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             if (Array.isArray(dateEntries)) {
               // Log if multiple barangays on same date
               if (dateEntries.length > 1) {
-                console.log(`📅 ${dateKey}: ${dateEntries.length} barangays reported (${dateEntries.map(e => e.barangay).join(', ')})`);
+                commandCenterGroup.log(`📅 ${dateKey}: ${dateEntries.length} barangays reported (${dateEntries.map(e => e.barangay).join(', ')})`);
               }
               
               dateEntries.forEach(entry => {
@@ -420,9 +425,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
       
-      console.log('📊 Dashboard: Total Reports Breakdown by Month:', reportBreakdown);
+      commandCenterGroup.log('📊 Total Reports Breakdown by Month:', reportBreakdown);
 
-      console.log('📊 Dashboard: Command Center data loaded:', {
+      commandCenterGroup.log('📊 Command Center data loaded:', {
         barangays: barangays.length,
         concernTypes: concernTypes.length,
         weeklyReports: weeklyReports.length,
@@ -438,9 +443,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         totalReports
       });
 
+      commandCenterGroup.log('✅ Command Center data fetch completed successfully');
+      commandCenterGroup.end();
+
     } catch (error) {
-      console.error('❌ Error fetching Command Center data:', error);
-      console.error('Error details:', error.message, error.stack);
+      commandCenterGroup.error('❌ Error fetching Command Center data:', error);
+      commandCenterGroup.error('Error details:', error.message, error.stack);
+      commandCenterGroup.end();
       // Show error notification
       showError(`Failed to load Command Center data: ${error.message}`);
       // Set empty data on error
@@ -468,7 +477,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     if (userAccessLevel === 'command-center') {
       const refreshInterval = setInterval(() => {
-        console.log('🔄 Auto-refreshing Command Center data...');
+        dashboardLog('🔄 Auto-refreshing Command Center data...');
         fetchCommandCenterData();
       }, 30000); // 30 seconds
 
@@ -478,7 +487,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Load IPatroller data when component mounts
   useEffect(() => {
-    console.log('🚀 Dashboard: Component mounted, loading IPatroller data...');
+    dashboardLog('🚀 Component mounted, loading IPatroller data...');
     loadIPatrollerData();
   }, []);
 
@@ -486,7 +495,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     try {
       onLogout();
     } catch (error) {
-      console.error('Logout error:', error);
+      dashboardLog('Logout error:', error, 'error');
     }
   };
 
@@ -634,7 +643,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   // Calculate active/inactive municipalities based on yesterday's data (using IPatroller data)
   const calculateActiveInactiveCounts = () => {
     if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
-      console.log('⚠️ Dashboard: No ipatrollerPatrolData for counting');
+      dashboardLog('⚠️ No ipatrollerPatrolData for counting');
       return { activeCount: 0, inactiveCount: 0, totalMunicipalities: 0 };
     }
 
@@ -642,8 +651,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayIndex = yesterday.getDate() - 1;
 
-    console.log('📊 Dashboard: Calculating counts for', yesterday.toDateString(), 'at index', yesterdayIndex);
-    console.log('📊 Dashboard: Processing', ipatrollerPatrolData.length, 'municipalities');
+    dashboardLog('📊 Calculating counts for', yesterday.toDateString(), 'at index', yesterdayIndex);
+    dashboardLog('📊 Processing', ipatrollerPatrolData.length, 'municipalities');
 
     let activeCount = 0;
     let inactiveCount = 0;
@@ -658,9 +667,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         } else {
           yesterdayPatrols = rawValue;
         }
-        console.log(`📊 ${item.municipality}: ${rawValue} → ${yesterdayPatrols >= 5 ? 'ACTIVE' : 'INACTIVE'}`);
+        dashboardLog(`📊 ${item.municipality}: ${rawValue} → ${yesterdayPatrols >= 5 ? 'ACTIVE' : 'INACTIVE'}`);
       } else {
-        console.log(`📊 ${item.municipality}: No data at index ${yesterdayIndex} → INACTIVE`);
+        dashboardLog(`📊 ${item.municipality}: No data at index ${yesterdayIndex} → INACTIVE`);
       }
 
       // Use IPatroller logic: Active if >= 5, Inactive if < 5
@@ -671,7 +680,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       }
     });
 
-    console.log('📊 Dashboard: Final counts - Active:', activeCount, 'Inactive:', inactiveCount);
+    dashboardLog('📊 Final counts - Active:', activeCount, 'Inactive:', inactiveCount);
 
     return {
       activeCount,
@@ -688,17 +697,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     if (userAccessLevel === 'admin' && ipatrollerPatrolData.length > 0) {
       const yesterday = new Date();
       yesterday.setDate(yesterday.getDate() - 1);
-      console.log('📊 Dashboard Active/Inactive Counts for', yesterday.toDateString());
-      console.log('✅ Active Municipalities:', activeCount);
-      console.log('❌ Inactive Municipalities:', inactiveCount);
-      console.log('📈 Total Municipalities:', totalMunicipalities);
-      console.log('📅 Data Source: IPatroller Firebase data');
+      dashboardLog('📊 Active/Inactive Counts for', yesterday.toDateString());
+      dashboardLog('✅ Active Municipalities:', activeCount);
+      dashboardLog('❌ Inactive Municipalities:', inactiveCount);
+      dashboardLog('📈 Total Municipalities:', totalMunicipalities);
+      dashboardLog('📅 Data Source: IPatroller Firebase data');
     }
   }, [activeCount, inactiveCount, totalMunicipalities, ipatrollerPatrolData, userAccessLevel]);
 
   // Calculate district distribution with fallback data (using IPatroller data source)
   const getDistrictData = () => {
-    console.log('📊 Dashboard getDistrictData - ipatrollerPatrolData:', ipatrollerPatrolData);
+    dashboardLog('📊 getDistrictData - ipatrollerPatrolData:', ipatrollerPatrolData);
     
     const districtCounts = {
       '1ST DISTRICT': 0,
@@ -712,7 +721,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       yesterday.setDate(yesterday.getDate() - 1);
       const yesterdayIndex = yesterday.getDate() - 1;
 
-      console.log(`📊 Dashboard: Counting active municipalities by district for ${yesterday.toDateString()}`);
+      dashboardLog(`📊 Counting active municipalities by district for ${yesterday.toDateString()}`);
 
       ipatrollerPatrolData.forEach(item => {
         if (item.district && districtCounts.hasOwnProperty(item.district)) {
@@ -730,14 +739,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           // Count as active if >= 5 patrols yesterday
           if (yesterdayPatrols >= 5) {
             districtCounts[item.district]++;
-            console.log(`✅ ${item.municipality} (${item.district}): Active - adding to district count`);
+            dashboardLog(`✅ ${item.municipality} (${item.district}): Active - adding to district count`);
           } else {
-            console.log(`❌ ${item.municipality} (${item.district}): Inactive - not counting`);
+            dashboardLog(`❌ ${item.municipality} (${item.district}): Inactive - not counting`);
           }
         }
       });
     } else {
-      console.log('⚠️ Dashboard: No ipatrollerPatrolData, using fallback data');
+      dashboardLog('⚠️ No ipatrollerPatrolData, using fallback data');
       // Fallback data when no real data is available
       districtCounts['1ST DISTRICT'] = 3;
       districtCounts['2ND DISTRICT'] = 3;
@@ -747,14 +756,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     // If we have data but zero active across all districts, fallback to sample so the pie isn't empty
     let totalActive = Object.values(districtCounts).reduce((sum, count) => sum + count, 0);
     if (ipatrollerPatrolData && ipatrollerPatrolData.length > 0 && totalActive === 0) {
-      console.log('⚠️ Dashboard: No active municipalities found, using fallback data for pie chart');
+      dashboardLog('⚠️ No active municipalities found, using fallback data for pie chart');
       districtCounts['1ST DISTRICT'] = 3;
       districtCounts['2ND DISTRICT'] = 3;
       districtCounts['3RD DISTRICT'] = 2;
       totalActive = 8;
     }
     
-    console.log('📊 Dashboard: District counts:', districtCounts, 'Total active:', totalActive);
+    dashboardLog('📊 District counts:', districtCounts, 'Total active:', totalActive);
     
     // Calculate percentages
     const labels = Object.keys(districtCounts).map(district => {
@@ -784,10 +793,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Get municipality lists for yesterday's data (using IPatroller data source)
   const getMunicipalityLists = () => {
-    console.log('🏛️ Dashboard getMunicipalityLists - ipatrollerPatrolData:', ipatrollerPatrolData);
+    dashboardLog('🏛️ getMunicipalityLists - ipatrollerPatrolData:', ipatrollerPatrolData);
     
     if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
-      console.log('⚠️ Dashboard: No ipatrollerPatrolData available');
+      dashboardLog('⚠️ No ipatrollerPatrolData available');
       return {
         active: [],
         inactive: []
@@ -798,7 +807,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayIndex = yesterday.getDate() - 1;
 
-    console.log(`📅 Dashboard: Yesterday was ${yesterday.toDateString()}, looking at index ${yesterdayIndex}`);
+    dashboardLog(`📅 Yesterday was ${yesterday.toDateString()}, looking at index ${yesterdayIndex}`);
 
     const active = [];
     const inactive = [];
@@ -806,7 +815,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     ipatrollerPatrolData.forEach(item => {
       let yesterdayPatrols = 0;
       
-      console.log(`🏛️ Processing ${item.municipality}:`, {
+      dashboardLog(`🏛️ Processing ${item.municipality}:`, {
         hasData: !!item.data,
         isArray: Array.isArray(item.data),
         dataLength: item.data ? item.data.length : 0,
@@ -822,9 +831,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         } else {
           yesterdayPatrols = rawValue;
         }
-        console.log(`📊 ${item.municipality}: Found ${rawValue} (${yesterdayPatrols}) patrols at index ${yesterdayIndex}`);
+        dashboardLog(`📊 ${item.municipality}: Found ${rawValue} (${yesterdayPatrols}) patrols at index ${yesterdayIndex}`);
       } else {
-        console.log(`❌ ${item.municipality}: No data at index ${yesterdayIndex}`);
+        dashboardLog(`❌ ${item.municipality}: No data at index ${yesterdayIndex}`);
       }
 
       const municipalityInfo = {
@@ -836,14 +845,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       // Use IPatroller logic: Active if >= 5, Inactive if < 5 (including null/undefined/0)
       if (yesterdayPatrols >= 5) {
         active.push(municipalityInfo);
-        console.log(`✅ ${item.municipality}: ACTIVE (${yesterdayPatrols} patrols)`);
+        dashboardLog(`✅ ${item.municipality}: ACTIVE (${yesterdayPatrols} patrols)`);
       } else {
         inactive.push(municipalityInfo);
-        console.log(`❌ ${item.municipality}: INACTIVE (${yesterdayPatrols} patrols)`);
+        dashboardLog(`❌ ${item.municipality}: INACTIVE (${yesterdayPatrols} patrols)`);
       }
     });
 
-    console.log('📈 Dashboard Final Lists:', {
+    dashboardLog('📈 Final Lists:', {
       active: active.length,
       inactive: inactive.length,
       activeList: active,
@@ -869,17 +878,17 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   // If no data is available, create some sample data for testing
   useEffect(() => {
     if (userAccessLevel === 'admin' && (!ipatrollerData || ipatrollerData.length === 0)) {
-      console.log('🧪 No real data found, consider using sample data for testing');
-      console.log('💡 You can call refreshIPatrollerData() or check if Firebase has data for the current month');
+      dashboardLog('🧪 No real data found, consider using sample data for testing');
+      dashboardLog('💡 You can call refreshIPatrollerData() or check if Firebase has data for the current month');
     }
   }, [ipatrollerData, userAccessLevel]);
 
   // Get district statistics for yesterday's data (using IPatroller data source)
   const getDistrictStats = () => {
-    console.log('🏛️ Dashboard getDistrictStats - ipatrollerPatrolData:', ipatrollerPatrolData);
+    dashboardLog('🏛️ getDistrictStats - ipatrollerPatrolData:', ipatrollerPatrolData);
     
     if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
-      console.log('⚠️ Dashboard: No ipatrollerPatrolData for district stats');
+      dashboardLog('⚠️ No ipatrollerPatrolData for district stats');
       return [];
     }
 
@@ -887,7 +896,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     yesterday.setDate(yesterday.getDate() - 1);
     const yesterdayIndex = yesterday.getDate() - 1;
 
-    console.log(`📊 Dashboard: Calculating district stats for ${yesterday.toDateString()} at index ${yesterdayIndex}`);
+    dashboardLog(`📊 Calculating district stats for ${yesterday.toDateString()} at index ${yesterdayIndex}`);
 
     const districtStats = {
       '1ST DISTRICT': { active: 0, total: 0, color: 'blue' },
@@ -912,9 +921,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
         if (yesterdayPatrols >= 5) {
           districtStats[item.district].active++;
-          console.log(`✅ ${item.municipality} (${item.district}): ACTIVE with ${yesterdayPatrols} patrols`);
+          dashboardLog(`✅ ${item.municipality} (${item.district}): ACTIVE with ${yesterdayPatrols} patrols`);
         } else {
-          console.log(`❌ ${item.municipality} (${item.district}): INACTIVE with ${yesterdayPatrols} patrols`);
+          dashboardLog(`❌ ${item.municipality} (${item.district}): INACTIVE with ${yesterdayPatrols} patrols`);
         }
       }
     });
@@ -928,7 +937,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       color: stats.color
     }));
 
-    console.log('📊 Dashboard: District stats calculated:', result);
+    dashboardLog('📊 District stats calculated:', result);
     return result;
   };
 
@@ -947,7 +956,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const fetchActionCenterData = async () => {
     setIsLoadingActionCenter(true);
     try {
-      console.log('🚀 Dashboard: COMPREHENSIVE ACTION DATA FETCH STARTED');
+      const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+      actionCenterGroup.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
       const allActionData = [];
       
       // List of possible collection names where action data might be stored (same as Action Center page)
@@ -963,16 +973,16 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         'pgEnroActions'
       ];
       
-      console.log('📋 Dashboard: Checking collections:', possibleCollections);
+      actionCenterGroup.log('📋 Checking collections:', possibleCollections);
       
       // Check each possible collection (same logic as Action Center page)
       for (const collectionName of possibleCollections) {
         try {
-          console.log(`🔍 Dashboard: Checking collection: ${collectionName}`);
+          actionCenterGroup.log(`🔍 Checking collection: ${collectionName}`);
           const collectionRef = collection(db, collectionName);
           const snapshot = await getDocs(collectionRef);
           
-          console.log(`📊 Dashboard: ${collectionName}: ${snapshot.size} documents found`);
+          actionCenterGroup.log(`📊 ${collectionName}: ${snapshot.size} documents found`);
           
           if (snapshot.size > 0) {
             snapshot.forEach((doc) => {
@@ -1025,11 +1035,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             });
           }
         } catch (collectionError) {
-          console.log(`⚠️ Dashboard: Collection ${collectionName} not accessible:`, collectionError.message);
+          actionCenterGroup.log(`⚠️ Collection ${collectionName} not accessible:`, collectionError.message);
         }
       }
       
-      console.log(`✅ Dashboard: TOTAL RAW ACTION DATA COLLECTED: ${allActionData.length} items`);
+      actionCenterGroup.log(`✅ TOTAL RAW ACTION DATA COLLECTED: ${allActionData.length} items`);
       
       // Transform and standardize all collected data (simplified version of Action Center transformation)
       const transformedData = allActionData
@@ -1049,11 +1059,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           reportIndex: item.reportIndex
         }));
       
-      console.log('📊 Dashboard: Loaded Action Center data:', transformedData.length, 'records');
+      actionCenterGroup.log('📊 Loaded Action Center data:', transformedData.length, 'records');
       setRealActionCenterData(transformedData);
       setLastDataUpdate(new Date());
+      actionCenterGroup.log('✅ Action Center data fetch completed successfully');
+      actionCenterGroup.end();
     } catch (error) {
-      console.error('❌ Dashboard: Error loading Action Center data:', error);
+      actionCenterGroup.error('❌ Error loading Action Center data:', error);
+      actionCenterGroup.end();
       setRealActionCenterData([]);
     } finally {
       setIsLoadingActionCenter(false);
@@ -1064,7 +1077,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const fetchIncidentsData = async () => {
     setIsLoadingIncidents(true);
     try {
-      console.log('🚀 Dashboard: Loading Incidents data from Firebase');
+      const incidentsGroup = createSectionGroup(CONSOLE_GROUPS.INCIDENTS, false);
+      incidentsGroup.log('🚀 Loading Incidents data from Firebase');
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const incidentsData = [];
@@ -1087,12 +1101,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         }
       });
       
-      console.log('📊 Dashboard: Loaded Incidents data:', incidentsData.length, 'records');
-      console.log('📄 Dashboard: Sample incident data:', incidentsData.slice(0, 2));
+      incidentsGroup.log('📊 Loaded Incidents data:', incidentsData.length, 'records');
+      incidentsGroup.log('📄 Sample incident data:', incidentsData.slice(0, 2));
       setRealIncidentsData(incidentsData);
       setLastDataUpdate(new Date());
+      incidentsGroup.log('✅ Incidents data fetch completed successfully');
+      incidentsGroup.end();
     } catch (error) {
-      console.error('❌ Dashboard: Error loading Incidents data:', error);
+      incidentsGroup.error('❌ Error loading Incidents data:', error);
+      incidentsGroup.end();
       setRealIncidentsData([]);
     } finally {
       setIsLoadingIncidents(false);
@@ -1112,7 +1129,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   // Auto-refresh Action Center data every 30 seconds
   useEffect(() => {
     const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing Action Center data...');
+        dashboardLog('🔄 Auto-refreshing Action Center data...');
       fetchActionCenterData();
     }, 30000); // 30 seconds
 
@@ -1122,7 +1139,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   // Auto-refresh Incidents data every 30 seconds
   useEffect(() => {
     const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing Incidents data...');
+        dashboardLog('🔄 Auto-refreshing Incidents data...');
       fetchIncidentsData();
     }, 30000); // 30 seconds
 
@@ -1319,7 +1336,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
     });
     
-    console.log(`📊 Dashboard: Incidents count for ${currentMonth} (same logic as Incidents page):`, filteredIncidents.length);
+    dashboardLog(`📊 Incidents count for ${currentMonth} (same logic as Incidents page):`, filteredIncidents.length);
     
     // Return actual count of filtered incidents (same as Incidents page stats.total)
     return filteredIncidents.length;
@@ -1392,7 +1409,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
     });
 
-    console.log(`📊 Dashboard: Filtered incidents for breakdown (${currentMonth}):`, filteredIncidents.length);
+    dashboardLog(`📊 Filtered incidents for breakdown (${currentMonth}):`, filteredIncidents.length);
 
     // Count by incident type (using exact field names from Incidents page)
     const typeCount = {};
@@ -1424,7 +1441,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         return order[b.level] - order[a.level];
       });
 
-    console.log('📊 Dashboard: Incident breakdown calculated:', { types, severity });
+    dashboardLog('📊 Incident breakdown calculated:', { types, severity });
     return { types, severity };
   };
 
@@ -1558,7 +1575,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     // Get current user's municipality (from auth context or default to Hermosa for demo)
     const currentMunicipality = userMunicipality || 'Hermosa';
     
-    console.log('📊 Dashboard getCommandCenterData called:', {
+    const commandCenterDataGroup = createSectionGroup(CONSOLE_GROUPS.COMMAND_CENTER, true);
+    commandCenterDataGroup.log('📊 getCommandCenterData called:', {
       userAccessLevel,
       userMunicipality: currentMunicipality,
       hasRealData: realCommandCenterData.totalBarangays > 0 || realCommandCenterData.totalConcernTypes > 0,
@@ -1659,7 +1677,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         return a.name.localeCompare(b.name);
       });
       
-      console.log('📊 Dashboard: Processed', processedBarangays.length, 'barangays with stats');
+      commandCenterDataGroup.log('📊 Processed', processedBarangays.length, 'barangays with stats');
 
       // Process real concern types data for display with actual counts from weekly reports
       let concernTypesCounts = {};
@@ -1695,6 +1713,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         })
         .sort((a, b) => b.count - a.count); // Show ALL, sorted by count (no slice)
 
+      commandCenterDataGroup.log('✅ Command Center data processed successfully');
+      commandCenterDataGroup.end();
       return {
         totalBarangays: realCommandCenterData.totalBarangays,
         totalConcernTypes: realCommandCenterData.totalConcernTypes,
@@ -1922,7 +1942,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
-                  console.log('🔄 Refreshing all dashboard data...');
+                  dashboardLog('🔄 Refreshing all dashboard data...');
                   // Refresh all data sources
                   loadIPatrollerData(); // Load from IPatroller source
                   refreshIPatrollerData(); // Also refresh DataContext
@@ -1942,7 +1962,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               {(!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) && (
                 <Button
                   onClick={() => {
-                    console.log('🧪 Creating sample IPatroller data for testing...');
+                    dashboardLog('🧪 Creating sample IPatroller data for testing...');
                     createSampleIPatrollerData();
                     showSuccess('Sample IPatroller data created for testing');
                   }}
@@ -1960,7 +1980,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             <div className="flex items-center gap-2">
               <Button
                 onClick={() => {
-                  console.log('🔄 Refreshing Command Center, Action, and Incidents data...');
+                  dashboardLog('🔄 Refreshing Command Center, Action, and Incidents data...');
                   fetchCommandCenterData();
                   fetchActionCenterData(); // Also refresh action data
                   fetchIncidentsData(); // Also refresh incidents data
