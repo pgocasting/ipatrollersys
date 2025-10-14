@@ -31,13 +31,19 @@ function AppContent() {
   const { user, loading, logout } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
-  // Set initial page based on URL only after user authentication is determined
+  // Set initial page after auth is determined; force command-center users to their page
   useEffect(() => {
     if (!loading) {
       if (user) {
-        // User is logged in, get page from URL
-        const pageFromURL = getCurrentPageFromURL();
-        setCurrentPage(pageFromURL);
+        if (userAccessLevel === 'command-center' && !isAdmin) {
+          if (currentPage !== 'commandcenter') {
+            setCurrentPage('commandcenter');
+            window.history.replaceState({}, '', '/commandcenter');
+          }
+        } else {
+          const pageFromURL = getCurrentPageFromURL();
+          setCurrentPage(pageFromURL);
+        }
       } else {
         // User is not logged in, ensure URL is root
         if (window.location.pathname !== '/') {
@@ -45,7 +51,7 @@ function AppContent() {
         }
       }
     }
-  }, [user, loading]);
+  }, [user, loading, userAccessLevel, isAdmin]);
 
   // Initialize users collection when app starts
   useEffect(() => {
@@ -61,6 +67,18 @@ function AppContent() {
     
     initApp();
   }, []);
+
+  // Immediately route command-center users to their page after login
+  useEffect(() => {
+    if (user && !loading) {
+      if (userAccessLevel === 'command-center' && !isAdmin) {
+        if (currentPage !== 'commandcenter') {
+          setCurrentPage('commandcenter');
+          window.history.replaceState({}, '', '/commandcenter');
+        }
+      }
+    }
+  }, [user, loading, userAccessLevel, isAdmin]);
 
   const handleLogout = async () => {
     try {
