@@ -27,28 +27,46 @@ import { logPageNavigation, logAdminLogout } from './utils/adminLogger';
 
 // Component that has access to AuthContext
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState('loading');
   const { user, loading, logout } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
-  // Set initial page after auth is determined; force command-center users to their page
+  // Set initial page after auth is determined; force all non-admin users to their respective pages
   useEffect(() => {
     if (!loading) {
       if (user) {
-        if (userAccessLevel === 'command-center' && !isAdmin) {
-          if (currentPage !== 'commandcenter') {
+        if (!isAdmin) {
+          // Set the appropriate page for non-admin users based on access level
+          if (userAccessLevel === 'command-center') {
             setCurrentPage('commandcenter');
             window.history.replaceState({}, '', '/commandcenter');
+          } else if (userAccessLevel === 'action-center') {
+            setCurrentPage('actioncenter');
+            window.history.replaceState({}, '', '/actioncenter');
+          } else if (userAccessLevel === 'ipatroller') {
+            setCurrentPage('ipatroller');
+            window.history.replaceState({}, '', '/ipatroller');
+          } else if (userAccessLevel === 'quarry-monitoring') {
+            setCurrentPage('quarrymonitoring');
+            window.history.replaceState({}, '', '/quarrymonitoring');
+          } else if (userAccessLevel === 'incidents') {
+            setCurrentPage('incidents');
+            window.history.replaceState({}, '', '/incidents');
+          } else {
+            // Fallback to dashboard if no specific access level (shouldn't happen)
+            setCurrentPage('dashboard');
           }
         } else {
+          // Admin users can access any page, default to dashboard or URL
           const pageFromURL = getCurrentPageFromURL();
-          setCurrentPage(pageFromURL);
+          setCurrentPage(pageFromURL || 'dashboard');
         }
       } else {
         // User is not logged in, ensure URL is root
         if (window.location.pathname !== '/') {
           window.history.replaceState({}, '', '/');
         }
+        setCurrentPage('loading');
       }
     }
   }, [user, loading, userAccessLevel, isAdmin]);
@@ -68,17 +86,27 @@ function AppContent() {
     initApp();
   }, []);
 
-  // Immediately route command-center users to their page after login
+  // Immediately route all non-admin users to their respective pages after login
   useEffect(() => {
-    if (user && !loading) {
-      if (userAccessLevel === 'command-center' && !isAdmin) {
-        if (currentPage !== 'commandcenter') {
-          setCurrentPage('commandcenter');
-          window.history.replaceState({}, '', '/commandcenter');
-        }
+    if (user && !loading && !isAdmin) {
+      if (userAccessLevel === 'command-center' && currentPage !== 'commandcenter') {
+        setCurrentPage('commandcenter');
+        window.history.replaceState({}, '', '/commandcenter');
+      } else if (userAccessLevel === 'action-center' && currentPage !== 'actioncenter') {
+        setCurrentPage('actioncenter');
+        window.history.replaceState({}, '', '/actioncenter');
+      } else if (userAccessLevel === 'ipatroller' && currentPage !== 'ipatroller') {
+        setCurrentPage('ipatroller');
+        window.history.replaceState({}, '', '/ipatroller');
+      } else if (userAccessLevel === 'quarry-monitoring' && currentPage !== 'quarrymonitoring') {
+        setCurrentPage('quarrymonitoring');
+        window.history.replaceState({}, '', '/quarrymonitoring');
+      } else if (userAccessLevel === 'incidents' && currentPage !== 'incidents') {
+        setCurrentPage('incidents');
+        window.history.replaceState({}, '', '/incidents');
       }
     }
-  }, [user, loading, userAccessLevel, isAdmin]);
+  }, [user, loading, userAccessLevel, isAdmin, currentPage]);
 
   const handleLogout = async () => {
     try {
@@ -111,15 +139,15 @@ function AppContent() {
       // Clear any stored data or state if needed
       console.log('🧹 Local storage cleared');
       
-      // Reset to dashboard page (this will be overridden by the user state change)
-      setCurrentPage('dashboard');
-      console.log('📄 Page reset to dashboard');
+      // Reset to loading page (this will be overridden by the user state change)
+      setCurrentPage('loading');
+      console.log('📄 Page reset to loading');
       
       console.log('🎯 Logout completed - waiting for auth state change...');
     } catch (error) {
       console.error('❌ Logout error:', error);
       // Even if Firebase logout fails, still try to redirect
-      setCurrentPage('dashboard');
+      setCurrentPage('loading');
     }
   };
 
@@ -167,11 +195,37 @@ function AppContent() {
   }, [currentPage, user]);
 
   const renderPage = () => {
-    // Access control for dashboard - command-center users cannot access dashboard
-    if (currentPage === 'dashboard' && userAccessLevel === 'command-center' && !isAdmin) {
-      // Redirect command-center users to their command center page
-      setCurrentPage('commandcenter');
-      return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+    // Show loading spinner while determining user access level
+    if (currentPage === 'loading') {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading...</p>
+          </div>
+        </div>
+      );
+    }
+
+    // Access control for dashboard - all non-admin users cannot access dashboard
+    if (currentPage === 'dashboard' && !isAdmin) {
+      // Redirect all non-admin users to their respective pages based on access level
+      if (userAccessLevel === 'command-center') {
+        setCurrentPage('commandcenter');
+        return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      } else if (userAccessLevel === 'action-center') {
+        setCurrentPage('actioncenter');
+        return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      } else if (userAccessLevel === 'ipatroller') {
+        setCurrentPage('ipatroller');
+        return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      } else if (userAccessLevel === 'quarry-monitoring') {
+        setCurrentPage('quarrymonitoring');
+        return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      } else if (userAccessLevel === 'incidents') {
+        setCurrentPage('incidents');
+        return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      }
     }
 
 
@@ -198,10 +252,24 @@ function AppContent() {
         return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       // Firebase test routes removed
       default:
-        // For default case, also check access control
-        if (userAccessLevel === 'command-center' && !isAdmin) {
-          setCurrentPage('commandcenter');
-          return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        // For default case, also check access control for all non-admin users
+        if (!isAdmin) {
+          if (userAccessLevel === 'command-center') {
+            setCurrentPage('commandcenter');
+            return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+          } else if (userAccessLevel === 'action-center') {
+            setCurrentPage('actioncenter');
+            return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+          } else if (userAccessLevel === 'ipatroller') {
+            setCurrentPage('ipatroller');
+            return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+          } else if (userAccessLevel === 'quarry-monitoring') {
+            setCurrentPage('quarrymonitoring');
+            return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+          } else if (userAccessLevel === 'incidents') {
+            setCurrentPage('incidents');
+            return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+          }
         }
         return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
     }

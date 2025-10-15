@@ -42,6 +42,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     "Orion",
     "Pilar",
     "Samal",
+    "Not Municipality",
   ];
 
   const [newUser, setNewUser] = useState({
@@ -104,7 +105,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     
     // Validate form
     if (!newUser.municipality && newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents") {
-      toast.error("Please select a municipality");
+      toast.error("Please select a municipality or 'Not Municipality'");
       return;
     }
     if (!newUser.firstName || !newUser.lastName) {
@@ -222,7 +223,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     
     // Validate form
     if (!editUser.municipality && editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents") {
-      toast.error("Please select a municipality");
+      toast.error("Please select a municipality or 'Not Municipality'");
       return;
     }
     if (!editUser.firstName || !editUser.lastName) {
@@ -461,7 +462,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Contact Number</Label>
+                    <Label htmlFor="phoneNumber">Contact Number (Optional)</Label>
                     <Input
                       id="phoneNumber"
                       name="phoneNumber"
@@ -483,10 +484,9 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         }
                         setNewUser((prev) => ({ ...prev, phoneNumber: value }));
                       }}
-                      pattern="^\+63 \d{3} \d{3} \d{4}$"
-                      title="Please enter a valid Philippine mobile number (+63 XXX XXX XXXX)"
                       className="col-span-3 bg-white border-slate-200"
                     />
+                    <p className="text-xs text-gray-500">Format: +63 XXX XXX XXXX</p>
                   </div>
                   <DialogFooter>
                     <DialogClose asChild>
@@ -598,7 +598,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     )}
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="editPhoneNumber">Contact Number</Label>
+                    <Label htmlFor="editPhoneNumber">Contact Number (Optional)</Label>
                     <Input
                       id="editPhoneNumber"
                       name="phoneNumber"
@@ -620,10 +620,9 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         }
                         setEditUser((prev) => ({ ...prev, phoneNumber: value }));
                       }}
-                      pattern="^\+63 \d{3} \d{3} \d{4}$"
-                      title="Please enter a valid Philippine mobile number (+63 XXX XXX XXXX)"
                       className="col-span-3 bg-white border-slate-200"
                     />
+                    <p className="text-xs text-gray-500">Format: +63 XXX XXX XXXX</p>
                   </div>
                   <DialogFooter>
                     <DialogClose asChild>
@@ -684,71 +683,197 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
               </DialogContent>
             </Dialog>
           </div>
-          <div className="border rounded-md border-gray-200 shadow-sm">
-            <Table className="border-gray-200">
-              <TableCaption className="text-slate-500">A list of all system users.</TableCaption>
-              <TableHeader>
-                <TableRow className="border-b border-gray-200">
-                  <TableHead className="w-[200px] border-gray-200">Name</TableHead>
-                  <TableHead className="border-gray-200">Username</TableHead>
-                  <TableHead className="border-gray-200">Email</TableHead>
-                  <TableHead className="border-gray-200">Phone</TableHead>
-                  <TableHead className="border-gray-200">Role</TableHead>
-                  <TableHead className="border-gray-200">Access Level</TableHead>
-                  <TableHead className="border-gray-200">Department</TableHead>
-                  <TableHead className="text-right border-gray-200">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.filter(u => u.role !== "Admin").length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">No users found.</TableCell>
-                  </TableRow>
-                ) : (
-                  users.filter(u => u.role !== "Admin").map((u) => (
-                    <TableRow key={u.id} className="border-gray-200">
-                      <TableCell className="font-medium">{`${u.firstName || ""} ${u.lastName || ""}`.trim()}</TableCell>
-                      <TableCell>{u.username}</TableCell>
-                      <TableCell>{u.email}</TableCell>
-                      <TableCell>{u.phoneNumber}</TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">{u.role}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-md bg-green-50 px-2 py-1 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-700/10">
-                          {u.accessLevel === 'action-center' ? 'Action Center' : u.accessLevel === 'command-center' ? 'Command Center' : u.accessLevel === 'ipatroller' ? 'IPatroller' : u.accessLevel === 'quarry-monitoring' ? 'Quarry Site Monitoring' : u.accessLevel === 'incidents' ? 'Incidents' : 'N/A'}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
-                          {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
-                        </span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleEditUser(u)}
-                          >
-                            Edit
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="sm"
-                            onClick={() => handleDeleteUser(u)}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                          >
-                            Delete
-                          </Button>
+          {/* Grouped Users by Access Level */}
+          {(() => {
+            const nonAdminUsers = users.filter(u => u.role !== "Admin");
+            const groupedUsers = nonAdminUsers.reduce((groups, user) => {
+              const accessLevel = user.accessLevel || 'other';
+              if (!groups[accessLevel]) {
+                groups[accessLevel] = [];
+              }
+              groups[accessLevel].push(user);
+              return groups;
+            }, {});
+
+            const accessLevelOrder = ['command-center', 'action-center', 'ipatroller', 'quarry-monitoring', 'incidents'];
+            const accessLevelLabels = {
+              'command-center': 'Command Center',
+              'action-center': 'Action Center',
+              'ipatroller': 'IPatroller',
+              'quarry-monitoring': 'Quarry Site Monitoring',
+              'incidents': 'Incidents'
+            };
+
+            if (nonAdminUsers.length === 0) {
+              return (
+                <div className="border rounded-md border-gray-200 shadow-sm p-8">
+                  <div className="text-center text-muted-foreground">
+                    <User className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                    <p className="text-lg font-medium">No users found</p>
+                    <p className="text-sm">Create your first user to get started</p>
+                  </div>
+                </div>
+              );
+            }
+
+            return (
+              <div className="space-y-6">
+                {accessLevelOrder.map(accessLevel => {
+                  const usersInGroup = groupedUsers[accessLevel] || [];
+                  if (usersInGroup.length === 0) return null;
+
+                  return (
+                    <div key={accessLevel} className="border rounded-md border-gray-200 shadow-sm">
+                      {/* Section Header */}
+                      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {accessLevelLabels[accessLevel]}
+                              </h3>
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800">
+                              {usersInGroup.length} user{usersInGroup.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+                      </div>
+
+                      {/* Users Table for this Group */}
+                      <Table className="border-gray-200">
+                        <TableHeader>
+                          <TableRow className="border-b border-gray-200">
+                            <TableHead className="w-[200px] border-gray-200">Name</TableHead>
+                            <TableHead className="border-gray-200">Username</TableHead>
+                            <TableHead className="border-gray-200">Email</TableHead>
+                            <TableHead className="border-gray-200">Phone</TableHead>
+                            <TableHead className="border-gray-200">Role</TableHead>
+                            <TableHead className="border-gray-200">Department</TableHead>
+                            <TableHead className="text-right border-gray-200">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {usersInGroup.map((u) => (
+                            <TableRow key={u.id} className="border-gray-200">
+                              <TableCell className="font-medium">{`${u.firstName || ""} ${u.lastName || ""}`.trim()}</TableCell>
+                              <TableCell>{u.username}</TableCell>
+                              <TableCell>{u.email}</TableCell>
+                              <TableCell>{u.phoneNumber}</TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">{u.role}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                                  {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-2 justify-end">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleEditUser(u)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDeleteUser(u)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+
+                {/* Other Access Levels */}
+                {Object.keys(groupedUsers).filter(level => !accessLevelOrder.includes(level)).map(accessLevel => {
+                  const usersInGroup = groupedUsers[accessLevel];
+                  if (usersInGroup.length === 0) return null;
+
+                  return (
+                    <div key={accessLevel} className="border rounded-md border-gray-200 shadow-sm">
+                      <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <div className="flex items-center space-x-2">
+                              <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                              <h3 className="text-lg font-semibold text-gray-900">
+                                {accessLevel.charAt(0).toUpperCase() + accessLevel.slice(1).replace('-', ' ')}
+                              </h3>
+                            </div>
+                            <span className="inline-flex items-center rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-800">
+                              {usersInGroup.length} user{usersInGroup.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <Table className="border-gray-200">
+                        <TableHeader>
+                          <TableRow className="border-b border-gray-200">
+                            <TableHead className="w-[200px] border-gray-200">Name</TableHead>
+                            <TableHead className="border-gray-200">Username</TableHead>
+                            <TableHead className="border-gray-200">Email</TableHead>
+                            <TableHead className="border-gray-200">Phone</TableHead>
+                            <TableHead className="border-gray-200">Role</TableHead>
+                            <TableHead className="border-gray-200">Department</TableHead>
+                            <TableHead className="text-right border-gray-200">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {usersInGroup.map((u) => (
+                            <TableRow key={u.id} className="border-gray-200">
+                              <TableCell className="font-medium">{`${u.firstName || ""} ${u.lastName || ""}`.trim()}</TableCell>
+                              <TableCell>{u.username}</TableCell>
+                              <TableCell>{u.email}</TableCell>
+                              <TableCell>{u.phoneNumber}</TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">{u.role}</span>
+                              </TableCell>
+                              <TableCell>
+                                <span className="inline-flex items-center rounded-md bg-purple-50 px-2 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">
+                                  {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
+                                </span>
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex gap-2 justify-end">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleEditUser(u)}
+                                  >
+                                    Edit
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDeleteUser(u)}
+                                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                  >
+                                    Delete
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       )}
     </Layout>
