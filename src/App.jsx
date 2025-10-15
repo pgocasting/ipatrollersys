@@ -33,41 +33,41 @@ function AppContent() {
 
   // Set initial page after auth is determined; force all non-admin users to their respective pages
   useEffect(() => {
-    if (!loading) {
-      if (user) {
-        if (!isAdmin) {
-          // Set the appropriate page for non-admin users based on access level
-          if (userAccessLevel === 'command-center') {
-            setCurrentPage('commandcenter');
-            window.history.replaceState({}, '', '/commandcenter');
-          } else if (userAccessLevel === 'action-center') {
-            setCurrentPage('actioncenter');
-            window.history.replaceState({}, '', '/actioncenter');
-          } else if (userAccessLevel === 'ipatroller') {
-            setCurrentPage('ipatroller');
-            window.history.replaceState({}, '', '/ipatroller');
-          } else if (userAccessLevel === 'quarry-monitoring') {
-            setCurrentPage('quarrymonitoring');
-            window.history.replaceState({}, '', '/quarrymonitoring');
-          } else if (userAccessLevel === 'incidents') {
-            setCurrentPage('incidents');
-            window.history.replaceState({}, '', '/incidents');
-          } else {
-            // Fallback to dashboard if no specific access level (shouldn't happen)
-            setCurrentPage('dashboard');
-          }
+    if (!loading && user) {
+      // Only proceed if we have a user and Firebase auth is ready
+      if (!isAdmin && userAccessLevel) {
+        // Set the appropriate page for non-admin users based on access level
+        if (userAccessLevel === 'command-center') {
+          setCurrentPage('commandcenter');
+          window.history.replaceState({}, '', '/commandcenter');
+        } else if (userAccessLevel === 'action-center') {
+          setCurrentPage('actioncenter');
+          window.history.replaceState({}, '', '/actioncenter');
+        } else if (userAccessLevel === 'ipatroller') {
+          setCurrentPage('ipatroller');
+          window.history.replaceState({}, '', '/ipatroller');
+        } else if (userAccessLevel === 'quarry-monitoring') {
+          setCurrentPage('quarrymonitoring');
+          window.history.replaceState({}, '', '/quarrymonitoring');
+        } else if (userAccessLevel === 'incidents') {
+          setCurrentPage('incidents');
+          window.history.replaceState({}, '', '/incidents');
         } else {
-          // Admin users can access any page, default to dashboard or URL
-          const pageFromURL = getCurrentPageFromURL();
-          setCurrentPage(pageFromURL || 'dashboard');
+          // Fallback to dashboard if no specific access level (shouldn't happen)
+          setCurrentPage('dashboard');
         }
-      } else {
-        // User is not logged in, ensure URL is root
-        if (window.location.pathname !== '/') {
-          window.history.replaceState({}, '', '/');
-        }
-        setCurrentPage('loading');
+      } else if (isAdmin) {
+        // Admin users can access any page, default to dashboard or URL
+        const pageFromURL = getCurrentPageFromURL();
+        setCurrentPage(pageFromURL || 'dashboard');
       }
+      // If userAccessLevel is not yet loaded, keep current page as 'loading'
+    } else if (!loading && !user) {
+      // User is not logged in, ensure URL is root
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/');
+      }
+      setCurrentPage('loading');
     }
   }, [user, loading, userAccessLevel, isAdmin]);
 
@@ -88,20 +88,21 @@ function AppContent() {
 
   // Immediately route all non-admin users to their respective pages after login
   useEffect(() => {
-    if (user && !loading && !isAdmin) {
-      if (userAccessLevel === 'command-center' && currentPage !== 'commandcenter') {
+    if (user && !loading && !isAdmin && userAccessLevel && currentPage === 'loading') {
+      // Only redirect if we're still in loading state and have access level
+      if (userAccessLevel === 'command-center') {
         setCurrentPage('commandcenter');
         window.history.replaceState({}, '', '/commandcenter');
-      } else if (userAccessLevel === 'action-center' && currentPage !== 'actioncenter') {
+      } else if (userAccessLevel === 'action-center') {
         setCurrentPage('actioncenter');
         window.history.replaceState({}, '', '/actioncenter');
-      } else if (userAccessLevel === 'ipatroller' && currentPage !== 'ipatroller') {
+      } else if (userAccessLevel === 'ipatroller') {
         setCurrentPage('ipatroller');
         window.history.replaceState({}, '', '/ipatroller');
-      } else if (userAccessLevel === 'quarry-monitoring' && currentPage !== 'quarrymonitoring') {
+      } else if (userAccessLevel === 'quarry-monitoring') {
         setCurrentPage('quarrymonitoring');
         window.history.replaceState({}, '', '/quarrymonitoring');
-      } else if (userAccessLevel === 'incidents' && currentPage !== 'incidents') {
+      } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         window.history.replaceState({}, '', '/incidents');
       }
@@ -195,13 +196,13 @@ function AppContent() {
   }, [currentPage, user]);
 
   const renderPage = () => {
-    // Show loading spinner while determining user access level
-    if (currentPage === 'loading') {
+    // Show loading spinner only if we don't have user access level yet
+    if (currentPage === 'loading' && user && !userAccessLevel) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading...</p>
+            <p className="mt-4 text-gray-600">Loading user access level...</p>
           </div>
         </div>
       );
@@ -275,13 +276,13 @@ function AppContent() {
     }
   };
 
-  // Show loading spinner while Firebase is initializing
-  if (loading) {
+  // Show loading spinner only while Firebase is initializing (not logged in yet)
+  if (loading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <p className="mt-4 text-gray-600">Initializing...</p>
         </div>
       </div>
     );
