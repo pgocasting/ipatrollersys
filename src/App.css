@@ -186,3 +186,44 @@
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* Fix for scrollbar overlapping table headers */
+.table-scroll-container {
+  overflow-x: auto;
+  overflow-y: auto;
+  padding-bottom: 8px;
+  margin-bottom: -8px;
+  padding-right: 8px;
+  margin-right: -8px;
+}
+
+.table-scroll-container::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+
+.table-scroll-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.table-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Ensure table headers have proper spacing from scrollbar */
+.table-header-spacing {
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+  padding-right: 4px;
+}
+
+/* Additional spacing for table cells to prevent overlap */
+.table-cell-spacing {
+  padding-right: 8px;
+}

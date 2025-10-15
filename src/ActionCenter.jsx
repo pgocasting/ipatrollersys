@@ -1361,19 +1361,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Actions Table */}
         <div className="border rounded-md border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
             <Table className="border-gray-200 w-full">
               <TableCaption className="text-slate-500">Action reports and their current status.</TableCaption>
               <TableHeader>
-                <TableRow className="border-b border-gray-200">
+                <TableRow className="border-b border-gray-200 table-header-spacing">
                   <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Department</TableHead>
                   <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Municipality</TableHead>
                   <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">District</TableHead>
                   <TableHead className="min-w-[200px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">What</TableHead>
                   <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">When</TableHead>
                   <TableHead className="min-w-[150px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Where</TableHead>
-                  <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Action Taken</TableHead>
-                  <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Actions</TableHead>
+                  <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs table-cell-spacing">Action Taken</TableHead>
+                  <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs table-cell-spacing">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1451,7 +1451,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           </p>
                         </div>
                       </TableCell>
-                      <TableCell className="break-all align-top whitespace-normal text-center">
+                      <TableCell className="break-all align-top whitespace-normal text-center table-cell-spacing">
                         <div className="py-2 px-1 min-w-0 text-center">
                           <span 
                             className={`inline-flex items-center px-2 py-1 text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
@@ -1464,7 +1464,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           </span>
                         </div>
                       </TableCell>
-                      <TableCell className="break-all align-top whitespace-normal text-center">
+                      <TableCell className="break-all align-top whitespace-normal text-center table-cell-spacing">
                         <div className="py-2 px-1 min-w-0 flex items-center justify-center gap-1 text-center">
                           <button
                             onClick={() => handleAction(item.id, 'view')}

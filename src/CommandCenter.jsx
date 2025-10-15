@@ -4274,7 +4274,7 @@ Are you absolutely sure you want to proceed?`;
               
               
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
-                <div className={`overflow-x-auto h-[60vh] md:h-[70vh] overflow-y-auto relative rounded-lg border border-gray-200 bg-white shadow-sm ${isCommandUser ? 'cc-compact' : ''}`}>
+                <div className={`overflow-x-auto h-[60vh] md:h-[70vh] overflow-y-auto relative rounded-lg border border-gray-200 bg-white shadow-sm ${isCommandUser ? 'cc-compact' : ''}`} style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
                   <table className="w-full min-w-[1200px]">
                     <thead className="sticky top-0 z-20">
                       <tr className="bg-white border-b-2 border-gray-300">
@@ -4299,13 +4299,13 @@ Are you absolutely sure you want to proceed?`;
                             WEEKLY REPORT
                           </div>
                         </th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             ACTION TAKEN
                           </div>
                         </th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800">
+                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 table-cell-spacing">
                           <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4 text-gray-500" />
                             REMARKS
@@ -4473,7 +4473,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 table-cell-spacing">
                                   <input 
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
@@ -4487,7 +4487,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-4 py-3 table-cell-spacing">
                                   <input 
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
@@ -4608,7 +4608,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-4 py-3 table-cell-spacing">
                                     <input 
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
@@ -4617,7 +4617,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-4 py-3 table-cell-spacing">
                                     <input 
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
