@@ -435,7 +435,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       );
     const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
-    const matchesDepartment = activeTab === 'all' || item.department === activeTab;
+    
+    // Department filtering logic
+    let matchesDepartment;
+    if (isAdmin) {
+      // Admin users can see all departments
+      matchesDepartment = activeTab === 'all' || item.department === activeTab;
+    } else if (userDepartment === 'agriculture' || userDepartment === 'pg-enro') {
+      // Agriculture and PG-ENRO users can only see their own department data
+      matchesDepartment = item.department && item.department.toLowerCase() === userDepartment.toLowerCase();
+    } else {
+      // Other users (like PNP) can see all departments
+      matchesDepartment = activeTab === 'all' || item.department === activeTab;
+    }
+    
     const matchesMunicipality = activeMunicipality === "all" || item.municipality === activeMunicipality;
     const matchesMonth = selectedMonth === 'all' || item.when.getMonth() === selectedMonth;
     
@@ -908,8 +921,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Action Center</h1>
-            <p className="text-gray-500 mt-2">Manage and track action reports with comprehensive analytics</p>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-gray-900">Action Center</h1>
+              {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') && (
+                <Badge 
+                  variant="secondary" 
+                  className={`${
+                    userDepartment === 'agriculture' 
+                      ? 'bg-green-100 text-green-800 border-green-200' 
+                      : 'bg-blue-100 text-blue-800 border-blue-200'
+                  } font-semibold`}
+                >
+                  {userDepartment === 'agriculture' ? 'Agriculture Dept.' : 'PG-ENRO Dept.'}
+                </Badge>
+              )}
+            </div>
+            <p className="text-gray-500 mt-2">
+              {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') 
+                ? `Manage and track ${userDepartment === 'agriculture' ? 'agriculture' : 'environmental'} action reports`
+                : 'Manage and track action reports with comprehensive analytics'
+              }
+            </p>
           </div>
           
           <div className="flex items-center gap-4">
@@ -968,7 +1000,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+          isAdmin || (!userDepartment || (userDepartment !== 'agriculture' && userDepartment !== 'pg-enro'))
+            ? 'lg:grid-cols-5' 
+            : 'lg:grid-cols-2'
+        }`}>
+          {/* Total Actions Card - Always shown */}
           <Card className="bg-white shadow-sm border border-gray-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
@@ -985,69 +1022,101 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">PNP (Monthly)</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {pnpActions.toLocaleString()}
-                  </p>
+          {/* Department-specific card for Agriculture and PG-ENRO users */}
+          {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') ? (
+            <Card className="bg-white shadow-sm border border-gray-200">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 mb-1">
+                      {userDepartment === 'agriculture' ? 'Agriculture (Bantay Dagat)' : 'PG-Enro (Environment)'}
+                    </p>
+                    <p className={`text-2xl font-bold ${
+                      userDepartment === 'agriculture' ? 'text-green-600' : 'text-emerald-600'
+                    }`}>
+                      {(userDepartment === 'agriculture' ? agricultureActions : pgEnroActions).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className={`p-2 rounded-lg ${
+                    userDepartment === 'agriculture' ? 'bg-green-100' : 'bg-emerald-100'
+                  }`}>
+                    {userDepartment === 'agriculture' ? (
+                      <Fish className="w-6 h-6 text-green-600" />
+                    ) : (
+                      <Trees className="w-6 h-6 text-emerald-600" />
+                    )}
+                  </div>
                 </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <Shield className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Show all cards for admin and other users */
+            <>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">PNP (Monthly)</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {pnpActions.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-red-100 rounded-lg">
+                      <Shield className="w-6 h-6 text-red-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Agriculture (Bantay Dagat)</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {agricultureActions.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <Fish className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Agriculture (Bantay Dagat)</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        {agricultureActions.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <Fish className="w-6 h-6 text-green-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">PG-Enro (Environment)</p>
-                  <p className="text-2xl font-bold text-emerald-600">
-                    {pgEnroActions.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <Trees className="w-6 h-6 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">PG-Enro (Environment)</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {pgEnroActions.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <Trees className="w-6 h-6 text-emerald-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Pending</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {pendingActions.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Clock className="w-6 h-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-medium text-gray-500 mb-1">Pending</p>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {pendingActions.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <Clock className="w-6 h-6 text-orange-600" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </>
+          )}
 
         </div>
 
@@ -1203,15 +1272,34 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 {/* Department Filter */}
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="department-filter" className="text-sm font-medium text-gray-700">Department</Label>
-                  <Select value={activeTab} onValueChange={setActiveTab}>
+                  <Select 
+                    value={activeTab} 
+                    onValueChange={setActiveTab}
+                    disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
+                  >
                     <SelectTrigger id="department-filter">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Departments</SelectItem>
-                      <SelectItem value="pnp">PNP</SelectItem>
-                      <SelectItem value="agriculture">Agriculture</SelectItem>
-                      <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                      {isAdmin ? (
+                        <>
+                          <SelectItem value="all">All Departments</SelectItem>
+                          <SelectItem value="pnp">PNP</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        </>
+                      ) : userDepartment === 'agriculture' ? (
+                        <SelectItem value="agriculture">Agriculture</SelectItem>
+                      ) : userDepartment === 'pg-enro' ? (
+                        <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                      ) : (
+                        <>
+                          <SelectItem value="all">All Departments</SelectItem>
+                          <SelectItem value="pnp">PNP</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        </>
+                      )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -1580,14 +1668,32 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="department" className="text-sm font-medium text-gray-700">Department *</Label>
-                    <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
+                    <Select 
+                      value={formData.department} 
+                      onValueChange={(value) => setFormData({...formData, department: value})}
+                      disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
+                    >
                       <SelectTrigger className="w-full">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pnp">PNP</SelectItem>
-                        <SelectItem value="agriculture">Agriculture</SelectItem>
-                        <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        {isAdmin ? (
+                          <>
+                            <SelectItem value="pnp">PNP</SelectItem>
+                            <SelectItem value="agriculture">Agriculture</SelectItem>
+                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                          </>
+                        ) : userDepartment === 'agriculture' ? (
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                        ) : userDepartment === 'pg-enro' ? (
+                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        ) : (
+                          <>
+                            <SelectItem value="pnp">PNP</SelectItem>
+                            <SelectItem value="agriculture">Agriculture</SelectItem>
+                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                          </>
+                        )}
                       </SelectContent>
                     </Select>
                   </div>

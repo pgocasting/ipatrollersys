@@ -3685,15 +3685,13 @@ Are you absolutely sure you want to proceed?`;
         const newEntry = {
           id: Date.now(),
           command: "weekly.save",
-          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'} (ID: ${collectionSaveResult.docId})`,
+          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}`,
           type: "success",
           timestamp: new Date()
         };
         setTerminalHistory(prev => [...prev, newEntry]);
-      } else if (saveResult.success) {
-        toast.warning(`Weekly report saved to legacy location, but failed to save to collection: ${collectionSaveResult.error}`);
       } else {
-        toast.error("Failed to save weekly report: " + saveResult.error);
+        toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
       }
     } catch (error) {
       console.error("Error saving weekly report:", error);
