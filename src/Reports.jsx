@@ -176,14 +176,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }, 0);
   };
 
-  // Calculate total Quarry Site Monitoring reports
-  const getTotalQuarryMonitoringReports = () => {
-    // TODO: Implement when Quarry Site Monitoring data structure is available
-    // For now, return 0 since the feature is in "Coming Soon" status
-    // In future implementation, this would fetch from quarry monitoring collection
-    // and count inspection reports, compliance reports, environmental assessments, etc.
-    return 0;
-  };
 
   // Translation and grammar correction function (from Action Center)
   const translateAndCorrectGrammar = (text) => {
@@ -1293,135 +1285,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
     
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
-  };
-
-  // Quarry Site Monitoring Report
-  const generateQuarrySiteMonitoringReport = () => {
-    const paperConfig = getPaperConfig(paperSize);
-    const doc = new jsPDF('p', 'mm', paperConfig.format);
-    
-    // Calculate center position
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const centerX = pageWidth / 2;
-    
-    // Add logo/header section
-    doc.setFillColor(251, 146, 60); // Orange background
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    // Main title - centered
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('Quarry Site Monitoring Report', centerX, 25, { align: 'center' });
-    
-    // Reset text color
-    doc.setTextColor(0, 0, 0);
-    
-    // Report info section with better organization
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Report Information', centerX, 60, { align: 'center' });
-    
-    // Info box
-    const infoY = 70;
-    doc.setFillColor(248, 250, 252);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
-    doc.setDrawColor(251, 146, 60);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
-    
-    // Report details - organized in two columns
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
-    
-    // Paper size indicator - right aligned
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
-    
-    // Quarry Site Statistics section with better design
-    doc.setFontSize(18);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Quarry Site Statistics', centerX, 130, { align: 'center' });
-    
-    // Statistics box - centered and properly sized
-    const statsY = 140;
-    const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 60;
-    
-    doc.setFillColor(255, 247, 237);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
-    doc.setDrawColor(251, 146, 60);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
-    
-    // Sample quarry statistics in organized layout - centered
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const textStartX = paperConfig.margin + 15;
-    const lineHeight = 12;
-    
-    doc.text(`• Total Quarry Sites: 24`, textStartX, statsY + 10);
-    doc.text(`• Active Sites: 18`, textStartX, statsY + 10 + lineHeight);
-    doc.text(`• Compliant Sites: 15`, textStartX, statsY + 10 + (lineHeight * 2));
-    doc.text(`• Violations: 3`, textStartX, statsY + 10 + (lineHeight * 3));
-    doc.text(`• Compliance Rate: 83.3%`, textStartX, statsY + 10 + (lineHeight * 4));
-    
-    // Quarry Sites Table with better design
-    const quarrySites = [
-      ['Bataan Quarry Corp.', 'Bagac', 'Active', 'Valid', 'Compliant', '2024-01-15'],
-      ['Mountain Stone Mining', 'Mariveles', 'Active', 'Valid', 'Compliant', '2024-01-10'],
-      ['Pacific Aggregates', 'Morong', 'Active', 'Expired', 'Non-Compliant', '2023-12-20'],
-      ['Bataan Rock Industries', 'Bagac', 'Active', 'Valid', 'Compliant', '2024-01-08'],
-      ['Limestone Quarry Inc.', 'Mariveles', 'Inactive', 'Valid', 'Under Review', '2024-01-05']
-    ];
-    
-    // Table title
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Quarry Site Details', centerX, 210, { align: 'center' });
-    
-    autoTable(doc, {
-      head: [['Operator', 'Location', 'Status', 'Permit Status', 'Compliance', 'Last Inspection']],
-      body: quarrySites,
-      startY: 220,
-      styles: { 
-        fontSize: paperSize === 'long' ? 10 : 9, 
-        cellPadding: 4,
-        overflow: 'linebreak',
-        halign: 'left'
-      },
-      headStyles: { 
-        fillColor: [251, 146, 60], 
-        fontStyle: 'bold',
-        textColor: [255, 255, 255],
-        fontSize: paperSize === 'long' ? 11 : 10
-      },
-      columnStyles: {
-        0: { cellWidth: 45, halign: 'left' },
-        1: { cellWidth: 25, halign: 'left' },
-        2: { cellWidth: 20, halign: 'center' },
-        3: { cellWidth: 25, halign: 'center' },
-        4: { cellWidth: 25, halign: 'center' },
-        5: { cellWidth: 30, halign: 'center' }
-      },
-      margin: { left: paperConfig.margin, right: paperConfig.margin },
-      tableWidth: 'auto',
-      showHead: 'everyPage',
-      pageBreak: 'auto',
-      didDrawPage: function (data) {
-        // Add page numbers
-        const pageCount = doc.internal.getNumberOfPages();
-        const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-        doc.setFontSize(8);
-        doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
-      }
-    });
-    
-    doc.save(`quarry-site-monitoring-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
   // Incidents Report (matching Incidents Reports data structure)
@@ -3050,22 +2913,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           priority: "high"
         }
       ]
-    },
-    {
-      id: "quarrymonitoring",
-      title: "Quarry Site Monitoring Reports",
-      description: "Quarry operations monitoring and compliance reports",
-      icon: <Mountain className="w-6 h-6" />,
-      color: "from-orange-500 to-orange-600",
-      reports: [
-        {
-          name: "Quarry Site Monitoring Report",
-          description: "Comprehensive quarry site monitoring with compliance tracking and permit status",
-          action: generateQuarrySiteMonitoringReport,
-          formats: ["PDF"],
-          priority: "high"
-        }
-      ]
     }
   ];
 
@@ -3191,21 +3038,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200 h-36">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Quarry Monitoring</p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {getTotalQuarryMonitoringReports().toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <Mountain className="w-5 h-5 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
         </div>
         */}
 

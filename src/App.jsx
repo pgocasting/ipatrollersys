@@ -6,7 +6,6 @@ import Reports from "./Reports";
 import IncidentsReports from "./IncidentsReports";
 import ActionCenter from "./ActionCenter";
 import CommandCenter from "./CommandCenter";
-import QuarryMonitoring from "./QuarryMonitoring";
 import Settings from "./Settings";
 import FirestoreTest from "./FirestoreTest";
 import Users from "./Users";
@@ -46,9 +45,6 @@ function AppContent() {
         } else if (userAccessLevel === 'ipatroller') {
           setCurrentPage('ipatroller');
           window.history.replaceState({}, '', '/ipatroller');
-        } else if (userAccessLevel === 'quarry-monitoring') {
-          setCurrentPage('quarrymonitoring');
-          window.history.replaceState({}, '', '/quarrymonitoring');
         } else if (userAccessLevel === 'incidents') {
           setCurrentPage('incidents');
           window.history.replaceState({}, '', '/incidents');
@@ -99,9 +95,6 @@ function AppContent() {
       } else if (userAccessLevel === 'ipatroller') {
         setCurrentPage('ipatroller');
         window.history.replaceState({}, '', '/ipatroller');
-      } else if (userAccessLevel === 'quarry-monitoring') {
-        setCurrentPage('quarrymonitoring');
-        window.history.replaceState({}, '', '/quarrymonitoring');
       } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         window.history.replaceState({}, '', '/incidents');
@@ -220,9 +213,6 @@ function AppContent() {
       } else if (userAccessLevel === 'ipatroller') {
         setCurrentPage('ipatroller');
         return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      } else if (userAccessLevel === 'quarry-monitoring') {
-        setCurrentPage('quarrymonitoring');
-        return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -243,8 +233,6 @@ function AppContent() {
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'actioncenter':
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      case 'quarrymonitoring':
-        return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'users':
@@ -264,9 +252,6 @@ function AppContent() {
           } else if (userAccessLevel === 'ipatroller') {
             setCurrentPage('ipatroller');
             return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-          } else if (userAccessLevel === 'quarry-monitoring') {
-            setCurrentPage('quarrymonitoring');
-            return <QuarryMonitoring onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
           } else if (userAccessLevel === 'incidents') {
             setCurrentPage('incidents');
             return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;

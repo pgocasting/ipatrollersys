@@ -1766,7 +1766,16 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             <span>Week 4</span>
                           </div>
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">% of Efficiency (Minimum Number of Reports (constant) / Week) / (No. of Report Attended / Week) * 100</th>
+                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">
+                          % of Efficiency (Minimum Number of Reports (constant) / Week) / (No. of Report Attended / Week) * 100
+                          <div className="flex justify-around mt-1 text-xs font-medium text-gray-600">
+                            <span>Week 1</span>
+                            <span>Week 2</span>
+                            <span>Week 3</span>
+                            <span>Week 4</span>
+                          </div>
+                        </th>
+                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">Overall Percentage</th>
                       </>
                     )}
                   </tr>
@@ -1906,10 +1915,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   }
                                 }
                                 
-                                // Calculate efficiency: (Actual No. of Report / Week) ÷ (No. of Report Attended / Week) × 100
-                                const totalAttended = weeklyAttended.reduce((sum, v) => sum + v, 0);
-                                const totalActual = weeklyActual.reduce((sum, v) => sum + v, 0);
-                                const efficiency = totalAttended > 0 ? Math.round((totalActual / totalAttended) * 100) : 0;
+                                // Calculate efficiency for each week: (No. of Report Attended / Minimum Number of Reports) × 100
+                                const weeklyEfficiency = weeklyAttended.map(attended => 
+                                  Math.round((attended / WEEKLY_MIN) * 100)
+                                );
+                                
+                                // Calculate overall percentage: Total of Week 1-4 efficiency percentages
+                                const overallPercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
                                 return (
                                   <>
                                     <td className="px-3 py-4 text-center text-sm text-gray-700">{idx + 1}</td>
@@ -1944,7 +1956,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                         )}
                                       </td>
                                     ))}
-                                    <td className="px-6 py-4 text-center text-sm font-semibold text-purple-600 border-l-2 border-gray-300">{efficiency}%</td>
+                                    {/* % of Efficiency / week - Week 1-4 */}
+                                    {weeklyEfficiency.map((efficiency, weekIndex) => (
+                                      <td key={`efficiency-${weekIndex}`} className={`px-3 py-4 text-center text-sm font-semibold text-purple-600 ${weekIndex === 0 ? 'border-l-2 border-gray-300' : ''}`}>
+                                        {efficiency}%
+                                      </td>
+                                    ))}
+                                    {/* Overall Percentage */}
+                                    <td className="px-6 py-4 text-center text-sm font-semibold text-green-600 border-l-2 border-gray-300">{overallPercentage}%</td>
                                   </>
                                 );
                               })()
