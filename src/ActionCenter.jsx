@@ -207,9 +207,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
 
+    const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
     try {
       setLoading(true);
-      const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
       actionCenterGroup.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
       actionCenterGroup.log('🔍 Database available:', !!db);
       actionCenterGroup.log('🔍 User logged in:', !!user);

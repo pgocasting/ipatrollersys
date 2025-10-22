@@ -367,6 +367,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   // Load Command Center Action Taken data for weekly attended reports
   const loadCommandCenterActionData = async () => {
+    const actionDataGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
     try {
       const monthNames = [
         "January", "February", "March", "April", "May", "June",
@@ -375,7 +377,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const selectedMonthName = monthNames[selectedMonth];
       const monthYear = `${selectedMonthName}_${selectedYear}`;
       
-      const actionDataGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
       actionDataGroup.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
       
       const actionData = {};
