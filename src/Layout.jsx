@@ -149,14 +149,17 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     <div className="flex h-screen w-full bg-white">
       {/* Mobile Sidebar using Sheet */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-        <SheetContent side="left" className="w-72 p-0">
+        <SheetTrigger asChild>
+          <div></div>
+        </SheetTrigger>
+        <SheetContent side="left" className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}>
           <Sidebar 
             sidebarOpen={true}
             setSidebarOpen={setSidebarOpen}
             navigationItems={navigationItems}
             currentPage={currentPage}
             handleNavigation={handleNavigation}
-            isCollapsed={false}
+            isCollapsed={isCollapsed}
             setIsCollapsed={setIsCollapsed}
             isMobile={true}
             onLogout={onLogout}
@@ -188,14 +191,15 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
 
       {/* Mobile Menu Button - Fixed Position */}
       <div className="fixed top-4 left-4 z-50 md:hidden">
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="bg-white shadow-md border-gray-200">
-              <Menu className="h-4 w-4 text-black" />
-              <span className="sr-only">Toggle navigation</span>
-            </Button>
-          </SheetTrigger>
-        </Sheet>
+        <Button 
+          variant="outline" 
+          size="icon" 
+          className="bg-white shadow-md border-gray-200"
+          onClick={() => setSidebarOpen(true)}
+        >
+          <Menu className="h-4 w-4 text-black" />
+          <span className="sr-only">Toggle navigation</span>
+        </Button>
       </div>
     </div>
   );

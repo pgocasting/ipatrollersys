@@ -255,7 +255,7 @@ const Sidebar = React.memo(({
           )}
           
           {/* Settings and Logout Section */}
-          {!isCollapsed && !isMobile && (
+          {!isCollapsed && (
             <div className="mt-3 pt-3 border-t border-gray-600 space-y-1">
               {/* Settings Button */}
               {(() => {
@@ -296,8 +296,7 @@ const Sidebar = React.memo(({
           )}
           
           {/* Collapse Button at Bottom */}
-          {!isMobile && (
-            <div className="mt-3 pt-3 border-t border-gray-600">
+          <div className="mt-3 pt-3 border-t border-gray-600">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -323,7 +322,6 @@ const Sidebar = React.memo(({
                 </TooltipContent>
               </Tooltip>
             </div>
-          )}
         </div>
       </aside>
     </TooltipProvider>
