@@ -844,38 +844,145 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const handleSaveAction = async () => {
+    const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
     try {
       setLoading(true);
       
       if (showEditModal && selectedAction) {
         // Update existing action
-        const result = await updateActionReport(selectedAction.id, selectedAction.monthKey, formData);
-        if (result.success) {
-          actionCenterLog('✅ Action updated successfully');
+        actionCenterGroup.log('🔄 Starting action update process');
+        actionCenterGroup.log('📋 Selected action details:', {
+          id: selectedAction.id,
+          sourceCollection: selectedAction.sourceCollection,
+          sourceDocument: selectedAction.sourceDocument,
+          sourceType: selectedAction.sourceType,
+          reportIndex: selectedAction.reportIndex
+        });
+
+        let updateResult = { success: false, error: 'Unknown error' };
+
+        // Handle different data structures based on source type
+        if (selectedAction.sourceType === 'month-based' && selectedAction.sourceCollection === 'actionReports') {
+          // Month-based structure - use the existing updateActionReport function
+          const monthKey = selectedAction.sourceDocument; // sourceDocument is the monthKey
+          actionCenterGroup.log('📅 Attempting month-based update with monthKey:', monthKey);
+          updateResult = await updateActionReport(selectedAction.id, monthKey, formData);
+        } else if (selectedAction.sourceType === 'individual' && selectedAction.sourceCollection === 'actionReports') {
+          // Individual document structure - use the existing updateActionReport function
+          actionCenterGroup.log('📄 Attempting individual document update');
+          updateResult = await updateActionReport(selectedAction.id, null, formData);
+        } else {
+          // For other collection types, try direct document update
+          actionCenterGroup.log('🔄 Attempting direct document update in collection:', selectedAction.sourceCollection);
+          try {
+            if (selectedAction.sourceType === 'actions-array' || selectedAction.sourceType === 'reports-array') {
+              // Handle array-based structures - need to update the parent document
+              actionCenterGroup.log('📋 Handling array-based update');
+              const docRef = doc(db, selectedAction.sourceCollection, selectedAction.sourceDocument);
+              const docSnap = await getDoc(docRef);
+              
+              if (docSnap.exists()) {
+                const docData = docSnap.data();
+                let arrayField = null;
+                let updatedArray = null;
+                
+                if (selectedAction.sourceType === 'actions-array' && docData.actions) {
+                  arrayField = 'actions';
+                  updatedArray = [...docData.actions];
+                  updatedArray[selectedAction.reportIndex] = {
+                    ...updatedArray[selectedAction.reportIndex],
+                    ...formData,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  };
+                } else if (selectedAction.sourceType === 'reports-array' && docData.reports) {
+                  arrayField = 'reports';
+                  updatedArray = [...docData.reports];
+                  updatedArray[selectedAction.reportIndex] = {
+                    ...updatedArray[selectedAction.reportIndex],
+                    ...formData,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  };
+                } else if (docData.data && Array.isArray(docData.data)) {
+                  arrayField = 'data';
+                  updatedArray = [...docData.data];
+                  updatedArray[selectedAction.reportIndex] = {
+                    ...updatedArray[selectedAction.reportIndex],
+                    ...formData,
+                    updatedAt: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  };
+                }
+                
+                if (arrayField && updatedArray !== null) {
+                  await updateDoc(docRef, {
+                    [arrayField]: updatedArray,
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  });
+                  updateResult = { success: true };
+                  actionCenterGroup.log('✅ Array-based update successful');
+                } else {
+                  updateResult = { success: false, error: 'Could not find array field to update' };
+                }
+              } else {
+                updateResult = { success: false, error: 'Parent document not found' };
+              }
+            } else {
+              // Try direct document update
+              const docRef = doc(db, selectedAction.sourceCollection, selectedAction.id);
+              const docSnap = await getDoc(docRef);
+              
+              if (docSnap.exists()) {
+                await updateDoc(docRef, {
+                  ...formData,
+                  updatedAt: new Date().toISOString(),
+                  updatedBy: user?.email || 'system'
+                });
+                updateResult = { success: true };
+                actionCenterGroup.log('✅ Direct document update successful');
+              } else {
+                updateResult = { success: false, error: 'Document not found for direct update' };
+              }
+            }
+          } catch (directUpdateError) {
+            actionCenterGroup.error('❌ Direct update failed:', directUpdateError);
+            updateResult = { success: false, error: directUpdateError.message };
+          }
+        }
+
+        if (updateResult.success) {
+          actionCenterGroup.log('✅ Action updated successfully');
+          showSuccess('Action report updated successfully!');
           await fetchAllActionData(); // Refresh data
           setShowEditModal(false);
           setSelectedAction(null);
         } else {
-          actionCenterLog('❌ Failed to update action:', result.error, 'error');
-          alert('Failed to update action: ' + result.error);
+          actionCenterGroup.error('❌ Failed to update action:', updateResult.error);
+          alert('Failed to update action: ' + updateResult.error);
         }
       } else {
         // Add new action
+        actionCenterGroup.log('➕ Adding new action report');
         const result = await addActionReport(formData);
         if (result.success) {
-          actionCenterLog('✅ Action added successfully');
+          actionCenterGroup.log('✅ Action added successfully');
+          showSuccess('Action report added successfully!');
           await fetchAllActionData(); // Refresh data
           setShowAddModal(false);
         } else {
-          actionCenterLog('❌ Failed to add action:', result.error, 'error');
+          actionCenterGroup.error('❌ Failed to add action:', result.error);
           alert('Failed to add action: ' + result.error);
         }
       }
     } catch (error) {
-      actionCenterLog('❌ Error saving action:', error, 'error');
+      actionCenterGroup.error('❌ Error saving action:', error);
       alert('Error saving action: ' + error.message);
     } finally {
       setLoading(false);
+      actionCenterGroup.end();
     }
   };
 
