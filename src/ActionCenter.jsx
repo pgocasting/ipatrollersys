@@ -2086,17 +2086,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
-                    <Select value={formData.actionTaken} onValueChange={(value) => setFormData({...formData, actionTaken: value})}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="Resolved">Resolved</SelectItem>
-                        <SelectItem value="Arrested">Arrested</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="actionTaken"
+                      type="text"
+                      value={formData.actionTaken}
+                      onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
+                      placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
+                      className="w-full"
+                    />
                   </div>
                   
                   <div className="space-y-2">
@@ -2603,17 +2600,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="edit-actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
-                    <Select value={formData.actionTaken} onValueChange={(value) => setFormData({...formData, actionTaken: value})}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select Status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Pending">Pending</SelectItem>
-                        <SelectItem value="In Progress">In Progress</SelectItem>
-                        <SelectItem value="Resolved">Resolved</SelectItem>
-                        <SelectItem value="Arrested">Arrested</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <Input
+                      id="edit-actionTaken"
+                      type="text"
+                      value={formData.actionTaken}
+                      onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
+                      placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
+                      className="w-full"
+                    />
                   </div>
                   
                   <div className="space-y-2">
