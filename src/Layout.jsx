@@ -7,7 +7,9 @@ import { Card, CardContent } from "./components/ui/card";
 
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
+import { useSidebar } from "./hooks/useSidebar";
 import Sidebar from "./components/Sidebar";
+import SidebarToggle from "./components/SidebarToggle";
 import { 
   Home, 
   Car, 
@@ -26,53 +28,20 @@ import {
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
 
 export default function Layout({ children, onNavigate, currentPage, onLogout }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    // Get initial state from localStorage
-    const saved = localStorage.getItem('sidebarCollapsed');
-    return saved ? JSON.parse(saved) : false;
-  });
-
-  // Save collapsed state to localStorage whenever it changes
-  useEffect(() => {
-    localStorage.setItem('sidebarCollapsed', JSON.stringify(isCollapsed));
-  }, [isCollapsed]);
+  const {
+    sidebarOpen,
+    isCollapsed,
+    isMobile,
+    openSidebar,
+    closeSidebar,
+    toggleCollapsed,
+    handleNavigation
+  } = useSidebar();
   const { user } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
   
-  // Close sidebar when screen size changes to desktop
-  useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth >= 768) {
-        setSidebarOpen(false);
-      }
-    };
-
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Close sidebar when clicking outside (mobile)
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (sidebarOpen && !event.target.closest('aside') && !event.target.closest('[data-sidebar-trigger]')) {
-        setSidebarOpen(false);
-      }
-    };
-
-    if (sidebarOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
-
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [sidebarOpen]);
-
-  // Close sidebar when navigating to a new page on mobile
-  useEffect(() => {
-    if (sidebarOpen && window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
-  }, [currentPage, sidebarOpen]);
+  // Enhanced navigation handler with auto-close functionality
+  const enhancedNavigate = handleNavigation(onNavigate);
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
@@ -124,14 +93,9 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
     }), [allNavigationItems, isAdmin, userAccessLevel]
   );
 
-  const handleNavigation = (pageId) => {
-    // Close mobile sidebar when navigating
-    if (sidebarOpen && window.innerWidth < 768) {
-      setSidebarOpen(false);
-    }
-    
-    // Navigate to page
-    onNavigate(pageId);
+  const handlePageNavigation = (pageId) => {
+    // Use enhanced navigation handler
+    enhancedNavigate(pageId);
     
     // Update browser history without adding to back stack
     window.history.replaceState({ page: pageId }, '', `/${pageId}`);
@@ -148,21 +112,25 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
   return (
     <div className="flex h-screen w-full bg-white">
       {/* Mobile Sidebar using Sheet */}
-      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+      <Sheet open={sidebarOpen} onOpenChange={closeSidebar}>
         <SheetTrigger asChild>
-          <div></div>
+          <div style={{ display: 'none' }}></div>
         </SheetTrigger>
-        <SheetContent side="left" className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}>
+        <SheetContent 
+          side="left" 
+          className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}
+          data-sheet-content="true"
+        >
           <Sidebar 
             sidebarOpen={true}
-            setSidebarOpen={setSidebarOpen}
             navigationItems={navigationItems}
             currentPage={currentPage}
-            handleNavigation={handleNavigation}
+            handleNavigation={handlePageNavigation}
             isCollapsed={isCollapsed}
-            setIsCollapsed={setIsCollapsed}
+            onToggleCollapsed={toggleCollapsed}
             isMobile={true}
             onLogout={onLogout}
+            onCloseSidebar={closeSidebar}
           />
         </SheetContent>
       </Sheet>
@@ -170,13 +138,12 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
       {/* Desktop Sidebar */}
       <div className="hidden md:block">
         <Sidebar 
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
+          sidebarOpen={false}
           navigationItems={navigationItems}
           currentPage={currentPage}
-          handleNavigation={handleNavigation}
+          handleNavigation={handlePageNavigation}
           isCollapsed={isCollapsed}
-          setIsCollapsed={setIsCollapsed}
+          onToggleCollapsed={toggleCollapsed}
           isMobile={false}
           onLogout={onLogout}
         />
@@ -191,15 +158,14 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
 
       {/* Mobile Menu Button - Fixed Position */}
       <div className="fixed top-4 left-4 z-50 md:hidden">
-        <Button 
-          variant="outline" 
-          size="icon" 
-          className="bg-white shadow-md border-gray-200"
-          onClick={() => setSidebarOpen(true)}
-        >
-          <Menu className="h-4 w-4 text-black" />
-          <span className="sr-only">Toggle navigation</span>
-        </Button>
+        <SidebarToggle
+          type="mobile-trigger"
+          variant="outline"
+          size="icon"
+          className="bg-white shadow-md border-gray-200 text-black hover:bg-gray-50"
+          onToggle={openSidebar}
+          showTooltip={false}
+        />
       </div>
     </div>
   );

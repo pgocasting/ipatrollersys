@@ -9,17 +9,18 @@ import { Badge } from "./ui/badge";
 import { ChevronLeft, ChevronRight, Settings, X, User, LogOut, Menu, Shield } from "lucide-react";
 import { useFirebase } from "../hooks/useFirebase";
 import { useAuth } from "../contexts/AuthContext";
+import SidebarToggle from "./SidebarToggle";
 
 const Sidebar = React.memo(({ 
   sidebarOpen, 
-  setSidebarOpen, 
   navigationItems, 
   currentPage, 
   handleNavigation,
   isCollapsed,
-  setIsCollapsed,
+  onToggleCollapsed,
   isMobile = false,
-  onLogout
+  onLogout,
+  onCloseSidebar
 }) => {
   const { user } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
@@ -54,7 +55,7 @@ const Sidebar = React.memo(({
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
-                    onClick={() => setIsCollapsed(false)}
+                    onClick={() => onToggleCollapsed && onToggleCollapsed()}
                     className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200"
                   >
                     <img 
@@ -103,15 +104,15 @@ const Sidebar = React.memo(({
             )}
             
             
-            {isMobile && (
-              <Button
+            {isMobile && onCloseSidebar && (
+              <SidebarToggle
+                type="mobile-close"
                 variant="ghost"
                 size="icon"
                 className="h-9 w-9 text-white hover:bg-white/10"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="h-5 w-5" />
-              </Button>
+                onClose={onCloseSidebar}
+                showTooltip={false}
+              />
             )}
           </div>
         </div>
@@ -297,31 +298,18 @@ const Sidebar = React.memo(({
           
           {/* Collapse Button at Bottom */}
           <div className="mt-3 pt-3 border-t border-gray-600">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size={isCollapsed ? "icon" : "default"}
-                    className={`w-full h-9 font-medium transition-all duration-300 group hover:bg-gray-700 text-gray-200 hover:text-white ${
-                      isCollapsed ? 'px-2 justify-center' : 'px-3 justify-start'
-                    } rounded-lg`}
-                    onClick={() => setIsCollapsed(!isCollapsed)}
-                  >
-                    {isCollapsed ? (
-                      <Menu className="h-4 w-4" />
-                    ) : (
-                      <div className="flex items-center gap-3">
-                        <Menu className="h-4 w-4" />
-                        <span className="text-sm font-medium">Collapse</span>
-                      </div>
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-black text-white">
-                  <p>{isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
+            <SidebarToggle
+              type="collapse"
+              isCollapsed={isCollapsed}
+              variant="ghost"
+              size={isCollapsed ? "icon" : "default"}
+              className={`w-full h-9 font-medium text-gray-200 ${
+                isCollapsed ? 'px-2 justify-center' : 'px-3 justify-start'
+              } rounded-lg`}
+              onToggle={onToggleCollapsed}
+              showTooltip={true}
+            />
+          </div>
         </div>
       </aside>
     </TooltipProvider>
