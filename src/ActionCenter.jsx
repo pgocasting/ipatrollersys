@@ -1129,6 +1129,155 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
+  // Clear duplicates function
+  const handleClearDuplicates = async () => {
+    const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
+    try {
+      actionCenterGroup.log('🔍 Starting duplicate detection process');
+      
+      if (actionItems.length === 0) {
+        showSuccess('No action reports found to check for duplicates.');
+        return;
+      }
+
+      // Find duplicates based on key fields
+      const duplicateGroups = {};
+      const duplicateIds = new Set();
+      
+      actionItems.forEach((item, index) => {
+        // Create a key based on critical fields to identify duplicates
+        const key = `${item.department || ''}_${item.municipality || ''}_${item.district || ''}_${(item.what || '').toLowerCase().trim()}_${item.where || ''}_${formatDate(item.when)}`.replace(/\s+/g, ' ');
+        
+        if (!duplicateGroups[key]) {
+          duplicateGroups[key] = [];
+        }
+        duplicateGroups[key].push({ item, index });
+      });
+
+      // Identify actual duplicates (groups with more than 1 item)
+      const actualDuplicates = Object.values(duplicateGroups).filter(group => group.length > 1);
+      
+      if (actualDuplicates.length === 0) {
+        actionCenterGroup.log('✅ No duplicates found');
+        showSuccess('No duplicate action reports found!');
+        actionCenterGroup.end();
+        return;
+      }
+
+      let duplicateCount = 0;
+      actualDuplicates.forEach(group => {
+        // Keep the first item, mark others as duplicates
+        for (let i = 1; i < group.length; i++) {
+          duplicateIds.add(group[i].item.id);
+          duplicateCount++;
+        }
+      });
+
+      actionCenterGroup.log(`🔍 Found ${duplicateCount} duplicate reports in ${actualDuplicates.length} groups`);
+
+      // Confirm with user before deletion
+      const confirmDelete = window.confirm(
+        `Found ${duplicateCount} duplicate action reports.\n\n` +
+        `This will keep the first occurrence of each duplicate group and remove the rest.\n\n` +
+        `Are you sure you want to proceed with clearing duplicates?`
+      );
+
+      if (!confirmDelete) {
+        actionCenterGroup.log('❌ User cancelled duplicate clearing');
+        actionCenterGroup.end();
+        return;
+      }
+
+      setLoading(true);
+      let deletedCount = 0;
+      let failedCount = 0;
+
+      // Delete duplicates one by one
+      for (const duplicateId of duplicateIds) {
+        const duplicateItem = actionItems.find(item => item.id === duplicateId);
+        if (!duplicateItem) continue;
+
+        try {
+          // Use the same deletion logic as handleConfirmDelete
+          let deleteResult = { success: false, error: 'Unknown error' };
+
+          if (duplicateItem.sourceType === 'month-based' && duplicateItem.sourceCollection === 'actionReports') {
+            const monthKey = duplicateItem.sourceDocument;
+            deleteResult = await deleteActionReport(duplicateItem.id, monthKey);
+          } else if (duplicateItem.sourceType === 'individual' && duplicateItem.sourceCollection === 'actionReports') {
+            deleteResult = await deleteActionReport(duplicateItem.id, null);
+          } else {
+            // Handle other data structures
+            if (duplicateItem.sourceType === 'actions-array' || duplicateItem.sourceType === 'reports-array') {
+              const docRef = doc(db, duplicateItem.sourceCollection, duplicateItem.sourceDocument);
+              const docSnap = await getDoc(docRef);
+              
+              if (docSnap.exists()) {
+                const docData = docSnap.data();
+                let arrayField = null;
+                let updatedArray = null;
+                
+                if (duplicateItem.sourceType === 'actions-array' && docData.actions) {
+                  arrayField = 'actions';
+                  updatedArray = docData.actions.filter((_, index) => index !== duplicateItem.reportIndex);
+                } else if (duplicateItem.sourceType === 'reports-array' && docData.reports) {
+                  arrayField = 'reports';
+                  updatedArray = docData.reports.filter((_, index) => index !== duplicateItem.reportIndex);
+                } else if (docData.data && Array.isArray(docData.data)) {
+                  arrayField = 'data';
+                  updatedArray = docData.data.filter((_, index) => index !== duplicateItem.reportIndex);
+                }
+                
+                if (arrayField && updatedArray !== null) {
+                  await updateDoc(docRef, {
+                    [arrayField]: updatedArray,
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  });
+                  deleteResult = { success: true };
+                }
+              }
+            } else {
+              const docRef = doc(db, duplicateItem.sourceCollection, duplicateItem.id);
+              await deleteDoc(docRef);
+              deleteResult = { success: true };
+            }
+          }
+
+          if (deleteResult.success) {
+            deletedCount++;
+            actionCenterGroup.log(`✅ Deleted duplicate: ${duplicateItem.id}`);
+          } else {
+            failedCount++;
+            actionCenterGroup.error(`❌ Failed to delete duplicate: ${duplicateItem.id}`, deleteResult.error);
+          }
+        } catch (error) {
+          failedCount++;
+          actionCenterGroup.error(`❌ Error deleting duplicate: ${duplicateItem.id}`, error);
+        }
+      }
+
+      // Refresh data
+      await fetchAllActionData();
+
+      actionCenterGroup.log(`✅ Duplicate clearing completed: ${deletedCount} deleted, ${failedCount} failed`);
+      
+      if (deletedCount > 0) {
+        showSuccess(`Successfully cleared ${deletedCount} duplicate action reports!${failedCount > 0 ? ` (${failedCount} failed)` : ''}`);
+      } else {
+        showSuccess('No duplicates were cleared. Please try again or check manually.');
+      }
+
+    } catch (error) {
+      actionCenterGroup.error('❌ Error during duplicate clearing:', error);
+      alert('Error clearing duplicates: ' + error.message);
+    } finally {
+      setLoading(false);
+      actionCenterGroup.end();
+    }
+  };
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="container mx-auto p-6 space-y-8">
@@ -1207,6 +1356,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 >
                   <Download className="w-4 h-4 text-green-600" />
                   <span>Import Excel/CSV</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Data Cleanup</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={handleClearDuplicates}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
+                >
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <span>Clear Duplicates</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
