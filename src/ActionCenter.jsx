@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from "react";
 import Layout from "./Layout";
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
-import { collection, getDocs, query, orderBy, onSnapshot, writeBatch, doc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, onSnapshot, writeBatch, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import * as XLSX from 'xlsx';
 import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
@@ -882,23 +882,100 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const handleConfirmDelete = async () => {
     if (!selectedAction) return;
     
+    const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
     try {
       setLoading(true);
-      const result = await deleteActionReport(selectedAction.id, selectedAction.monthKey);
-      if (result.success) {
-        actionCenterLog('✅ Action deleted successfully');
+      actionCenterGroup.log('🗑️ Starting action deletion process');
+      actionCenterGroup.log('📋 Selected action details:', {
+        id: selectedAction.id,
+        sourceCollection: selectedAction.sourceCollection,
+        sourceDocument: selectedAction.sourceDocument,
+        sourceType: selectedAction.sourceType,
+        reportIndex: selectedAction.reportIndex
+      });
+
+      let deleteResult = { success: false, error: 'Unknown error' };
+
+      // Handle different data structures based on source type
+      if (selectedAction.sourceType === 'month-based' && selectedAction.sourceCollection === 'actionReports') {
+        // Month-based structure - use the existing deleteActionReport function
+        const monthKey = selectedAction.sourceDocument; // sourceDocument is the monthKey
+        actionCenterGroup.log('📅 Attempting month-based deletion with monthKey:', monthKey);
+        deleteResult = await deleteActionReport(selectedAction.id, monthKey);
+      } else if (selectedAction.sourceType === 'individual' && selectedAction.sourceCollection === 'actionReports') {
+        // Individual document structure - use the existing deleteActionReport function
+        actionCenterGroup.log('📄 Attempting individual document deletion');
+        deleteResult = await deleteActionReport(selectedAction.id, null);
+      } else {
+        // For other collection types, try direct document deletion
+        actionCenterGroup.log('🔄 Attempting direct document deletion from collection:', selectedAction.sourceCollection);
+        try {
+          if (selectedAction.sourceType === 'actions-array' || selectedAction.sourceType === 'reports-array') {
+            // Handle array-based structures - need to update the parent document
+            actionCenterGroup.log('📋 Handling array-based deletion');
+            const docRef = doc(db, selectedAction.sourceCollection, selectedAction.sourceDocument);
+            const docSnap = await getDoc(docRef);
+            
+            if (docSnap.exists()) {
+              const docData = docSnap.data();
+              let arrayField = null;
+              let updatedArray = null;
+              
+              if (selectedAction.sourceType === 'actions-array' && docData.actions) {
+                arrayField = 'actions';
+                updatedArray = docData.actions.filter((_, index) => index !== selectedAction.reportIndex);
+              } else if (selectedAction.sourceType === 'reports-array' && docData.reports) {
+                arrayField = 'reports';
+                updatedArray = docData.reports.filter((_, index) => index !== selectedAction.reportIndex);
+              } else if (docData.data && Array.isArray(docData.data)) {
+                arrayField = 'data';
+                updatedArray = docData.data.filter((_, index) => index !== selectedAction.reportIndex);
+              }
+              
+              if (arrayField && updatedArray !== null) {
+                await updateDoc(docRef, {
+                  [arrayField]: updatedArray,
+                  lastUpdated: new Date().toISOString(),
+                  updatedBy: user?.email || 'system'
+                });
+                deleteResult = { success: true };
+                actionCenterGroup.log('✅ Array-based deletion successful');
+              } else {
+                deleteResult = { success: false, error: 'Could not find array field to update' };
+              }
+            } else {
+              deleteResult = { success: false, error: 'Parent document not found' };
+            }
+          } else {
+            // Try direct document deletion
+            const docRef = doc(db, selectedAction.sourceCollection, selectedAction.id);
+            await deleteDoc(docRef);
+            deleteResult = { success: true };
+            actionCenterGroup.log('✅ Direct document deletion successful');
+          }
+        } catch (directDeleteError) {
+          actionCenterGroup.error('❌ Direct deletion failed:', directDeleteError);
+          deleteResult = { success: false, error: directDeleteError.message };
+        }
+      }
+
+      if (deleteResult.success) {
+        actionCenterGroup.log('✅ Action deleted successfully');
+        showSuccess('Action report deleted successfully!');
         await fetchAllActionData(); // Refresh data
         setShowDeleteModal(false);
         setSelectedAction(null);
       } else {
-        actionCenterLog('❌ Failed to delete action:', result.error, 'error');
-        alert('Failed to delete action: ' + result.error);
+        actionCenterGroup.error('❌ Failed to delete action:', deleteResult.error);
+        alert('Failed to delete action: ' + deleteResult.error);
       }
     } catch (error) {
-      actionCenterLog('❌ Error deleting action:', error, 'error');
+      actionCenterGroup.error('❌ Error deleting action:', error);
       alert('Error deleting action: ' + error.message);
     } finally {
       setLoading(false);
+      actionCenterGroup.end();
     }
   };
 
