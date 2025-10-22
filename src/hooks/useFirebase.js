@@ -746,7 +746,14 @@ export const useFirebase = () => {
       }
 
       // Generate month key from report date
-      const reportDate = new Date(reportData.when);
+      let reportDate;
+      if (typeof reportData.when === 'string' && !reportData.when.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        // If "when" is text (like "Yesterday", "This morning"), use current date for month key
+        reportDate = new Date();
+      } else {
+        // If "when" is a date string or Date object, use it
+        reportDate = new Date(reportData.when);
+      }
       const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
       
       // Generate unique report ID

@@ -106,7 +106,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     municipality: '',
     district: '',
     what: '',
-    when: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+    when: new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    }) + ' at about ' + new Date().toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit', 
+      hour12: true 
+    }),
     where: '',
     actionTaken: 'Pending',
     // PNP specific fields
@@ -309,24 +317,35 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         // Transform and standardize all collected data
         const transformedData = allActionData
           .map((item, index) => {
-            // Handle different date formats
-            let dateValue = new Date();
+            // Handle different date formats - preserve original text when possible
+            let whenValue = new Date();
             if (item.when) {
               if (item.when.toDate && typeof item.when.toDate === 'function') {
-                dateValue = item.when.toDate(); // Firestore Timestamp
+                whenValue = item.when.toDate(); // Firestore Timestamp
               } else if (item.when instanceof Date) {
-                dateValue = item.when;
-              } else if (typeof item.when === 'string' || typeof item.when === 'number') {
-                dateValue = new Date(item.when);
+                whenValue = item.when;
+              } else if (typeof item.when === 'string') {
+                // Check if it's a natural language date (contains "at about", "yesterday", etc.)
+                if (item.when.includes('at about') || item.when.includes('yesterday') || item.when.includes('today') || 
+                    item.when.includes('morning') || item.when.includes('evening') || item.when.includes('afternoon') ||
+                    !item.when.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                  // Preserve original text for natural language dates
+                  whenValue = item.when;
+                } else {
+                  // Convert standard date strings to Date objects
+                  whenValue = new Date(item.when);
+                }
+              } else if (typeof item.when === 'number') {
+                whenValue = new Date(item.when);
               }
             } else if (item.date) {
               if (item.date.toDate && typeof item.date.toDate === 'function') {
-                dateValue = item.date.toDate();
+                whenValue = item.date.toDate();
               } else {
-                dateValue = new Date(item.date);
+                whenValue = new Date(item.date);
               }
             } else if (item.createdAt) {
-              dateValue = new Date(item.createdAt);
+              whenValue = new Date(item.createdAt);
             }
             
             return {
@@ -335,7 +354,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               municipality: item.municipality || item.city || item.location || null,
               district: item.district || item.area || null,
               what: item.what || item.action || item.description || item.activity || null,
-              when: dateValue,
+              when: whenValue,
               where: item.where || item.place || item.venue || item.location || null,
               actionTaken: translateAndCorrectGrammar(item.actionTaken || item.status || item.result || 'Pending'),
               // Additional metadata
@@ -480,7 +499,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
     
     const matchesMunicipality = activeMunicipality === "all" || item.municipality === activeMunicipality;
-    const matchesMonth = selectedMonth === 'all' || item.when.getMonth() === selectedMonth;
+    const matchesMonth = selectedMonth === 'all' || (() => {
+      if (item.when instanceof Date) {
+        return item.when.getMonth() === selectedMonth;
+      } else if (typeof item.when === 'string') {
+        // For text dates, try to extract month or use current month as fallback
+        const currentDate = new Date();
+        try {
+          const parsedDate = new Date(item.when);
+          if (!isNaN(parsedDate.getTime())) {
+            return parsedDate.getMonth() === selectedMonth;
+          }
+        } catch (e) {
+          // If parsing fails, include in current month filter
+        }
+        return currentDate.getMonth() === selectedMonth;
+      }
+      return false;
+    })();
     
     // Additional filter to exclude any remaining unknown entries
     const hasValidData = item.department && 
@@ -523,7 +559,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   // Monthly counts for each department
   const getMonthlyCount = (department, month) => {
     return actionItems.filter(item => {
-      const itemMonth = item.when ? item.when.getMonth() : -1;
+      let itemMonth = -1;
+      if (item.when) {
+        if (item.when instanceof Date) {
+          itemMonth = item.when.getMonth();
+        } else if (typeof item.when === 'string') {
+          try {
+            const parsedDate = new Date(item.when);
+            if (!isNaN(parsedDate.getTime())) {
+              itemMonth = parsedDate.getMonth();
+            } else {
+              // For unparseable natural language dates, use current month
+              itemMonth = new Date().getMonth();
+            }
+          } catch (e) {
+            // If parsing fails, use current month
+            itemMonth = new Date().getMonth();
+          }
+        }
+      }
       const matchesDepartment = item.department && item.department.toLowerCase() === department.toLowerCase();
       return matchesDepartment && itemMonth === month;
     }).length;
@@ -771,7 +825,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       municipality: '',
       district: '',
       what: '',
-      when: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
+      when: new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }) + ' at about ' + new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      }),
       where: '',
       actionTaken: 'Pending',
       // PNP specific fields
@@ -803,7 +865,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         municipality: action.municipality || '',
         district: action.district || '',
         what: action.what || '',
-        when: action.when ? new Date(action.when).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        when: action.when || new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }) + ' at about ' + new Date().toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit', 
+          hour12: true 
+        }),
         where: action.where || '',
         actionTaken: action.actionTaken || 'Pending',
         // PNP specific fields
@@ -1812,7 +1882,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
                           <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap text-center">
-                            {formatDate(item.when)}
+                            {typeof item.when === 'string' ? item.when : formatDate(item.when)}
                           </p>
                         </div>
                       </TableCell>
@@ -2045,7 +2115,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       onValueChange={(value) => setFormData({...formData, department: value})}
                       disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="department" className="w-full">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2084,7 +2154,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="space-y-2">
                     <Label htmlFor="district" className="text-sm font-medium text-gray-700">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="district" className="w-full">
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2163,7 +2233,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="gender" className="text-sm font-medium text-gray-700">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger id="gender" className="w-full">
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2370,9 +2440,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">Date</Label>
+                    <Label className="text-sm font-medium text-gray-600">When</Label>
                     <p className="text-base font-semibold text-gray-900 mt-1">
-                      {formatDate(selectedAction.when)}
+                      {typeof selectedAction.when === 'string' ? selectedAction.when : formatDate(selectedAction.when)}
                     </p>
                   </div>
                 </div>
@@ -2573,7 +2643,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="space-y-2">
                     <Label htmlFor="edit-department" className="text-sm font-medium text-gray-700">Department *</Label>
                     <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="edit-department" className="w-full">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2598,7 +2668,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="space-y-2">
                     <Label htmlFor="edit-district" className="text-sm font-medium text-gray-700">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger id="edit-district" className="w-full">
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2677,7 +2747,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="edit-gender" className="text-sm font-medium text-gray-700">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger id="edit-gender" className="w-full">
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
                         <SelectContent>

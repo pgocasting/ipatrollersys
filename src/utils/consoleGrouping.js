@@ -40,11 +40,12 @@ const activeGroups = new Map();
 export const createGroup = (groupName, collapsed = false) => {
   const groupId = `${groupName}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  if (collapsed) {
-    console.groupCollapsed(groupName);
-  } else {
-    console.group(groupName);
-  }
+  // DISABLED: Console grouping disabled - logs will appear ungrouped
+  // if (collapsed) {
+  //   console.groupCollapsed(groupName);
+  // } else {
+  //   console.group(groupName);
+  // }
   
   activeGroups.set(groupId, groupName);
   return groupId;
@@ -56,7 +57,8 @@ export const createGroup = (groupName, collapsed = false) => {
  */
 export const endGroup = (groupId) => {
   if (activeGroups.has(groupId)) {
-    console.groupEnd();
+    // DISABLED: Console grouping disabled - no groupEnd needed
+    // console.groupEnd();
     activeGroups.delete(groupId);
   }
 };
@@ -247,9 +249,10 @@ export const tableLog = (groupName, data, title = 'Data Table') => {
  * Clear all active groups (useful for cleanup)
  */
 export const clearAllGroups = () => {
-  activeGroups.forEach((groupName, groupId) => {
-    console.groupEnd();
-  });
+  // DISABLED: Console grouping disabled - no groupEnd needed
+  // activeGroups.forEach((groupName, groupId) => {
+  //   console.groupEnd();
+  // });
   activeGroups.clear();
 };
 
