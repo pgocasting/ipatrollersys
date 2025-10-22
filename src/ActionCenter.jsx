@@ -106,7 +106,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     municipality: '',
     district: '',
     what: '',
-    when: new Date().toISOString().split('T')[0],
+    when: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
     where: '',
     actionTaken: 'Pending',
     // PNP specific fields
@@ -771,7 +771,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       municipality: '',
       district: '',
       what: '',
-      when: new Date().toISOString().split('T')[0],
+      when: new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }),
       where: '',
       actionTaken: 'Pending',
       // PNP specific fields
@@ -1938,12 +1938,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="when" className="text-sm font-medium text-gray-700">When (Date) *</Label>
+                    <Label htmlFor="when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
                     <Input
                       id="when"
-                      type="date"
+                      type="text"
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
+                      placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
                       className="w-full"
                     />
                   </div>
@@ -2454,12 +2455,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-when" className="text-sm font-medium text-gray-700">When (Date) *</Label>
+                    <Label htmlFor="edit-when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
                     <Input
                       id="edit-when"
-                      type="date"
+                      type="text"
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
+                      placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
                       className="w-full"
                     />
                   </div>
