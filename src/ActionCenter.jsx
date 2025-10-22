@@ -429,6 +429,35 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     "3RD DISTRICT": ["Bagac", "Dinalupihan", "Mariveles", "Morong"]
   };
 
+  // Function to auto-detect district based on municipality
+  const getDistrictByMunicipality = (municipality) => {
+    if (!municipality) return '';
+    
+    const municipalityLower = municipality.toLowerCase().trim();
+    
+    for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+      const found = municipalities.some(mun => 
+        mun.toLowerCase() === municipalityLower || 
+        municipalityLower.includes(mun.toLowerCase()) ||
+        mun.toLowerCase().includes(municipalityLower)
+      );
+      if (found) {
+        return district;
+      }
+    }
+    return '';
+  };
+
+  // Handle municipality change with auto-detection
+  const handleMunicipalityChange = (value) => {
+    const detectedDistrict = getDistrictByMunicipality(value);
+    setFormData({
+      ...formData, 
+      municipality: value,
+      district: detectedDistrict
+    });
+  };
+
   // Filter and sort data
   const filteredItems = actionItems.filter(item => {
     const matchesSearch = searchTerm === "" || 
@@ -1704,8 +1733,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Input
                       id="municipality"
                       value={formData.municipality}
-                      onChange={(e) => setFormData({...formData, municipality: e.target.value})}
-                      placeholder="Enter municipality"
+                      onChange={(e) => handleMunicipalityChange(e.target.value)}
+                      placeholder="Enter municipality (district will auto-detect)"
                       className="w-full"
                     />
                   </div>
@@ -2220,8 +2249,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Input
                       id="edit-municipality"
                       value={formData.municipality}
-                      onChange={(e) => setFormData({...formData, municipality: e.target.value})}
-                      placeholder="Enter municipality"
+                      onChange={(e) => handleMunicipalityChange(e.target.value)}
+                      placeholder="Enter municipality (district will auto-detect)"
                       className="w-full"
                     />
                   </div>
