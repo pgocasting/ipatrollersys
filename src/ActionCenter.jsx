@@ -325,8 +325,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               } else if (item.when instanceof Date) {
                 whenValue = item.when;
               } else if (typeof item.when === 'string') {
+                // Check if it's a string that contains only digits (Excel serial number as string)
+                if (/^\d+(\.\d+)?$/.test(item.when.trim())) {
+                  const serialNumber = parseFloat(item.when);
+                  if (serialNumber > 1 && serialNumber < 100000) {
+                    // This looks like an Excel serial number stored as string
+                    whenValue = excelSerialToDate(serialNumber);
+                  } else {
+                    whenValue = new Date(item.when);
+                  }
+                }
                 // Check if it's a natural language date (contains "at about", "yesterday", etc.)
-                if (item.when.includes('at about') || item.when.includes('yesterday') || item.when.includes('today') || 
+                else if (item.when.includes('at about') || item.when.includes('yesterday') || item.when.includes('today') || 
                     item.when.includes('morning') || item.when.includes('evening') || item.when.includes('afternoon') ||
                     !item.when.match(/^\d{4}-\d{2}-\d{2}$/)) {
                   // Preserve original text for natural language dates
@@ -336,11 +346,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   whenValue = new Date(item.when);
                 }
               } else if (typeof item.when === 'number') {
-                whenValue = new Date(item.when);
+                // Check if it's an Excel serial number (typically between 1 and 100000 for recent dates)
+                if (item.when > 1 && item.when < 100000) {
+                  // This looks like an Excel serial number, convert it properly
+                  whenValue = excelSerialToDate(item.when);
+                } else {
+                  // Treat as milliseconds timestamp
+                  whenValue = new Date(item.when);
+                }
               }
             } else if (item.date) {
               if (item.date.toDate && typeof item.date.toDate === 'function') {
                 whenValue = item.date.toDate();
+              } else if (typeof item.date === 'number' && item.date > 1 && item.date < 100000) {
+                // Handle Excel serial numbers in date field
+                whenValue = excelSerialToDate(item.date);
+              } else if (typeof item.date === 'string' && /^\d+(\.\d+)?$/.test(item.date.trim())) {
+                // Handle Excel serial numbers stored as strings in date field
+                const serialNumber = parseFloat(item.date);
+                if (serialNumber > 1 && serialNumber < 100000) {
+                  whenValue = excelSerialToDate(serialNumber);
+                } else {
+                  whenValue = new Date(item.date);
+                }
               } else {
                 whenValue = new Date(item.date);
               }
@@ -685,6 +713,163 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     fileInputRef.current?.click();
   };
 
+  // Helper function to detect municipality from data and auto-set district
+  const detectMunicipalityAndDistrict = (locationText, municipalityText) => {
+    const municipalitiesByDistrict = {
+      '1ST DISTRICT': ['Abucay', 'Orani', 'Samal', 'Hermosa'],
+      '2ND DISTRICT': ['Balanga City', 'Pilar', 'Orion', 'Limay'],
+      '3RD DISTRICT': ['Bagac', 'Dinalupihan', 'Mariveles', 'Morong']
+    };
+
+    // First check explicit municipality field
+    if (municipalityText) {
+      for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+        const found = municipalities.find(m => 
+          m.toLowerCase().includes(municipalityText.toLowerCase()) ||
+          municipalityText.toLowerCase().includes(m.toLowerCase())
+        );
+        if (found) {
+          return { municipality: found, district };
+        }
+      }
+    }
+
+    // Then check location text for municipality names
+    if (locationText) {
+      for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+        const found = municipalities.find(m => 
+          locationText.toLowerCase().includes(m.toLowerCase())
+        );
+        if (found) {
+          return { municipality: found, district };
+        }
+      }
+    }
+
+    return { municipality: municipalityText || '', district: '' };
+  };
+
+  // Helper function to convert Excel serial number to JavaScript Date
+  const excelSerialToDate = (serial) => {
+    // Excel serial date starts from January 1, 1900 (but Excel incorrectly treats 1900 as a leap year)
+    // So we need to account for this
+    const excelEpoch = new Date(1899, 11, 30); // December 30, 1899
+    const days = Math.floor(serial);
+    const milliseconds = (serial - days) * 24 * 60 * 60 * 1000;
+    return new Date(excelEpoch.getTime() + days * 24 * 60 * 60 * 1000 + milliseconds);
+  };
+
+  // Helper function to format date values for Agriculture Department
+  const formatAgricultureDate = (dateValue) => {
+    if (!dateValue) {
+      return new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      }) + ' at about ' + new Date().toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit', 
+        hour12: true 
+      });
+    }
+
+    // If it's already a formatted string, return as is
+    if (typeof dateValue === 'string' && (dateValue.includes('at about') || dateValue.includes('at'))) {
+      return dateValue;
+    }
+
+    let parsedDate;
+
+    // Check if it's an Excel serial number (typically between 1 and 50000+ for recent dates)
+    if (typeof dateValue === 'number' || (typeof dateValue === 'string' && /^\d+(\.\d+)?$/.test(dateValue))) {
+      const serialNumber = typeof dateValue === 'string' ? parseFloat(dateValue) : dateValue;
+      if (serialNumber > 1 && serialNumber < 100000) {
+        // This looks like an Excel serial number
+        parsedDate = excelSerialToDate(serialNumber);
+      }
+    }
+
+    // If not an Excel serial number, try to parse as regular date
+    if (!parsedDate) {
+      try {
+        parsedDate = new Date(dateValue);
+        if (isNaN(parsedDate.getTime())) {
+          parsedDate = null;
+        }
+      } catch (e) {
+        parsedDate = null;
+      }
+    }
+
+    // If we successfully parsed a date, format it
+    if (parsedDate && !isNaN(parsedDate.getTime())) {
+      return parsedDate.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    }
+
+    // If all parsing failed, return the original value or current date
+    return dateValue || new Date().toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  // Helper function to get Agriculture Department specific field mapping
+  const getAgricultureFieldMapping = (headers, values) => {
+    const mapping = {
+      // Agriculture specific mappings
+      what: values[headers.indexOf('Complaint / Report')] || 
+            values[headers.indexOf('COMPLAINT / REPORT')] || 
+            values[headers.indexOf('Complaint/Report')] ||
+            values[headers.indexOf('COMPLAINT/REPORT')] ||
+            values[headers.indexOf('What')] || 
+            values[headers.indexOf('WHAT')] || '',
+      
+      where: values[headers.indexOf('Location')] || 
+             values[headers.indexOf('LOCATION')] ||
+             values[headers.indexOf('Where')] || 
+             values[headers.indexOf('WHERE')] || '',
+      
+      when: formatAgricultureDate(
+        values[headers.indexOf('Date Received')] || 
+        values[headers.indexOf('DATE RECEIVED')] ||
+        values[headers.indexOf('Date_Received')] ||
+        values[headers.indexOf('DATE_RECEIVED')] ||
+        values[headers.indexOf('When')] || 
+        values[headers.indexOf('WHEN')] || 
+        values[headers.indexOf('DATE')] ||
+        values[headers.indexOf('Date')] || null
+      ),
+      
+      actionTaken: values[headers.indexOf('Action Taken')] || 
+                   values[headers.indexOf('ACTION TAKEN')] ||
+                   values[headers.indexOf('Action_Taken')] ||
+                   values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+      
+      how: values[headers.indexOf('Observation / Findings')] || 
+           values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+           values[headers.indexOf('Observation/Findings')] ||
+           values[headers.indexOf('OBSERVATION/FINDINGS')] ||
+           values[headers.indexOf('Observation_Findings')] ||
+           values[headers.indexOf('OBSERVATION_FINDINGS')] ||
+           values[headers.indexOf('How')] || 
+           values[headers.indexOf('HOW')] || '',
+      
+      documents: values[headers.indexOf('Documents')] ||
+                 values[headers.indexOf('DOCUMENTS')] ||
+                 values[headers.indexOf('Document Links')] ||
+                 values[headers.indexOf('DOCUMENT LINKS')] ||
+                 values[headers.indexOf('Document_Links')] ||
+                 values[headers.indexOf('DOCUMENT_LINKS')] || ''
+    };
+
+    return mapping;
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -712,47 +897,104 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             if (lines[i].trim() === '') continue;
             const values = lines[i].split(',').map(value => value.trim());
 
-            const action = {
-              department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
-              municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
-              district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
-              what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
-              when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
-              where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
-              actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
-              who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
-              why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
-              how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
-              gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
-              source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
-              otherInformation: 
-                values[headers.indexOf('Other Information')] ||
-                values[headers.indexOf('OTHER_INFORMATION')] ||
-                values[headers.indexOf('Observation / Findings')] ||
-                values[headers.indexOf('OBSERVATION / FINDINGS')] ||
-                '',
-              photos: extractLinksFromCell(
-                values[headers.indexOf('Documents')] ||
-                values[headers.indexOf('DOCUMENTS')] ||
-                values[headers.indexOf('Document Links')] ||
-                values[headers.indexOf('DOCUMENT LINKS')] ||
-                ''
-              )
-            };
+            let action;
+            
+            if (selectedImportDepartment === 'agriculture') {
+              // Use Agriculture Department specific mapping
+              const agriMapping = getAgricultureFieldMapping(headers, values);
+              const locationInfo = detectMunicipalityAndDistrict(
+                agriMapping.where, 
+                values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || ''
+              );
+              
+              action = {
+                department: 'agriculture',
+                municipality: locationInfo.municipality,
+                district: locationInfo.district,
+                what: agriMapping.what,
+                when: agriMapping.when,
+                where: agriMapping.where,
+                actionTaken: agriMapping.actionTaken,
+                who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                how: agriMapping.how,
+                gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+                photos: extractLinksFromCell(agriMapping.documents)
+              };
+            } else {
+              // Use standard mapping for other departments
+              action = {
+                department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
+                municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
+                district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
+                what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
+                when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
+                where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
+                actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+                who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
+                gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                otherInformation: 
+                  values[headers.indexOf('Other Information')] ||
+                  values[headers.indexOf('OTHER_INFORMATION')] ||
+                  values[headers.indexOf('Observation / Findings')] ||
+                  values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+                  '',
+                photos: extractLinksFromCell(
+                  values[headers.indexOf('Documents')] ||
+                  values[headers.indexOf('DOCUMENTS')] ||
+                  values[headers.indexOf('Document Links')] ||
+                  values[headers.indexOf('DOCUMENT LINKS')] ||
+                  ''
+                )
+              };
+            }
 
             // Only add actions that have at least some basic data
-            if (action.what || action.where || action.who) {
-              importedActions.push(action);
+            // For agriculture department, prioritize complaint/report and location
+            if (selectedImportDepartment === 'agriculture') {
+              if (action.what || action.where) {
+                importedActions.push(action);
+              }
+            } else {
+              if (action.what || action.where || action.who) {
+                importedActions.push(action);
+              }
             }
           }
 
           if (importedActions.length > 0) {
-            // Save imported actions to Firestore
+            // Check for duplicates against existing data
+            const duplicateCheck = importedActions.filter(newAction => {
+              return !actionItems.some(existingAction => 
+                existingAction.what === newAction.what &&
+                existingAction.where === newAction.where &&
+                existingAction.municipality === newAction.municipality &&
+                existingAction.department === newAction.department
+              );
+            });
+
+            if (duplicateCheck.length === 0) {
+              alert('All data in the file already exists in the system. No new records were imported.');
+              return;
+            }
+
+            const duplicateCount = importedActions.length - duplicateCheck.length;
+            if (duplicateCount > 0) {
+              const proceed = confirm(`Found ${duplicateCount} duplicate record(s) that will be skipped. Continue importing ${duplicateCheck.length} new record(s)?`);
+              if (!proceed) return;
+            }
+
+            // Save non-duplicate actions to Firestore
             try {
               setLoading(true);
               const batch = writeBatch(db);
               const actionsRef = collection(db, 'actionReports');
-              importedActions.forEach(action => {
+              duplicateCheck.forEach(action => {
                 const docRef = doc(actionsRef);
                 batch.set(docRef, {
                   ...action,
@@ -762,7 +1004,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               });
               await batch.commit();
               await fetchAllActionData(); // Reload from Firestore
-              showSuccess(`Successfully imported ${importedActions.length} action reports!`);
+              
+              let successMessage = `Successfully imported ${duplicateCheck.length} action reports!`;
+              if (duplicateCount > 0) {
+                successMessage += ` (${duplicateCount} duplicates were skipped)`;
+              }
+              showSuccess(successMessage);
             } catch (error) {
               actionCenterLog('Error saving imported actions:', error, 'error');
               alert('Error saving imported actions to database. Please try again.');
@@ -800,48 +1047,105 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               if (!row || row.length === 0) continue;
               const values = row.map(value => value ? value.toString().trim() : '');
 
-              const action = {
-                department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
-                municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
-                district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
-                what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
-                when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
-                where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
-                actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
-                who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
-                why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
-                how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
-                gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
-                source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
-                otherInformation: 
-                  values[headers.indexOf('Other Information')] ||
-                  values[headers.indexOf('OTHER_INFORMATION')] ||
-                  values[headers.indexOf('Observation / Findings')] ||
-                  values[headers.indexOf('OBSERVATION / FINDINGS')] ||
-                  '',
-                photos: extractLinksFromCell(
-                  values[headers.indexOf('Documents')] ||
-                  values[headers.indexOf('DOCUMENTS')] ||
-                  values[headers.indexOf('Document Links')] ||
-                  values[headers.indexOf('DOCUMENT LINKS')] ||
-                  ''
-                )
-              };
+              let action;
+              
+              if (selectedImportDepartment === 'agriculture') {
+                // Use Agriculture Department specific mapping
+                const agriMapping = getAgricultureFieldMapping(headers, values);
+                const locationInfo = detectMunicipalityAndDistrict(
+                  agriMapping.where, 
+                  values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || ''
+                );
+                
+                action = {
+                  department: 'agriculture',
+                  municipality: locationInfo.municipality,
+                  district: locationInfo.district,
+                  what: agriMapping.what,
+                  when: agriMapping.when,
+                  where: agriMapping.where,
+                  actionTaken: agriMapping.actionTaken,
+                  who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                  why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                  how: agriMapping.how,
+                  gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                  source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                  otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+                  photos: extractLinksFromCell(agriMapping.documents)
+                };
+              } else {
+                // Use standard mapping for other departments
+                action = {
+                  department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
+                  municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
+                  district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
+                  what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
+                  when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
+                  where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
+                  actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+                  who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                  why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                  how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
+                  gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                  source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                  otherInformation: 
+                    values[headers.indexOf('Other Information')] ||
+                    values[headers.indexOf('OTHER_INFORMATION')] ||
+                    values[headers.indexOf('Observation / Findings')] ||
+                    values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+                    '',
+                  photos: extractLinksFromCell(
+                    values[headers.indexOf('Documents')] ||
+                    values[headers.indexOf('DOCUMENTS')] ||
+                    values[headers.indexOf('Document Links')] ||
+                    values[headers.indexOf('DOCUMENT LINKS')] ||
+                    ''
+                  )
+                };
+              }
 
               // Only add actions that have at least some basic data
-              if (action.what || action.where || action.who) {
-                importedActions.push(action);
+              // For agriculture department, prioritize complaint/report and location
+              if (selectedImportDepartment === 'agriculture') {
+                if (action.what || action.where) {
+                  importedActions.push(action);
+                }
+              } else {
+                if (action.what || action.where || action.who) {
+                  importedActions.push(action);
+                }
               }
             }
           });
 
           if (importedActions.length > 0) {
-            // Save imported actions to Firestore
+            // Check for duplicates against existing data
+            const duplicateCheck = importedActions.filter(newAction => {
+              return !actionItems.some(existingAction => 
+                existingAction.what === newAction.what &&
+                existingAction.where === newAction.where &&
+                existingAction.municipality === newAction.municipality &&
+                existingAction.department === newAction.department
+              );
+            });
+
+            if (duplicateCheck.length === 0) {
+              alert('All data in the file already exists in the system. No new records were imported.');
+              return;
+            }
+
+            const duplicateCount = importedActions.length - duplicateCheck.length;
+            if (duplicateCount > 0) {
+              const proceed = confirm(`Found ${duplicateCount} duplicate record(s) that will be skipped. Continue importing ${duplicateCheck.length} new record(s)?`);
+              if (!proceed) return;
+            }
+
+            // Save non-duplicate actions to Firestore
             try {
               setLoading(true);
               const batch = writeBatch(db);
               const actionsRef = collection(db, 'actionReports');
-              importedActions.forEach(action => {
+              duplicateCheck.forEach(action => {
                 const docRef = doc(actionsRef);
                 batch.set(docRef, {
                   ...action,
@@ -851,7 +1155,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               });
               await batch.commit();
               await fetchAllActionData(); // Reload from Firestore
-              showSuccess(`Successfully imported ${importedActions.length} action reports!`);
+              
+              let successMessage = `Successfully imported ${duplicateCheck.length} action reports!`;
+              if (duplicateCount > 0) {
+                successMessage += ` (${duplicateCount} duplicates were skipped)`;
+              }
+              showSuccess(successMessage);
             } catch (error) {
               actionCenterLog('Error saving imported actions:', error, 'error');
               alert('Error saving imported actions to database. Please try again.');
@@ -1260,7 +1569,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     if (date instanceof Date) {
       return date.toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'short',
+        month: 'long',
         day: 'numeric'
       });
     }
@@ -1269,7 +1578,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     if (date.toDate && typeof date.toDate === 'function') {
       return date.toDate().toLocaleDateString('en-US', {
         year: 'numeric',
-        month: 'short',
+        month: 'long',
         day: 'numeric'
       });
     }
@@ -1280,7 +1589,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       if (!isNaN(dateObj.getTime())) {
         return dateObj.toLocaleDateString('en-US', {
           year: 'numeric',
-          month: 'short',
+          month: 'long',
           day: 'numeric'
         });
       }
@@ -2626,7 +2935,52 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Fish className="w-4 h-4" />
                     Agriculture Department Information
                   </h4>
-                  <p className="text-sm text-green-700">Agriculture and fisheries related action report</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {selectedAction.who && (
+                      <div className="p-3 bg-white rounded-lg border border-green-100">
+                        <Label className="text-sm font-medium text-gray-600">Who (Person/s Involved)</Label>
+                        <p className="text-sm text-gray-900 mt-2">
+                          {selectedAction.who}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {selectedAction.why && (
+                      <div className="p-3 bg-white rounded-lg border border-green-100">
+                        <Label className="text-sm font-medium text-gray-600">Why (Reason/Motive)</Label>
+                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                          {selectedAction.why}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {selectedAction.how && (
+                      <div className="p-3 bg-white rounded-lg border border-green-100 md:col-span-2">
+                        <Label className="text-sm font-medium text-gray-600">How (Observation/Findings)</Label>
+                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                          {selectedAction.how}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {selectedAction.gender && (
+                      <div className="p-3 bg-white rounded-lg border border-green-100">
+                        <Label className="text-sm font-medium text-gray-600">Gender</Label>
+                        <p className="text-sm text-gray-900 mt-2">
+                          {selectedAction.gender}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {selectedAction.source && (
+                      <div className="p-3 bg-white rounded-lg border border-green-100">
+                        <Label className="text-sm font-medium text-gray-600">Source</Label>
+                        <p className="text-sm text-gray-900 mt-2">
+                          {selectedAction.source}
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
 
@@ -2676,10 +3030,37 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   
                   {selectedAction.photos && selectedAction.photos.length > 0 && (
                     <div className="p-3 bg-white rounded-lg border border-gray-100">
-                      <Label className="text-sm font-medium text-gray-600">Photos/Evidence</Label>
-                      <p className="text-sm text-gray-500 mt-2">
-                        {selectedAction.photos.length} file(s) attached
-                      </p>
+                      <Label className="text-sm font-medium text-gray-600">Documents/Evidence</Label>
+                      <div className="mt-3 space-y-2">
+                        <p className="text-sm text-gray-500">
+                          {selectedAction.photos.length} document(s) attached:
+                        </p>
+                        <div className="space-y-2">
+                          {selectedAction.photos.map((link, index) => (
+                            <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded border">
+                              <div className="p-1 bg-blue-100 rounded">
+                                <Database className="w-3 h-3 text-blue-600" />
+                              </div>
+                              <a 
+                                href={link} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:text-blue-800 hover:underline flex-1 truncate"
+                                title={link}
+                              >
+                                {link.length > 50 ? `${link.substring(0, 50)}...` : link}
+                              </a>
+                              <button
+                                onClick={() => window.open(link, '_blank')}
+                                className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                                title="Open link"
+                              >
+                                <Eye className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
