@@ -477,6 +477,60 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     });
   };
 
+  // Enhanced month detection function (reusable)
+  const detectMonthFromText = (whenText) => {
+    if (!whenText || typeof whenText !== 'string') return -1;
+    
+    const monthNames = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+    const monthAbbreviations = [
+      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+      'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+    ];
+    
+    const whenLower = whenText.toLowerCase();
+    
+    // Check for full month names
+    for (let i = 0; i < monthNames.length; i++) {
+      if (whenLower.includes(monthNames[i])) {
+        return i;
+      }
+    }
+    
+    // Check for month abbreviations
+    for (let i = 0; i < monthAbbreviations.length; i++) {
+      if (whenLower.includes(monthAbbreviations[i])) {
+        return i;
+      }
+    }
+    
+    // For relative dates, determine the actual month
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    
+    if (whenLower.includes('today') || whenLower.includes('ngayon') ||
+        whenLower.includes('this morning') || whenLower.includes('this afternoon') || 
+        whenLower.includes('this evening') || whenLower.includes('kanina')) {
+      return currentMonth;
+    }
+    
+    if (whenLower.includes('yesterday') || whenLower.includes('kahapon')) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      return yesterday.getMonth();
+    }
+    
+    if (whenLower.includes('last week') || whenLower.includes('nakaraang linggo')) {
+      const lastWeek = new Date(now);
+      lastWeek.setDate(lastWeek.getDate() - 7);
+      return lastWeek.getMonth();
+    }
+    
+    return -1; // Could not determine month
+  };
+
   // Filter and sort data
   const filteredItems = actionItems.filter(item => {
     const matchesSearch = searchTerm === "" || 
@@ -503,17 +557,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       if (item.when instanceof Date) {
         return item.when.getMonth() === selectedMonth;
       } else if (typeof item.when === 'string') {
-        // For text dates, try to extract month or use current month as fallback
-        const currentDate = new Date();
+        // For text dates, try to extract month
         try {
           const parsedDate = new Date(item.when);
           if (!isNaN(parsedDate.getTime())) {
             return parsedDate.getMonth() === selectedMonth;
           }
         } catch (e) {
-          // If parsing fails, include in current month filter
+          // If parsing fails, use enhanced month detection
         }
-        return currentDate.getMonth() === selectedMonth;
+        
+        // Use the enhanced month detection function
+        const detectedMonth = detectMonthFromText(item.when);
+        return detectedMonth === selectedMonth;
       }
       return false;
     })();
@@ -556,6 +612,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     item.department && item.department.toLowerCase() === 'pg-enro'
   ).length;
 
+
   // Monthly counts for each department
   const getMonthlyCount = (department, month) => {
     return actionItems.filter(item => {
@@ -569,12 +626,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             if (!isNaN(parsedDate.getTime())) {
               itemMonth = parsedDate.getMonth();
             } else {
-              // For unparseable natural language dates, use current month
-              itemMonth = new Date().getMonth();
+              // Use enhanced month detection for natural language dates
+              itemMonth = detectMonthFromText(item.when);
             }
           } catch (e) {
-            // If parsing fails, use current month
-            itemMonth = new Date().getMonth();
+            // Use enhanced month detection for unparseable dates
+            itemMonth = detectMonthFromText(item.when);
           }
         }
       }
@@ -1192,11 +1249,46 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!date) return 'No Date';
+    
+    // If it's already a string (like "June 10, 2025 at about 6:05 PM"), return as is
+    if (typeof date === 'string') {
+      return date;
+    }
+    
+    // If it's a Date object, format it
+    if (date instanceof Date) {
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
+    // If it's a Firestore timestamp, convert to Date first
+    if (date.toDate && typeof date.toDate === 'function') {
+      return date.toDate().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    }
+    
+    // Try to convert to Date if it's a number or other format
+    try {
+      const dateObj = new Date(date);
+      if (!isNaN(dateObj.getTime())) {
+        return dateObj.toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
+    } catch (e) {
+      // If conversion fails, return the original value as string
+    }
+    
+    return String(date);
   };
 
   // Clear duplicates function
