@@ -1287,7 +1287,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  // Incidents Report (matching Incidents Reports data structure)
+  // Incidents Report (matching Incidents Reports data structure) - Compact Single Page
   const generateIncidentsReport = () => {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
@@ -1297,44 +1297,47 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const pageHeight = doc.internal.pageSize.getHeight();
     const centerX = pageWidth / 2;
     
-    // Add logo/header section
+    // Add compact header section
     doc.setFillColor(239, 68, 68); // Red background
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    doc.rect(0, 0, pageWidth, 30, 'F'); // Reduced height
     
-    // Main title - centered
-    doc.setFontSize(24);
+    // Main title - centered and smaller
+    doc.setFontSize(18); // Reduced from 24
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
-    doc.text('Incidents Report', centerX, 25, { align: 'center' });
+    doc.text('Incidents Report', centerX, 20, { align: 'center' });
     
     // Reset text color
     doc.setTextColor(0, 0, 0);
     
-    // Report info section with better spacing
-    doc.setFontSize(14);
+    // Compact report info section
+    doc.setFontSize(12); // Reduced from 14
     doc.setFont('helvetica', 'bold');
-    doc.text('Report Information', centerX, 60, { align: 'center' });
+    doc.text('Report Information', centerX, 45, { align: 'center' });
     
-    // Info box - improved layout
-    const infoY = 70;
-    const infoBoxHeight = 35;
+    // Compact info box
+    const infoY = 50;
+    const infoBoxHeight = 25; // Reduced from 35
     doc.setFillColor(248, 250, 252);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'F');
+    doc.rect(paperConfig.margin, infoY - 3, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'S');
+    doc.rect(paperConfig.margin, infoY - 3, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'S');
     
-    // Report details - better organized
-    doc.setFontSize(10);
+    // Compact report details in two columns
+    doc.setFontSize(9); // Reduced from 10
     doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    const leftCol = paperConfig.margin + 5;
+    const rightCol = centerX + 10;
     
-    // Paper size indicator - right aligned
-    doc.setFontSize(8);
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, leftCol, infoY + 5);
+    doc.text(`Month: ${months[selectedMonth]}`, leftCol, infoY + 12);
+    doc.text(`Year: ${selectedYear}`, rightCol, infoY + 5);
+    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, rightCol, infoY + 12);
+    
+    // Paper size indicator
+    doc.setFontSize(7);
     doc.setFont('helvetica', 'italic');
-    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
+    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 5, infoY + 19, { align: 'right' });
     
     // Filter incidents by date and district
     let filteredIncidents = incidents || [];
@@ -1360,34 +1363,35 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       if (incident.status === 'Resolved') incidentTypeStats[type].resolved++;
     });
     
-    // Incident Statistics section - better positioning
-    const statsStartY = infoY + infoBoxHeight + 20;
-    doc.setFontSize(16);
+    // Compact statistics section
+    const statsStartY = infoY + infoBoxHeight + 10; // Reduced spacing
+    doc.setFontSize(12); // Reduced from 16
     doc.setFont('helvetica', 'bold');
     doc.text('Incident Statistics', centerX, statsStartY, { align: 'center' });
     
-    // Statistics box - improved design
-    const statsY = statsStartY + 10;
+    // Compact statistics box
+    const statsY = statsStartY + 8;
     const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 35;
+    const boxHeight = 20; // Reduced from 35
     
     doc.setFillColor(254, 242, 242);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
+    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
+    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'S');
     
-    // Statistics in organized layout
-    doc.setFontSize(11);
+    // Statistics in horizontal layout
+    doc.setFontSize(9); // Reduced from 11
     doc.setFont('helvetica', 'normal');
     
-    const textStartX = paperConfig.margin + 15;
-    const lineHeight = 10;
+    const stat1X = paperConfig.margin + 10;
+    const stat2X = centerX - 30;
+    const stat3X = centerX + 30;
     
-    doc.text(`Total Incidents: ${filteredIncidents.length}`, textStartX, statsY + 5);
-    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, textStartX, statsY + 5 + lineHeight);
-    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, textStartX, statsY + 5 + (lineHeight * 2));
+    doc.text(`Total Incidents: ${filteredIncidents.length}`, stat1X, statsY + 8);
+    doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, stat2X, statsY + 8);
+    doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, stat3X, statsY + 8);
     
-    // Incident type breakdown table - better positioning
+    // Compact incident type breakdown table
     if (Object.keys(incidentTypeStats).length > 0) {
       const tableData = Object.entries(incidentTypeStats)
         .sort(([,a], [,b]) => b.count - a.count)
@@ -1399,21 +1403,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
         ]);
       
-      // Calculate proper table positioning with adequate spacing
-      const tableStartY = statsY + boxHeight + 15; // More space after statistics box
+      // Compact table positioning
+      const tableStartY = statsY + boxHeight + 8; // Reduced spacing
       
-      // Table title
-      doc.setFontSize(14);
+      // Compact table title
+      doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Incident Type Breakdown', centerX, tableStartY, { align: 'center' });
       
       autoTable(doc, {
         head: [['Incident Type', 'Total', 'Active', 'Resolved', 'Resolution Rate']],
         body: tableData,
-        startY: tableStartY + 10,
+        startY: tableStartY + 6,
         styles: { 
-          fontSize: paperSize === 'long' ? 10 : 9, 
-          cellPadding: 4,
+          fontSize: 8, // Reduced font size
+          cellPadding: 2, // Reduced padding
           overflow: 'linebreak',
           halign: 'left',
           valign: 'middle'
@@ -1422,28 +1426,27 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           fillColor: [239, 68, 68], 
           fontStyle: 'bold',
           textColor: [255, 255, 255],
-          fontSize: paperSize === 'long' ? 11 : 10,
+          fontSize: 9, // Reduced header font
           halign: 'center',
           valign: 'middle'
         },
-        columnStyles: getColumnWidths(paperSize, 'incidents'),
+        columnStyles: {
+          0: { cellWidth: 'auto' },
+          1: { cellWidth: 20, halign: 'center' },
+          2: { cellWidth: 20, halign: 'center' },
+          3: { cellWidth: 20, halign: 'center' },
+          4: { cellWidth: 25, halign: 'center' }
+        },
         margin: { left: paperConfig.margin, right: paperConfig.margin },
         tableWidth: 'auto',
-        showHead: 'everyPage',
-        pageBreak: 'auto',
-        theme: 'grid',
-        didDrawPage: function (data) {
-          // Add page numbers
-          const pageCount = doc.internal.getNumberOfPages();
-          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-          doc.setFontSize(8);
-          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, pageHeight - 10);
-        }
+        showHead: 'firstPage',
+        pageBreak: 'avoid', // Prevent page breaks
+        theme: 'grid'
       });
     } else {
-      // No data message - positioned after statistics box
-      const noDataY = statsY + boxHeight + 25;
-      doc.setFontSize(12);
+      // Compact no data message
+      const noDataY = statsY + boxHeight + 15;
+      doc.setFontSize(10);
       doc.setFont('helvetica', 'italic');
       doc.text('No incidents available for the selected period.', paperConfig.margin, noDataY);
     }
@@ -2098,75 +2101,89 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     };
 
     const totalIncidents = filteredData.length;
+    
+    // Completed incidents calculation
     const completedIncidents = filteredData.filter(incident => 
       incident.status === 'Completed' || 
       incident.status === 'completed' || 
-      incident.status === 'COMPLETED'
+      incident.status === 'COMPLETED' ||
+      incident.status === 'Resolved' ||
+      incident.status === 'resolved' ||
+      incident.status === 'RESOLVED'
     ).length;
-    const actionTakenIncidents = filteredData.filter(incident => 
-      incident.actionType && incident.actionType.trim() !== ""
-    ).length;
+    
+    // Under investigation calculation
     const underInvestigation = filteredData.filter(incident => 
       incident.status === 'Under Investigation' || 
       incident.status === 'under investigation' || 
       incident.status === 'UNDER INVESTIGATION' ||
       incident.status === 'Under investigation'
     ).length;
+    
+    // Improved action taken calculation - check multiple fields
+    const actionTakenIncidents = filteredData.filter(incident => {
+      const hasActionType = incident.actionType && incident.actionType.trim() !== "";
+      const hasActionTaken = incident.actionTaken && incident.actionTaken.trim() !== "";
+      const hasStatus = incident.status && 
+        (incident.status.toLowerCase().includes('resolved') || 
+         incident.status.toLowerCase().includes('completed') ||
+         incident.status.toLowerCase().includes('arrested') ||
+         incident.status.toLowerCase().includes('filed'));
+      return hasActionType || hasActionTaken || hasStatus;
+    }).length;
+    
+    // Drug-related incidents - improved detection
     const drugsIncidents = filteredData.filter(incident => 
-      incident.incidentType === 'Drug-related'
+      incident.incidentType === 'Drug-related' ||
+      incident.incidentType === 'Drugs' ||
+      incident.description?.toLowerCase().includes('drug') ||
+      incident.description?.toLowerCase().includes('shabu') ||
+      incident.description?.toLowerCase().includes('marijuana') ||
+      incident.description?.toLowerCase().includes('illegal substance')
     ).length;
-    const othersIncidents = filteredData.filter(incident => 
-      incident.incidentType !== 'Drug-related' && 
-      incident.incidentType !== 'Theft' && 
-      incident.incidentType !== 'Assault' && 
-      incident.incidentType !== 'Traffic Violation' && 
-      incident.incidentType !== 'Vandalism' && 
-      incident.incidentType !== 'Fraud' && 
-      incident.incidentType !== 'Domestic Violence' && 
-      incident.incidentType !== 'Public Disturbance' && 
-      incident.incidentType !== 'Property Damage' && 
-      incident.incidentType !== 'Missing Person' && 
-      incident.incidentType !== 'Suspicious Activity' && 
-      incident.incidentType !== 'Environmental Violation' && 
-      incident.incidentType !== 'Animal Control' && 
-      incident.incidentType !== 'Fire Safety' && 
-      incident.incidentType !== 'Emergency Response' && 
-      incident.incidentType !== 'Other'
-    ).length;
-    const accidentsIncidents = filteredData.filter(incident => 
-      incident.incidentType === 'Traffic Accident' || 
-      incident.incidentType === 'Work Accident' || 
-      incident.incidentType === 'Accident' ||
-      incident.description?.toLowerCase().includes('accident') ||
-      incident.description?.toLowerCase().includes('crash') ||
-      incident.description?.toLowerCase().includes('collision')
-    ).length;
+    
+    // Accidents - improved categorization
     const trafficAccidents = filteredData.filter(incident => 
       incident.incidentType === 'Traffic Accident' || 
       incident.incidentType === 'Traffic Violation' ||
-      incident.description?.toLowerCase().includes('traffic') && (
+      incident.incidentType === 'Vehicle Accident' ||
+      (incident.description?.toLowerCase().includes('traffic') && (
         incident.description?.toLowerCase().includes('accident') ||
         incident.description?.toLowerCase().includes('crash') ||
         incident.description?.toLowerCase().includes('collision')
-      )
+      )) ||
+      incident.description?.toLowerCase().includes('vehicular')
     ).length;
+    
     const workAccidents = filteredData.filter(incident => 
       incident.incidentType === 'Work Accident' ||
-      incident.description?.toLowerCase().includes('work') && (
+      (incident.description?.toLowerCase().includes('work') && (
         incident.description?.toLowerCase().includes('accident') ||
         incident.description?.toLowerCase().includes('injury') ||
         incident.description?.toLowerCase().includes('fall')
-      )
+      ))
     ).length;
+    
     const otherAccidents = filteredData.filter(incident => 
       (incident.incidentType === 'Accident' || 
        incident.description?.toLowerCase().includes('accident')) &&
       !(incident.incidentType === 'Traffic Accident' || 
+        incident.incidentType === 'Vehicle Accident' ||
         incident.incidentType === 'Work Accident' ||
         incident.description?.toLowerCase().includes('traffic') ||
-        incident.description?.toLowerCase().includes('work'))
+        incident.description?.toLowerCase().includes('vehicular') ||
+        (incident.description?.toLowerCase().includes('work') && (
+          incident.description?.toLowerCase().includes('accident') ||
+          incident.description?.toLowerCase().includes('injury') ||
+          incident.description?.toLowerCase().includes('fall')
+        )))
     ).length;
-
+    
+    const accidentsIncidents = trafficAccidents + workAccidents + otherAccidents;
+    
+    // Others - everything that's not drugs or accidents
+    const othersIncidents = totalIncidents - drugsIncidents - accidentsIncidents;
+    
     // Incident type analysis
     const incidentTypeCounts = {};
     filteredData.forEach(incident => {
@@ -2837,15 +2854,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               action: generateCommandCenterReport,
               format: "PDF",
               priority: "high"
-            },
-            {
-              name: "View Summary",
-              action: () => setShowCommandCenterSummary(true),
-              format: "Modal",
-              priority: "high"
             }
           ],
-          formats: ["PDF", "Modal"],
+          formats: ["PDF"],
           priority: "high"
         }
       ]
@@ -2868,7 +2879,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               priority: "high"
             },
             {
-              name: "Summary Insights",
+              name: "Summary",
               action: () => setShowActionCenterSummary(true),
               format: "Modal",
               priority: "high"
@@ -2897,19 +2908,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               priority: "high"
             },
             {
-              name: "Summary Insights",
-              action: () => setShowSummaryModal(true),
-              format: "Modal",
-              priority: "high"
-            },
-            {
-              name: "Export to PDF",
+              name: "Generate PDF",
               action: exportSummaryToPDF,
               format: "PDF",
               priority: "high"
             }
           ],
-          formats: ["PDF", "Modal"],
+          formats: ["PDF"],
           priority: "high"
         }
       ]
@@ -3120,9 +3125,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                         <Calendar className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "Preview Report" ? (
                                         <Eye className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Summary Insights" ? (
+                                      ) : actionItem.name === "Summary" ? (
                                         <Activity className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Export to PDF" ? (
+                                      ) : actionItem.name === "Generate PDF" ? (
                                         <Download className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "View Summary" ? (
                                         <BarChart3 className="w-3 h-3 mr-1" />
@@ -3173,7 +3178,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
         </div>
 
-        {/* Summary Insights Modal */}
+        {/* Summary Modal */}
         {showSummaryModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
@@ -3184,7 +3189,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                   </div>
                   <div>
                     <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
-                      Summary Insights
+                      Summary
                     </h3>
                     <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
                   </div>
@@ -3211,7 +3216,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   <button
                     onClick={exportSummaryToPDF}
                     className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
-                    title="Export to PDF"
+                    title="Generate PDF"
                   >
                     <Download className="w-5 h-5" />
                   </button>
@@ -3252,74 +3257,115 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
 
                   const insights = generateSummaryInsights(filteredIncidents);
                   return (
-                    <div className="space-y-8">
-                      {/* Overview Section */}
-                      <div className="p-6 rounded-xl border-2 bg-blue-50 border-blue-200">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="p-2 rounded-lg bg-blue-100">
-                            <AlertTriangle className="w-6 h-6 text-blue-600" />
+                    <div className="space-y-6">
+                      {/* Summary Statistics Header */}
+                      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-2xl font-bold">Incidents Summary Report</h3>
+                            <p className="text-blue-100 mt-1">
+                              {selectedMonth !== "all" ? `${months[selectedMonth]} ${selectedYear}` : `Full Year ${selectedYear}`} Analysis
+                            </p>
                           </div>
-                          <h3 className="text-xl font-bold text-gray-900">📊 Data Overview {selectedMonth !== "all" && `(${months[selectedMonth]})`}</h3>
+                          <div className="text-right">
+                            <div className="text-3xl font-bold">{insights.totalIncidents}</div>
+                            <div className="text-blue-100 text-sm">Total Incidents</div>
+                          </div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
-                          <div className="p-4 rounded-lg bg-blue-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-full bg-blue-200">
-                                <FileText className="w-4 h-4 text-blue-600" />
-                              </div>
-                              <p className="text-sm font-medium text-blue-600">Total Incidents</p>
+                      </div>
+
+                      {/* Main Overview Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white rounded-lg border border-red-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                              <Shield className="w-5 h-5 text-red-600" />
                             </div>
-                            <p className="text-2xl font-bold text-blue-600">{insights.totalIncidents}</p>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.drugsIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
+                            </div>
                           </div>
-                          <div className="p-4 rounded-lg bg-red-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-full bg-red-200">
-                                <Shield className="w-4 h-4 text-red-600" />
-                              </div>
-                              <p className="text-sm font-medium text-red-600">Drugs</p>
+                          <div className="text-sm font-medium text-gray-900">Drug-Related</div>
+                          <div className="text-xs text-gray-600">Illegal drugs, substances</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-orange-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                              <Car className="w-5 h-5 text-orange-600" />
                             </div>
-                            <p className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</p>
-                            <p className="text-xs text-gray-600">Drug-related incidents</p>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.accidentsIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
+                            </div>
                           </div>
-                          <div className="p-4 rounded-lg bg-gray-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-full bg-gray-200">
-                                <MoreHorizontal className="w-4 h-4 text-gray-600" />
-                              </div>
-                              <p className="text-sm font-medium text-gray-600">Others</p>
+                          <div className="text-sm font-medium text-gray-900">Accidents</div>
+                          <div className="text-xs text-gray-600">Traffic: {insights.trafficAccidents} | Work: {insights.workAccidents} | Other: {insights.otherAccidents}</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-green-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                              <CheckCircle className="w-5 h-5 text-green-600" />
                             </div>
-                            <p className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</p>
-                            <p className="text-xs text-gray-600">Other incident types</p>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-green-600">{insights.actionTakenIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.actionTakenIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
+                            </div>
                           </div>
-                          <div className="p-4 rounded-lg bg-orange-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-full bg-orange-200">
-                                <Car className="w-4 h-4 text-orange-600" />
-                              </div>
-                              <p className="text-sm font-medium text-orange-600">Accidents</p>
+                          <div className="text-sm font-medium text-gray-900">Action Taken</div>
+                          <div className="text-xs text-gray-600">Resolved, arrested, filed</div>
+                        </div>
+
+                        <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                              <MoreHorizontal className="w-5 h-5 text-gray-600" />
                             </div>
-                            <p className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</p>
-                            <div className="mt-2 space-y-1">
-                              <div className="flex justify-between text-xs">
-                                <span className="text-gray-600">Traffic:</span>
-                                <span className="font-medium text-orange-600">{insights.trafficAccidents}</span>
-                              </div>
-                              <div className="flex justify-between text-xs">
-                                <span className="text-gray-600">Other:</span>
-                                <span className="font-medium text-orange-600">{insights.otherAccidents}</span>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.othersIncidents / insights.totalIncidents) * 100) : 0}%
                               </div>
                             </div>
-                            <p className="text-xs mt-2 text-gray-600">Accident breakdown</p>
                           </div>
-                          <div className="p-4 rounded-lg bg-yellow-100">
-                            <div className="flex items-center gap-3 mb-2">
-                              <div className="p-2 rounded-full bg-yellow-200">
-                                <CheckCircle className="w-4 h-4 text-yellow-600" />
-                              </div>
-                              <p className="text-sm font-medium text-yellow-600">Action Taken</p>
+                          <div className="text-sm font-medium text-gray-900">Other Types</div>
+                          <div className="text-xs text-gray-600">Theft, assault, etc.</div>
+                        </div>
+                      </div>
+
+                      {/* Status Overview */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <Activity className="w-5 h-5 text-blue-600" />
+                          Status Overview
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="text-center p-4 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">{insights.completedIncidents}</div>
+                            <div className="text-sm text-gray-600">Completed/Resolved</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {insights.totalIncidents > 0 ? Math.round((insights.completedIncidents / insights.totalIncidents) * 100) : 0}% completion rate
                             </div>
-                            <p className="text-2xl font-bold text-yellow-600">{insights.actionTakenIncidents}</p>
-                            <p className="text-xs text-gray-600">Actions completed</p>
+                          </div>
+                          <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                            <div className="text-2xl font-bold text-yellow-600">{insights.underInvestigation}</div>
+                            <div className="text-sm text-gray-600">Under Investigation</div>
+                            <div className="text-xs text-gray-500 mt-1">Ongoing cases</div>
+                          </div>
+                          <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <div className="text-2xl font-bold text-gray-600">
+                              {insights.totalIncidents - insights.completedIncidents - insights.underInvestigation}
+                            </div>
+                            <div className="text-sm text-gray-600">Other Status</div>
+                            <div className="text-xs text-gray-500 mt-1">Pending, new, etc.</div>
                           </div>
                         </div>
                       </div>
@@ -3828,7 +3874,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
           </div>
         )}
 
-        {/* Action Center Summary Insights Modal */}
+        {/* Action Center Summary Modal */}
         {showActionCenterSummary && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
@@ -3839,7 +3885,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     <Activity className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Action Center Summary Insights</h3>
+                    <h3 className="text-lg font-semibold text-gray-900">Action Center Summary</h3>
                     <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
                   </div>
                 </div>
