@@ -820,6 +820,146 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       }
       
+      // Municipality Performance Table - matching preview format
+      if (ipatrollerPatrolData.length > 0) {
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Municipality Performance', 20, finalY);
+        
+        const municipalityTableData = ipatrollerPatrolData.map(item => [
+          item.municipality,
+          item.district,
+          (barangayCounts[item.municipality] || 0).toString(),
+          (item.totalPatrols || 0).toLocaleString(),
+          (item.activeDays || 0).toString(),
+          (item.inactiveDays || 0).toString(),
+          `${item.activePercentage || 0}%`
+        ]);
+        
+        autoTable(doc, {
+          head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
+          body: municipalityTableData,
+          startY: finalY + 7,
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            overflow: 'linebreak',
+            halign: 'left',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: [34, 197, 94], // Green background like preview
+            fontStyle: 'bold',
+            textColor: [255, 255, 255],
+            fontSize: 9,
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          alternateRowStyles: {
+            fillColor: [248, 250, 252] // Light gray alternating rows like preview
+          },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'left' },
+            2: { cellWidth: 'auto', halign: 'center' },
+            3: { cellWidth: 'auto', halign: 'center' },
+            4: { cellWidth: 'auto', halign: 'center' },
+            5: { cellWidth: 'auto', halign: 'center' },
+            6: { cellWidth: 'auto', halign: 'center' }
+          },
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          showHead: 'everyPage',
+          pageBreak: 'auto',
+          didDrawPage: function (data) {
+            // Add page numbers
+            const pageCount = doc.internal.getNumberOfPages();
+            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+            doc.setFontSize(8);
+            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
+          }
+        });
+        
+        // Overall Summary Statistics - auto-fit table layout
+        const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        
+        // Separator
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(20, summaryY, pageWidth - 20, summaryY);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Overall Summary Statistics', 20, summaryY + 10);
+        
+        // Two-column key/value table that auto-fits to page width
+        const summaryRows = [
+          ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
+          ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
+          ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
+        ];
+        
+        autoTable(doc, {
+          head: [['Metric', 'Value', 'Metric', 'Value']],
+          body: summaryRows,
+          startY: summaryY + 16,
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'left' },
+            3: { cellWidth: 'auto', halign: 'center' }
+          }
+        });
+        
+      } else {
+        // No data message
+        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'italic');
+        doc.text('No patrol data available for the selected period.', 20, finalY);
+        
+        // Overall Summary Statistics - even when no data, show as auto-fit table
+        const summaryY = finalY + 10;
+        
+        // Separator
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(20, summaryY, pageWidth - 20, summaryY);
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Overall Summary Statistics', 20, summaryY + 10);
+        
+        const summaryRowsNoData = [
+          ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
+          ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
+          ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
+        ];
+        
+        autoTable(doc, {
+          head: [['Metric', 'Value', 'Metric', 'Value']],
+          body: summaryRowsNoData,
+          startY: summaryY + 16,
+          margin: { left: 20, right: 20 },
+          tableWidth: 'auto',
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          columnStyles: {
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 'auto', halign: 'center' },
+            2: { cellWidth: 'auto', halign: 'left' },
+            3: { cellWidth: 'auto', halign: 'center' }
+          }
+        });
+      }
+      
       // Save the PDF
       doc.save(`ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
       
