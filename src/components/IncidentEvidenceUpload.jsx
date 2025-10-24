@@ -150,6 +150,8 @@ const IncidentEvidenceUpload = ({
     <div className={`incident-evidence-upload ${className}`}>
       {/* Hidden file input */}
       <input
+        id="incident-evidence-upload"
+        name="incident-evidence-upload"
         ref={fileInputRef}
         type="file"
         multiple
@@ -160,9 +162,9 @@ const IncidentEvidenceUpload = ({
       
       {/* File type selection */}
       <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
+        <div className="block text-sm font-medium text-gray-700 mb-2">
           File Types to Accept:
-        </label>
+        </div>
         <div className="flex flex-wrap gap-2">
           {[
             { type: 'image', label: 'Images', icon: '📷' },

@@ -4050,6 +4050,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   <div className="relative">
                     <select
                       id="date-select"
+                      name="date-select"
                       value={ipatrollerSelectedDayIndex}
                       onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
                       className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 

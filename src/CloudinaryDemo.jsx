@@ -211,25 +211,25 @@ export default function CloudinaryDemo() {
               <CardContent className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Cloud Name</label>
+                    <div className="text-sm font-medium text-gray-700">Cloud Name</div>
                     <div className="p-3 bg-gray-50 rounded-md font-mono text-sm">
                       duooicxyl
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">API Key</label>
+                    <div className="text-sm font-medium text-gray-700">API Key</div>
                     <div className="p-3 bg-gray-50 rounded-md font-mono text-sm">
                       193961254783825
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Upload Preset</label>
+                    <div className="text-sm font-medium text-gray-700">Upload Preset</div>
                     <div className="p-3 bg-gray-50 rounded-md font-mono text-sm">
                       Files_Upload
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">API Secret</label>
+                    <div className="text-sm font-medium text-gray-700">API Secret</div>
                     <div className="p-3 bg-gray-50 rounded-md font-mono text-sm">
                       Set in environment variables
                     </div>

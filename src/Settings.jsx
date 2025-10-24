@@ -206,10 +206,12 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     <div className="relative">
                       <Input
                         id="currentPassword"
+                        name="currentPassword"
                         type={showPasswords.current ? "text" : "password"}
                         value={passwords.currentPassword}
                         onChange={(e) => setPasswords({...passwords, currentPassword: e.target.value})}
                         className="pr-10"
+                        autoComplete="current-password"
                       />
                       <Button
                         type="button"
@@ -228,8 +230,10 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     <div className="relative">
                       <Input
                         id="newPassword"
+                        name="newPassword"
                         type={showPasswords.new ? "text" : "password"}
                         value={passwords.newPassword}
+                        autoComplete="new-password"
                         onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
                         className="pr-10"
                       />
@@ -250,10 +254,12 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                     <div className="relative">
                       <Input
                         id="confirmPassword"
+                        name="confirmPassword"
                         type={showPasswords.confirm ? "text" : "password"}
                         value={passwords.confirmPassword}
                         onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
                         className="pr-10"
+                        autoComplete="new-password"
                       />
                       <Button
                         type="button"

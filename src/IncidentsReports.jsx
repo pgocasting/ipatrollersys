@@ -3480,10 +3480,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
                       id="search"
+                      name="search"
                       placeholder="Search incidents..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -3492,7 +3494,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[160px]">
                   <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger id="month-filter">
+                    <SelectTrigger id="month-filter" name="month-filter">
                       <SelectValue placeholder="All Months" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3510,7 +3512,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Status</Label>
                   <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger id="status-filter">
+                    <SelectTrigger id="status-filter" name="status-filter">
                       <SelectValue placeholder="All Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3526,7 +3528,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
                   <Select value={filterDistrict} onValueChange={setFilterDistrict}>
-                    <SelectTrigger id="district-filter">
+                    <SelectTrigger id="district-filter" name="district-filter">
                       <SelectValue placeholder="All Districts" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3544,7 +3546,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
                   <Select value={filterMunicipality} onValueChange={setFilterMunicipality}>
-                    <SelectTrigger id="municipality-filter">
+                    <SelectTrigger id="municipality-filter" name="municipality-filter">
                       <SelectValue placeholder="All Municipalities" />
                     </SelectTrigger>
                     <SelectContent>
@@ -3823,7 +3825,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   setItemsPerPage(parseInt(value));
                   setPaginationPage(1);
                 }}>
-                  <SelectTrigger id="itemsPerPage" className="w-20">
+                  <SelectTrigger id="itemsPerPage" name="itemsPerPage" className="w-20">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -3977,7 +3979,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     Department *
                   </Label>
                   <Select value={newIncident.incidentType} onValueChange={handleIncidentTypeChange}>
-                    <SelectTrigger id="incidentType" className="mt-2">
+                    <SelectTrigger id="incidentType" name="incidentType" className="mt-2">
                       <SelectValue placeholder="Select Incident Type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -4000,11 +4002,13 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="date"
+                    name="date"
                     type="text"
                     placeholder="Enter date and time (e.g., January 15, 2024 2:30 PM)"
                     value={newIncident.date}
                     onChange={(e) => setNewIncident({...newIncident, date: e.target.value})}
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                    autoComplete="off"
                   />
                 </div>
                 <div>
@@ -4012,7 +4016,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     District *
                   </Label>
                   <Select value={newIncident.district} onValueChange={handleDistrictChange}>
-                    <SelectTrigger id="district" className="mt-2">
+                    <SelectTrigger id="district" name="district" className="mt-2">
                       <SelectValue placeholder="Select District" />
                     </SelectTrigger>
                     <SelectContent>
@@ -4029,7 +4033,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     Municipality *
                   </Label>
                   <Select value={newIncident.municipality} onValueChange={(value) => setNewIncident({...newIncident, municipality: value})}>
-                    <SelectTrigger id="municipality" className="mt-2">
+                    <SelectTrigger id="municipality" name="municipality" className="mt-2">
                       <SelectValue placeholder="Select Municipality" />
                     </SelectTrigger>
                     <SelectContent>
@@ -4047,10 +4051,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="location"
+                    name="location"
                     value={newIncident.location}
                     onChange={(e) => setNewIncident({...newIncident, location: e.target.value})}
-                    placeholder="Location of the incident..."
+                    placeholder="Enter specific location"
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                    autoComplete="street-address"
                   />
                 </div>
                 <div>
@@ -4059,10 +4065,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="officer"
+                    name="officer"
                     value={newIncident.officer}
                     onChange={(e) => setNewIncident({...newIncident, officer: e.target.value})}
-                    placeholder="Personnel involved..."
+                    placeholder="Enter officer name"
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                    autoComplete="name"
                   />
                 </div>
                 <div>
@@ -4071,10 +4079,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="why"
+                    name="why"
                     value={newIncident.why}
                     onChange={(e) => setNewIncident({...newIncident, why: e.target.value})}
-                    placeholder="Reason for the action..."
+                    placeholder="Enter reason or cause"
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                    autoComplete="off"
                   />
                 </div>
                 <div>
@@ -4083,9 +4093,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="what"
+                    name="what"
                     value={newIncident.description}
                     onChange={(e) => handleDescriptionChange(e.target.value)}
-                    placeholder="Describe what happened..."
+                    placeholder="Enter incident description"
+                    autoComplete="off"
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
@@ -4096,6 +4108,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   <div className="grid grid-cols-1 gap-3 mt-2">
                     <select
                       id="actionType"
+                      name="actionType"
                       value={newIncident.actionType}
                       onChange={(e) => setNewIncident({...newIncident, actionType: e.target.value})}
                       className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
@@ -4108,20 +4121,28 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       ))}
                     </select>
                     <Input
+                      id="assignedOfficer"
+                      name="assignedOfficer"
                       placeholder="Assigned Officer"
                       value={newIncident.assignedOfficer}
                       onChange={(e) => setNewIncident({...newIncident, assignedOfficer: e.target.value})}
                       className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      autoComplete="name"
                     />
                     <div className="grid grid-cols-2 gap-3">
                       <Input
+                        id="actionDate"
+                        name="actionDate"
                         type="date"
                         placeholder="Action Date"
                         value={newIncident.actionDate}
                         onChange={(e) => setNewIncident({...newIncident, actionDate: e.target.value})}
                         className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                        autoComplete="off"
                       />
                       <select
+                        id="priority"
+                        name="priority"
                         value={newIncident.priority}
                         onChange={(e) => setNewIncident({...newIncident, priority: e.target.value})}
                         className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
@@ -4134,6 +4155,8 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       </select>
                     </div>
                     <textarea
+                      id="actionDescription"
+                      name="actionDescription"
                       placeholder="Action Description"
                       value={newIncident.actionDescription}
                       onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
@@ -4148,10 +4171,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <Input
                     id="how"
+                    name="how"
                     value={newIncident.actionDescription}
                     onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
-                    placeholder="Method or procedure used..."
+                    placeholder="Enter action description"
                     className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="md:col-span-2">
@@ -4160,6 +4185,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Label>
                   <textarea
                     id="otherInfo"
+                    name="otherInfo"
                     value={newIncident.followUpNotes}
                     onChange={(e) => setNewIncident({...newIncident, followUpNotes: e.target.value})}
                     placeholder="Additional details and notes..."
@@ -4744,43 +4770,51 @@ Top Location: ${insights.topLocation}`);
                     <Label htmlFor="for" className="transition-colors duration-300 text-gray-700">FOR:</Label>
                     <Input
                       id="for"
+                      name="for"
                       value={pdfReportData.memorandum.for}
                       onChange={(e) => setPdfReportData(prev => ({
                         ...prev,
                         memorandum: { ...prev.memorandum, for: e.target.value }
                       }))}
                       className="mt-1 transition-colors duration-300 bg-white border-gray-300"
+                      autoComplete="off"
                     />
                   </div>
                   <div>
                     <Label htmlFor="from" className="transition-colors duration-300 text-gray-700">FROM:</Label>
                     <Input
                       id="from"
+                      name="from"
                       value={pdfReportData.memorandum.from}
                       onChange={(e) => setPdfReportData(prev => ({
                         ...prev,
                         memorandum: { ...prev.memorandum, from: e.target.value }
                       }))}
                       className="mt-1 transition-colors duration-300 bg-white border-gray-300"
+                      autoComplete="off"
                     />
                   </div>
                   <div>
                           <Label htmlFor="memo-date" className="transition-colors duration-300 text-gray-700">DATE:</Label>
                     <Input
                       id="memo-date"
+                      name="memo-date"
                       value={pdfReportData.memorandum.date}
                       onChange={(e) => setPdfReportData(prev => ({
                         ...prev,
                         memorandum: { ...prev.memorandum, date: e.target.value }
                       }))}
                       className="mt-1 transition-colors duration-300 bg-white border-gray-300"
+                      autoComplete="off"
                     />
                   </div>
                   <div>
                     <Label htmlFor="subject" className="transition-colors duration-300 text-gray-700">SUBJECT:</Label>
                     <Input
                       id="subject"
+                      name="subject"
                       value={pdfReportData.memorandum.subject}
+                      autoComplete="off"
                       onChange={(e) => setPdfReportData(prev => ({
                         ...prev,
                         memorandum: { ...prev.memorandum, subject: e.target.value }
@@ -4799,6 +4833,7 @@ Top Location: ${insights.topLocation}`);
                       <input
                         type="checkbox"
                         id={section}
+                        name={section}
                         checked={included}
                         onChange={(e) => setPdfReportData(prev => ({
                           ...prev,
@@ -4825,6 +4860,8 @@ Top Location: ${insights.topLocation}`);
               <div className="space-y-4">
                 <h3 className="text-lg font-medium transition-colors duration-300 text-gray-900">Custom Notes (Optional)</h3>
                 <Textarea
+                  id="custom-notes"
+                  name="custom-notes"
                   value={pdfReportData.customNotes}
                   onChange={(e) => setPdfReportData(prev => ({
                     ...prev,
@@ -5133,7 +5170,7 @@ Top Location: ${insights.topLocation}`);
               {viewingIncident && (
                 <div className="grid grid-cols-1 gap-4">
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Incident Type</label>
+                    <div className="text-sm font-medium text-gray-600">Incident Type</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {viewingIncident.incidentType || 'Not specified'}
                     </p>
@@ -5141,28 +5178,28 @@ Top Location: ${insights.topLocation}`);
                     
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Date & Time</label>
+                    <div className="text-sm font-medium text-gray-600">Date & Time</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {viewingIncident.date || 'Not specified'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Location</label>
+                    <div className="text-sm font-medium text-gray-600">Location</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.location || 'Not specified'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">District & Municipality</label>
+                    <div className="text-sm font-medium text-gray-600">District & Municipality</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {viewingIncident.district || 'Not specified'} - {viewingIncident.municipality || 'Not specified'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Status</label>
+                    <div className="text-sm font-medium text-gray-600">Status</div>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
                         viewingIncident.status === 'Active' ? 'bg-red-100 text-red-800 border border-red-200' :
@@ -5176,28 +5213,28 @@ Top Location: ${insights.topLocation}`);
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Reporting Officer</label>
+                    <div className="text-sm font-medium text-gray-600">Reporting Officer</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.officer || 'Not specified'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Description</label>
+                    <div className="text-sm font-medium text-gray-600">Description</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.description || 'No description available'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Witnesses</label>
+                    <div className="text-sm font-medium text-gray-600">Witnesses</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.witnesses || 'No witnesses recorded'}
                     </p>
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <label className="text-sm font-medium text-gray-600">Evidence</label>
+                    <div className="text-sm font-medium text-gray-600">Evidence</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.evidence || 'No evidence recorded'}
                     </p>
@@ -5212,14 +5249,14 @@ Top Location: ${insights.topLocation}`);
                       </h3>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Action Type</label>
+                          <div className="block text-sm font-semibold text-gray-700 mb-2">Action Type</div>
                           <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                             <p className="text-gray-900 break-words whitespace-pre-wrap">{viewingIncident.actionType || 'Not specified'}</p>
                           </div>
                         </div>
                         
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Assigned Officer</label>
+                          <div className="block text-sm font-semibold text-gray-700 mb-2">Assigned Officer</div>
                           <div className="p-4 bg-blue-50 rounded-xl border border-blue-200">
                             <p className="text-gray-900 break-words whitespace-pre-wrap">{viewingIncident.assignedOfficer || 'Not assigned'}</p>
                           </div>
@@ -5228,7 +5265,7 @@ Top Location: ${insights.topLocation}`);
                       
                       {viewingIncident.actionDescription && (
                         <div className="mt-4">
-                          <label className="block text-sm font-semibold text-gray-700 mb-2">Action Description</label>
+                          <div className="block text-sm font-semibold text-gray-700 mb-2">Action Description</div>
                           <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 min-h-[100px]">
                             <p className="text-gray-900 break-words whitespace-pre-wrap leading-relaxed">{viewingIncident.actionDescription}</p>
                           </div>
@@ -5240,7 +5277,7 @@ Top Location: ${insights.topLocation}`);
                   {/* Link */}
                   {viewingIncident.link && (
                     <div>
-                      <label className="block text-sm font-semibold text-gray-700 mb-2">Related Link</label>
+                      <div className="block text-sm font-semibold text-gray-700 mb-2">Related Link</div>
                       <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
                         <a 
                           href={viewingIncident.link} 
@@ -5315,6 +5352,7 @@ Top Location: ${insights.topLocation}`);
                       <div className="relative">
                         <select
                           id="edit-incident-type"
+                          name="incidentType"
                           value={editingIncident.incidentType}
                           onChange={(e) => setEditingIncident({...editingIncident, incidentType: e.target.value})}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
@@ -5337,6 +5375,7 @@ Top Location: ${insights.topLocation}`);
                       </label>
                       <input
                         id="edit-date"
+                        name="date"
                         type="date"
                         value={editingIncident.date}
                         onChange={(e) => setEditingIncident({...editingIncident, date: e.target.value})}
@@ -5351,6 +5390,7 @@ Top Location: ${insights.topLocation}`);
                       </label>
                       <input
                         id="edit-time"
+                        name="time"
                         type="time"
                         value={editingIncident.time}
                         onChange={(e) => setEditingIncident({...editingIncident, time: e.target.value})}
@@ -5366,6 +5406,7 @@ Top Location: ${insights.topLocation}`);
                       <div className="relative">
                         <select
                           id="edit-status"
+                          name="status"
                           value={editingIncident.status}
                           onChange={(e) => setEditingIncident({...editingIncident, status: e.target.value})}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
@@ -5387,6 +5428,7 @@ Top Location: ${insights.topLocation}`);
                       <div className="relative">
                         <select
                           id="edit-district"
+                          name="district"
                           value={editingIncident.district}
                           onChange={(e) => {
                             const value = e.target.value;
@@ -5419,6 +5461,7 @@ Top Location: ${insights.topLocation}`);
                       <div className="relative">
                         <select
                           id="edit-municipality"
+                          name="municipality"
                           value={editingIncident.municipality}
                           onChange={(e) => setEditingIncident({...editingIncident, municipality: e.target.value})}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
@@ -5442,6 +5485,7 @@ Top Location: ${insights.topLocation}`);
                     </label>
                     <textarea
                       id="edit-location"
+                      name="location"
                       value={editingIncident.location}
                       onChange={(e) => setEditingIncident({...editingIncident, location: e.target.value})}
                       placeholder="Enter detailed location..."
@@ -5457,6 +5501,7 @@ Top Location: ${insights.topLocation}`);
                     </label>
                     <textarea
                       id="edit-description"
+                      name="description"
                       value={editingIncident.description}
                       onChange={(e) => setEditingIncident({...editingIncident, description: e.target.value})}
                       placeholder="Enter incident description..."
@@ -5473,6 +5518,7 @@ Top Location: ${insights.topLocation}`);
                       </label>
                       <input
                         id="edit-officer"
+                        name="officer"
                         type="text"
                         value={editingIncident.officer}
                         onChange={(e) => setEditingIncident({...editingIncident, officer: e.target.value})}
@@ -5487,6 +5533,7 @@ Top Location: ${insights.topLocation}`);
                       </label>
                       <input
                         id="edit-link"
+                        name="link"
                         type="url"
                         value={editingIncident.link}
                         onChange={(e) => setEditingIncident({...editingIncident, link: e.target.value})}
@@ -5503,6 +5550,7 @@ Top Location: ${insights.topLocation}`);
                     </label>
                     <textarea
                       id="edit-witnesses"
+                      name="witnesses"
                       value={editingIncident.witnesses}
                       onChange={(e) => setEditingIncident({...editingIncident, witnesses: e.target.value})}
                       placeholder="Enter witness information..."
@@ -5518,6 +5566,7 @@ Top Location: ${insights.topLocation}`);
                     </label>
                     <textarea
                       id="edit-evidence"
+                      name="evidence"
                       value={editingIncident.evidence}
                       onChange={(e) => setEditingIncident({...editingIncident, evidence: e.target.value})}
                       placeholder="Enter evidence information..."
@@ -5539,6 +5588,7 @@ Top Location: ${insights.topLocation}`);
                         </label>
                         <input
                           id="edit-action-type"
+                          name="actionType"
                           type="text"
                           value={editingIncident.actionType}
                           onChange={(e) => setEditingIncident({...editingIncident, actionType: e.target.value})}
@@ -5553,6 +5603,7 @@ Top Location: ${insights.topLocation}`);
                         </label>
                         <input
                           id="edit-assigned-officer"
+                          name="assignedOfficer"
                           type="text"
                           value={editingIncident.assignedOfficer}
                           onChange={(e) => setEditingIncident({...editingIncident, assignedOfficer: e.target.value})}
@@ -5568,6 +5619,7 @@ Top Location: ${insights.topLocation}`);
                       </label>
                       <textarea
                         id="edit-action-description"
+                        name="actionDescription"
                         value={editingIncident.actionDescription}
                         onChange={(e) => setEditingIncident({...editingIncident, actionDescription: e.target.value})}
                         placeholder="Enter detailed action description..."

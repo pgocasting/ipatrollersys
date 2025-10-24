@@ -1520,10 +1520,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Label>
                 <Input
                   id="search"
+                  name="search"
                   placeholder="Search municipalities..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  autoComplete="off"
                 />
               </div>
               <div>
@@ -1532,6 +1534,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Label>
                 <select
                   id="month-filter"
+                  name="month-filter"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1556,6 +1559,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Label>
                 <select
                   id="year-filter"
+                  name="year-filter"
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1573,6 +1577,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Label>
                 <select
                   id="district-filter"
+                  name="district-filter"
                   value={selectedDistrict}
                   onChange={(e) => setSelectedDistrict(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
@@ -1854,6 +1859,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                 <td key={index} className="px-2 py-4 text-center">
                                   <div className="flex flex-col items-center gap-1">
                                     <input
+                                      id={`patrol-data-${item.municipality}-${index}`}
+                                      name={`patrol-data-${item.municipality}-${index}`}
                                       type="number"
                                       min="0"
                                       value={item.data[index] !== null && item.data[index] !== undefined ? item.data[index] : ""}
@@ -2356,6 +2363,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   <Label htmlFor="top-performers-month" className="text-sm font-medium text-gray-700">Month:</Label>
                   <select
                     id="top-performers-month"
+                    name="top-performers-month"
                     value={selectedTopPerformersMonth}
                     onChange={(e) => setSelectedTopPerformersMonth(parseInt(e.target.value))}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -2378,6 +2386,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   <Label htmlFor="top-performers-year" className="text-sm font-medium text-gray-700">Year:</Label>
                   <select
                     id="top-performers-year"
+                    name="top-performers-year"
                     value={selectedTopPerformersYear}
                     onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
                     className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"

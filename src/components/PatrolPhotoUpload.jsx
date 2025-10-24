@@ -119,6 +119,8 @@ const PatrolPhotoUpload = ({
     <div className={`patrol-photo-upload ${className}`}>
       {/* Hidden file input */}
       <input
+        id="patrol-photo-upload"
+        name="patrol-photo-upload"
         ref={fileInputRef}
         type="file"
         multiple

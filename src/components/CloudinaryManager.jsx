@@ -256,6 +256,8 @@ export default function CloudinaryManager() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
+                  id="search-files"
+                  name="search-files"
                   placeholder="Search files..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -301,6 +303,8 @@ export default function CloudinaryManager() {
 
             {/* Folder Filter */}
             <select
+              id="folder-filter"
+              name="folder-filter"
               value={selectedFolder}
               onChange={(e) => setSelectedFolder(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -313,6 +317,8 @@ export default function CloudinaryManager() {
 
             {/* Sort */}
             <select
+              id="sort-filter"
+              name="sort-filter"
               value={`${sortBy}-${sortOrder}`}
               onChange={(e) => {
                 const [field, order] = e.target.value.split('-');

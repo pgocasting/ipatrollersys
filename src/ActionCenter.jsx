@@ -17,6 +17,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "./components/ui/dialog";
 import { useNotification, NotificationContainer } from './components/ui/notification';
 import { actionCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
+import { logger } from './utils/logger';
 // import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "./components/ui/sheet";
 
 import { 
@@ -1402,14 +1403,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       } else {
         // Add new action
         actionCenterGroup.log('➕ Adding new action report');
+        logger.log("Form data being submitted:", formData); // Won't show (disabled)
+        
         const result = await addActionReport(formData);
         if (result.success) {
           actionCenterGroup.log('✅ Action added successfully');
+          logger.log("Action added with result:", result); // Won't show (disabled)
           showSuccess('Action report added successfully!');
           await fetchAllActionData(); // Refresh data
           setShowAddModal(false);
         } else {
           actionCenterGroup.error('❌ Failed to add action:', result.error);
+          logger.error("Failed to add action:", result.error); // Will show in development
           alert('Failed to add action: ' + result.error);
         }
       }
@@ -2083,10 +2088,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
                       id="search"
+                      name="search"
                       placeholder="Search actions..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
                       className="pl-10"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -2095,7 +2102,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="flex flex-col gap-2 w-full sm:w-[160px]">
                   <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
                   <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(value === 'all' ? 'all' : parseInt(value))}>
-                    <SelectTrigger id="month-filter">
+                    <SelectTrigger id="month-filter" name="month-filter">
                       <SelectValue placeholder="All Months" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2120,7 +2127,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     onValueChange={setActiveTab}
                     disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
                   >
-                    <SelectTrigger id="department-filter">
+                    <SelectTrigger id="department-filter" name="department-filter">
                       <SelectValue placeholder="All Departments" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2151,7 +2158,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
                   <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                    <SelectTrigger id="district-filter">
+                    <SelectTrigger id="district-filter" name="district-filter">
                       <SelectValue placeholder="All Districts" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2167,7 +2174,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
                   <Select value={activeMunicipality} onValueChange={setActiveMunicipality}>
-                    <SelectTrigger id="municipality-filter">
+                    <SelectTrigger id="municipality-filter" name="municipality-filter">
                       <SelectValue placeholder="All Municipalities" />
                     </SelectTrigger>
                     <SelectContent>
@@ -2352,7 +2359,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 setItemsPerPage(parseInt(value));
                 setTablePage(1);
               }}>
-                <SelectTrigger id="itemsPerPage" className="w-20">
+                <SelectTrigger id="itemsPerPage" name="itemsPerPage" className="w-20">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -2516,7 +2523,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       onValueChange={(value) => setFormData({...formData, department: value})}
                       disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
                     >
-                      <SelectTrigger id="department" className="w-full">
+                      <SelectTrigger id="department" name="department" className="w-full">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2545,17 +2552,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="municipality" className="text-sm font-medium text-gray-700">Municipality *</Label>
                     <Input
                       id="municipality"
+                      name="municipality"
                       value={formData.municipality}
                       onChange={(e) => handleMunicipalityChange(e.target.value)}
                       placeholder="Enter municipality (district will auto-detect)"
                       className="w-full"
+                      autoComplete="address-level2"
                     />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="district" className="text-sm font-medium text-gray-700">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger id="district" className="w-full">
+                      <SelectTrigger id="district" name="district" className="w-full">
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
                       <SelectContent>
@@ -2570,11 +2579,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
                     <Input
                       id="when"
+                      name="when"
                       type="text"
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
                       placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
                       className="w-full"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -2591,6 +2602,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="what" className="text-sm font-medium text-gray-700">What (Action Description) *</Label>
                     <Textarea
                       id="what"
+                      name="what"
                       value={formData.what}
                       onChange={(e) => setFormData({...formData, what: e.target.value})}
                       placeholder="Describe the action taken in detail"
@@ -2603,10 +2615,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="where" className="text-sm font-medium text-gray-700">Where (Location) *</Label>
                     <Input
                       id="where"
+                      name="where"
                       value={formData.where}
                       onChange={(e) => setFormData({...formData, where: e.target.value})}
                       placeholder="Enter specific location"
                       className="w-full"
+                      autoComplete="street-address"
                     />
                   </div>
                 </div>
@@ -2624,17 +2638,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="who" className="text-sm font-medium text-gray-700">Who (Person/s Involved)</Label>
                       <Input
                         id="who"
+                        name="who"
                         value={formData.who}
                         onChange={(e) => setFormData({...formData, who: e.target.value})}
                         placeholder="Names of persons involved"
                         className="w-full"
+                        autoComplete="name"
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="gender" className="text-sm font-medium text-gray-700">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger id="gender" className="w-full">
+                        <SelectTrigger id="gender" name="gender" className="w-full">
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -2650,6 +2666,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="why" className="text-sm font-medium text-gray-700">Why (Reason/Motive)</Label>
                       <Textarea
                         id="why"
+                        name="why"
                         value={formData.why}
                         onChange={(e) => setFormData({...formData, why: e.target.value})}
                         placeholder="Reason or motive for the incident"
@@ -2662,6 +2679,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="how" className="text-sm font-medium text-gray-700">How (Method/Manner)</Label>
                       <Textarea
                         id="how"
+                        name="how"
                         value={formData.how}
                         onChange={(e) => setFormData({...formData, how: e.target.value})}
                         placeholder="How the incident occurred or was handled"
@@ -2674,10 +2692,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="source" className="text-sm font-medium text-gray-700">Source</Label>
                       <Input
                         id="source"
+                        name="source"
                         value={formData.source}
                         onChange={(e) => setFormData({...formData, source: e.target.value})}
                         placeholder="Information source (e.g., witness, report, etc.)"
                         className="w-full"
+                        autoComplete="off"
                       />
                     </div>
                   </div>
@@ -2717,11 +2737,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
                     <Input
                       id="actionTaken"
+                      name="actionTaken"
                       type="text"
                       value={formData.actionTaken}
                       onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
                       placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
                       className="w-full"
+                      autoComplete="off"
                     />
                   </div>
                   
@@ -2729,6 +2751,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="otherInformation" className="text-sm font-medium text-gray-700">Other Information</Label>
                     <Textarea
                       id="otherInformation"
+                      name="otherInformation"
                       value={formData.otherInformation}
                       onChange={(e) => setFormData({...formData, otherInformation: e.target.value})}
                       placeholder="Any additional relevant information, notes, or observations"
@@ -2741,6 +2764,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="photos" className="text-sm font-medium text-gray-700">Photos/Evidence</Label>
                     <Input
                       id="photos"
+                      name="photos"
                       type="file"
                       multiple
                       accept="image/*"
@@ -2749,6 +2773,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         setFormData({...formData, photos: files});
                       }}
                       className="w-full"
+                      autoComplete="off"
                     />
                     <p className="text-xs text-gray-500">Upload photos or evidence related to this action report</p>
                   </div>
@@ -2820,28 +2845,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">Department</Label>
+                    <div className="text-sm font-medium text-gray-600">Department</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {selectedAction.department?.toUpperCase() || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">Municipality</Label>
+                    <div className="text-sm font-medium text-gray-600">Municipality</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {selectedAction.municipality || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">District</Label>
+                    <div className="text-sm font-medium text-gray-600">District</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {selectedAction.district || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">When</Label>
+                    <div className="text-sm font-medium text-gray-600">When</div>
                     <p className="text-base font-semibold text-gray-900 mt-1">
                       {typeof selectedAction.when === 'string' ? selectedAction.when : formatDate(selectedAction.when)}
                     </p>
@@ -2857,14 +2882,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">What (Action Description)</Label>
+                    <div className="text-sm font-medium text-gray-600">What (Action Description)</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {selectedAction.what || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">Where (Location)</Label>
+                    <div className="text-sm font-medium text-gray-600">Where (Location)</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {selectedAction.where || 'N/A'}
                     </p>
@@ -2882,7 +2907,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedAction.who && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <Label className="text-sm font-medium text-gray-600">Who (Person/s Involved)</Label>
+                        <div className="text-sm font-medium text-gray-600">Who (Person/s Involved)</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.who}
                         </p>
@@ -2891,7 +2916,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.gender && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <Label className="text-sm font-medium text-gray-600">Gender</Label>
+                        <div className="text-sm font-medium text-gray-600">Gender</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.gender}
                         </p>
@@ -2900,7 +2925,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.why && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <Label className="text-sm font-medium text-gray-600">Why (Reason/Motive)</Label>
+                        <div className="text-sm font-medium text-gray-600">Why (Reason/Motive)</div>
                         <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                           {selectedAction.why}
                         </p>
@@ -2909,7 +2934,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.how && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <Label className="text-sm font-medium text-gray-600">How (Method/Manner)</Label>
+                        <div className="text-sm font-medium text-gray-600">How (Method/Manner)</div>
                         <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                           {selectedAction.how}
                         </p>
@@ -2918,7 +2943,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.source && (
                       <div className="p-3 bg-white rounded-lg border border-red-100 md:col-span-2">
-                        <Label className="text-sm font-medium text-gray-600">Source</Label>
+                        <div className="text-sm font-medium text-gray-600">Source</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.source}
                         </p>
@@ -2938,7 +2963,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedAction.who && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <Label className="text-sm font-medium text-gray-600">Who (Person/s Involved)</Label>
+                        <div className="text-sm font-medium text-gray-600">Who (Person/s Involved)</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.who}
                         </p>
@@ -2947,7 +2972,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.why && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <Label className="text-sm font-medium text-gray-600">Why (Reason/Motive)</Label>
+                        <div className="text-sm font-medium text-gray-600">Why (Reason/Motive)</div>
                         <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                           {selectedAction.why}
                         </p>
@@ -2956,7 +2981,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.how && (
                       <div className="p-3 bg-white rounded-lg border border-green-100 md:col-span-2">
-                        <Label className="text-sm font-medium text-gray-600">How (Observation/Findings)</Label>
+                        <div className="text-sm font-medium text-gray-600">How (Observation/Findings)</div>
                         <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                           {selectedAction.how}
                         </p>
@@ -2965,7 +2990,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.gender && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <Label className="text-sm font-medium text-gray-600">Gender</Label>
+                        <div className="text-sm font-medium text-gray-600">Gender</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.gender}
                         </p>
@@ -2974,7 +2999,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.source && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <Label className="text-sm font-medium text-gray-600">Source</Label>
+                        <div className="text-sm font-medium text-gray-600">Source</div>
                         <p className="text-sm text-gray-900 mt-2">
                           {selectedAction.source}
                         </p>
@@ -3003,7 +3028,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <Label className="text-sm font-medium text-gray-600">Action Taken/Status</Label>
+                    <div className="text-sm font-medium text-gray-600">Action Taken/Status</div>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
                         selectedAction.actionTaken && selectedAction.actionTaken.toLowerCase().includes('arrested') 
@@ -3021,7 +3046,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   
                   {selectedAction.otherInformation && (
                     <div className="p-3 bg-white rounded-lg border border-gray-100">
-                      <Label className="text-sm font-medium text-gray-600">Other Information</Label>
+                      <div className="text-sm font-medium text-gray-600">Other Information</div>
                       <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                         {selectedAction.otherInformation}
                       </p>
@@ -3030,7 +3055,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   
                   {selectedAction.photos && selectedAction.photos.length > 0 && (
                     <div className="p-3 bg-white rounded-lg border border-gray-100">
-                      <Label className="text-sm font-medium text-gray-600">Documents/Evidence</Label>
+                      <div className="text-sm font-medium text-gray-600">Documents/Evidence</div>
                       <div className="mt-3 space-y-2">
                         <p className="text-sm text-gray-500">
                           {selectedAction.photos.length} document(s) attached:
@@ -3116,7 +3141,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="space-y-2">
                     <Label htmlFor="edit-department" className="text-sm font-medium text-gray-700">Department *</Label>
                     <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-                      <SelectTrigger id="edit-department" className="w-full">
+                      <SelectTrigger id="edit-department" name="department" className="w-full">
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3131,17 +3156,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-municipality" className="text-sm font-medium text-gray-700">Municipality *</Label>
                     <Input
                       id="edit-municipality"
+                      name="municipality"
                       value={formData.municipality}
                       onChange={(e) => handleMunicipalityChange(e.target.value)}
                       placeholder="Enter municipality (district will auto-detect)"
                       className="w-full"
+                      autoComplete="address-level2"
                     />
                   </div>
                   
                   <div className="space-y-2">
                     <Label htmlFor="edit-district" className="text-sm font-medium text-gray-700">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger id="edit-district" className="w-full">
+                      <SelectTrigger id="edit-district" name="district" className="w-full">
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
                       <SelectContent>
@@ -3156,11 +3183,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
                     <Input
                       id="edit-when"
+                      name="when"
                       type="text"
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
                       placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
                       className="w-full"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
@@ -3177,6 +3206,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-what" className="text-sm font-medium text-gray-700">What (Action Description) *</Label>
                     <Textarea
                       id="edit-what"
+                      name="what"
                       value={formData.what}
                       onChange={(e) => setFormData({...formData, what: e.target.value})}
                       placeholder="Describe the action taken in detail"
@@ -3189,10 +3219,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-where" className="text-sm font-medium text-gray-700">Where (Location) *</Label>
                     <Input
                       id="edit-where"
+                      name="where"
                       value={formData.where}
                       onChange={(e) => setFormData({...formData, where: e.target.value})}
                       placeholder="Enter specific location"
                       className="w-full"
+                      autoComplete="street-address"
                     />
                   </div>
                 </div>
@@ -3210,17 +3242,19 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="edit-who" className="text-sm font-medium text-gray-700">Who (Person/s Involved)</Label>
                       <Input
                         id="edit-who"
+                        name="who"
                         value={formData.who}
                         onChange={(e) => setFormData({...formData, who: e.target.value})}
                         placeholder="Names of persons involved"
                         className="w-full"
+                        autoComplete="name"
                       />
                     </div>
                     
                     <div className="space-y-2">
                       <Label htmlFor="edit-gender" className="text-sm font-medium text-gray-700">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger id="edit-gender" className="w-full">
+                        <SelectTrigger id="edit-gender" name="gender" className="w-full">
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
                         <SelectContent>
@@ -3236,6 +3270,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="edit-why" className="text-sm font-medium text-gray-700">Why (Reason/Motive)</Label>
                       <Textarea
                         id="edit-why"
+                        name="why"
                         value={formData.why}
                         onChange={(e) => setFormData({...formData, why: e.target.value})}
                         placeholder="Reason or motive for the incident"
@@ -3248,6 +3283,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="edit-how" className="text-sm font-medium text-gray-700">How (Method/Manner)</Label>
                       <Textarea
                         id="edit-how"
+                        name="how"
                         value={formData.how}
                         onChange={(e) => setFormData({...formData, how: e.target.value})}
                         placeholder="How the incident occurred or was handled"
@@ -3260,10 +3296,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="edit-source" className="text-sm font-medium text-gray-700">Source</Label>
                       <Input
                         id="edit-source"
+                        name="source"
                         value={formData.source}
                         onChange={(e) => setFormData({...formData, source: e.target.value})}
                         placeholder="Information source (e.g., witness, report, etc.)"
                         className="w-full"
+                        autoComplete="off"
                       />
                     </div>
                   </div>
@@ -3303,11 +3341,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
                     <Input
                       id="edit-actionTaken"
+                      name="actionTaken"
                       type="text"
                       value={formData.actionTaken}
                       onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
                       placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
                       className="w-full"
+                      autoComplete="off"
                     />
                   </div>
                   
@@ -3315,6 +3355,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-otherInformation" className="text-sm font-medium text-gray-700">Other Information</Label>
                     <Textarea
                       id="edit-otherInformation"
+                      name="otherInformation"
                       value={formData.otherInformation}
                       onChange={(e) => setFormData({...formData, otherInformation: e.target.value})}
                       placeholder="Any additional relevant information, notes, or observations"
@@ -3327,6 +3368,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="edit-photos" className="text-sm font-medium text-gray-700">Photos/Evidence</Label>
                     <Input
                       id="edit-photos"
+                      name="photos"
                       type="file"
                       multiple
                       accept="image/*"
@@ -3335,6 +3377,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         setFormData({...formData, photos: files});
                       }}
                       className="w-full"
+                      autoComplete="off"
                     />
                     <p className="text-xs text-gray-500">Upload new photos or evidence (will replace existing files)</p>
                   </div>
@@ -3537,6 +3580,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       
       {/* Hidden file input for Excel import */}
       <input
+        id="action-center-file-input"
+        name="action-center-file-input"
         type="file"
         ref={fileInputRef}
         onChange={handleFileUpload}

@@ -249,6 +249,8 @@ export default function CloudinaryUpload({
 
           {/* Hidden file input */}
           <input
+            id="cloudinary-upload"
+            name="cloudinary-upload"
             ref={fileInputRef}
             type="file"
             multiple

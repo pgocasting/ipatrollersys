@@ -154,6 +154,7 @@ export default function Login({ onLogin }) {
                 required
                 className="w-full py-3 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
                 placeholder="Enter your username"
+                autoComplete="username"
               />
             </div>
 
@@ -172,6 +173,7 @@ export default function Login({ onLogin }) {
                   required
                   className="w-full pr-12 py-3 border-2 border-gray-200 rounded-lg text-gray-900 placeholder-gray-500 focus:ring-4 focus:ring-blue-500/20 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter your password"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -212,6 +214,7 @@ export default function Login({ onLogin }) {
             {/* Login Button */}
             <Button
               type="submit"
+              name="login"
               disabled={isLoading}
               className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >

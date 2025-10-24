@@ -390,23 +390,23 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                      <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="given-name" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                      <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="family-name" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                      <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="email" required />
                     </div>
                     {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && (
                       <div className="space-y-2">
                         <Label htmlFor="municipality">Municipality</Label>
                         <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
-                          <SelectTrigger id="municipality" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="municipality" name="municipality" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select municipality" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -422,7 +422,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="accessLevel">Access Level</Label>
                       <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger id="accessLevel" className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="accessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -438,7 +438,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-2">
                         <Label htmlFor="department">Department</Label>
                         <Select value={newUser.department} onValueChange={(value) => setNewUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="department" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="department" name="department" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -451,15 +451,15 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
-                    <Input id="username" name="username" placeholder="johndoe" value={newUser.username} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                    <Input id="username" name="username" placeholder="johndoe" value={newUser.username} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="username" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input id="password" name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                    <Input id="password" name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="new-password" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" required />
+                    <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="new-password" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phoneNumber">Contact Number (Optional)</Label>
@@ -467,6 +467,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       id="phoneNumber"
                       name="phoneNumber"
                       type="tel"
+                      autoComplete="tel"
                       placeholder="+63 9XX XXX XXXX"
                       value={newUser.phoneNumber}
                       onChange={(e) => {
@@ -492,7 +493,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <DialogClose asChild>
                       <Button type="button" variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={createLoading} className="bg-black text-white hover:bg-black/90">
+                    <Button type="submit" name="create-user" disabled={createLoading} className="bg-black text-white hover:bg-black/90">
                       {createLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Create User
                     </Button>
@@ -521,6 +522,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         value={editUser.firstName} 
                         onChange={handleEditInputChange} 
                         className="col-span-3 bg-white border-slate-200" 
+                        autoComplete="given-name"
                         required 
                       />
                     </div>
@@ -533,6 +535,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         value={editUser.lastName} 
                         onChange={handleEditInputChange} 
                         className="col-span-3 bg-white border-slate-200" 
+                        autoComplete="family-name"
                         required 
                       />
                     </div>
@@ -542,7 +545,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <Label htmlFor="editUsername">Username</Label>
                       <Input 
                         id="editUsername" 
-                        name="username" 
+                        name="username"
+                        autoComplete="username" 
                         placeholder="johndoe" 
                         value={editUser.username} 
                         onChange={handleEditInputChange} 
@@ -554,7 +558,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-2">
                         <Label htmlFor="editMunicipality">Municipality</Label>
                         <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
-                          <SelectTrigger id="editMunicipality" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="editMunicipality" name="municipality" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select municipality" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -570,7 +574,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="space-y-2">
                       <Label htmlFor="editAccessLevel">Access Level</Label>
                       <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger id="editAccessLevel" className="col-span-3 bg-white border border-slate-200">
+                        <SelectTrigger id="editAccessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -586,7 +590,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-2">
                         <Label htmlFor="editDepartment">Department</Label>
                         <Select value={editUser.department} onValueChange={(value) => setEditUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="editDepartment" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="editDepartment" name="department" className="col-span-3 bg-white border border-slate-200">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -603,6 +607,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       id="editPhoneNumber"
                       name="phoneNumber"
                       type="tel"
+                      autoComplete="tel"
                       placeholder="+63 9XX XXX XXXX"
                       value={editUser.phoneNumber}
                       onChange={(e) => {
@@ -628,7 +633,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <DialogClose asChild>
                       <Button type="button" variant="outline">Cancel</Button>
                     </DialogClose>
-                    <Button type="submit" disabled={updateLoading} className="bg-black text-white hover:bg-black/90">
+                    <Button type="submit" name="update-user" disabled={updateLoading} className="bg-black text-white hover:bg-black/90">
                       {updateLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                       Update User
                     </Button>

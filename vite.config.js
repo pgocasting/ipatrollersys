@@ -22,6 +22,13 @@ export default defineConfig({
     open: true
   },
   build: {
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true, // Remove console.log, console.warn, etc.
+        drop_debugger: true, // Remove debugger statements
+      },
+    },
     rollupOptions: {
       output: {
         manualChunks: {

@@ -3853,6 +3853,8 @@ Are you absolutely sure you want to proceed?`;
               <p>Your municipality tab is auto-selected. Barangay Management is visible to admins only.</p>
               <label className="mt-2 flex items-center gap-2 text-sm text-gray-600">
                 <input
+                  id="dont-show-again"
+                  name="dont-show-again"
                   type="checkbox"
                   checked={dontShowAgain}
                   onChange={(e) => setDontShowAgain(e.target.checked)}
@@ -4002,6 +4004,8 @@ Are you absolutely sure you want to proceed?`;
                       <div className="flex items-center gap-3">
                         <label className="flex items-center gap-2 text-sm text-gray-700">
                           <input
+                            id="import-all-months"
+                            name="import-all-months"
                             type="checkbox"
                             checked={importAllMonths}
                             onChange={(e) => setImportAllMonths(e.target.checked)}
@@ -4102,6 +4106,8 @@ Are you absolutely sure you want to proceed?`;
                               <h4 className="text-sm font-medium text-gray-800 mb-3">Clear Selected Municipality</h4>
                               <div className="space-y-3">
                                 <select 
+                                  id="clear-municipality-select"
+                                  name="clear-municipality-select"
                                   value={selectedClearMunicipality}
                                   onChange={(e) => setSelectedClearMunicipality(e.target.value)}
                                   className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
@@ -4189,6 +4195,7 @@ Are you absolutely sure you want to proceed?`;
                     
                     <input
                       id="excel-file-input"
+                      name="excel-file-input"
                       type="file"
                       accept=".xlsx,.xls,.csv"
                       onChange={handleExcelFileSelect}
@@ -4201,8 +4208,10 @@ Are you absolutely sure you want to proceed?`;
                 {/* Month/Year Selection */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+                    <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
                     <select 
+                      id="month-select"
+                      name="month-select"
                       value={selectedMonth}
                       onChange={(e) => {
                         const newMonth = e.target.value;
@@ -4218,8 +4227,10 @@ Are you absolutely sure you want to proceed?`;
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+                    <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
                     <select 
+                      id="year-select"
+                      name="year-select"
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -4234,7 +4245,7 @@ Are you absolutely sure you want to proceed?`;
                 {/* Municipality Selection - Admin only */}
                 {isAdmin && (
                   <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Municipality</label>
+                    <div className="block text-sm font-medium text-gray-700 mb-3">Municipality</div>
                     <div className="flex flex-wrap gap-3">
                       {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
                         const isActive = activeMunicipalityTab === municipality;
@@ -4360,6 +4371,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <select 
+                                    id={`barangay-select-${date}`}
+                                    name={`barangay-select-${date}`}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                                     value=""
                                     onChange={(e) => {
@@ -4383,6 +4396,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <select 
+                                    id={`concern-type-select-${date}`}
+                                    name={`concern-type-select-${date}`}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
                                     value=""
                                     onChange={(e) => {
@@ -4411,6 +4426,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <input 
+                                    id={`week1-${date}`}
+                                    name={`week1-${date}`}
                                     type="number" 
                                     min="0"
                                     step="1"
@@ -4427,6 +4444,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <input 
+                                    id={`week2-${date}`}
+                                    name={`week2-${date}`}
                                     type="number" 
                                     min="0"
                                     step="1"
@@ -4443,6 +4462,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <input 
+                                    id={`week3-${date}`}
+                                    name={`week3-${date}`}
                                     type="number" 
                                     min="0"
                                     step="1"
@@ -4459,6 +4480,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3">
                                   <input 
+                                    id={`week4-${date}`}
+                                    name={`week4-${date}`}
                                     type="number" 
                                     min="0"
                                     step="1"
@@ -4475,6 +4498,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3 table-cell-spacing">
                                   <input 
+                                    id={`action-taken-${date}`}
+                                    name={`action-taken-${date}`}
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
                                     placeholder="Action taken..."
@@ -4489,6 +4514,8 @@ Are you absolutely sure you want to proceed?`;
                                 </td>
                                 <td className="px-4 py-3 table-cell-spacing">
                                   <input 
+                                    id={`remarks-${date}`}
+                                    name={`remarks-${date}`}
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
                                     placeholder="Add remarks..."
@@ -4517,6 +4544,8 @@ Are you absolutely sure you want to proceed?`;
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
                                       <select 
+                                        id={`existing-barangay-${date}-${entryIndex}`}
+                                        name={`existing-barangay-${date}-${entryIndex}`}
                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
                                         value={entry.barangay}
                                         onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
@@ -4543,6 +4572,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3">
                                     <select 
+                                      id={`existing-concern-type-${date}-${entryIndex}`}
+                                      name={`existing-concern-type-${date}-${entryIndex}`}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
                                       value={entry.concernType}
                                       onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
@@ -4566,6 +4597,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3">
                                     <input 
+                                      id={`existing-week1-${date}-${entryIndex}`}
+                                      name={`existing-week1-${date}-${entryIndex}`}
                                       type="number" 
                                       min="0"
                                       step="1"
@@ -4577,6 +4610,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3">
                                     <input 
+                                      id={`existing-week2-${date}-${entryIndex}`}
+                                      name={`existing-week2-${date}-${entryIndex}`}
                                       type="number" 
                                       min="0"
                                       step="1"
@@ -4588,6 +4623,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3">
                                     <input 
+                                      id={`existing-week3-${date}-${entryIndex}`}
+                                      name={`existing-week3-${date}-${entryIndex}`}
                                       type="number" 
                                       min="0"
                                       step="1"
@@ -4599,6 +4636,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3">
                                     <input 
+                                      id={`existing-week4-${date}-${entryIndex}`}
+                                      name={`existing-week4-${date}-${entryIndex}`}
                                       type="number" 
                                       min="0"
                                       step="1"
@@ -4610,6 +4649,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3 table-cell-spacing">
                                     <input 
+                                      id={`existing-action-taken-${date}-${entryIndex}`}
+                                      name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
                                       placeholder="Action taken..."
@@ -4619,6 +4660,8 @@ Are you absolutely sure you want to proceed?`;
                                   </td>
                                   <td className="px-4 py-3 table-cell-spacing">
                                     <input 
+                                      id={`existing-remarks-${date}-${entryIndex}`}
+                                      name={`existing-remarks-${date}-${entryIndex}`}
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
                                       placeholder="Add remarks..."
@@ -4768,6 +4811,7 @@ Are you absolutely sure you want to proceed?`;
                   <label htmlFor="barangay-data" className="block text-sm font-medium text-gray-700">Barangay Names</label>
                   <textarea
                     id="barangay-data"
+                    name="barangay-data"
                     placeholder="Enter barangay names separated by commas or new lines&#10;Example:&#10;Barangay 1&#10;Barangay 2&#10;Barangay 3"
                     value={barangayData}
                     onChange={(e) => setBarangayData(e.target.value)}
@@ -4979,6 +5023,8 @@ Are you absolutely sure you want to proceed?`;
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
                                   <input
+                                    id={`select-all-barangays-${municipality}`}
+                                    name={`select-all-barangays-${municipality}`}
                                     type="checkbox"
                                     checked={isAllSelected}
                                     ref={(input) => {
@@ -5029,6 +5075,8 @@ Are you absolutely sure you want to proceed?`;
                           >
                             <div className="flex items-center gap-3">
                               <input
+                                id={`barangay-${barangay.id}`}
+                                name={`barangay-${barangay.id}`}
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={(e) => handleBarangaySelection(barangay.id, e.target.checked)}
@@ -5079,15 +5127,17 @@ Are you absolutely sure you want to proceed?`;
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                        <label htmlFor="edit-barangay-name" className="block text-sm font-medium text-gray-700 mb-2">
                           {editingBarangay.isBulkEdit ? 'Barangay Names (comma-separated)' : 'Barangay Name'}
                         </label>
                         <input
+                          id="edit-barangay-name"
+                          name="edit-barangay-name"
                           type="text"
                           value={editingBarangay.name}
                           onChange={(e) => setEditingBarangay({...editingBarangay, name: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                           placeholder={editingBarangay.isBulkEdit ? "Enter barangay names separated by commas" : "Enter barangay name"}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
                         {editingBarangay.isBulkEdit && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -5097,8 +5147,10 @@ Are you absolutely sure you want to proceed?`;
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                        <label htmlFor="edit-barangay-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
                         <select
+                          id="edit-barangay-district"
+                          name="edit-barangay-district"
                           value={editingBarangay.district}
                           onChange={(e) => setEditingBarangay({...editingBarangay, district: e.target.value})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -5112,8 +5164,10 @@ Are you absolutely sure you want to proceed?`;
                       </div>
 
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
+                        <label htmlFor="edit-barangay-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
                         <select
+                          id="edit-barangay-municipality"
+                          name="edit-barangay-municipality"
                           value={editingBarangay.municipality}
                           onChange={(e) => setEditingBarangay({...editingBarangay, municipality: e.target.value})}
                           className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
@@ -5207,10 +5261,12 @@ Are you absolutely sure you want to proceed?`;
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <label htmlFor="edit-concern-type-name" className="block text-sm font-medium text-gray-700 mb-2">
                       {editingConcernType.isBulkEdit ? 'Concern Type Names (comma-separated)' : 'Concern Type Name'}
                     </label>
                     <input
+                      id="edit-concern-type-name"
+                      name="edit-concern-type-name"
                       type="text"
                       value={editingConcernType.name}
                       onChange={(e) => setEditingConcernType({...editingConcernType, name: e.target.value})}
@@ -5225,8 +5281,10 @@ Are you absolutely sure you want to proceed?`;
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                    <label htmlFor="edit-concern-type-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
                     <select
+                      id="edit-concern-type-district"
+                      name="edit-concern-type-district"
                       value={editingConcernType.district}
                       onChange={(e) => setEditingConcernType({...editingConcernType, district: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -5240,8 +5298,10 @@ Are you absolutely sure you want to proceed?`;
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
+                    <label htmlFor="edit-concern-type-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
                     <select
+                      id="edit-concern-type-municipality"
+                      name="edit-concern-type-municipality"
                       value={editingConcernType.municipality}
                       onChange={(e) => setEditingConcernType({...editingConcernType, municipality: e.target.value})}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
@@ -5431,6 +5491,7 @@ Are you absolutely sure you want to proceed?`;
                     <label htmlFor="concern-type-data" className="block text-sm font-medium text-gray-700">Concern Type Names</label>
                     <textarea
                       id="concern-type-data"
+                      name="concern-type-data"
                       placeholder="Enter concern types separated by commas or new lines&#10;Example:&#10;Security Issue&#10;Traffic Violation&#10;Public Disturbance&#10;Emergency Response&#10;Community Service"
                       value={concernTypeData}
                       onChange={(e) => setConcernTypeData(e.target.value)}
@@ -5685,6 +5746,8 @@ Are you absolutely sure you want to proceed?`;
                           >
                             <div className="flex items-center gap-3">
                                         <input
+                                          id={`concern-type-${type.id}`}
+                                          name={`concern-type-${type.id}`}
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={(e) => handleConcernTypeSelection(type.id, e.target.checked)}
