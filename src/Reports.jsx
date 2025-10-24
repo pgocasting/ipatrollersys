@@ -528,7 +528,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Load patrol data from Firestore for IPatroller Daily Summary
   const loadIPatrollerData = useCallback(async () => {
     try {
-      const monthYearId = `${String(ipatrollerSelectedMonth + 1).padStart(2, "0")}-${ipatrollerSelectedYear}`;
+      const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
       
       const monthDocRef = doc(db, 'patrolData', monthYearId);
       const municipalitiesRef = collection(monthDocRef, 'municipalities');
@@ -550,7 +550,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.error('Error loading IPatroller data:', error);
       setIpatrollerPatrolData([]);
     }
-  }, [ipatrollerSelectedMonth, ipatrollerSelectedYear]);
+  }, [selectedMonth, selectedYear]);
 
   // Load IPatroller data when modals are shown
   useEffect(() => {
@@ -663,7 +663,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   // Generate preview data for the report (moved from IPatroller.jsx)
   const generateIPatrollerPreviewData = () => {
-    const selectedDates = generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear);
+    const selectedDates = generateDates(selectedMonth, selectedYear);
     const overallSummary = calculateIPatrollerOverallSummary();
     
     // Group data by district
@@ -685,9 +685,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const previewData = {
       title: "I-Patroller Monthly Summary Report",
       generatedDate: new Date().toLocaleDateString(),
-      month: months[ipatrollerSelectedMonth],
-      year: ipatrollerSelectedYear,
-      reportPeriod: new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      month: months[selectedMonth],
+      year: selectedYear,
+      reportPeriod: new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
       dataSource: "Based on IPatroller Daily Counts",
       totalDaysInMonth,
       totalPossibleDays,
@@ -720,7 +720,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
-      const selectedDates = generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear);
+      const selectedDates = generateDates(selectedMonth, selectedYear);
       const overallSummary = calculateIPatrollerOverallSummary();
       
       // Group data by district
@@ -743,8 +743,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
-      const monthText = `Month: ${months[ipatrollerSelectedMonth]} ${ipatrollerSelectedYear}`;
-      const periodText = `Report Period: ${new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+      const monthText = `Month: ${months[selectedMonth]} ${selectedYear}`;
+      const periodText = `Report Period: ${new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
       const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
       
       const generatedWidth = doc.getTextWidth(generatedText);
@@ -821,7 +821,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       }
       
       // Save the PDF
-      doc.save(`ipatroller-monthly-summary-${months[ipatrollerSelectedMonth]}-${ipatrollerSelectedYear}.pdf`);
+      doc.save(`ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1006,139 +1006,216 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
     
-    // Add logo/header section
-    doc.setFillColor(59, 130, 246); // Blue background
-    doc.rect(0, 0, pageWidth, 40, 'F');
-    
-    // Main title - centered
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('I-Patroller Summary Report', centerX, 25, { align: 'center' });
-    
-    // Reset text color
-    doc.setTextColor(0, 0, 0);
-    
-    // Report info section with better organization
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Report Information', centerX, 60, { align: 'center' });
-    
-    // Info box
-    const infoY = 70;
-    doc.setFillColor(248, 250, 252);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
-    
-    // Report details - organized in two columns
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
-    
-    // Paper size indicator - right aligned
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
-    
-    // Overall Summary (matching I-Patroller exactly)
-    const overallSummary = calculateOverallSummary();
-    
-    // Summary section with better design
+    // Main title - centered and bold
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
-    doc.text('Overall Summary Statistics', centerX, 130, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    doc.text('I-Patroller Monthly Summary Report', centerX, 25, { align: 'center' });
     
-    // Summary box - centered and properly sized
-    const summaryY = 140;
-    const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 60;
-    
-    doc.setFillColor(239, 246, 255);
-    doc.rect(paperConfig.margin, summaryY - 5, boxWidth, boxHeight, 'F');
-    doc.setDrawColor(59, 130, 246);
-    doc.rect(paperConfig.margin, summaryY - 5, boxWidth, boxHeight, 'S');
-    
-    // Summary stats in organized layout - centered
+    // Report details - centered
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
+    doc.text(`Generated: ${new Date().toLocaleDateString()}`, centerX, 35, { align: 'center' });
+    doc.text(`Month: ${months[selectedMonth]} ${selectedYear}`, centerX, 42, { align: 'center' });
+    doc.text(`Report Period: ${months[selectedMonth]} ${selectedYear}`, centerX, 49, { align: 'center' });
+    doc.text('Data Source: Based on IPatroller Daily Counts', centerX, 56, { align: 'center' });
     
-    // Center the text within the box
-    const textStartX = paperConfig.margin + 15;
-    const lineHeight = 12;
+    // District Summary Section
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('District Summary', 20, 75);
     
-    doc.text(`• Total Patrols: ${overallSummary.totalPatrols.toLocaleString()}`, textStartX, summaryY + 10);
-    doc.text(`• Total Active Days: ${overallSummary.totalActive.toLocaleString()}`, textStartX, summaryY + 10 + lineHeight);
-    doc.text(`• Total Inactive Days: ${overallSummary.totalInactive.toLocaleString()}`, textStartX, summaryY + 10 + (lineHeight * 2));
-    doc.text(`• Average Active Percentage: ${overallSummary.avgActivePercentage}%`, textStartX, summaryY + 10 + (lineHeight * 3));
-    doc.text(`• Total Municipalities: ${overallSummary.municipalityCount}`, textStartX, summaryY + 10 + (lineHeight * 4));
-    
-    // Municipality Performance Table with better design
-    if (ipatrollerData && ipatrollerData.length > 0) {
-      let filteredData = selectedDistrict === 'all' 
-        ? ipatrollerData 
-        : ipatrollerData.filter(item => item.district === selectedDistrict);
+    // Calculate district summary data
+    const districtSummaryData = [];
+    Object.keys(municipalitiesByDistrict).forEach(district => {
+      const municipalities = municipalitiesByDistrict[district];
+      let totalPatrols = 0;
+      let activeDays = 0;
+      let inactiveDays = 0;
       
-      // Table title
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Municipality Performance Details', centerX, 210, { align: 'center' });
-      
-      const tableData = filteredData.map(item => {
-        const stats = calculatePatrolStats(item.data);
-        const totalDays = stats.activeDays + stats.inactiveDays;
-        const activePercentage = totalDays > 0 ? Math.round((stats.activeDays / totalDays) * 100) : 0;
-        
-        return [
-          item.municipality || 'N/A',
-          item.district || 'N/A',
-          stats.totalPatrols.toString(),
-          stats.activeDays.toString(),
-          stats.inactiveDays.toString(),
-          `${activePercentage}%`
-        ];
-      });
-      
-      autoTable(doc, {
-        head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
-        body: tableData,
-        startY: 220,
-        styles: { 
-          fontSize: paperSize === 'long' ? 10 : 9, 
-          cellPadding: 4,
-          overflow: 'linebreak',
-          halign: 'left'
-        },
-        headStyles: { 
-          fillColor: [59, 130, 246], 
-          fontStyle: 'bold',
-          textColor: [255, 255, 255],
-          fontSize: paperSize === 'long' ? 11 : 10
-        },
-        columnStyles: getColumnWidths(paperSize, 'ipatroller'),
-        margin: { left: paperConfig.margin, right: paperConfig.margin },
-        tableWidth: 'auto',
-        showHead: 'everyPage',
-        pageBreak: 'auto',
-        didDrawPage: function (data) {
-          // Add page numbers
-          const pageCount = doc.internal.getNumberOfPages();
-          const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-          doc.setFontSize(8);
-          doc.text(`Page ${currentPage} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+      municipalities.forEach(municipality => {
+        const municipalityData = ipatrollerData?.find(item => item.municipality === municipality);
+        if (municipalityData) {
+          const stats = calculatePatrolStats(municipalityData.data);
+          totalPatrols += stats.totalPatrols;
+          activeDays += stats.activeDays;
+          inactiveDays += stats.inactiveDays;
         }
       });
-    } else {
-      // No data message
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'italic');
-      doc.text('No patrol data available for the selected period.', paperConfig.margin, 175);
+      
+      const avgActivePercentage = (activeDays + inactiveDays) > 0 
+        ? Math.round((activeDays / (activeDays + inactiveDays)) * 100) 
+        : 0;
+      
+      districtSummaryData.push([
+        district,
+        municipalities.length.toString(),
+        totalPatrols.toLocaleString(),
+        activeDays.toString(),
+        inactiveDays.toString(),
+        `${avgActivePercentage}%`
+      ]);
+    });
+    
+    // District Summary Table
+    autoTable(doc, {
+      head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
+      body: districtSummaryData,
+      startY: 80,
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        overflow: 'linebreak',
+        halign: 'center',
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [59, 130, 246], // Blue background
+        fontStyle: 'bold',
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        halign: 'center'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252] // Light gray alternating rows
+      },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'center' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+    
+    // Municipality Performance Section
+    const finalY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Municipality Performance', 20, finalY);
+    
+    // Calculate municipality performance data
+    const municipalityData = [];
+    Object.keys(municipalitiesByDistrict).forEach(district => {
+      municipalitiesByDistrict[district].forEach(municipality => {
+        const municipalityInfo = ipatrollerData?.find(item => item.municipality === municipality);
+        const requiredBarangays = barangayCounts[municipality] || 0;
+        
+        if (municipalityInfo) {
+          const stats = calculatePatrolStats(municipalityInfo.data);
+          const totalDays = stats.activeDays + stats.inactiveDays;
+          const activePercentage = totalDays > 0 ? Math.round((stats.activeDays / totalDays) * 100) : 0;
+          
+          municipalityData.push([
+            municipality,
+            district,
+            requiredBarangays.toString(),
+            stats.totalPatrols.toLocaleString(),
+            stats.activeDays.toString(),
+            stats.inactiveDays.toString(),
+            `${activePercentage}%`
+          ]);
+        } else {
+          // Add municipality with no data
+          municipalityData.push([
+            municipality,
+            district,
+            requiredBarangays.toString(),
+            '0',
+            '0',
+            '0',
+            '0%'
+          ]);
+        }
+      });
+    });
+    
+    // Municipality Performance Table
+    autoTable(doc, {
+      head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
+      body: municipalityData,
+      startY: finalY + 5,
+      styles: {
+        fontSize: 8,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        halign: 'center',
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [34, 197, 94], // Green background
+        fontStyle: 'bold',
+        textColor: [255, 255, 255],
+        fontSize: 9,
+        halign: 'center'
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252] // Light gray alternating rows
+      },
+      columnStyles: {
+        0: { halign: 'left' },
+        1: { halign: 'left' },
+        2: { halign: 'center' },
+        3: { halign: 'center' },
+        4: { halign: 'center' },
+        5: { halign: 'center' },
+        6: { halign: 'center' }
+      },
+      margin: { left: 20, right: 20 }
+    });
+    
+    // Overall Summary Statistics Section
+    const overallFinalY = doc.lastAutoTable.finalY + 15;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Overall Summary Statistics', 20, overallFinalY);
+    
+    // Calculate overall statistics
+    const overallSummary = calculateOverallSummary();
+    const totalMunicipalities = Object.values(municipalitiesByDistrict).flat().length;
+    
+    const overallStatsData = [
+      ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
+      ['Total Active Days', overallSummary.totalActive.toString(), 'Total Municipalities', totalMunicipalities.toString()],
+      ['Total Inactive Days', overallSummary.totalInactive.toString(), '', '']
+    ];
+    
+    // Overall Summary Statistics Table
+    autoTable(doc, {
+      body: overallStatsData,
+      startY: overallFinalY + 5,
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+        overflow: 'linebreak',
+        halign: 'left',
+        lineColor: [0, 0, 0],
+        lineWidth: 0.1
+      },
+      columnStyles: {
+        0: { fontStyle: 'bold', halign: 'left', cellWidth: 40 },
+        1: { halign: 'left', cellWidth: 40 },
+        2: { fontStyle: 'bold', halign: 'left', cellWidth: 40 },
+        3: { halign: 'left', cellWidth: 40 }
+      },
+      margin: { left: 20, right: 20 },
+      showHead: false
+    });
+    
+    // Page footer
+    const pageCount = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Page ${i} of ${pageCount}`, centerX, doc.internal.pageSize.height - 10, { align: 'center' });
     }
     
-    doc.save(`ipatroller-summary-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+    doc.save(`ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
   };
 
   // Action Center Report (matching Action Center data structure)
@@ -3046,6 +3123,70 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         </div>
         */}
 
+        {/* Month and Year Filters */}
+        <Card className="bg-white shadow-sm border border-gray-200">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <CardTitle className="text-lg font-semibold text-black flex items-center gap-2">
+              <Filter className="w-5 h-5" />
+              Report Filters
+            </CardTitle>
+            <p className="text-gray-600">Select month and year for report generation</p>
+          </CardHeader>
+          <CardContent className="p-6">
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+              <div className="flex-1">
+                <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Month
+                </Label>
+                <Select 
+                  value={selectedMonth.toString()} 
+                  onValueChange={(value) => setSelectedMonth(parseInt(value))}
+                >
+                  <SelectTrigger id="month-filter" className="w-full">
+                    <SelectValue placeholder="Select month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {months.map((month, index) => (
+                      <SelectItem key={index} value={index.toString()}>
+                        {month}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex-1">
+                <Label htmlFor="year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                  Year
+                </Label>
+                <Select 
+                  value={selectedYear.toString()} 
+                  onValueChange={(value) => setSelectedYear(parseInt(value))}
+                >
+                  <SelectTrigger id="year-filter" className="w-full">
+                    <SelectValue placeholder="Select year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <div className="flex-1 sm:flex-initial">
+                <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                  Current Selection
+                </Label>
+                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900">
+                  {months[selectedMonth]} {selectedYear}
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
           {/* Reports Table */}
           <Card className="bg-white shadow-sm border border-gray-200">
@@ -4016,7 +4157,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   <div>
                     <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
                     <p className="text-sm text-gray-600">
-                      {new Date(ipatrollerSelectedYear, ipatrollerSelectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                      {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
                     </p>
                   </div>
                 </div>
@@ -4043,7 +4184,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     <div>
                       <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
                       <p className="text-lg font-semibold text-gray-900">
-                        {generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
+                        {generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
                       </p>
                     </div>
                   </div>
@@ -4057,7 +4198,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                       text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
                       focus:border-blue-500 transition-all duration-200 min-w-[200px]"
                     >
-                      {generateDates(ipatrollerSelectedMonth, ipatrollerSelectedYear).map((date, index) => (
+                      {generateDates(selectedMonth, selectedYear).map((date, index) => (
                         <option key={index} value={index} className="py-2">
                           {date.fullDate}
                         </option>
@@ -4185,61 +4326,38 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
               {/* Modal Content */}
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
                 <div className="space-y-6">
-                  {/* Report Header */}
-                  <div className="text-center border-b border-gray-200 pb-4">
-                    <h1 className="text-2xl font-bold text-gray-900">{ipatrollerPreviewData.title}</h1>
-                    <p className="text-sm text-gray-600 mt-2">Generated: {ipatrollerPreviewData.generatedDate}</p>
-                    <p className="text-sm text-gray-600">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
-                    <p className="text-sm text-gray-600">Data Source: {ipatrollerPreviewData.dataSource}</p>
-                  </div>
-
-                  {/* Overall Summary */}
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-3">Overall Summary</h2>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-blue-600">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</p>
-                        <p className="text-sm text-gray-600">Total Patrols</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-green-600">{ipatrollerPreviewData.overallSummary.totalActive}</p>
-                        <p className="text-sm text-gray-600">Active Days</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-red-600">{ipatrollerPreviewData.overallSummary.totalInactive}</p>
-                        <p className="text-sm text-gray-600">Inactive Days</p>
-                      </div>
-                      <div className="text-center">
-                        <p className="text-2xl font-bold text-purple-600">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</p>
-                        <p className="text-sm text-gray-600">Avg Active %</p>
-                      </div>
-                    </div>
+                  {/* Report Header - Centered */}
+                  <div className="text-center space-y-1">
+                    <p className="text-sm text-gray-700">Generated: {ipatrollerPreviewData.generatedDate}</p>
+                    <p className="text-sm text-gray-700">Month: {ipatrollerPreviewData.month} {ipatrollerPreviewData.year}</p>
+                    <p className="text-sm text-gray-700">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
+                    <p className="text-sm text-gray-700">Data Source: {ipatrollerPreviewData.dataSource}</p>
                   </div>
 
                   {/* District Summary */}
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-3">District Summary</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">District Summary</h2>
                     <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-200 rounded-lg">
-                        <thead className="bg-blue-600 text-white">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-sm font-medium">District</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium">Municipalities</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium">Total Patrols</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium">Active Days</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium">Inactive Days</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium">Avg Active %</th>
+                      <table className="w-full border border-gray-300">
+                        <thead>
+                          <tr className="bg-blue-500 text-white">
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipalities</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Avg Active %</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody>
                           {ipatrollerPreviewData.districtSummary.map((district, index) => (
                             <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{district.district}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.municipalityCount}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalPatrols.toLocaleString()}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalActive}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.totalInactive}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{district.avgActivePercentage}%</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.district}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.municipalityCount}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalPatrols.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalActive}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalInactive}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.avgActivePercentage}%</td>
                             </tr>
                           ))}
                         </tbody>
@@ -4249,30 +4367,67 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
 
                   {/* Municipality Performance */}
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900 mb-3">Municipality Performance</h2>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Municipality Performance</h2>
                     <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-200 rounded-lg">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">District</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Total Patrols</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Active Days</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Inactive Days</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Active %</th>
+                      <table className="w-full border border-gray-300">
+                        <thead>
+                          <tr className="bg-green-500 text-white">
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipality</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Required Barangays</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active %</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
+                        <tbody>
                           {ipatrollerPreviewData.municipalityPerformance.map((municipality, index) => (
-                            <tr key={municipality.municipality} className="hover:bg-gray-50">
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{municipality.municipality}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{municipality.district}</td>
-                              <td className="px-4 py-2 text-sm text-center text-gray-900">{municipality.totalPatrols}</td>
-                              <td className="px-4 py-2 text-sm text-center text-green-600 font-medium">{municipality.activeDays}</td>
-                              <td className="px-4 py-2 text-sm text-center text-red-600 font-medium">{municipality.inactiveDays}</td>
-                              <td className="px-4 py-2 text-sm text-center text-purple-600 font-medium">{municipality.activePercentage}%</td>
+                            <tr key={municipality.municipality} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.municipality}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.district}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.requiredBarangays}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.totalPatrols}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.activeDays}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.inactiveDays}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.activePercentage}%</td>
                             </tr>
                           ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Overall Summary Statistics */}
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border border-gray-300">
+                        <tbody>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Patrols</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">Average Active Percentage</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</td>
+                          </tr>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Active Days</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalActive}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Municipalities</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.municipalityCount}</td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Inactive Days</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalInactive}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
