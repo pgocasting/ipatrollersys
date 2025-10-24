@@ -41,13 +41,13 @@ const Sidebar = React.memo(({
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   return (
     <TooltipProvider>
-      <aside className={`flex h-screen flex-col bg-gray-800 border-r border-gray-700 transition-all duration-300 ease-in-out flex-shrink-0 shadow-lg
+      <aside className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex-shrink-0 shadow-lg
         ${isCollapsed && !isMobile ? 'w-16' : 'w-72'}
         ${isMobile ? 'block' : 'hidden md:block'}`}>
         
         {/* Header Section */}
         <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gray-700"></div>
+          <div className="absolute inset-0 bg-blue-600"></div>
           <div className={`relative flex h-20 items-center text-white ${
             isCollapsed && !isMobile ? 'justify-center px-2' : 'justify-between px-6'
           }`}>
@@ -123,7 +123,7 @@ const Sidebar = React.memo(({
           <nav className="px-3 space-y-1">
             {(!isCollapsed || isMobile) && (
               <div className="px-3 pb-3">
-                <h2 className="text-xs font-bold tracking-wider text-gray-400 uppercase">
+                <h2 className="text-xs font-bold tracking-wider text-gray-600 uppercase">
                   Main Menu
                 </h2>
               </div>
@@ -139,8 +139,8 @@ const Sidebar = React.memo(({
                   size={isCollapsed && !isMobile ? "icon" : "default"}
                   className={`w-full h-11 font-medium transition-all duration-300 group ${
                     isActive 
-                      ? 'bg-gray-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]' 
-                      : 'hover:bg-gray-700 text-gray-200 hover:text-white hover:translate-x-1 hover:shadow-md'
+                      ? 'bg-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]' 
+                      : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900 hover:translate-x-1 hover:shadow-md'
                   } ${
                     isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-3 justify-start'
                   } rounded-lg`}
@@ -148,14 +148,14 @@ const Sidebar = React.memo(({
                 >
                   {isCollapsed && !isMobile ? (
                     <Icon className={`h-5 w-5 ${
-                      isActive ? 'text-white' : 'text-gray-300'
+                      isActive ? 'text-white' : 'text-gray-600'
                     }`} />
                   ) : (
                     <div className="flex items-center gap-3 min-w-0">
                       <div className={`p-1.5 rounded-md transition-all duration-300 flex-shrink-0 ${
                         isActive 
                           ? 'bg-white/20 text-white' 
-                          : 'bg-gray-600 text-gray-300 group-hover:bg-gray-500 group-hover:text-white'
+                          : 'bg-gray-200 text-gray-600 group-hover:bg-gray-300 group-hover:text-gray-800'
                       }`}>
                         <Icon className="h-4 w-4" />
                       </div>
@@ -185,7 +185,7 @@ const Sidebar = React.memo(({
         </ScrollArea>
 
         {/* Footer Section */}
-        <div className="border-t border-gray-600 bg-gray-800 px-3 py-3">
+        <div className="border-t border-gray-200 bg-white px-3 py-3">
           {/* User Profile */}
           {isCollapsed && !isMobile ? (
             <div className="flex justify-center">
@@ -193,7 +193,7 @@ const Sidebar = React.memo(({
                 <TooltipTrigger asChild>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg border-2 border-gray-600 hover:border-gray-500 transition-all duration-300">
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all duration-300">
                         <Avatar className="h-7 w-7">
                           <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
                           <AvatarFallback className="text-xs font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
@@ -237,16 +237,16 @@ const Sidebar = React.memo(({
           ) : (
             <div className="space-y-3">
               {/* User Profile Card */}
-              <div className="relative overflow-hidden rounded-xl bg-gray-700 p-3 text-white">
-                <div className="absolute inset-0 bg-gray-600/20"></div>
+              <div className="relative overflow-hidden rounded-xl bg-gray-100 p-3 text-gray-800">
+                <div className="absolute inset-0 bg-gray-50/50"></div>
                 <div className="relative flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border-2 border-white/30">
+                  <Avatar className="h-10 w-10 border-2 border-gray-300">
                     <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                    <AvatarFallback className="text-xs font-bold bg-white/20 text-white backdrop-blur-sm">{initials}</AvatarFallback>
+                    <AvatarFallback className="text-xs font-bold bg-blue-600 text-white">{initials}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1 min-w-0">
                     <p className="text-sm font-bold leading-none truncate">{userInfo.name}</p>
-                    <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs mt-1 w-fit">
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs mt-1 w-fit">
                       {isAdmin ? 'Administrator' : userAccessLevel}
                     </Badge>
                   </div>
@@ -257,7 +257,7 @@ const Sidebar = React.memo(({
           
           {/* Settings and Logout Section */}
           {!isCollapsed && (
-            <div className="mt-3 pt-3 border-t border-gray-600 space-y-1">
+            <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
               {/* Settings Button */}
               {(() => {
                 const isActive = currentPage === 'settings';
@@ -267,8 +267,8 @@ const Sidebar = React.memo(({
                     size="default"
                     className={`w-full h-9 font-medium transition-all duration-300 group ${
                       isActive 
-                        ? 'bg-gray-600 text-white shadow-lg' 
-                        : 'hover:bg-gray-700 text-gray-200 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-lg' 
+                        : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
                     } px-3 justify-start rounded-lg`}
                     onClick={() => handleNavigation('settings')}
                   >
@@ -285,7 +285,7 @@ const Sidebar = React.memo(({
               <Button
                 variant="ghost"
                 size="default"
-                className="w-full h-9 font-medium transition-all duration-300 group hover:bg-red-900/20 text-gray-200 hover:text-red-400 px-3 justify-start rounded-lg"
+                className="w-full h-9 font-medium transition-all duration-300 group hover:bg-red-50 text-gray-700 hover:text-red-600 px-3 justify-start rounded-lg"
                 onClick={onLogout}
               >
                 <div className="flex items-center gap-3">
@@ -297,13 +297,13 @@ const Sidebar = React.memo(({
           )}
           
           {/* Collapse Button at Bottom */}
-          <div className="mt-3 pt-3 border-t border-gray-600">
+          <div className="mt-3 pt-3 border-t border-gray-200">
             <SidebarToggle
               type="collapse"
               isCollapsed={isCollapsed}
               variant="ghost"
               size={isCollapsed ? "icon" : "default"}
-              className={`w-full h-9 font-medium text-gray-200 ${
+              className={`w-full h-9 font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${
                 isCollapsed ? 'px-2 justify-center' : 'px-3 justify-start'
               } rounded-lg`}
               onToggle={onToggleCollapsed}
