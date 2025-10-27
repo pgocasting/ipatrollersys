@@ -55,16 +55,18 @@ export const DataProvider = ({ children }) => {
       return;
     }
 
-    setLoading(true);
+    // OPTIMIZED: Set loading to false immediately, load data in background
+    setLoading(false);
     const unsubscribeFunctions = [];
 
-    // Load essential data first
+    // Load essential data first (in background)
     const loadEssentialData = async () => {
       try {
         // Load minimal data needed for initial render
         const essentialDataQuery = query(
           collection(db, 'patrolData'),
-          orderBy('timestamp', 'desc')
+          orderBy('timestamp', 'desc'),
+          limit(10) // Only load 10 most recent items for faster initial load
         );
         const snapshot = await getDocs(essentialDataQuery);
         const essentialData = snapshot.docs.map(doc => ({
@@ -81,12 +83,8 @@ export const DataProvider = ({ children }) => {
             totalPatrols: essentialData.length
           }
         }));
-
-        // Mark loading as false after essential data is loaded
-        setLoading(false);
       } catch (error) {
         console.error('Error loading essential data:', error);
-        setLoading(false);
       }
     };
 

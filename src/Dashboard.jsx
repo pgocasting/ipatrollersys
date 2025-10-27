@@ -466,29 +466,35 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Load Command Center data when component mounts or user changes
+  // Load Command Center data when component mounts or user changes (non-blocking)
   useEffect(() => {
     if (userAccessLevel === 'command-center') {
-      fetchCommandCenterData();
+      // Load in background without blocking UI
+      setTimeout(() => {
+        fetchCommandCenterData();
+      }, 0);
     }
   }, [userAccessLevel, userMunicipality]);
 
-  // Auto-refresh Command Center data every 30 seconds for command-center users
+  // Auto-refresh Command Center data every 60 seconds for command-center users
   useEffect(() => {
     if (userAccessLevel === 'command-center') {
       const refreshInterval = setInterval(() => {
         dashboardLog('🔄 Auto-refreshing Command Center data...');
         fetchCommandCenterData();
-      }, 30000); // 30 seconds
+      }, 60000); // 60 seconds
 
       return () => clearInterval(refreshInterval);
     }
-  }, [userAccessLevel]);
+  }, [userAccessLevel, userMunicipality]);
 
-  // Load IPatroller data when component mounts
+  // Load IPatroller data when component mounts (non-blocking)
   useEffect(() => {
-    dashboardLog('🚀 Component mounted, loading IPatroller data...');
-    loadIPatrollerData();
+    dashboardLog('🚀 Component mounted, loading IPatroller data in background...');
+    // Load in background without blocking UI
+    setTimeout(() => {
+      loadIPatrollerData();
+    }, 0);
   }, []);
 
   const handleLogout = async () => {
@@ -1116,35 +1122,41 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Load Action Center data when component mounts and when user changes
+  // Load Action Center data when component mounts and when user changes (non-blocking)
   useEffect(() => {
-    fetchActionCenterData();
+    // Load in background without blocking UI
+    setTimeout(() => {
+      fetchActionCenterData();
+    }, 100); // Slight delay to prioritize UI rendering
   }, [userAccessLevel, userMunicipality]);
 
-  // Load Incidents data when component mounts and when user changes
+  // Load Incidents data when component mounts and when user changes (non-blocking)
   useEffect(() => {
-    fetchIncidentsData();
+    // Load in background without blocking UI
+    setTimeout(() => {
+      fetchIncidentsData();
+    }, 200); // Slight delay to prioritize UI rendering
   }, [userAccessLevel, userMunicipality]);
 
-  // Auto-refresh Action Center data every 30 seconds
+  // Auto-refresh Action Center data every 60 seconds
   useEffect(() => {
     const refreshInterval = setInterval(() => {
         dashboardLog('🔄 Auto-refreshing Action Center data...');
       fetchActionCenterData();
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds
 
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [userAccessLevel, userMunicipality]);
 
-  // Auto-refresh Incidents data every 30 seconds
+  // Auto-refresh Incidents data every 60 seconds
   useEffect(() => {
     const refreshInterval = setInterval(() => {
         dashboardLog('🔄 Auto-refreshing Incidents data...');
       fetchIncidentsData();
-    }, 30000); // 30 seconds
+    }, 60000); // 60 seconds
 
     return () => clearInterval(refreshInterval);
-  }, []);
+  }, [userAccessLevel, userMunicipality]);
 
   // Get action breakdown data from real Action Center data
   const getActionBreakdown = () => {
@@ -1779,20 +1791,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   const commandCenterData = getCommandCenterData();
 
-  if (dataLoading || (userAccessLevel === 'command-center' && isLoadingCommandCenter) || ipatrollerLoading || isLoadingActionCenter) {
-    return (
-      <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-        <div className="min-h-screen bg-white flex items-center justify-center">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-black"></div>
-            <span className="text-sm font-medium text-gray-700">
-              Loading dashboard data...
-            </span>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
+  // REMOVED: No blocking loading screen - show dashboard immediately
+  // All data loads in background, individual cards show loading states
 
   // Get instruction content based on user access level
   const getInstructionContent = () => {
