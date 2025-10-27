@@ -1408,15 +1408,22 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
     
     // Filter action reports by date and district
-    let filteredActions = actionReports || [];
+    // Use actionItems (loaded from fetchAllActionData) instead of actionReports from DataContext
+    let filteredActions = actionItems.length > 0 ? actionItems : (actionReports || []);
+    
+    console.log('📊 Generating Action Center Report with', filteredActions.length, 'total actions');
+    
     if (selectedMonth !== 'all' && selectedYear !== 'all') {
       filteredActions = filteredActions.filter(action => {
-        const actionDate = new Date(action.when);
+        const actionDate = action.when ? new Date(action.when) : null;
+        if (!actionDate) return false;
         return actionDate.getMonth() === selectedMonth && actionDate.getFullYear() === selectedYear;
       });
+      console.log('📅 After month/year filter:', filteredActions.length, 'actions');
     }
     if (selectedDistrict !== 'all') {
       filteredActions = filteredActions.filter(action => action.district === selectedDistrict);
+      console.log('🗺️ After district filter:', filteredActions.length, 'actions');
     }
     
     // Department breakdown
@@ -1427,35 +1434,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         departmentStats[dept] = { count: 0, pending: 0, resolved: 0 };
       }
       departmentStats[dept].count++;
-      if (action.status === 'pending') departmentStats[dept].pending++;
-      if (action.status === 'resolved') departmentStats[dept].resolved++;
+      
+      // Check both status and actionTaken fields (actionTaken is the actual field used)
+      const status = (action.status || action.actionTaken || '').toLowerCase();
+      if (status.includes('pending') || status.includes('ongoing') || status.includes('investigation')) {
+        departmentStats[dept].pending++;
+      } else if (status.includes('resolved') || status.includes('arrested') || status.includes('filed')) {
+        departmentStats[dept].resolved++;
+      } else {
+        // Default to pending if status is unclear
+        departmentStats[dept].pending++;
+      }
     });
     
-    // Department Statistics section with better design
-    doc.setFontSize(18);
+    // Department Statistics section - cleaner design
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('Department Statistics', centerX, 130, { align: 'center' });
-    
-    // Statistics box - centered and properly sized
-    const statsY = 140;
-    const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 40;
-    
-    doc.setFillColor(248, 250, 255);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'F');
-    doc.setDrawColor(147, 51, 234);
-    doc.rect(paperConfig.margin, statsY - 5, boxWidth, boxHeight, 'S');
-    
-    // Statistics in organized layout - centered
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'normal');
-    
-    const textStartX = paperConfig.margin + 15;
-    const lineHeight = 12;
-    
-    doc.text(`Total Action Reports: ${filteredActions.length}`, textStartX, statsY + 10);
-    doc.text(`Pending: ${filteredActions.filter(a => a.status === 'pending').length}`, textStartX, statsY + 10 + lineHeight);
-    doc.text(`Resolved: ${filteredActions.filter(a => a.status === 'resolved').length}`, textStartX, statsY + 10 + (lineHeight * 2));
+    doc.text('Department Statistics', centerX, 120, { align: 'center' });
     
     // Department breakdown table with autofit
     if (Object.keys(departmentStats).length > 0) {
@@ -1470,20 +1465,29 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       autoTable(doc, {
         head: [['Department', 'Total Reports', 'Pending', 'Resolved', 'Resolution Rate']],
         body: tableData,
-        startY: 135,
+        startY: 130,
         styles: { 
-          fontSize: paperSize === 'long' ? 10 : 9, 
-          cellPadding: 4,
+          fontSize: 10,
+          cellPadding: 3,
           overflow: 'linebreak',
-          halign: 'left'
+          halign: 'center',
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1
         },
         headStyles: { 
-          fillColor: [147, 51, 234], 
+          fillColor: [147, 51, 234],
           fontStyle: 'bold',
           textColor: [255, 255, 255],
-          fontSize: paperSize === 'long' ? 11 : 10
+          fontSize: 11,
+          halign: 'center'
         },
-        columnStyles: getColumnWidths(paperSize, 'action'),
+        columnStyles: {
+          0: { halign: 'left', cellWidth: 'auto' },
+          1: { halign: 'center', cellWidth: 'auto' },
+          2: { halign: 'center', cellWidth: 'auto' },
+          3: { halign: 'center', cellWidth: 'auto' },
+          4: { halign: 'center', cellWidth: 'auto' }
+        },
         margin: { left: paperConfig.margin, right: paperConfig.margin },
         tableWidth: 'auto',
         showHead: 'everyPage',
@@ -1500,7 +1504,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       // No data message
       doc.setFontSize(12);
       doc.setFont('helvetica', 'italic');
-      doc.text('No action reports available for the selected period.', paperConfig.margin, 135);
+      doc.setTextColor(100, 100, 100);
+      doc.text('No action reports available for the selected period.', centerX, 150, { align: 'center' });
     }
     
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
