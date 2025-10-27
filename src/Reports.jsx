@@ -111,7 +111,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const loadCommandCenterData = async () => {
     setIsLoadingCommandCenter(true);
     try {
-      const monthYear = `${selectedMonth}_${selectedYear}`;
+      // Convert month number to month name to match CommandCenter storage format
+      const monthName = months[selectedMonth]; // e.g., "September"
+      const monthYear = `${monthName}_${selectedYear}`;
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
       const commandCenterReports = {};
       
@@ -1683,82 +1685,121 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.log('Starting Command Center Report generation...');
       console.log('Command Center Data:', commandCenterData);
       
-      // Check if data is available
-      if (!commandCenterData.reports || Object.keys(commandCenterData.reports).length === 0) {
-        console.log('No Command Center data available, loading data first...');
-        await loadCommandCenterData();
+      // Load fresh data for report generation
+      let reportData = commandCenterData;
+      
+      // Always reload data to ensure we have the latest
+      console.log('Loading fresh Command Center data for report...');
+      const monthName = months[selectedMonth];
+      const monthYear = `${monthName}_${selectedYear}`;
+      const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
+      const commandCenterReports = {};
+      
+      // Load data for each municipality
+      for (const municipality of allMunicipalities) {
+        try {
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            const municipalityData = docSnap.data();
+            console.log(`✅ Loaded ${municipality} for report:`, municipalityData);
+            commandCenterReports[municipality] = municipalityData;
+          }
+        } catch (error) {
+          console.error(`❌ Error loading ${municipality}:`, error);
+        }
       }
       
+      // Load barangays and concern types
+      const barangaysResult = await getBarangays();
+      const concernTypesResult = await getConcernTypes();
+      
+      reportData = {
+        reports: commandCenterReports,
+        barangays: barangaysResult.success ? barangaysResult.data : [],
+        concernTypes: concernTypesResult.success ? concernTypesResult.data : []
+      };
+      
+      console.log('📊 Report data loaded:', {
+        municipalities: Object.keys(reportData.reports).length,
+        barangays: reportData.barangays.length,
+        concernTypes: reportData.concernTypes.length
+      });
+      
       const paperConfig = getPaperConfig(paperSize);
-      const doc = new jsPDF('p', 'mm', paperConfig.format);
+      const pdfDoc = new jsPDF('p', 'mm', paperConfig.format);
     
     // Calculate center position
-    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageWidth = pdfDoc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
     
-    // Add logo/header section
-    doc.setFillColor(16, 185, 129); // Green background
-    doc.rect(0, 0, pageWidth, 40, 'F');
+    // ============ PAGE 1: COVER PAGE ============
+    
+    // Add logo/header section - Full width banner
+    pdfDoc.setFillColor(16, 185, 129); // Green background
+    pdfDoc.rect(0, 0, pageWidth, 50, 'F');
     
     // Main title - centered
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(255, 255, 255);
-    doc.text('Command Center Report', centerX, 25, { align: 'center' });
+    pdfDoc.setFontSize(28);
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.setTextColor(255, 255, 255);
+    pdfDoc.text('Command Center Report', centerX, 32, { align: 'center' });
     
     // Reset text color
-    doc.setTextColor(0, 0, 0);
+    pdfDoc.setTextColor(0, 0, 0);
     
-    // Report info section with better organization
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Report Information', centerX, 60, { align: 'center' });
+    // Report Information Section - Table Style
+    let currentY = 65;
+    pdfDoc.setFontSize(14);
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.text('Report Information', centerX, currentY, { align: 'center' });
+    currentY += 8;
     
-    // Info box
-    const infoY = 70;
-    doc.setFillColor(248, 250, 252);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
-    doc.setDrawColor(16, 185, 129);
-    doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
+    // Report Information Table - Compact
+    const reportInfoData = [
+      ['Generated Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+      ['Report Month', months[selectedMonth]],
+      ['Report Year', selectedYear.toString()],
+      ['District Filter', selectedDistrict === 'all' ? 'All Districts' : selectedDistrict],
+      ['Paper Size', paperConfig.name]
+    ];
     
-    // Report details - organized in two columns
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin + 10, infoY + 5);
-    doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
-    doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
-    doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
+    autoTable(pdfDoc, {
+      body: reportInfoData,
+      startY: currentY,
+      theme: 'grid',
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3
+      },
+      columnStyles: {
+        0: { 
+          cellWidth: 50, 
+          fontStyle: 'bold', 
+          fillColor: [240, 253, 244],
+          halign: 'left'
+        },
+        1: { 
+          cellWidth: 'auto', 
+          halign: 'left'
+        }
+      },
+      margin: { left: paperConfig.margin, right: paperConfig.margin }
+    });
     
-    // Paper size indicator - right aligned
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
-    doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
+    currentY = pdfDoc.lastAutoTable.finalY + 12;
     
-    // Command Center Statistics section - Compact
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Command Center Overview', centerX, 130, { align: 'center' });
-    
-    // Statistics box - Compact and properly sized
-    const statsY = 138;
-    const boxWidth = pageWidth - (paperConfig.margin * 2);
-    const boxHeight = 45;
-    
-    doc.setFillColor(240, 253, 244);
-    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'F');
-    doc.setDrawColor(16, 185, 129);
-    doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'S');
-    
-    // Statistics in organized layout - Two columns for better space usage
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    
-    const textStartX = paperConfig.margin + 12;
-    const textStartX2 = paperConfig.margin + (boxWidth / 2) + 5;
-    const lineHeight = 10;
+    // Command Center Overview Section - Table Style
+    pdfDoc.setFontSize(14);
+    pdfDoc.setFont('helvetica', 'bold');
+    pdfDoc.text('Command Center Overview', centerX, currentY, { align: 'center' });
+    currentY += 8;
     
     // Calculate real statistics from Command Center data
-    const reports = commandCenterData.reports || {};
+    const reports = reportData.reports || {};
     const totalMunicipalities = Object.keys(reports).length;
     const totalReports = Object.values(reports).reduce((sum, report) => {
       if (report.weeklyReportData) {
@@ -1769,33 +1810,69 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       return sum;
     }, 0);
     
-    const totalBarangays = commandCenterData.barangays ? commandCenterData.barangays.length : 0;
-    const totalConcernTypes = commandCenterData.concernTypes ? commandCenterData.concernTypes.length : 0;
+    const totalBarangays = reportData.barangays ? reportData.barangays.length : 0;
+    const totalConcernTypes = reportData.concernTypes ? reportData.concernTypes.length : 0;
     
-    const commandCenterStats = {
-      municipalities: totalMunicipalities,
-      totalReports: totalReports,
-      totalBarangays: totalBarangays,
-      concernTypes: totalConcernTypes,
-      reportingPeriod: `${months[selectedMonth]} ${selectedYear}`,
-      dataStatus: isLoadingCommandCenter ? 'Loading...' : 'Current'
-    };
+    // Command Center Statistics Table - Compact
+    const statsData = [
+      ['Total Municipalities', totalMunicipalities.toString()],
+      ['Total Reports', totalReports.toString()],
+      ['Total Barangays', totalBarangays.toString()],
+      ['Total Concern Types', totalConcernTypes.toString()],
+      ['Reporting Period', `${months[selectedMonth]} ${selectedYear}`],
+      ['Data Status', isLoadingCommandCenter ? 'Loading...' : 'Current']
+    ];
     
-    // Left column
-    doc.text(`• Municipalities: ${commandCenterStats.municipalities}`, textStartX, statsY + 8);
-    doc.text(`• Total Reports: ${commandCenterStats.totalReports}`, textStartX, statsY + 8 + lineHeight);
-    doc.text(`• Reporting Period: ${commandCenterStats.reportingPeriod}`, textStartX, statsY + 8 + (lineHeight * 2));
+    autoTable(pdfDoc, {
+      body: statsData,
+      startY: currentY,
+      theme: 'grid',
+      styles: {
+        fontSize: 9,
+        cellPadding: 3,
+        lineColor: [200, 200, 200],
+        lineWidth: 0.3
+      },
+      columnStyles: {
+        0: { 
+          cellWidth: 50, 
+          fontStyle: 'bold', 
+          fillColor: [240, 253, 244],
+          halign: 'left'
+        },
+        1: { 
+          cellWidth: 'auto', 
+          halign: 'left',
+          fontSize: 10,
+          fontStyle: 'bold',
+          textColor: [16, 185, 129]
+        }
+      },
+      margin: { left: paperConfig.margin, right: paperConfig.margin }
+    });
     
-    // Right column
-    doc.text(`• Total Barangays: ${commandCenterStats.totalBarangays}`, textStartX2, statsY + 8);
-    doc.text(`• Concern Types: ${commandCenterStats.concernTypes}`, textStartX2, statsY + 8 + lineHeight);
-    doc.text(`• Data Status: ${commandCenterStats.dataStatus}`, textStartX2, statsY + 8 + (lineHeight * 2));
+    // Add footer note on first page
+    currentY = pdfDoc.lastAutoTable.finalY + 20;
+    pdfDoc.setFontSize(9);
+    pdfDoc.setFont('helvetica', 'italic');
+    pdfDoc.setTextColor(100, 100, 100);
+    pdfDoc.text('Detailed breakdown by district, municipality, and barangay follows on the next pages.', centerX, currentY, { align: 'center' });
+    pdfDoc.setTextColor(0, 0, 0);
     
-    // Process real Command Center data to create municipality structure
+    // ============ START PAGE 2: DISTRICT DATA ============
+    pdfDoc.addPage();
+    
+    // Process real Command Center data to create district-based hierarchical structure
     const processCommandCenterData = () => {
-      const municipalityData = {};
-      const reports = commandCenterData.reports || {};
-      const barangays = commandCenterData.barangays || [];
+      const districtData = {};
+      const reports = reportData.reports || {};
+      const barangays = reportData.barangays || [];
+      
+      console.log('🔍 Processing Command Center Data:');
+      console.log('📊 Reports:', reports);
+      console.log('📊 Reports keys:', Object.keys(reports));
+      console.log('🏘️ Barangays:', barangays.length);
+      console.log('📋 Command Center Data:', commandCenterData);
       
       // Get district mapping for municipalities
       const getDistrictForMunicipality = (municipality) => {
@@ -1809,8 +1886,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       
       // Process each municipality's data
       Object.entries(reports).forEach(([municipality, reportData]) => {
+        console.log(`🏙️ Processing municipality: ${municipality}`, reportData);
         const district = getDistrictForMunicipality(municipality);
         const weeklyData = reportData.weeklyReportData || {};
+        
+        // Initialize district if not exists
+        if (!districtData[district]) {
+          districtData[district] = {};
+        }
         
         // Get barangays for this municipality
         const municipalityBarangays = barangays.filter(b => b.municipality === municipality);
@@ -1820,9 +1903,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         // Process each barangay's data
         municipalityBarangays.forEach(barangay => {
           const barangayName = barangay.name;
-          const concernTypeCounts = {};
+          const concernTypeData = {};
           let totalReports = 0;
-          let completedReports = 0;
           
           // Count concern types for this barangay across all dates
           Object.values(weeklyData).forEach(dateEntries => {
@@ -1832,185 +1914,264 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 if (entry.barangay && entry.barangay.includes(barangayName)) {
                   totalReports++;
                   
-                  // Count concern type
+                  // Count concern type with action taken tracking
                   if (entry.concernType) {
-                    concernTypeCounts[entry.concernType] = (concernTypeCounts[entry.concernType] || 0) + 1;
-                  }
-                  
-                  // Check if report is completed (has action taken or remarks)
-                  if (entry.actionTaken || entry.remarks) {
-                    completedReports++;
+                    if (!concernTypeData[entry.concernType]) {
+                      concernTypeData[entry.concernType] = {
+                        total: 0,
+                        actionTaken: 0
+                      };
+                    }
+                    concernTypeData[entry.concernType].total++;
+                    
+                    // Check if action was taken
+                    if (entry.actionTaken && entry.actionTaken.trim() !== '') {
+                      concernTypeData[entry.concernType].actionTaken++;
+                    }
                   }
                 }
               });
             }
           });
           
-          // Convert concern type counts to array format
-          const concernTypes = Object.entries(concernTypeCounts).map(([type, count]) => ({
+          // Convert concern type data to array format
+          const concernTypes = Object.entries(concernTypeData).map(([type, data]) => ({
             type,
-            count
+            total: data.total,
+            actionTaken: data.actionTaken
           }));
           
           // Only include barangays that have data
           if (totalReports > 0) {
             barangayData[barangayName] = {
               concernTypes,
-              totalReports,
-              completionRate: totalReports > 0 ? Math.round((completedReports / totalReports) * 100) : 0
+              totalReports
             };
           }
         });
         
         // Only include municipalities that have barangay data
         if (Object.keys(barangayData).length > 0) {
-          municipalityData[municipality] = {
-            district,
+          districtData[district][municipality] = {
             barangays: barangayData
           };
         }
       });
       
-      return municipalityData;
+      console.log('✅ Final districtData:', districtData);
+      console.log('✅ District keys:', Object.keys(districtData));
+      return districtData;
     };
     
-    const municipalityData = processCommandCenterData();
+    const districtData = processCommandCenterData();
+    console.log('📦 Processed districtData:', districtData);
 
-    // Filter municipalities by selected district
-    let filteredMunicipalities = Object.entries(municipalityData);
+    // Filter districts by selected district
+    let filteredDistricts = Object.entries(districtData);
+    console.log('🔍 All districts:', filteredDistricts.map(([d]) => d));
+    console.log('🎯 Selected district:', selectedDistrict);
+    
     if (selectedDistrict !== 'all') {
-      filteredMunicipalities = filteredMunicipalities.filter(([municipality, data]) => data.district === selectedDistrict);
+      filteredDistricts = filteredDistricts.filter(([district]) => district === selectedDistrict);
+      console.log('🔍 Filtered districts:', filteredDistricts.map(([d]) => d));
     }
     
+    console.log('📊 Filtered districts length:', filteredDistricts.length);
+    
     // If no data available, show message
-    if (filteredMunicipalities.length === 0) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'normal');
-      doc.text('No Command Center data available for the selected period and district.', centerX, 200, { align: 'center' });
-      doc.text('Please ensure data has been entered in the Command Center module.', centerX, 215, { align: 'center' });
+    if (filteredDistricts.length === 0) {
+      console.log('❌ No data available - generating empty report');
+      console.log('❌ reportData:', reportData);
+      console.log('❌ districtData:', districtData);
+      pdfDoc.setFontSize(12);
+      pdfDoc.setFont('helvetica', 'normal');
+      pdfDoc.text('No Command Center data available for the selected period and district.', centerX, 200, { align: 'center' });
+      pdfDoc.text('Please ensure data has been entered in the Command Center module.', centerX, 215, { align: 'center' });
       
-      doc.save(`command-center-no-data-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+      pdfDoc.save(`command-center-no-data-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
       return;
     }
 
-    let currentY = 195;
+    // Start districts on page 2 with proper Y position
+    currentY = 30;
 
-    // Municipality Details Section - Per Barangay Breakdown
-    filteredMunicipalities.forEach(([municipality, data], index) => {
-      // Check if we need a new page
-      if (currentY > paperConfig.height - 120) {
-        doc.addPage();
+    // District-based hierarchical report structure
+    filteredDistricts.forEach(([district, municipalities], districtIndex) => {
+      // Start each district on a new page for better organization
+      if (districtIndex > 0) {
+        pdfDoc.addPage();
         currentY = 30;
       }
 
-      // Municipality Header
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`${municipality} (${data.district})`, centerX, currentY, { align: 'center' });
-      currentY += 12;
+      // DISTRICT HEADER - Full width banner
+      pdfDoc.setFillColor(16, 185, 129);
+      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 18, 'F');
+      pdfDoc.setFontSize(18);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setTextColor(255, 255, 255);
+      pdfDoc.text(district, centerX, currentY + 12, { align: 'center' });
+      pdfDoc.setTextColor(0, 0, 0);
+      currentY += 25;
 
-      // Calculate municipality totals
-      const barangayEntries = Object.entries(data.barangays);
-      const totalReports = barangayEntries.reduce((sum, [, barangay]) => sum + barangay.totalReports, 0);
-      const avgCompletionRate = Math.round(barangayEntries.reduce((sum, [, barangay]) => sum + barangay.completionRate, 0) / barangayEntries.length);
+      // Calculate district totals
+      const municipalityEntries = Object.entries(municipalities);
+      const districtTotalReports = municipalityEntries.reduce((sum, [, munData]) => {
+        return sum + Object.values(munData.barangays).reduce((mSum, brgy) => mSum + brgy.totalReports, 0);
+      }, 0);
+      const districtTotalBarangays = municipalityEntries.reduce((sum, [, munData]) => {
+        return sum + Object.keys(munData.barangays).length;
+      }, 0);
 
-      // Municipality Summary Box - Compact
-      const summaryBoxHeight = 25;
-      doc.setFillColor(240, 253, 244);
-      doc.rect(paperConfig.margin, currentY - 3, pageWidth - (paperConfig.margin * 2), summaryBoxHeight, 'F');
-      doc.setDrawColor(16, 185, 129);
-      doc.rect(paperConfig.margin, currentY - 3, pageWidth - (paperConfig.margin * 2), summaryBoxHeight, 'S');
-
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Total Reports: ${totalReports}`, paperConfig.margin + 8, currentY + 5);
-      doc.text(`Avg Completion: ${avgCompletionRate}%`, paperConfig.margin + 8, currentY + 15);
-      doc.text(`Barangays: ${barangayEntries.length}`, pageWidth - paperConfig.margin - 60, currentY + 5);
-      doc.text(`Per Barangay Details`, pageWidth - paperConfig.margin - 60, currentY + 15);
+      // District Summary Box
+      pdfDoc.setFillColor(240, 253, 244);
+      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'F');
+      pdfDoc.setDrawColor(16, 185, 129);
+      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'S');
       
-      currentY += summaryBoxHeight + 8;
+      pdfDoc.setFontSize(10);
+      pdfDoc.setFont('helvetica', 'italic');
+      pdfDoc.setTextColor(0, 0, 0);
+      pdfDoc.text(`District Summary: ${municipalityEntries.length} Municipalities | ${districtTotalBarangays} Barangays | ${districtTotalReports} Total Reports`, centerX, currentY + 10, { align: 'center' });
+      currentY += 22;
 
-      // Barangay Details - Each barangay with its concern types
-      barangayEntries.forEach(([barangayName, barangayData], barangayIndex) => {
-        // Calculate space needed for this barangay (header + table)
-        const spaceNeeded = 35 + (barangayData.concernTypes.length * 8); // Approximate space needed
-        
-        // Check if we need a new page for barangay details
-        if (currentY + spaceNeeded > paperConfig.height - 30) {
-          doc.addPage();
+      // Process each municipality in the district
+      municipalityEntries.forEach(([municipality, munData], munIndex) => {
+        // Check if we need a new page
+        if (currentY > paperConfig.height - 100) {
+          pdfDoc.addPage();
           currentY = 30;
         }
 
-        // Barangay Header - Compact
-        doc.setFontSize(11);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(16, 185, 129);
-        doc.text(`Barangay ${barangayName}`, paperConfig.margin, currentY);
-        doc.setTextColor(0, 0, 0);
-        
-        // Barangay summary info - Same line
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`(${barangayData.totalReports} reports, ${barangayData.completionRate}% completion)`, paperConfig.margin + 80, currentY);
+        // MUNICIPALITY HEADER - Clean box design
+        pdfDoc.setFillColor(34, 139, 34);
+        pdfDoc.rect(paperConfig.margin + 5, currentY, pageWidth - (paperConfig.margin * 2) - 10, 12, 'F');
+        pdfDoc.setFontSize(14);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setTextColor(255, 255, 255);
+        pdfDoc.text(municipality, paperConfig.margin + 10, currentY + 8);
+        pdfDoc.setTextColor(0, 0, 0);
+        currentY += 17;
+
+        // Calculate municipality totals
+        const barangayEntries = Object.entries(munData.barangays);
+        const munTotalReports = barangayEntries.reduce((sum, [, brgy]) => sum + brgy.totalReports, 0);
+
+        // Municipality Summary - inline with better spacing
+        pdfDoc.setFontSize(9);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.setTextColor(100, 100, 100);
+        pdfDoc.text(`${barangayEntries.length} Barangays | ${munTotalReports} Reports`, paperConfig.margin + 10, currentY);
+        pdfDoc.setTextColor(0, 0, 0);
         currentY += 10;
 
-        // Concern Types Table for this barangay - Optimized
-        const concernTableData = barangayData.concernTypes.map(concern => [
-          concern.type,
-          concern.count.toString(),
-          `${Math.round((concern.count / barangayData.totalReports) * 100)}%`
-        ]);
+        // Process each barangay in the municipality
+        barangayEntries.forEach(([barangayName, barangayData], brgyIndex) => {
+          // Calculate space needed for this barangay
+          const spaceNeeded = 40 + (barangayData.concernTypes.length * 8);
+          
+          // Check if we need a new page
+          if (currentY + spaceNeeded > paperConfig.height - 30) {
+            pdfDoc.addPage();
+            currentY = 30;
+          }
 
-        // Calculate optimal column widths based on available space
-        const availableWidth = pageWidth - (paperConfig.margin * 2) - 15; // Account for indentation
-        const col1Width = availableWidth * 0.6; // 60% for concern type
-        const col2Width = availableWidth * 0.2; // 20% for count
-        const col3Width = availableWidth * 0.2; // 20% for percentage
+          // BARANGAY HEADER - Cleaner design without symbols
+          pdfDoc.setFillColor(245, 248, 250);
+          pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'F');
+          pdfDoc.setDrawColor(70, 130, 180);
+          pdfDoc.setLineWidth(0.5);
+          pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'S');
+          
+          pdfDoc.setFontSize(11);
+          pdfDoc.setFont('helvetica', 'bold');
+          pdfDoc.setTextColor(70, 130, 180);
+          pdfDoc.text(`Barangay ${barangayName}`, paperConfig.margin + 20, currentY + 7);
+          
+          // Barangay total - right aligned
+          pdfDoc.setFontSize(9);
+          pdfDoc.setFont('helvetica', 'normal');
+          pdfDoc.setTextColor(100, 100, 100);
+          pdfDoc.text(`(${barangayData.totalReports} reports)`, pageWidth - paperConfig.margin - 50, currentY + 7);
+          pdfDoc.setTextColor(0, 0, 0);
+          currentY += 15;
 
-        autoTable(doc, {
-          head: [['Concern Type', 'Count', '%']],
-          body: concernTableData,
-          startY: currentY,
-          styles: { 
-            fontSize: 7, 
-            cellPadding: 2,
-            halign: 'left',
-            overflow: 'linebreak'
-          },
-          headStyles: { 
-            fillColor: [16, 185, 129], 
-            fontStyle: 'bold',
-            textColor: [255, 255, 255],
-            fontSize: 8,
-            halign: 'center'
-          },
-          columnStyles: {
-            0: { cellWidth: col1Width, halign: 'left' },
-            1: { cellWidth: col2Width, halign: 'center' },
-            2: { cellWidth: col3Width, halign: 'center' }
-          },
-          margin: { left: paperConfig.margin + 10, right: paperConfig.margin + 5 },
-          theme: 'striped',
-          alternateRowStyles: { fillColor: [248, 250, 252] },
-          tableWidth: 'wrap'
+          // CONCERN TYPES TABLE with Total and Action Taken columns
+          const concernTableData = barangayData.concernTypes.map(concern => [
+            concern.type,
+            concern.total.toString(),
+            concern.actionTaken.toString()
+          ]);
+
+          // Add totals row
+          const totalConcerns = barangayData.concernTypes.reduce((sum, c) => sum + c.total, 0);
+          const totalActions = barangayData.concernTypes.reduce((sum, c) => sum + c.actionTaken, 0);
+          concernTableData.push(['TOTAL', totalConcerns.toString(), totalActions.toString()]);
+
+          // Calculate optimal column widths - better proportions
+          const tableWidth = pageWidth - (paperConfig.margin * 2) - 40;
+          const col1Width = tableWidth * 0.60; // 60% for concern type
+          const col2Width = tableWidth * 0.20; // 20% for total
+          const col3Width = tableWidth * 0.20; // 20% for action taken
+
+          autoTable(pdfDoc, {
+            head: [['Concern Type', 'Total', 'Action Taken']],
+            body: concernTableData,
+            startY: currentY,
+            styles: { 
+              fontSize: 9, 
+              cellPadding: 3,
+              halign: 'left',
+              overflow: 'linebreak',
+              lineColor: [200, 200, 200],
+              lineWidth: 0.3
+            },
+            headStyles: { 
+              fillColor: [70, 130, 180], 
+              fontStyle: 'bold',
+              textColor: [255, 255, 255],
+              fontSize: 10,
+              halign: 'center',
+              cellPadding: 4
+            },
+            columnStyles: {
+              0: { cellWidth: col1Width, halign: 'left', fontStyle: 'normal' },
+              1: { cellWidth: col2Width, halign: 'center', fontStyle: 'normal' },
+              2: { cellWidth: col3Width, halign: 'center', fontStyle: 'normal' }
+            },
+            margin: { left: paperConfig.margin + 20, right: paperConfig.margin + 20 },
+            theme: 'striped',
+            alternateRowStyles: { fillColor: [248, 250, 252] },
+            tableWidth: 'wrap',
+            didParseCell: function(data) {
+              // Make totals row bold with distinct background
+              if (data.row.index === concernTableData.length - 1) {
+                data.cell.styles.fontStyle = 'bold';
+                data.cell.styles.fillColor = [200, 230, 255];
+                data.cell.styles.fontSize = 10;
+              }
+            }
+          });
+
+          currentY = pdfDoc.lastAutoTable.finalY + 10;
         });
 
-        currentY = doc.lastAutoTable.finalY + 8;
+        // Add spacing between municipalities
+        currentY += 8;
       });
 
-      // Add spacing between municipalities - Reduced
-      currentY += 8;
+      // Add spacing between districts
+      currentY += 12;
     });
 
     // Add page numbers to all pages
-    const pageCount = doc.internal.getNumberOfPages();
+    const pageCount = pdfDoc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.text(`Page ${i} of ${pageCount}`, paperConfig.margin, doc.internal.pageSize.height - 10);
+      pdfDoc.setPage(i);
+      pdfDoc.setFontSize(8);
+      pdfDoc.text(`Page ${i} of ${pageCount}`, paperConfig.margin, pdfDoc.internal.pageSize.height - 10);
     }
     
-    doc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+    pdfDoc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
     console.log('Command Center Report generated successfully!');
     } catch (error) {
       console.error('Error generating Command Center Report:', error);
