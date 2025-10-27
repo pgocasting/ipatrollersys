@@ -698,10 +698,39 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return dataToUse
       .filter(item => item && (item.municipality || item.id))
       .map(item => {
+        // Calculate Active Days from Daily Counts tab logic (days with >= 5 patrols)
         const activeDays = item.data.filter(count => count >= 5).length;
         const inactiveDays = item.data.filter(count => count < 5 && count > 0).length;
         const totalDays = item.data.length;
-        const activePercentage = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
+        
+        // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
+        const totalPatrols = item.data.reduce((sum, count) => sum + (count || 0), 0);
+        
+        // Calculate Performance % from Criteria tab logic (Overall Percentage)
+        // Based on weekly efficiency: (Reports Attended / 98) × 100, summed across 4 weeks
+        const WEEKLY_MIN = 98; // Minimum reports per week (14 × 7)
+        const weeklyEfficiency = [];
+        
+        // Get Action Taken counts from Command Center data for this municipality
+        const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+        
+        // Calculate efficiency for each of the 4 weeks
+        for (let week = 0; week < 4; week++) {
+          const weekStart = week * 7;
+          const weekEnd = Math.min(weekStart + 7, totalDays);
+          
+          if (weekStart < totalDays) {
+            // Use Action Taken count from Command Center data
+            const attended = municipalityActionCounts[week] || 0;
+            const efficiency = Math.round((attended / WEEKLY_MIN) * 100);
+            weeklyEfficiency.push(efficiency);
+          } else {
+            weeklyEfficiency.push(0);
+          }
+        }
+        
+        // Overall Percentage is the sum of all weekly efficiency percentages
+        const activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
         
         return {
           ...item,
@@ -709,13 +738,17 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           inactiveDays,
           totalDays,
           activePercentage,
-          totalPatrols: item.data.reduce((sum, count) => sum + (count || 0), 0)
+          totalPatrols
         };
       })
       .sort((a, b) => {
-        // Sort by active percentage first, then by total patrols
+        // Sort by performance percentage first (primary metric), then by active days (secondary), then by total patrols (tertiary)
+        // This ensures municipalities with higher performance rank higher
         if (b.activePercentage !== a.activePercentage) {
           return b.activePercentage - a.activePercentage;
+        }
+        if (b.activeDays !== a.activeDays) {
+          return b.activeDays - a.activeDays;
         }
         return b.totalPatrols - a.totalPatrols;
       })
@@ -770,14 +803,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       
       // Prepare table data
       const tableData = topPerformers.map((performer, index) => {
-        const activePercentage = performer.activeDays + performer.inactiveDays > 0 
-          ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
-          : 0;
+        // Use the pre-calculated activePercentage from Criteria tab logic
+        const activePercentage = performer.activePercentage;
         
         const getStatusText = () => {
-          if (activePercentage === 100) return 'Very Satisfactory';
-          if (activePercentage >= 75) return 'Very Good';
-          if (activePercentage >= 50) return 'Good';
+          if (activePercentage >= 96) return 'Very Satisfactory';
+          if (activePercentage >= 86) return 'Very Good';
+          if (activePercentage >= 75) return 'Good';
           return 'Needs Improvement';
         };
 
@@ -911,12 +943,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'bold');
       doc.text('• Average Performance:', rightColumn, summaryY + 30);
       doc.setFont('helvetica', 'normal');
-      const avgPercentage = Math.round(topPerformers.reduce((sum, p) => {
-        const activePercentage = p.activeDays + p.inactiveDays > 0 
-          ? Math.round((p.activeDays / (p.activeDays + p.inactiveDays)) * 100)
-          : 0;
-        return sum + activePercentage;
-      }, 0) / topPerformers.length);
+      const avgPercentage = Math.round(topPerformers.reduce((sum, p) => sum + p.activePercentage, 0) / topPerformers.length);
       doc.text(`${avgPercentage}%`, rightColumn + 100, summaryY + 30);
       
       // Add footer
@@ -2431,11 +2458,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     <h4 className="font-semibold text-gray-900 mb-3">How Top Performers Ranking Works</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                       <div className="space-y-2">
-                        <p><strong>Ranking Criteria:</strong> Municipalities are ranked by active percentage first, then by total patrols</p>
-                        <p><strong>Performance Status:</strong> Very Satisfactory (100%), Very Good (75%+), Good (50%+), Needs Improvement (&lt;50%)</p>
+                        <p><strong>Ranking Criteria:</strong> Municipalities are ranked by performance % first, then by active days, then by total patrols as tiebreakers</p>
+                        <p><strong>Active Days:</strong> Days with 5 or more patrols (from Daily Counts tab)</p>
+                        <p><strong>Total Patrols:</strong> Sum of Week 1-4 actual reports (from Criteria tab)</p>
                       </div>
                       <div className="space-y-2">
-                        <p><strong>Active Percentage:</strong> Calculated as (Active Days ÷ Total Days) × 100</p>
+                        <p><strong>Performance %:</strong> Overall percentage from Criteria tab (sum of weekly efficiency)</p>
+                        <p><strong>Status Levels:</strong> Very Satisfactory (96-100%), Very Good (86-95%), Good (75-85%), Needs Improvement (&lt;75%)</p>
                         <p><strong>Top 12 Display:</strong> Shows the best performing municipalities for the selected month</p>
                       </div>
                     </div>
@@ -2563,21 +2592,20 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           </thead>
                           <tbody className="divide-y divide-gray-200">
                             {getTopPerformers().map((performer, index) => {
-                              const activePercentage = performer.activeDays + performer.inactiveDays > 0 
-                                ? Math.round((performer.activeDays / (performer.activeDays + performer.inactiveDays)) * 100)
-                                : 0;
+                              // Use the pre-calculated activePercentage from Criteria tab logic
+                              const activePercentage = performer.activePercentage;
                               
                               const getStatusStyle = () => {
-                                if (activePercentage === 100) return 'bg-blue-100 text-blue-800 border-blue-200';
-                                if (activePercentage >= 75) return 'bg-green-100 text-green-800 border-green-200';
-                                if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-                                return 'bg-red-100 text-red-800 border-red-200';
+                                if (activePercentage >= 96) return 'bg-blue-100 text-blue-800 border-blue-200'; // Very Satisfactory (96-100)
+                                if (activePercentage >= 86) return 'bg-green-100 text-green-800 border-green-200'; // Very Good (86-95)
+                                if (activePercentage >= 75) return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Good (75-85)
+                                return 'bg-red-100 text-red-800 border-red-200'; // Needs Improvement (<75)
                               };
                               
                               const getStatusText = () => {
-                                if (activePercentage === 100) return 'Very Satisfactory';
-                                if (activePercentage >= 75) return 'Very Good';
-                                if (activePercentage >= 50) return 'Good';
+                                if (activePercentage >= 96) return 'Very Satisfactory';
+                                if (activePercentage >= 86) return 'Very Good';
+                                if (activePercentage >= 75) return 'Good';
                                 return 'Needs Improvement';
                               };
 

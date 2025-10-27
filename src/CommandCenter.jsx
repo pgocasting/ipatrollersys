@@ -1125,10 +1125,14 @@ Are you absolutely sure you want to proceed?`;
   const getConcernTypesForMunicipality = (municipality) => {
     if (!municipality) return importedConcernTypes;
     
-    return importedConcernTypes.filter(type => 
-      type.municipality === municipality || 
-      type.municipality === "All Municipalities"
-    );
+    // Normalize municipality name for comparison (handle "Balanga" vs "Balanga City")
+    const normalizedMunicipality = municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+    
+    return importedConcernTypes.filter(type => {
+      if (type.municipality === "All Municipalities") return true;
+      const normalizedType = type.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+      return normalizedType === normalizedMunicipality;
+    });
   };
 
   // Calculate summary statistics for weekly report per municipality
@@ -3884,6 +3888,24 @@ Are you absolutely sure you want to proceed?`;
           </div>
           
           <div className="flex items-center gap-4">
+            {/* Municipality Badge - for non-admin users */}
+            {(activeMunicipalityTab || userMunicipality) && (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0">
+                <Building2 className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
+                <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
+                  {importedBarangays.filter(b => {
+                    const currentMunicipality = activeMunicipalityTab || userMunicipality;
+                    if (!currentMunicipality) return true;
+                    // Normalize municipality names for comparison
+                    const normalizedCurrent = currentMunicipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                    const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                    return normalizedBarangay === normalizedCurrent;
+                  }).length} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
+                </span>
+              </div>
+            )}
+            
             {/* View Options Dropdown */}
             <div className="relative">
               <button
@@ -3992,7 +4014,12 @@ Are you absolutely sure you want to proceed?`;
                           </div>
                           <div className="text-sm text-gray-600">
                             {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
-                            {importedBarangays.filter(b => b.municipality === activeMunicipalityTab).length} barangays
+                            {importedBarangays.filter(b => {
+                              if (!activeMunicipalityTab) return false;
+                              const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                              const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                              return normalizedBarangay === normalizedTab;
+                            }).length} barangays
                           </div>
                         </div>
                       )}
@@ -4164,17 +4191,6 @@ Are you absolutely sure you want to proceed?`;
                         </Dialog>
                       )}
                       
-                      {/* Municipality Badge - moved before Save button */}
-                      {(activeMunicipalityTab || userMunicipality) && (
-                        <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0">
-                          <Building2 className="h-4 w-4 text-green-600" />
-                          <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
-                          <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
-                            {importedBarangays.filter(b => (activeMunicipalityTab || userMunicipality) ? b.municipality === (activeMunicipalityTab || userMunicipality) : true).length} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
-                          </span>
-                        </div>
-                      )}
-
                       {(isAdmin || userAccessLevel === 'command-center') && (
                         <button 
                           onClick={handleSaveWeeklyReport}
@@ -4384,9 +4400,13 @@ Are you absolutely sure you want to proceed?`;
                                   >
                                     <option value="">Select Barangay</option>
                                     {importedBarangays
-                                      .filter(barangay => 
-                                        !activeMunicipalityTab || barangay.municipality === activeMunicipalityTab
-                                      )
+                                      .filter(barangay => {
+                                        if (!activeMunicipalityTab) return true;
+                                        // Normalize municipality names for comparison (handle "Balanga" vs "Balanga City")
+                                        const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                                        const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                                        return normalizedBarangay === normalizedTab;
+                                      })
                                       .map((barangay) => (
                                         <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
                                           {barangay.name} ({barangay.municipality})
@@ -4552,9 +4572,13 @@ Are you absolutely sure you want to proceed?`;
                                       >
                                         <option value="">Select Barangay</option>
                                         {importedBarangays
-                                          .filter(barangay => 
-                                            !activeMunicipalityTab || barangay.municipality === activeMunicipalityTab
-                                          )
+                                          .filter(barangay => {
+                                            if (!activeMunicipalityTab) return true;
+                                            // Normalize municipality names for comparison (handle "Balanga" vs "Balanga City")
+                                            const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                                            const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                                            return normalizedBarangay === normalizedTab;
+                                          })
                                           .map((barangay) => (
                                             <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
                                               {barangay.name} ({barangay.municipality})
