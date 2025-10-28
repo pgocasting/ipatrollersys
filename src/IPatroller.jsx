@@ -824,30 +824,37 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         ];
       });
 
-      // Add table using autoTable
+      // Add table using autoTable with auto-fit columns
       autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', 'Active Days', 'Total Patrols', 'Performance', 'Status']],
+        head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Performa\nnce', 'Status']],
         body: tableData,
-        startY: 110,
+        startY: 105,
+        margin: { left: 30, right: 30 },
+        tableWidth: 'auto',
         styles: {
           fontSize: 9,
-          cellPadding: 4,
+          cellPadding: 5,
           halign: 'center',
-          valign: 'middle'
+          valign: 'middle',
+          lineColor: [200, 200, 200],
+          lineWidth: 0.5
         },
         headStyles: {
           fillColor: [59, 130, 246],
           textColor: [255, 255, 255],
-          fontStyle: 'bold'
+          fontStyle: 'bold',
+          fontSize: 9,
+          cellPadding: 6,
+          halign: 'center'
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 30 },  // Rank
-          1: { halign: 'left', cellWidth: 80 },    // Municipality
-          2: { halign: 'left', cellWidth: 60 },     // District
-          3: { halign: 'center', cellWidth: 50 },   // Active Days
-          4: { halign: 'center', cellWidth: 50 },   // Total Patrols
-          5: { halign: 'center', cellWidth: 50 },   // Performance
-          6: { halign: 'center', cellWidth: 60 }    // Status
+          0: { halign: 'center', cellWidth: 'auto', minCellWidth: 30 },  // Rank
+          1: { halign: 'left', cellWidth: 'auto', minCellWidth: 80 },    // Municipality
+          2: { halign: 'center', cellWidth: 'auto', minCellWidth: 70 },  // District
+          3: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },  // Active Days
+          4: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },  // Total Patrols
+          5: { halign: 'center', cellWidth: 'auto', minCellWidth: 55 },  // Performance
+          6: { halign: 'center', cellWidth: 'auto', minCellWidth: 90 }   // Status
         },
         alternateRowStyles: {
           fillColor: [248, 250, 252]
@@ -891,10 +898,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         }
       });
 
-      // Add summary statistics
-      const finalY = doc.lastAutoTable.finalY + 20;
+      // Add summary statistics in formal format
+      const finalY = doc.lastAutoTable.finalY + 40;
       
-      doc.setFontSize(12);
+      doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text('Summary Statistics', 30, finalY);
@@ -904,47 +911,57 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const totalPatrols = topPerformers.reduce((sum, p) => sum + p.totalPatrols, 0);
       const avgActiveDays = (totalActiveDays / topPerformers.length).toFixed(1);
       const avgPatrols = (totalPatrols / topPerformers.length).toFixed(1);
-      
-      // Add summary in two columns
-      const leftColumn = 30;
-      const rightColumn = pageWidth / 2 + 20;
-      const summaryY = finalY + 20;
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      
-      // Left column
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Most Active Municipality:', leftColumn, summaryY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`${topPerformers[0]?.municipality || 'N/A'} (${topPerformers[0]?.activeDays || 0} days)`, leftColumn + 120, summaryY);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Total Active Days:', leftColumn, summaryY + 15);
-      doc.setFont('helvetica', 'normal');
-      doc.text(totalActiveDays.toString(), leftColumn + 120, summaryY + 15);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Average Active Days:', leftColumn, summaryY + 30);
-      doc.setFont('helvetica', 'normal');
-      doc.text(avgActiveDays, leftColumn + 120, summaryY + 30);
-      
-      // Right column
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Total Patrols:', rightColumn, summaryY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(totalPatrols.toString(), rightColumn + 100, summaryY);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Average Patrols:', rightColumn, summaryY + 15);
-      doc.setFont('helvetica', 'normal');
-      doc.text(avgPatrols, rightColumn + 100, summaryY + 15);
-      
-      doc.setFont('helvetica', 'bold');
-      doc.text('• Average Performance:', rightColumn, summaryY + 30);
-      doc.setFont('helvetica', 'normal');
       const avgPercentage = Math.round(topPerformers.reduce((sum, p) => sum + p.activePercentage, 0) / topPerformers.length);
-      doc.text(`${avgPercentage}%`, rightColumn + 100, summaryY + 30);
+      
+      // Create formal summary table
+      const summaryTableData = [
+        ['Most Active Municipality', `${topPerformers[0]?.municipality || 'N/A'} (${topPerformers[0]?.activeDays || 0} days)`],
+        ['Total Active Days', totalActiveDays.toString()],
+        ['Average Active Days', avgActiveDays],
+        ['Total Patrols', totalPatrols.toLocaleString()],
+        ['Average Patrols', avgPatrols],
+        ['Average Performance', `${avgPercentage}%`]
+      ];
+      
+      autoTable(doc, {
+        body: summaryTableData,
+        startY: finalY + 10,
+        margin: { left: 30, right: 30 },
+        theme: 'grid',
+        styles: {
+          fontSize: 10,
+          cellPadding: 6,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.5,
+          halign: 'left',
+          valign: 'middle'
+        },
+        columnStyles: {
+          0: { 
+            fontStyle: 'bold', 
+            cellWidth: 140,
+            fillColor: [248, 250, 252],
+            textColor: [0, 0, 0],
+            halign: 'left'
+          },
+          1: { 
+            cellWidth: 'auto',
+            textColor: [0, 0, 0],
+            halign: 'left'
+          }
+        },
+        didParseCell: function(data) {
+          // Highlight the Most Active Municipality value in green
+          if (data.row.index === 0 && data.column.index === 1) {
+            data.cell.styles.textColor = [34, 197, 94]; // Green
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // Highlight numeric values
+          if (data.column.index === 1 && data.row.index > 0) {
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      });
       
       // Add footer
       const footerY = pageHeight - 40;
@@ -2440,15 +2457,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   size="sm"
                 >
                   <FileText className="w-4 h-4 mr-2" />
-                  Export PDF
-                </Button>
-                <Button
-                  onClick={() => showSuccess('Export feature coming soon!')}
-                  variant="outline"
-                  size="sm"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Export Feature
+                  Generate Top Performer's PDF
                 </Button>
                 <Button
                   onClick={() => setShowTopPerformersModal(false)}
