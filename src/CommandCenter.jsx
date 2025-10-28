@@ -3907,8 +3907,8 @@ Are you absolutely sure you want to proceed?`;
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">7</span>
                     <div>
-                      <p className="font-medium text-gray-900">Save Weekly Report</p>
-                      <p className="text-sm text-gray-600 mt-1">After adding all entries for the week, click <span className="font-semibold">"Save Weekly Report"</span> to store all data for your municipality and selected time period.</p>
+                      <p className="font-medium text-gray-900">Save Data</p>
+                      <p className="text-sm text-gray-600 mt-1">After adding all entries, click <span className="font-semibold">"Save Data"</span> to save all the data you inputted into the system.</p>
                     </div>
                   </li>
                 </ol>
@@ -3985,7 +3985,7 @@ Are you absolutely sure you want to proceed?`;
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-yellow-600">•</span>
-                    <span>Remember to click "Save Weekly Report" after adding all your daily entries</span>
+                    <span>Remember to click "Save Data" after adding all your daily entries</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="text-yellow-600">•</span>
