@@ -1774,41 +1774,53 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       </>
                     ) : (
                       <>
-                        <th className="px-3 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 w-16">Number</th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-700">Municipality / City</th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700">Number of Barangay</th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700">Minimum number of reports (Constant)/ day</th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700">No. of days to complete a C/M</th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700">Frequency of visit for every barangay within a week</th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700">Minimum number of reports (Constant)/ Week</th>
-                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">
-                          Actual No. of report / week
-                          <div className="flex justify-around mt-1 text-xs font-medium text-gray-600">
-                            <span>Week 1</span>
-                            <span>Week 2</span>
-                            <span>Week 3</span>
-                            <span>Week 4</span>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 w-16 align-top">Number</th>
+                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[180px] align-top">Municipality / City</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[100px] align-top">
+                          <div className="leading-tight">Number of<br/>Barangay</div>
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[120px] align-top">
+                          <div className="leading-tight">Minimum<br/>Number of<br/>Reports<br/>(Constant)/<br/>Day</div>
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[100px] align-top">
+                          <div className="leading-tight">No. of<br/>Days to<br/>Complete<br/>a C/M</div>
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[120px] align-top">
+                          <div className="leading-tight">Frequency<br/>of Visit<br/>for Every<br/>Barangay<br/>Within a<br/>Week</div>
+                        </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[120px] align-top">
+                          <div className="leading-tight">Minimum<br/>Number of<br/>Reports<br/>(Constant)/<br/>Week</div>
+                        </th>
+                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300 align-top">
+                          <div className="leading-tight mb-2">Actual No. of Report / Week</div>
+                          <div className="flex justify-around text-[10px] font-medium text-gray-600">
+                            <span className="w-12">Week 1</span>
+                            <span className="w-12">Week 2</span>
+                            <span className="w-12">Week 3</span>
+                            <span className="w-12">Week 4</span>
                           </div>
                         </th>
-                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">
-                          No. of report attended / week
-                          <div className="flex justify-around mt-1 text-xs font-medium text-gray-600">
-                            <span>Week 1</span>
-                            <span>Week 2</span>
-                            <span>Week 3</span>
-                            <span>Week 4</span>
+                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300 align-top">
+                          <div className="leading-tight mb-2">No. of Report Attended / Week</div>
+                          <div className="flex justify-around text-[10px] font-medium text-gray-600">
+                            <span className="w-12">Week 1</span>
+                            <span className="w-12">Week 2</span>
+                            <span className="w-12">Week 3</span>
+                            <span className="w-12">Week 4</span>
                           </div>
                         </th>
-                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">
-                          % of Efficiency (Minimum Number of Reports (constant) / Week) / (No. of Report Attended / Week) * 100
-                          <div className="flex justify-around mt-1 text-xs font-medium text-gray-600">
-                            <span>Week 1</span>
-                            <span>Week 2</span>
-                            <span>Week 3</span>
-                            <span>Week 4</span>
+                        <th colSpan="4" className="px-2 py-2 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300 align-top">
+                          <div className="leading-tight mb-2">% of Efficiency<br/>(Minimum Number of Reports / Week) /<br/>(No. of Report Attended / Week) * 100</div>
+                          <div className="flex justify-around text-[10px] font-medium text-gray-600">
+                            <span className="w-12">Week 1</span>
+                            <span className="w-12">Week 2</span>
+                            <span className="w-12">Week 3</span>
+                            <span className="w-12">Week 4</span>
                           </div>
                         </th>
-                        <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300">Overall Percentage</th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300 min-w-[100px] align-top">
+                          <div className="leading-tight">Overall<br/>Percentage</div>
+                        </th>
                       </>
                     )}
                   </tr>
@@ -1820,7 +1832,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <tr className="border-b transition-all duration-300 bg-gray-50 border-gray-200">
                         <td
                           colSpan={
-                            activeTab === "daily" ? selectedDates.length + 2 : 16
+                            activeTab === "daily" ? selectedDates.length + 2 : 20
                           }
                           className="px-6 py-3"
                         >
