@@ -60,9 +60,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const { user, getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [fromMonth, setFromMonth] = useState(new Date().getMonth());
+  const [fromYear, setFromYear] = useState(new Date().getFullYear());
+  const [toMonth, setToMonth] = useState(new Date().getMonth());
+  const [toYear, setToYear] = useState(new Date().getFullYear());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
+  
+  // Backward compatibility: use fromMonth/fromYear as selectedMonth/selectedYear for existing code
+  const selectedMonth = fromMonth;
+  const selectedYear = fromYear;
   const [isGenerating, setIsGenerating] = useState(false);
   const [paperSize, setPaperSize] = useState("short"); // "short" for Letter, "long" for Legal
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -527,32 +533,62 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     return summaryData;
   };
 
-  // Load patrol data from Firestore for IPatroller Daily Summary
+  // Helper function to get all months between from and to dates
+  const getMonthsInRange = (fromMonth, fromYear, toMonth, toYear) => {
+    const months = [];
+    let currentMonth = fromMonth;
+    let currentYear = fromYear;
+    
+    while (currentYear < toYear || (currentYear === toYear && currentMonth <= toMonth)) {
+      months.push({ month: currentMonth, year: currentYear });
+      currentMonth++;
+      if (currentMonth > 11) {
+        currentMonth = 0;
+        currentYear++;
+      }
+    }
+    
+    return months;
+  };
+
+  // Load patrol data from Firestore for IPatroller (supports multiple months)
   const loadIPatrollerData = useCallback(async () => {
     try {
-      const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
+      const monthsToLoad = getMonthsInRange(fromMonth, fromYear, toMonth, toYear);
+      const allFirestoreData = [];
       
-      const monthDocRef = doc(db, 'patrolData', monthYearId);
-      const municipalitiesRef = collection(monthDocRef, 'municipalities');
-      const querySnapshot = await getDocs(municipalitiesRef);
-      
-      const firestoreData = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (data) {
-          firestoreData.push({
-            id: doc.id,
-            ...data
+      // Load data for each month in the range
+      for (const { month, year } of monthsToLoad) {
+        const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+        
+        try {
+          const monthDocRef = doc(db, 'patrolData', monthYearId);
+          const municipalitiesRef = collection(monthDocRef, 'municipalities');
+          const querySnapshot = await getDocs(municipalitiesRef);
+          
+          querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data) {
+              allFirestoreData.push({
+                id: doc.id,
+                month: month,
+                year: year,
+                monthYearId: monthYearId,
+                ...data
+              });
+            }
           });
+        } catch (monthError) {
+          console.warn(`No data found for ${monthYearId}:`, monthError);
         }
-      });
+      }
 
-      setIpatrollerPatrolData(firestoreData);
+      setIpatrollerPatrolData(allFirestoreData);
     } catch (error) {
       console.error('Error loading IPatroller data:', error);
       setIpatrollerPatrolData([]);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [fromMonth, fromYear, toMonth, toYear]);
 
   // Load IPatroller data when modals are shown
   useEffect(() => {
@@ -663,13 +699,40 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     };
   };
 
-  // Generate preview data for the report (moved from IPatroller.jsx)
+  // Generate preview data for the report (supports multi-month)
   const generateIPatrollerPreviewData = () => {
-    const selectedDates = generateDates(selectedMonth, selectedYear);
     const overallSummary = calculateIPatrollerOverallSummary();
     
-    // Group data by district
-    const groupedData = ipatrollerPatrolData.reduce((acc, item) => {
+    // Group data by municipality and aggregate across months
+    const municipalityAggregates = {};
+    ipatrollerPatrolData.forEach(item => {
+      const key = item.municipality;
+      if (!municipalityAggregates[key]) {
+        municipalityAggregates[key] = {
+          municipality: item.municipality,
+          district: item.district,
+          totalPatrols: 0,
+          activeDays: 0,
+          inactiveDays: 0,
+          dataPoints: []
+        };
+      }
+      municipalityAggregates[key].totalPatrols += item.totalPatrols || 0;
+      municipalityAggregates[key].activeDays += item.activeDays || 0;
+      municipalityAggregates[key].inactiveDays += item.inactiveDays || 0;
+      municipalityAggregates[key].dataPoints.push(...(item.data || []));
+    });
+
+    // Convert to array and calculate percentages
+    const aggregatedData = Object.values(municipalityAggregates).map(item => ({
+      ...item,
+      activePercentage: (item.activeDays + item.inactiveDays) > 0 
+        ? Math.round((item.activeDays / (item.activeDays + item.inactiveDays)) * 100)
+        : 0
+    }));
+
+    // Group by district
+    const groupedData = aggregatedData.reduce((acc, item) => {
       if (!acc[item.district]) {
         acc[item.district] = [];
       }
@@ -677,38 +740,55 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       return acc;
     }, {});
 
-    // Calculate additional statistics based on daily counts
-    const totalDaysInMonth = selectedDates.length;
-    const totalPossibleDays = ipatrollerPatrolData.length * totalDaysInMonth;
-    const daysWithData = ipatrollerPatrolData.reduce((acc, municipality) => {
-      return acc + municipality.data.filter(day => day !== null && day !== undefined && day !== '').length;
+    // Calculate total days across all months
+    const monthsInRange = getMonthsInRange(fromMonth, fromYear, toMonth, toYear);
+    const totalDays = monthsInRange.reduce((sum, { month, year }) => {
+      return sum + new Date(year, month + 1, 0).getDate();
     }, 0);
 
+    // Generate report period text
+    const reportPeriod = fromMonth === toMonth && fromYear === toYear
+      ? `${months[fromMonth]} ${fromYear}`
+      : `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`;
+
     const previewData = {
-      title: "I-Patroller Monthly Summary Report",
+      title: fromMonth === toMonth && fromYear === toYear 
+        ? "I-Patroller Monthly Summary Report"
+        : "I-Patroller Multi-Month Summary Report",
       generatedDate: new Date().toLocaleDateString(),
-      month: months[selectedMonth],
-      year: selectedYear,
-      reportPeriod: new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" }),
+      month: months[fromMonth],
+      year: fromYear,
+      reportPeriod: reportPeriod,
       dataSource: "Based on IPatroller Daily Counts",
-      totalDaysInMonth,
-      totalPossibleDays,
-      daysWithData,
-      dataCompleteness: totalPossibleDays > 0 ? Math.round((daysWithData / totalPossibleDays) * 100) : 0,
+      totalDaysInRange: totalDays,
+      monthsCount: monthsInRange.length,
       overallSummary: overallSummary,
-      districtSummary: Object.keys(groupedData).map(district => ({
-        district,
-        ...getIPatrollerDistrictSummary(district)
-      })),
-      municipalityPerformance: ipatrollerPatrolData.map(item => ({
+      districtSummary: Object.keys(groupedData).map(district => {
+        const districtMunicipalities = groupedData[district];
+        const totalPatrols = districtMunicipalities.reduce((sum, m) => sum + m.totalPatrols, 0);
+        const totalActive = districtMunicipalities.reduce((sum, m) => sum + m.activeDays, 0);
+        const totalInactive = districtMunicipalities.reduce((sum, m) => sum + m.inactiveDays, 0);
+        const avgActivePercentage = (totalActive + totalInactive) > 0
+          ? Math.round((totalActive / (totalActive + totalInactive)) * 100)
+          : 0;
+        
+        return {
+          district,
+          municipalityCount: districtMunicipalities.length,
+          totalPatrols,
+          totalActive,
+          totalInactive,
+          avgActivePercentage
+        };
+      }),
+      municipalityPerformance: aggregatedData.map(item => ({
         municipality: item.municipality,
         district: item.district,
         requiredBarangays: barangayCounts[item.municipality] || 0,
-        totalPatrols: item.totalPatrols || 0,
-        activeDays: item.activeDays || 0,
-        inactiveDays: item.inactiveDays || 0,
-        activePercentage: item.activePercentage || 0,
-        dailyData: item.data || [] // Include daily data for reference
+        totalPatrols: item.totalPatrols,
+        activeDays: item.activeDays,
+        inactiveDays: item.inactiveDays,
+        activePercentage: item.activePercentage
       }))
     };
 
@@ -716,17 +796,42 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     setShowIPatrollerPreview(true);
   };
 
-  // Generate Monthly Summary Report (moved from IPatroller.jsx)
+  // Generate Monthly/Multi-Month Summary Report (supports date ranges)
   const generateIPatrollerMonthlySummaryReport = () => {
     setIsGeneratingIPatrollerReport(true);
     
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
-      const selectedDates = generateDates(selectedMonth, selectedYear);
       const overallSummary = calculateIPatrollerOverallSummary();
       
-      // Group data by district
-      const groupedData = ipatrollerPatrolData.reduce((acc, item) => {
+      // Aggregate data by municipality across all months
+      const municipalityAggregates = {};
+      ipatrollerPatrolData.forEach(item => {
+        const key = item.municipality;
+        if (!municipalityAggregates[key]) {
+          municipalityAggregates[key] = {
+            municipality: item.municipality,
+            district: item.district,
+            totalPatrols: 0,
+            activeDays: 0,
+            inactiveDays: 0
+          };
+        }
+        municipalityAggregates[key].totalPatrols += item.totalPatrols || 0;
+        municipalityAggregates[key].activeDays += item.activeDays || 0;
+        municipalityAggregates[key].inactiveDays += item.inactiveDays || 0;
+      });
+
+      // Convert to array and calculate percentages
+      const aggregatedData = Object.values(municipalityAggregates).map(item => ({
+        ...item,
+        activePercentage: (item.activeDays + item.inactiveDays) > 0 
+          ? Math.round((item.activeDays / (item.activeDays + item.inactiveDays)) * 100)
+          : 0
+      }));
+
+      // Group by district
+      const groupedData = aggregatedData.reduce((acc, item) => {
         if (!acc[item.district]) {
           acc[item.district] = [];
         }
@@ -734,53 +839,66 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         return acc;
       }, {});
       
+      // Determine report title and period
+      const isMultiMonth = fromMonth !== toMonth || fromYear !== toYear;
+      const reportTitle = isMultiMonth ? 'I-Patroller Multi-Month Summary Report' : 'I-Patroller Monthly Summary Report';
+      const reportPeriod = isMultiMonth
+        ? `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`
+        : `${months[fromMonth]} ${fromYear}`;
+      
       // Header - Centered with tighter top spacing
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
       const pageWidth = doc.internal.pageSize.width;
-      const titleWidth = doc.getTextWidth('I-Patroller Monthly Summary Report');
-      doc.text('I-Patroller Monthly Summary Report', (pageWidth - titleWidth) / 2, 20);
+      const titleWidth = doc.getTextWidth(reportTitle);
+      doc.text(reportTitle, (pageWidth - titleWidth) / 2, 20);
       
       // Report details - tighter vertical spacing
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
-      const monthText = `Month: ${months[selectedMonth]} ${selectedYear}`;
-      const periodText = `Report Period: ${new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
+      const periodText = `Report Period: ${reportPeriod}`;
       const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
       
       const generatedWidth = doc.getTextWidth(generatedText);
-      const monthWidth = doc.getTextWidth(monthText);
       const periodWidth = doc.getTextWidth(periodText);
       const dataSourceWidth = doc.getTextWidth(dataSourceText);
       
       doc.text(generatedText, (pageWidth - generatedWidth) / 2, 30);
-      doc.text(monthText, (pageWidth - monthWidth) / 2, 36);
-      doc.text(periodText, (pageWidth - periodWidth) / 2, 42);
-      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 48);
+      doc.text(periodText, (pageWidth - periodWidth) / 2, 36);
+      doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 42);
       
-      // District Summary Table - matching preview format
+      let currentY = 50;
+      
+      // District Summary Table - Show first
       if (Object.keys(groupedData).length > 0) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
-        doc.text('District Summary', 20, 55);
+        doc.text(isMultiMonth ? 'Overall District Summary' : 'District Summary', 20, currentY);
         
         const districtTableData = Object.keys(groupedData).map(district => {
-          const summary = getIPatrollerDistrictSummary(district);
+          const districtMunicipalities = groupedData[district];
+          const totalPatrols = districtMunicipalities.reduce((sum, m) => sum + m.totalPatrols, 0);
+          const totalActive = districtMunicipalities.reduce((sum, m) => sum + m.activeDays, 0);
+          const totalInactive = districtMunicipalities.reduce((sum, m) => sum + m.inactiveDays, 0);
+          const avgActivePercentage = (totalActive + totalInactive) > 0
+            ? Math.round((totalActive / (totalActive + totalInactive)) * 100)
+            : 0;
+          
           return [
             district,
-            summary.municipalityCount.toString(),
-            summary.totalPatrols.toLocaleString(),
-            summary.totalActive.toString(),
-            summary.totalInactive.toString(),
-            `${summary.avgActivePercentage}%`
+            districtMunicipalities.length.toString(),
+            totalPatrols.toLocaleString(),
+            totalActive.toString(),
+            totalInactive.toString(),
+            `${avgActivePercentage}%`
           ];
         });
         
         autoTable(doc, {
           head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
           body: districtTableData,
-          startY: 60,
+          startY: currentY + 5,
           styles: {
             fontSize: 9,
             cellPadding: 2,
@@ -820,30 +938,134 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
           }
         });
+        
+        currentY = doc.lastAutoTable.finalY + 15;
+      }
+      
+      // Per-Month Breakdown (only for multi-month reports)
+      if (isMultiMonth) {
+        // Add separator before monthly breakdown
+        doc.setDrawColor(0, 0, 0);
+        doc.setLineWidth(0.5);
+        doc.line(20, currentY, pageWidth - 20, currentY);
+        currentY += 10;
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Monthly Breakdown', 20, currentY);
+        currentY += 7;
+        
+        // Group data by month
+        const monthsInRange = getMonthsInRange(fromMonth, fromYear, toMonth, toYear);
+        
+        monthsInRange.forEach(({ month, year }) => {
+          const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+          const monthData = ipatrollerPatrolData.filter(item => item.monthYearId === monthYearId);
+          
+          if (monthData.length > 0) {
+            // Month header
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            doc.text(`${months[month]} ${year}`, 20, currentY);
+            currentY += 5;
+            
+            // Calculate month summary
+            const monthTotalPatrols = monthData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0);
+            const monthActiveDays = monthData.reduce((sum, item) => sum + (item.activeDays || 0), 0);
+            const monthInactiveDays = monthData.reduce((sum, item) => sum + (item.inactiveDays || 0), 0);
+            const monthActivePercentage = (monthActiveDays + monthInactiveDays) > 0
+              ? Math.round((monthActiveDays / (monthActiveDays + monthInactiveDays)) * 100)
+              : 0;
+            
+            // Month data table
+            const monthTableData = monthData.map(item => [
+              item.municipality,
+              item.district,
+              (item.totalPatrols || 0).toLocaleString(),
+              (item.activeDays || 0).toString(),
+              (item.inactiveDays || 0).toString(),
+              `${item.activePercentage || 0}%`
+            ]);
+            
+            // Add summary row
+            monthTableData.push([
+              { content: 'Month Total', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+              { content: monthTotalPatrols.toLocaleString(), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+              { content: monthActiveDays.toString(), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+              { content: monthInactiveDays.toString(), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
+              { content: `${monthActivePercentage}%`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
+            ]);
+            
+            autoTable(doc, {
+              head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
+              body: monthTableData,
+              startY: currentY,
+              styles: {
+                fontSize: 8,
+                cellPadding: 2,
+                overflow: 'linebreak',
+                halign: 'left',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1
+              },
+              headStyles: {
+                fillColor: [147, 51, 234], // Purple background for monthly tables
+                fontStyle: 'bold',
+                textColor: [255, 255, 255],
+                fontSize: 9,
+                lineColor: [0, 0, 0],
+                lineWidth: 0.1
+              },
+              alternateRowStyles: {
+                fillColor: [248, 250, 252]
+              },
+              columnStyles: {
+                0: { cellWidth: 'auto', halign: 'left' },
+                1: { cellWidth: 'auto', halign: 'left' },
+                2: { cellWidth: 'auto', halign: 'center' },
+                3: { cellWidth: 'auto', halign: 'center' },
+                4: { cellWidth: 'auto', halign: 'center' },
+                5: { cellWidth: 'auto', halign: 'center' }
+              },
+              margin: { left: 20, right: 20 },
+              tableWidth: 'auto',
+              didDrawPage: function (data) {
+                const pageCount = doc.internal.getNumberOfPages();
+                const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
+                doc.setFontSize(8);
+                doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
+              }
+            });
+            
+            currentY = doc.lastAutoTable.finalY + 10;
+          }
+        });
       }
       
       // Municipality Performance Table - matching preview format
-      if (ipatrollerPatrolData.length > 0) {
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
+      if (aggregatedData.length > 0) {
+        // Add new page for Municipality Performance
+        doc.addPage();
+        const finalY = 30; // Minimal spacing from top
         
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Municipality Performance', 20, finalY);
         
-        const municipalityTableData = ipatrollerPatrolData.map(item => [
+        const municipalityTableData = aggregatedData.map(item => [
           item.municipality,
           item.district,
           (barangayCounts[item.municipality] || 0).toString(),
-          (item.totalPatrols || 0).toLocaleString(),
-          (item.activeDays || 0).toString(),
-          (item.inactiveDays || 0).toString(),
-          `${item.activePercentage || 0}%`
+          item.totalPatrols.toLocaleString(),
+          item.activeDays.toString(),
+          item.inactiveDays.toString(),
+          `${item.activePercentage}%`
         ]);
         
         autoTable(doc, {
           head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
           body: municipalityTableData,
-          startY: finalY + 7,
+          startY: finalY + 10,
           styles: {
             fontSize: 8,
             cellPadding: 2,
@@ -962,8 +1184,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       }
       
-      // Save the PDF
-      doc.save(`ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
+      // Save the PDF with appropriate filename
+      const filename = isMultiMonth
+        ? `ipatroller-summary-${months[fromMonth]}-${fromYear}-to-${months[toMonth]}-${toYear}.pdf`
+        : `ipatroller-monthly-summary-${months[fromMonth]}-${fromYear}.pdf`;
+      doc.save(filename);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1155,12 +1380,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.text('I-Patroller Monthly Summary Report', centerX, 25, { align: 'center' });
     
     // Report details - centered
+    const isMultiMonth = fromMonth !== toMonth || fromYear !== toYear;
+    const reportPeriod = isMultiMonth
+      ? `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`
+      : `${months[fromMonth]} ${fromYear}`;
+    
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, centerX, 35, { align: 'center' });
-    doc.text(`Month: ${months[selectedMonth]} ${selectedYear}`, centerX, 42, { align: 'center' });
-    doc.text(`Report Period: ${months[selectedMonth]} ${selectedYear}`, centerX, 49, { align: 'center' });
-    doc.text('Data Source: Based on IPatroller Daily Counts', centerX, 56, { align: 'center' });
+    doc.text(`Report Period: ${reportPeriod}`, centerX, 42, { align: 'center' });
+    doc.text('Data Source: Based on IPatroller Daily Counts', centerX, 49, { align: 'center' });
     
     // District Summary Section
     doc.setFontSize(14);
@@ -1357,7 +1586,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.text(`Page ${i} of ${pageCount}`, centerX, doc.internal.pageSize.height - 10, { align: 'center' });
     }
     
-    doc.save(`ipatroller-monthly-summary-${months[selectedMonth]}-${selectedYear}.pdf`);
+    // Save with appropriate filename
+    const filename = (fromMonth !== toMonth || fromYear !== toYear)
+      ? `ipatroller-summary-${months[fromMonth]}-${fromYear}-to-${months[toMonth]}-${toYear}.pdf`
+      : `ipatroller-monthly-summary-${months[fromMonth]}-${fromYear}.pdf`;
+    doc.save(filename);
   };
 
   // Action Center Report (matching Action Center data structure)
@@ -3199,7 +3432,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           actions: [
             {
               name: "Generate Report",
-              action: generateIPatrollerSummaryReport,
+              action: generateIPatrollerMonthlySummaryReport,
               format: "PDF",
               priority: "high"
             },
@@ -3439,56 +3672,115 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             <p className="text-gray-600">Select month and year for report generation</p>
           </CardHeader>
           <CardContent className="p-6">
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-              <div className="flex-1">
-                <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Month
-                </Label>
-                <Select 
-                  value={selectedMonth.toString()} 
-                  onValueChange={(value) => setSelectedMonth(parseInt(value))}
-                >
-                  <SelectTrigger id="month-filter" className="w-full">
-                    <SelectValue placeholder="Select month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((month, index) => (
-                      <SelectItem key={index} value={index.toString()}>
-                        {month}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex-1">
-                <Label htmlFor="year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
-                  Year
-                </Label>
-                <Select 
-                  value={selectedYear.toString()} 
-                  onValueChange={(value) => setSelectedYear(parseInt(value))}
-                >
-                  <SelectTrigger id="year-filter" className="w-full">
-                    <SelectValue placeholder="Select year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
-                      <SelectItem key={year} value={year.toString()}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="flex-1 sm:flex-initial">
-                <Label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Current Selection
-                </Label>
-                <div className="bg-gray-50 border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900">
-                  {months[selectedMonth]} {selectedYear}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* From Date Section */}
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold text-gray-900 block">From</Label>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="from-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                      Month
+                    </Label>
+                    <Select 
+                      value={fromMonth.toString()} 
+                      onValueChange={(value) => setFromMonth(parseInt(value))}
+                    >
+                      <SelectTrigger id="from-month-filter" className="w-full">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((month, index) => (
+                          <SelectItem key={index} value={index.toString()}>
+                            {month}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <Label htmlFor="from-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                      Year
+                    </Label>
+                    <Select 
+                      value={fromYear.toString()} 
+                      onValueChange={(value) => setFromYear(parseInt(value))}
+                    >
+                      <SelectTrigger id="from-year-filter" className="w-full">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
+              </div>
+
+              {/* To Date Section */}
+              <div className="space-y-4">
+                <Label className="text-sm font-semibold text-gray-900 block">To</Label>
+                <div className="flex gap-3">
+                  <div className="flex-1">
+                    <Label htmlFor="to-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                      Month
+                    </Label>
+                    <Select 
+                      value={toMonth.toString()} 
+                      onValueChange={(value) => setToMonth(parseInt(value))}
+                    >
+                      <SelectTrigger id="to-month-filter" className="w-full">
+                        <SelectValue placeholder="Select month" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {months.map((month, index) => (
+                          <SelectItem key={index} value={index.toString()}>
+                            {month}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <Label htmlFor="to-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                      Year
+                    </Label>
+                    <Select 
+                      value={toYear.toString()} 
+                      onValueChange={(value) => setToYear(parseInt(value))}
+                    >
+                      <SelectTrigger id="to-year-filter" className="w-full">
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Current Selection Display */}
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                Current Selection
+              </Label>
+              <div className="bg-gray-50 border border-gray-200 rounded-md px-4 py-3 text-sm text-gray-900">
+                {fromMonth === toMonth && fromYear === toYear ? (
+                  <span className="font-medium">{months[fromMonth]} {fromYear}</span>
+                ) : (
+                  <span className="font-medium">{months[fromMonth]} {fromYear} - {months[toMonth]} {toYear}</span>
+                )}
               </div>
             </div>
           </CardContent>

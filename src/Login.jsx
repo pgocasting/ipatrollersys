@@ -64,7 +64,7 @@ export default function Login({ onLogin }) {
   return (
     <div className="min-h-screen flex items-start justify-center bg-white p-4 pt-30">
       {/* Login Card Container */}
-      <div className="relative z-10 w-full max-w-xl">
+      <div className="relative z-10 w-full max-w-md">
         {/* Login Form Card with Shadow */}
         <Card className="shadow-xl border-gray-200 bg-white">
           {/* Logo Section - Inside Card */}
