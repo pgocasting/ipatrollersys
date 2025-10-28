@@ -27,7 +27,7 @@ import {
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
 
-export default function Layout({ children, onNavigate, currentPage, onLogout }) {
+export default function Layout({ children, onNavigate, currentPage, onLogout, onShowHelp }) {
   const {
     sidebarOpen,
     isCollapsed,
@@ -131,6 +131,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
             isMobile={true}
             onLogout={onLogout}
             onCloseSidebar={closeSidebar}
+            onShowHelp={onShowHelp}
           />
         </SheetContent>
       </Sheet>
@@ -146,6 +147,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout }) 
           onToggleCollapsed={toggleCollapsed}
           isMobile={false}
           onLogout={onLogout}
+          onShowHelp={onShowHelp}
         />
       </div>
 

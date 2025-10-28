@@ -35,7 +35,8 @@ import {
   ChevronDown,
   ChevronRight,
   Check,
-  Edit
+  Edit,
+  HelpCircle
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNotification, NotificationContainer } from './components/ui/notification';
@@ -3806,7 +3807,7 @@ Are you absolutely sure you want to proceed?`;
   };
 
   return (
-    <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout}>
+    <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout} onShowHelp={() => setShowCommandCenterHelp(true)}>
       <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
         {isCommandUser && (
           <style>{`
@@ -3828,34 +3829,176 @@ Are you absolutely sure you want to proceed?`;
           }
           setShowCommandCenterHelp(open);
         }}>
-          <DialogContent className="sm:max-w-xl">
+          <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
             <DialogHeader className="gap-3">
               <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <Shield className="h-5 w-5" />
+                <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
+                  <Shield className="h-6 w-6" />
                 </div>
                 <div>
                   <DialogTitle className="text-2xl">Welcome to Command Center</DialogTitle>
-                  <DialogDescription className="text-base">Quick tips to get you started</DialogDescription>
+                  <DialogDescription className="text-base">Step-by-step guide to using the system</DialogDescription>
                 </div>
               </div>
             </DialogHeader>
-            <div className="space-y-4 text-base text-gray-700">
-              <p>
-                Use <span className="font-semibold">View Options</span> (top-right) to switch between:
-              </p>
-              <ul className="space-y-3">
-                <li className="flex items-start gap-3">
-                  <Check className="mt-1 h-5 w-5 text-green-600" />
-                  <span><span className="font-semibold">Weekly Report</span>: record daily incidents per barangay, then save per municipality.</span>
-                </li>
-                <li className="flex items-start gap-3">
-                  <Check className="mt-1 h-5 w-5 text-green-600" />
-                  <span><span className="font-semibold">Concern Types</span>: manage the selectable categories used in reports.</span>
-                </li>
-              </ul>
-              <p>Your municipality tab is auto-selected. Barangay Management is visible to admins only.</p>
-              <label className="mt-2 flex items-center gap-2 text-sm text-gray-600">
+            
+            <div className="space-y-6 text-base text-gray-700">
+              {/* Overview */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  What is Command Center?
+                </h3>
+                <p className="text-sm text-blue-800">
+                  Command Center is your central hub for recording and managing weekly incident reports across all barangays in your municipality. 
+                  You can track different types of concerns, generate reports, and export data for analysis.
+                </p>
+              </div>
+
+              {/* Step-by-step instructions */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-green-600" />
+                  How to Record Daily Incidents
+                </h3>
+                <ol className="space-y-4">
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">1</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Select Barangay</p>
+                      <p className="text-sm text-gray-600 mt-1">Choose the barangay from the dropdown where the incident occurred. Your municipality is already pre-selected.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">2</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Select Concern Type</p>
+                      <p className="text-sm text-gray-600 mt-1">Pick the type of concern/incident from the dropdown (e.g., Traffic Violation, Security Issue, etc.).</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">3</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Input Daily Data</p>
+                      <p className="text-sm text-gray-600 mt-1">Enter the date and number of incidents for that specific day. You can input data for any day of the week (Monday-Sunday).</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">4</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Add Action Report (If Applicable)</p>
+                      <p className="text-sm text-gray-600 mt-1">If any action was taken regarding the incident, enter the details in the "Action Taken" field. This is optional.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">5</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Add Remarks (Optional)</p>
+                      <p className="text-sm text-gray-600 mt-1">Add any additional notes, observations, or important details about the incident in the "Remarks" field if needed.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">6</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Add Entry & Continue</p>
+                      <p className="text-sm text-gray-600 mt-1">Click <span className="font-semibold">"Add Entry"</span> to save this record. You can add multiple entries per day for different barangays or concern types.</p>
+                    </div>
+                  </li>
+                  <li className="flex gap-3">
+                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">7</span>
+                    <div>
+                      <p className="font-medium text-gray-900">Save Weekly Report</p>
+                      <p className="text-sm text-gray-600 mt-1">After adding all entries for the week, click <span className="font-semibold">"Save Weekly Report"</span> to store all data for your municipality and selected time period.</p>
+                    </div>
+                  </li>
+                </ol>
+              </div>
+
+              {/* Managing Concern Types */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-orange-600" />
+                  Managing Concern Types
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm"><span className="font-medium">View Concern Types:</span> Click <span className="font-semibold">"View Options"</span> (top-right) → <span className="font-semibold">"Concern Types"</span></p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm"><span className="font-medium">Add New Type:</span> Click the <span className="font-semibold">"+ Add Concern Type"</span> button and enter the concern name</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm"><span className="font-medium">Edit/Delete:</span> Use the action buttons next to each concern type to modify or remove them</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Exporting Reports */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <Download className="h-5 w-5 text-blue-600" />
+                  Exporting Reports
+                </h3>
+                <ul className="space-y-3">
+                  <li className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm">Click the <span className="font-semibold">"Export to Excel"</span> button to download your weekly report as a spreadsheet</p>
+                    </div>
+                  </li>
+                  <li className="flex items-start gap-3">
+                    <Check className="mt-0.5 h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm">The exported file includes all barangays, daily counts, and totals for easy analysis</p>
+                    </div>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Tips */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Quick Tips
+                </h3>
+                <ul className="space-y-2 text-sm text-yellow-800">
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>You can add multiple entries per day for different barangays or concern types</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>Your municipality is automatically selected - you only see data for your area</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>Action reports and remarks are optional but helpful for detailed record-keeping</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>Remember to click "Save Weekly Report" after adding all your daily entries</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>Use View Options menu to manage Concern Types or switch views</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-yellow-600">•</span>
+                    <span>You can reopen this guide anytime by clicking "View Instructions" in the sidebar</span>
+                  </li>
+                </ul>
+              </div>
+
+              <label className="mt-4 flex items-center gap-2 text-sm text-gray-600">
                 <input
                   id="dont-show-again"
                   name="dont-show-again"
@@ -3864,18 +4007,19 @@ Are you absolutely sure you want to proceed?`;
                   onChange={(e) => setDontShowAgain(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300"
                 />
-                Don't show this again
+                Don't show this again on login
               </label>
             </div>
+            
             <DialogFooter>
               <button
                 onClick={() => {
                   if (dontShowAgain) localStorage.setItem('ccHelpDismissed', '1');
                   setShowCommandCenterHelp(false);
                 }}
-                className="inline-flex items-center rounded-md bg-black px-4 py-2 text-white hover:bg-gray-800"
+                className="inline-flex items-center rounded-md bg-black px-6 py-2.5 text-white hover:bg-gray-800 font-medium"
               >
-                Got it
+                Got it, let's start!
               </button>
             </DialogFooter>
           </DialogContent>

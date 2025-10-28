@@ -6,7 +6,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "./ui/dropdown-menu";
 import { Badge } from "./ui/badge";
-import { ChevronLeft, ChevronRight, Settings, X, User, LogOut, Menu, Shield } from "lucide-react";
+import { ChevronLeft, ChevronRight, Settings, X, User, LogOut, Menu, Shield, HelpCircle } from "lucide-react";
 import { useFirebase } from "../hooks/useFirebase";
 import { useAuth } from "../contexts/AuthContext";
 import SidebarToggle from "./SidebarToggle";
@@ -20,7 +20,8 @@ const Sidebar = React.memo(({
   onToggleCollapsed,
   isMobile = false,
   onLogout,
-  onCloseSidebar
+  onCloseSidebar,
+  onShowHelp
 }) => {
   const { user } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
@@ -221,6 +222,12 @@ const Sidebar = React.memo(({
                         <Settings className="mr-2 h-4 w-4 text-gray-600" />
                         <span>Settings</span>
                       </DropdownMenuItem>
+                      {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
+                        <DropdownMenuItem onClick={onShowHelp} className="text-gray-700 hover:bg-blue-50 hover:text-blue-600">
+                          <HelpCircle className="mr-2 h-4 w-4 text-blue-600" />
+                          <span>View Instructions</span>
+                        </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={onLogout} className="text-gray-600 hover:bg-gray-100 focus:text-gray-800">
                         <LogOut className="mr-2 h-4 w-4" />
@@ -280,6 +287,20 @@ const Sidebar = React.memo(({
                 );
               })()}
               
+              {/* View Instructions Button - for command-center users */}
+              {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
+                <Button
+                  variant="ghost"
+                  size="default"
+                  className="w-full h-9 font-medium transition-all duration-300 group hover:bg-blue-50 text-gray-700 hover:text-blue-600 px-3 justify-start rounded-lg"
+                  onClick={onShowHelp}
+                >
+                  <div className="flex items-center gap-3">
+                    <HelpCircle className="h-4 w-4" />
+                    <span className="text-sm font-medium">View Instructions</span>
+                  </div>
+                </Button>
+              )}
               
               {/* Logout Button */}
               <Button
