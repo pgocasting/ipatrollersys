@@ -223,7 +223,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Municipalities by district
   const municipalitiesByDistrict = {
     "District 1": ["Abucay", "Hermosa", "Orani", "Samal"],
-    "District 2": ["Balanga", "Limay", "Orion", "Pilar"],
+    "District 2": ["Balanga City", "Limay", "Orion", "Pilar"],
     "District 3": ["Bagac", "Dinalupihan", "Mariveles", "Morong"]
   };
 
@@ -4038,14 +4038,32 @@ Are you absolutely sure you want to proceed?`;
                 <Building2 className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
                 <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
-                  {importedBarangays.filter(b => {
+                  {(() => {
                     const currentMunicipality = activeMunicipalityTab || userMunicipality;
-                    if (!currentMunicipality) return true;
-                    // Normalize municipality names for comparison
-                    const normalizedCurrent = currentMunicipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                    const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                    return normalizedBarangay === normalizedCurrent;
-                  }).length} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
+                    console.log('🔍 Debug barangay count:', {
+                      currentMunicipality,
+                      totalBarangays: importedBarangays.length,
+                      barangayMunicipalities: importedBarangays.map(b => b.municipality)
+                    });
+                    
+                    const filtered = importedBarangays.filter(b => {
+                      if (!currentMunicipality) return true;
+                      // Normalize municipality names for comparison
+                      const normalizedCurrent = currentMunicipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                      const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                      console.log('   Comparing:', { 
+                        currentMunicipality, 
+                        barangayMunicipality: b.municipality,
+                        normalizedCurrent, 
+                        normalizedBarangay,
+                        match: normalizedBarangay === normalizedCurrent
+                      });
+                      return normalizedBarangay === normalizedCurrent;
+                    });
+                    
+                    console.log('✅ Filtered count:', filtered.length);
+                    return filtered.length;
+                  })()} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
                 </span>
               </div>
             )}
@@ -4410,7 +4428,12 @@ Are you absolutely sure you want to proceed?`;
                       {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
                         const isActive = activeMunicipalityTab === municipality;
                         const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
-                        const barangaysCount = importedBarangays.filter(b => b.municipality === municipality).length;
+                        const barangaysCount = importedBarangays.filter(b => {
+                          // Normalize municipality names for comparison
+                          const normalizedMunicipality = municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                          const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                          return normalizedBarangay === normalizedMunicipality;
+                        }).length;
                         
                         return (
                           <Badge
