@@ -871,6 +871,58 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return mapping;
   };
 
+  // Helper function to get PG-ENRO Department specific field mapping
+  const getPGENROFieldMapping = (headers, values) => {
+    const mapping = {
+      // PG- cohesiveness mappings (same structure as Agriculture)
+      what: values[headers.indexOf('Complaint / Report')] || 
+            values[headers.indexOf('COMPLAINT / REPORT')] || 
+            values[headers.indexOf('Complaint/Report')] ||
+            values[headers.indexOf('COMPLAINT/REPORT')] ||
+            values[headers.indexOf('What')] || 
+            values[headers.indexOf('WHAT')] || '',
+      
+      where: values[headers.indexOf('Location')] || 
+             values[headers.indexOf('LOCATION')] ||
+             values[headers.indexOf('Where')] || 
+             values[headers.indexOf('WHERE')] || '',
+      
+      when: formatAgricultureDate(
+        values[headers.indexOf('Date Received')] || 
+        values[headers.indexOf('DATE RECEIVED')] ||
+        values[headers.indexOf('Date_Received')] ||
+        values[headers.indexOf('DATE_RECEIVED')] ||
+        values[headers.indexOf('When')] || 
+        values[headers.indexOf('WHEN')] || 
+        values[headers.indexOf('DATE')] ||
+        values[headers.indexOf('Date')] || null
+      ),
+      
+      actionTaken: values[headers.indexOf('Action Taken')] || 
+                   values[headers.indexOf('ACTION TAKEN')] ||
+                   values[headers.indexOf('Action_Taken')] ||
+                   values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
+      
+      how: values[headers.indexOf('Observation / Findings')] || 
+           values[headers.indexOf('OBSERVATION / FINDINGS')] ||
+           values[headers.indexOf('Observation/Findings')] ||
+           values[headers.indexOf('OBSERVATION/FINDINGS')] ||
+           values[headers.indexOf('Observation_Findings')] ||
+           values[headers.indexOf('OBSERVATION_FINDINGS')] ||
+           values[headers.indexOf('How')] || 
+           values[headers.indexOf('HOW')] || '',
+      
+      documents: values[headers.indexOf('Documents')] ||
+                 values[headers.indexOf('DOCUMENTS')] ||
+                 values[headers.indexOf('Document Links')] ||
+                 values[headers.indexOf('DOCUMENT LINKS')] ||
+                 values[headers.indexOf('Document_Links')] ||
+                 values[headers.indexOf('DOCUMENT_LINKS')] || ''
+    };
+
+    return mapping;
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -924,6 +976,30 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
                 photos: extractLinksFromCell(agriMapping.documents)
               };
+            } else if (selectedImportDepartment === 'pg-enro') {
+              // Use PG-ENRO Department specific mapping (same structure as Agriculture)
+              const pgenroMapping = getPGENROFieldMapping(headers, values);
+              const locationInfo = detectMunicipalityAndDistrict(
+                pgenroMapping.where, 
+                values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || ''
+              );
+              
+              action = {
+                department: 'pg-enro',
+                municipality: locationInfo.municipality,
+                district: locationInfo.district,
+                what: pgenroMapping.what,
+                when: pgenroMapping.when,
+                where: pgenroMapping.where,
+                actionTaken: pgenroMapping.actionTaken,
+                who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                how: pgenroMapping.how,
+                gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+                photos: extractLinksFromCell(pgenroMapping.documents)
+              };
             } else {
               // Use standard mapping for other departments
               action = {
@@ -957,7 +1033,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
             // Only add actions that have at least some basic data
             // For agriculture department, prioritize complaint/report and location
-            if (selectedImportDepartment === 'agriculture') {
+            if (selectedImportDepartment === 'agriculture' || selectedImportDepartment === 'pg-enro') {
               if (action.what || action.where) {
                 importedActions.push(action);
               }
@@ -1074,6 +1150,30 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
                   photos: extractLinksFromCell(agriMapping.documents)
                 };
+              } else if (selectedImportDepartment === 'pg-enro') {
+                // Use PG-ENRO Department specific mapping (same structure as Agriculture)
+                const pgenroMapping = getPGENROFieldMapping(headers, values);
+                const locationInfo = detectMunicipalityAndDistrict(
+                  pgenroMapping.where, 
+                  values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || ''
+                );
+                
+                action = {
+                  department: 'pg-enro',
+                  municipality: locationInfo.municipality,
+                  district: locationInfo.district,
+                  what: pgenroMapping.what,
+                  when: pgenroMapping.when,
+                  where: pgenroMapping.where,
+                  actionTaken: pgenroMapping.actionTaken,
+                  who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
+                  why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
+                  how: pgenroMapping.how,
+                  gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
+                  source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
+                  otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
+                  photos: extractLinksFromCell(pgenroMapping.documents)
+                };
               } else {
                 // Use standard mapping for other departments
                 action = {
@@ -1106,8 +1206,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               }
 
               // Only add actions that have at least some basic data
-              // For agriculture department, prioritize complaint/report and location
-              if (selectedImportDepartment === 'agriculture') {
+              // For agriculture and pg-enro departments, prioritize complaint/report and location
+              if (selectedImportDepartment === 'agriculture' || selectedImportDepartment === 'pg-enro') {
                 if (action.what || action.where) {
                   importedActions.push(action);
                 }

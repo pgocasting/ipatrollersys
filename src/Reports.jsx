@@ -3519,12 +3519,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           actions: [
             {
               name: "Generate Report",
-              action: generateIncidentsReport,
-              format: "PDF",
-              priority: "high"
-            },
-            {
-              name: "Generate PDF",
               action: exportSummaryToPDF,
               format: "PDF",
               priority: "high"
