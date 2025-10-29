@@ -3866,41 +3866,41 @@ Are you absolutely sure you want to proceed?`;
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">1</span>
                     <div>
                       <p className="font-medium text-gray-900">Select Barangay</p>
-                      <p className="text-sm text-gray-600 mt-1">Choose the barangay from the dropdown where the incident occurred. Your municipality is already pre-selected.</p>
+                      <p className="text-sm text-gray-600 mt-1">Select the barangay with the concern type.</p>
                     </div>
                   </li>
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">2</span>
                     <div>
-                      <p className="font-medium text-gray-900">Select Concern Type</p>
-                      <p className="text-sm text-gray-600 mt-1">Pick the type of concern/incident from the dropdown (e.g., Traffic Violation, Security Issue, etc.).</p>
+                      <p className="font-medium text-gray-900">Select Type of Concern</p>
+                      <p className="text-sm text-gray-600 mt-1">Select a concern type (e.g., Public Consumption of Alcoholic Beverages, Curfew Violations, Stray Dogs, Smoking in Public Area, No Barangay Tanod on Duty, Improper Garbage Disposal, Busted Street Lights, Road Obstructions).</p>
                     </div>
                   </li>
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">3</span>
                     <div>
-                      <p className="font-medium text-gray-900">Input Daily Data</p>
-                      <p className="text-sm text-gray-600 mt-1">Enter the date and number of incidents for that specific day. You can input data for any day of the week (Monday-Sunday).</p>
+                      <p className="font-medium text-gray-900">Input Daily Data or Counts</p>
+                      <p className="text-sm text-gray-600 mt-1">Input the daily data or counts based on the barangay and type of concern.</p>
                     </div>
                   </li>
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">4</span>
                     <div>
-                      <p className="font-medium text-gray-900">Add Action Report (If Applicable)</p>
-                      <p className="text-sm text-gray-600 mt-1">If any action was taken regarding the incident, enter the details in the "Action Taken" field. This is optional.</p>
+                      <p className="font-medium text-gray-900">Action Taken</p>
+                      <p className="text-sm text-gray-600 mt-1">Based on the action taken by the barangay.</p>
                     </div>
                   </li>
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">5</span>
                     <div>
-                      <p className="font-medium text-gray-900">Add Remarks (Optional)</p>
-                      <p className="text-sm text-gray-600 mt-1">Add any additional notes, observations, or important details about the incident in the "Remarks" field if needed.</p>
+                      <p className="font-medium text-gray-900">Remarks Optional</p>
+                      <p className="text-sm text-gray-600 mt-1">These remarks are based on the Command Center or barangays.</p>
                     </div>
                   </li>
                   <li className="flex gap-3">
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">6</span>
                     <div>
-                      <p className="font-medium text-gray-900">Add Entry & Continue</p>
+                      <p className="font-medium text-gray-900">Add Entry</p>
                       <p className="text-sm text-gray-600 mt-1">Click <span className="font-semibold">"Add Entry"</span> to save this record. You can add multiple entries per day for different barangays or concern types.</p>
                     </div>
                   </li>
@@ -3908,7 +3908,7 @@ Are you absolutely sure you want to proceed?`;
                     <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">7</span>
                     <div>
                       <p className="font-medium text-gray-900">Save Data</p>
-                      <p className="text-sm text-gray-600 mt-1">After adding all entries, click <span className="font-semibold">"Save Data"</span> to save all the data you inputted into the system.</p>
+                      <p className="text-sm text-gray-600 mt-1">Always click Save Data to save your weekly input.</p>
                     </div>
                   </li>
                 </ol>
