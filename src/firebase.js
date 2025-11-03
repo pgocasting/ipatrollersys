@@ -27,7 +27,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
 // Initialize Cloud Firestore with long-polling to avoid QUIC protocol errors
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
-  experimentalAutoDetectLongPolling: true,
+  experimentalAutoDetectLongPolling: false,
 });
 
 export default app;
