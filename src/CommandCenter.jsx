@@ -849,9 +849,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return data;
   };
 
+  // Validate if entry has all required data (required before photo upload)
+  const isEntryIncomplete = (entry) => {
+    if (!entry) return true;
+    
+    const hasBarangay = entry.barangay && entry.barangay.trim() !== '';
+    const hasConcernType = entry.concernType && entry.concernType.trim() !== '';
+    const hasWeekData = (entry.week1 && entry.week1.trim() !== '') ||
+                        (entry.week2 && entry.week2.trim() !== '') ||
+                        (entry.week3 && entry.week3.trim() !== '') ||
+                        (entry.week4 && entry.week4.trim() !== '');
+    const hasActionTaken = entry.actionTaken && entry.actionTaken.trim() !== '';
+    
+    // Entry is incomplete if ANY required field is missing
+    // All fields must be filled: barangay, concern type, at least one week, and action taken
+    return !hasBarangay || !hasConcernType || !hasWeekData || !hasActionTaken;
+  };
+
   // Photo upload handlers
   const handleOpenPhotoUpload = (date, entryIndex) => {
     const entry = weeklyReportData[date]?.[entryIndex];
+    
+    // Validate that entry has all required data before allowing photo upload
+    if (isEntryIncomplete(entry)) {
+      showError('Please complete all required fields (Barangay, Concern Type, at least one Week, and Action Taken) before uploading photos.');
+      return;
+    }
+    
     setCurrentPhotoEntry({ date, entryIndex, entry });
     
     // Load existing photos if available
@@ -5116,8 +5140,17 @@ Are you absolutely sure you want to proceed?`;
                                         // Show Upload button only when no photos exist
                                         <button
                                           onClick={() => handleOpenPhotoUpload(date, entryIndex)}
-                                          className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                          title="Upload Photos & Add Remarks"
+                                          disabled={isEntryIncomplete(entry)}
+                                          className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-colors duration-200 border ${
+                                            isEntryIncomplete(entry)
+                                              ? 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed opacity-50'
+                                              : 'text-blue-600 hover:text-white hover:bg-blue-600 border-blue-300 hover:border-blue-600'
+                                          }`}
+                                          title={
+                                            isEntryIncomplete(entry)
+                                              ? 'Complete all required fields first: Barangay, Concern Type, at least one Week, and Action Taken'
+                                              : 'Upload Photos & Add Remarks'
+                                          }
                                         >
                                           <Upload className="w-4 h-4" />
                                           <span className="text-sm font-medium">Upload</span>
