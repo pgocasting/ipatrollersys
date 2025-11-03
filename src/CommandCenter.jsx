@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "./Layout";
 import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import { useFirebase } from "./hooks/useFirebase";
@@ -36,7 +36,9 @@ import {
   ChevronRight,
   Check,
   Edit,
-  HelpCircle
+  HelpCircle,
+  Image,
+  Eye
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNotification, NotificationContainer } from './components/ui/notification';
@@ -51,6 +53,7 @@ import {
   DialogTrigger 
 } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
+import { cloudinaryUtils } from './utils/cloudinary';
 
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
@@ -219,6 +222,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Excel Import States
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
+
+  // Photo Upload States
+  const [showPhotoUploadDialog, setShowPhotoUploadDialog] = useState(false);
+  const [currentPhotoEntry, setCurrentPhotoEntry] = useState(null);
+  const [beforePhoto, setBeforePhoto] = useState(null);
+  const [afterPhoto, setAfterPhoto] = useState(null);
+  const [beforePhotoPreview, setBeforePhotoPreview] = useState(null);
+  const [afterPhotoPreview, setAfterPhotoPreview] = useState(null);
+  const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [showPhotoViewDialog, setShowPhotoViewDialog] = useState(false);
+  const [viewingPhotos, setViewingPhotos] = useState(null);
+  
+  // Ref for debouncing remarks updates
+  const remarksDebounceRef = useRef(null);
 
   // Municipalities by district
   const municipalitiesByDistrict = {
@@ -417,9 +434,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     loadBarangaysFromFirestore();
     loadConcernTypesFromFirestore();
-    // Add debug function call
     debugFirestoreDocuments();
   }, []);
+
+  // Cleanup debounce timeout when photo upload dialog closes
+  useEffect(() => {
+    return () => {
+      if (remarksDebounceRef.current) {
+        clearTimeout(remarksDebounceRef.current);
+      }
+    };
+  }, [showPhotoUploadDialog]);
 
   // Set default active municipality tab when component loads
   useEffect(() => {
@@ -824,51 +849,276 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return data;
   };
 
-  // Validate weekly report data
-  const validateWeeklyReportData = () => {
-    const errors = [];
-    const dates = generateDates(selectedMonth, selectedYear);
+  // Photo upload handlers
+  const handleOpenPhotoUpload = (date, entryIndex) => {
+    const entry = weeklyReportData[date]?.[entryIndex];
+    setCurrentPhotoEntry({ date, entryIndex, entry });
     
-    // Check if at least one date has data
-    let hasData = false;
-    dates.forEach(date => {
-      const dateEntries = getDateData(date);
-      dateEntries.forEach(entry => {
-        if (entry.barangay || entry.concernType || entry.week1 || 
-            entry.week2 || entry.week3 || entry.week4 || 
-            entry.actionTaken || entry.remarks) {
-          hasData = true;
-        }
-      });
-    });
-    
-    if (!hasData) {
-      errors.push("Please enter data for at least one date");
+    // Load existing photos if available
+    if (entry?.photos) {
+      setBeforePhotoPreview(entry.photos.before || null);
+      setAfterPhotoPreview(entry.photos.after || null);
+    } else {
+      setBeforePhotoPreview(null);
+      setAfterPhotoPreview(null);
     }
     
-    // Check for incomplete entries (barangay selected but no concern type, etc.)
-    dates.forEach(date => {
-      const dateEntries = getDateData(date);
-      dateEntries.forEach((entry, entryIndex) => {
-        if (entry.barangay && !entry.concernType) {
-          errors.push(`Date ${date}, Entry ${entryIndex + 1}: Concern type is required when barangay is selected`);
+    setBeforePhoto(null);
+    setAfterPhoto(null);
+    setShowPhotoUploadDialog(true);
+  };
+
+  // Compress image to under 2MB
+  const compressImage = async (file, maxSizeMB = 2) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        // Use HTMLImageElement to avoid conflict with lucide-react Image icon
+        const img = document.createElement('img');
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+          
+          // Calculate new dimensions while maintaining aspect ratio
+          const maxDimension = 1920; // Max width or height
+          if (width > height && width > maxDimension) {
+            height = (height * maxDimension) / width;
+            width = maxDimension;
+          } else if (height > maxDimension) {
+            width = (width * maxDimension) / height;
+            height = maxDimension;
+          }
+          
+          canvas.width = width;
+          canvas.height = height;
+          
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Start with quality 0.9 and reduce if needed
+          let quality = 0.9;
+          const tryCompress = () => {
+            canvas.toBlob(
+              (blob) => {
+                const sizeMB = blob.size / 1024 / 1024;
+                
+                if (sizeMB <= maxSizeMB || quality <= 0.5) {
+                  // Convert blob to file
+                  const compressedFile = new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now(),
+                  });
+                  console.log(`✅ Image compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${sizeMB.toFixed(2)}MB (quality: ${quality})`);
+                  resolve(compressedFile);
+                } else {
+                  // Reduce quality and try again
+                  quality -= 0.1;
+                  tryCompress();
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          };
+          
+          tryCompress();
+        };
+        img.onerror = reject;
+      };
+      reader.onerror = reject;
+    });
+  };
+
+  const handleBeforePhotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        // Show loading state
+        const originalSize = (file.size / 1024 / 1024).toFixed(2);
+        console.log(`📸 Original before photo size: ${originalSize}MB`);
+        
+        // Compress image
+        const compressedFile = await compressImage(file, 2);
+        setBeforePhoto(compressedFile);
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setBeforePhotoPreview(reader.result);
+        };
+        reader.readAsDataURL(compressedFile);
+        
+        const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+        if (originalSize > 2) {
+          showSuccess(`Before photo compressed from ${originalSize}MB to ${compressedSize}MB`);
         }
-        if (entry.concernType && !entry.barangay) {
-          errors.push(`Date ${date}, Entry ${entryIndex + 1}: Barangay is required when concern type is selected`);
+      } catch (error) {
+        console.error('Error compressing before photo:', error);
+        showError('Failed to process image. Please try another photo.');
+      }
+    }
+  };
+
+  const handleAfterPhotoChange = async (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      try {
+        // Show loading state
+        const originalSize = (file.size / 1024 / 1024).toFixed(2);
+        console.log(`📸 Original after photo size: ${originalSize}MB`);
+        
+        // Compress image
+        const compressedFile = await compressImage(file, 2);
+        setAfterPhoto(compressedFile);
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setAfterPhotoPreview(reader.result);
+        };
+        reader.readAsDataURL(compressedFile);
+        
+        const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+        if (originalSize > 2) {
+          showSuccess(`After photo compressed from ${originalSize}MB to ${compressedSize}MB`);
+        }
+      } catch (error) {
+        console.error('Error compressing after photo:', error);
+        showError('Failed to process image. Please try another photo.');
+      }
+    }
+  };
+
+  const handleUploadPhotos = async () => {
+    if (!currentPhotoEntry) return;
+    
+    setIsUploadingPhotos(true);
+    try {
+      const { date, entryIndex } = currentPhotoEntry;
+      const photos = {};
+      
+      // Upload before photo if selected
+      if (beforePhoto) {
+        const result = await cloudinaryUtils.uploadImage(beforePhoto, {
+          folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+          publicId: `before-${date}-${entryIndex}-${Date.now()}`
+        });
+        
+        if (result.success) {
+          photos.before = result.data.url;
+        } else {
+          throw new Error('Failed to upload before photo');
+        }
+      } else if (beforePhotoPreview) {
+        // Keep existing before photo
+        photos.before = beforePhotoPreview;
+      }
+      
+      // Upload after photo if selected
+      if (afterPhoto) {
+        const result = await cloudinaryUtils.uploadImage(afterPhoto, {
+          folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+          publicId: `after-${date}-${entryIndex}-${Date.now()}`
+        });
+        
+        if (result.success) {
+          photos.after = result.data.url;
+        } else {
+          throw new Error('Failed to upload after photo');
+        }
+      } else if (afterPhotoPreview) {
+        // Keep existing after photo
+        photos.after = afterPhotoPreview;
+      }
+      
+      // Update the entry with photo URLs
+      updateDateData(date, entryIndex, 'photos', photos);
+      
+      showSuccess('Photos uploaded successfully!');
+      setShowPhotoUploadDialog(false);
+      setBeforePhoto(null);
+      setAfterPhoto(null);
+      setBeforePhotoPreview(null);
+      setAfterPhotoPreview(null);
+      setCurrentPhotoEntry(null);
+    } catch (error) {
+      console.error('Error uploading photos:', error);
+      showError('Failed to upload photos. Please try again.');
+    } finally {
+      setIsUploadingPhotos(false);
+    }
+  };
+
+  const handleViewPhotos = (date, entryIndex) => {
+    const entry = weeklyReportData[date]?.[entryIndex];
+    if (entry?.photos) {
+      setViewingPhotos(entry.photos);
+      setShowPhotoViewDialog(true);
+    }
+  };
+
+  const handleResetPhotos = async (date, entryIndex) => {
+    if (!isAdmin) {
+      showError('Only administrators can reset photos');
+      return;
+    }
+
+    const entry = weeklyReportData[date]?.[entryIndex];
+    const hasPhotos = entry?.photos?.before || entry?.photos?.after;
+
+    const confirmReset = window.confirm(
+      'Are you sure you want to reset the photos for this entry?\n\n' +
+      'This will DELETE the photos from Cloudinary and remove the photo links and remarks.\n' +
+      'This action cannot be undone.'
+    );
+
+    if (confirmReset) {
+      let deletionResults = { before: null, after: null };
+      
+      // Try to delete photos from Cloudinary
+      if (hasPhotos) {
+        showNotification('Deleting photos from Cloudinary...', 'info');
+        
+        if (entry.photos.before) {
+          console.log('🗑️ Deleting before photo:', entry.photos.before);
+          deletionResults.before = await cloudinaryUtils.deleteResource(entry.photos.before);
         }
         
-        // Validate week numbers
-        const weekFields = ['week1', 'week2', 'week3', 'week4'];
-        weekFields.forEach(weekField => {
-          const value = entry[weekField];
-          if (value && (isNaN(Number(value)) || Number(value) < 0)) {
-            errors.push(`Date ${date}, Entry ${entryIndex + 1}: ${weekField} must be a valid positive number`);
-          }
-        });
-      });
-    });
-    
-    return errors;
+        if (entry.photos.after) {
+          console.log('🗑️ Deleting after photo:', entry.photos.after);
+          deletionResults.after = await cloudinaryUtils.deleteResource(entry.photos.after);
+        }
+      }
+      
+      // Remove photos and remarks from the entry
+      updateDateData(date, entryIndex, 'photos', null);
+      updateDateData(date, entryIndex, 'remarks', '');
+      
+      // Determine success message based on deletion results
+      const beforeDeleted = !entry?.photos?.before || deletionResults.before?.success;
+      const afterDeleted = !entry?.photos?.after || deletionResults.after?.success;
+      
+      if (beforeDeleted && afterDeleted) {
+        showSuccess('Photos deleted from Cloudinary and reset successfully.');
+      } else if (deletionResults.before?.partialSuccess || deletionResults.after?.partialSuccess) {
+        showNotification('Photo links removed. Note: Could not delete from Cloudinary (may require server-side setup). Files remain in cloud storage.', 'warning');
+      } else {
+        showSuccess('Photo links and remarks reset successfully.');
+      }
+      
+      // Add to terminal history
+      const newEntry = {
+        id: Date.now(),
+        command: "photos.reset",
+        output: `Admin reset photos and remarks for ${date}, Entry ${entryIndex + 1}. Cloudinary deletion: ${beforeDeleted && afterDeleted ? 'Success' : 'Partial/Failed'}`,
+        type: "warning",
+        timestamp: new Date()
+      };
+      setTerminalHistory(prev => [...prev, newEntry]);
+    }
   };
 
   // Clear all weekly report data for active municipality
@@ -4546,13 +4796,13 @@ Are you absolutely sure you want to proceed?`;
                             {dateEntries.length === 0 ? (
                               // Empty row when no entries
                               <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
-                                <td className="px-4 py-3 text-sm font-medium text-gray-700 bg-white/30">
+                                <td className="px-3 py-2 text-sm font-medium text-gray-700 bg-white/30">
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-3 w-3 text-gray-400" />
                                     {date}
                                   </div>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <select 
                                     id={`barangay-select-${date}`}
                                     name={`barangay-select-${date}`}
@@ -4581,7 +4831,7 @@ Are you absolutely sure you want to proceed?`;
                                       ))}
                                   </select>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <select 
                                     id={`concern-type-select-${date}`}
                                     name={`concern-type-select-${date}`}
@@ -4611,7 +4861,7 @@ Are you absolutely sure you want to proceed?`;
                                     )}
                                   </select>
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <input 
                                     id={`week1-${date}`}
                                     name={`week1-${date}`}
@@ -4629,7 +4879,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <input 
                                     id={`week2-${date}`}
                                     name={`week2-${date}`}
@@ -4647,7 +4897,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <input 
                                     id={`week3-${date}`}
                                     name={`week3-${date}`}
@@ -4665,7 +4915,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3">
+                                <td className="px-3 py-2">
                                   <input 
                                     id={`week4-${date}`}
                                     name={`week4-${date}`}
@@ -4683,7 +4933,7 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3 table-cell-spacing">
+                                <td className="px-3 py-2 table-cell-spacing">
                                   <input 
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
@@ -4699,21 +4949,10 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-4 py-3 table-cell-spacing">
-                                  <input 
-                                    id={`remarks-${date}`}
-                                    name={`remarks-${date}`}
-                                    type="text" 
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
-                                    placeholder="Add remarks..."
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'remarks', e.target.value);
-                                      }
-                                    }}
-                                  />
+                                <td className="px-3 py-2 table-cell-spacing">
+                                  <div className="flex items-center justify-center">
+                                    <span className="text-xs text-gray-400 italic">Add entry to upload</span>
+                                  </div>
                                 </td>
                               </tr>
                             ) : (
@@ -4721,14 +4960,14 @@ Are you absolutely sure you want to proceed?`;
                               dateEntries.map((entry, entryIndex) => (
                                 <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
                                   {entryIndex === 0 && (
-                                    <td className="px-4 py-3 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
+                                    <td className="px-3 py-2 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
                                       <div className="flex items-center gap-2">
                                         <Clock className="h-3 w-3 text-gray-400" />
                                         {date}
                                       </div>
                                     </td>
                                   )}
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <div className="flex items-center gap-2">
                                       <select 
                                         id={`existing-barangay-${date}-${entryIndex}`}
@@ -4761,7 +5000,7 @@ Are you absolutely sure you want to proceed?`;
                                       </button>
                                     </div>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <select 
                                       id={`existing-concern-type-${date}-${entryIndex}`}
                                       name={`existing-concern-type-${date}-${entryIndex}`}
@@ -4786,7 +5025,7 @@ Are you absolutely sure you want to proceed?`;
                                       )}
                                     </select>
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <input 
                                       id={`existing-week1-${date}-${entryIndex}`}
                                       name={`existing-week1-${date}-${entryIndex}`}
@@ -4799,7 +5038,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week1', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <input 
                                       id={`existing-week2-${date}-${entryIndex}`}
                                       name={`existing-week2-${date}-${entryIndex}`}
@@ -4812,7 +5051,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <input 
                                       id={`existing-week3-${date}-${entryIndex}`}
                                       name={`existing-week3-${date}-${entryIndex}`}
@@ -4825,7 +5064,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3">
+                                  <td className="px-3 py-2">
                                     <input 
                                       id={`existing-week4-${date}-${entryIndex}`}
                                       name={`existing-week4-${date}-${entryIndex}`}
@@ -4838,7 +5077,7 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3 table-cell-spacing">
+                                  <td className="px-3 py-2 table-cell-spacing">
                                     <input 
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
@@ -4849,16 +5088,60 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-4 py-3 table-cell-spacing">
-                                    <input 
-                                      id={`existing-remarks-${date}-${entryIndex}`}
-                                      name={`existing-remarks-${date}-${entryIndex}`}
-                                      type="text" 
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:border-gray-500 bg-white transition-all duration-200"
-                                      placeholder="Add remarks..."
-                                      value={entry.remarks}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'remarks', e.target.value)}
-                                    />
+                                  <td className="px-3 py-2 table-cell-spacing">
+                                    <div className="flex items-center justify-center gap-2 h-full">
+                                      {entry.photos && (entry.photos.before || entry.photos.after) ? (
+                                        <>
+                                          {/* View button when photos exist */}
+                                          <button
+                                            onClick={() => handleViewPhotos(date, entryIndex)}
+                                            className="flex items-center gap-2 px-4 py-1.5 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
+                                            title="View Photos & Remarks"
+                                          >
+                                            <Eye className="w-4 h-4" />
+                                            <span className="text-sm font-medium">View</span>
+                                          </button>
+                                          {/* Reset button for administrators only */}
+                                          {isAdmin && (
+                                            <button
+                                              onClick={() => handleResetPhotos(date, entryIndex)}
+                                              className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 rounded-md transition-colors duration-200 border border-red-300 hover:border-red-600"
+                                              title="Reset Photos (Admin Only)"
+                                            >
+                                              <X className="w-4 h-4" />
+                                            </button>
+                                          )}
+                                        </>
+                                      ) : (
+                                        // Show Upload button only when no photos exist
+                                        <button
+                                          onClick={() => handleOpenPhotoUpload(date, entryIndex)}
+                                          className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
+                                          title="Upload Photos & Add Remarks"
+                                        >
+                                          <Upload className="w-4 h-4" />
+                                          <span className="text-sm font-medium">Upload</span>
+                                        </button>
+                                      )}
+                                      {entry.remarks && (
+                                        <div className="relative group">
+                                          <div className="px-2.5 py-1 bg-yellow-100 border-l-4 border-yellow-400 rounded-r-md shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-1">
+                                            <span className="text-yellow-600 text-sm">📝</span>
+                                            <span className="text-xs font-medium text-yellow-800">Note</span>
+                                          </div>
+                                          {/* Tooltip on hover - positioned above */}
+                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none">
+                                            <div className="flex items-start gap-2 mb-2">
+                                              <span className="text-lg">📝</span>
+                                              <span className="text-xs font-bold text-yellow-900">Remarks:</span>
+                                            </div>
+                                            <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap">{entry.remarks}</p>
+                                            {/* Arrow pointing down */}
+                                            <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-yellow-50 border-r-2 border-b-2 border-yellow-300 transform rotate-45"></div>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                               ))
@@ -6167,6 +6450,258 @@ Are you absolutely sure you want to proceed?`;
         </div>
       )}
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+
+      {/* Photo Upload Dialog */}
+      <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
+        <DialogContent className="sm:max-w-[700px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900">Upload Before & After Photos</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Document the before and after state of your action with photos.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {/* Instructions Card */}
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 mt-0.5">
+                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
+                  <span className="text-white text-lg">📋</span>
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-blue-900 mb-2">Quick Instructions</h4>
+                <ul className="space-y-1.5 text-xs text-blue-800">
+                  <li className="flex items-start gap-2">
+                    <span className="text-blue-500 font-bold mt-0.5">•</span>
+                    <span><strong className="text-blue-900">Before Photo:</strong> Capture the situation/area BEFORE taking action</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-green-500 font-bold mt-0.5">•</span>
+                    <span><strong className="text-green-900">After Photo:</strong> Capture the same area AFTER action completed</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-500 font-bold mt-0.5">•</span>
+                    <span>Photos auto-compress to under 2MB • Both optional but recommended</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Photo Upload Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Before Photo Card */}
+            <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
+                <h3 className="font-semibold text-gray-900">Before Photo</h3>
+              </div>
+              
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleBeforePhotoChange}
+                className="hidden"
+                id="before-photo-input"
+              />
+              
+              {beforePhotoPreview ? (
+                <div className="relative w-full aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group bg-white">
+                  <img
+                    src={beforePhotoPreview}
+                    alt="Before preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => {
+                        setBeforePhoto(null);
+                        setBeforePhotoPreview(null);
+                        document.getElementById('before-photo-input').value = '';
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-lg"
+                    >
+                      <X className="w-4 h-4" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  htmlFor="before-photo-input"
+                  className="w-full aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100/50 transition-all bg-white"
+                >
+                  <Image className="w-12 h-12 text-blue-400 mb-2" />
+                  <span className="text-sm font-medium text-blue-600">Click to choose photo</span>
+                  <span className="text-xs text-gray-500 mt-1">or drag and drop</span>
+                </label>
+              )}
+            </div>
+
+            {/* After Photo Card */}
+            <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50/30 hover:bg-green-50/50 transition-colors">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
+                <h3 className="font-semibold text-gray-900">After Photo</h3>
+              </div>
+              
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleAfterPhotoChange}
+                className="hidden"
+                id="after-photo-input"
+              />
+              
+              {afterPhotoPreview ? (
+                <div className="relative w-full aspect-video border-2 border-green-300 rounded-lg overflow-hidden group bg-white">
+                  <img
+                    src={afterPhotoPreview}
+                    alt="After preview"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <button
+                      onClick={() => {
+                        setAfterPhoto(null);
+                        setAfterPhotoPreview(null);
+                        document.getElementById('after-photo-input').value = '';
+                      }}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-lg"
+                    >
+                      <X className="w-4 h-4" />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <label
+                  htmlFor="after-photo-input"
+                  className="w-full aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-100/50 transition-all bg-white"
+                >
+                  <Image className="w-12 h-12 text-green-400 mb-2" />
+                  <span className="text-sm font-medium text-green-600">Click to choose photo</span>
+                  <span className="text-xs text-gray-500 mt-1">or drag and drop</span>
+                </label>
+              )}
+            </div>
+          </div>
+
+          {/* Remarks Section */}
+          <div className="mt-4 border-t pt-4">
+            <label className="block text-sm font-semibold text-gray-900 mb-2">
+              <MessageSquare className="w-4 h-4 inline mr-1" />
+              Remarks (Optional)
+            </label>
+            <textarea
+              value={currentPhotoEntry?.entry?.remarks || ''}
+              onChange={(e) => {
+                if (currentPhotoEntry) {
+                  const newValue = e.target.value;
+                  
+                  // Update currentPhotoEntry immediately for responsive UI
+                  setCurrentPhotoEntry(prev => ({
+                    ...prev,
+                    entry: { ...prev.entry, remarks: newValue }
+                  }));
+                  
+                  // Debounce the weeklyReportData update to prevent slowness
+                  if (remarksDebounceRef.current) {
+                    clearTimeout(remarksDebounceRef.current);
+                  }
+                  
+                  remarksDebounceRef.current = setTimeout(() => {
+                    updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
+                  }, 300); // Wait 300ms after user stops typing
+                }
+              }}
+              placeholder="Add any additional notes or remarks about this action..."
+              rows={3}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
+            />
+            <p className="text-xs text-gray-500 mt-1">You can add remarks here while uploading photos</p>
+          </div>
+
+          <DialogFooter className="mt-6">
+            <button
+              onClick={() => setShowPhotoUploadDialog(false)}
+              className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+              disabled={isUploadingPhotos}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleUploadPhotos}
+              disabled={isUploadingPhotos || (!beforePhoto && !afterPhoto && !beforePhotoPreview && !afterPhotoPreview)}
+              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
+            >
+              {isUploadingPhotos ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4" />
+                  Upload Photos
+                </>
+              )}
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo View Dialog */}
+      <Dialog open={showPhotoViewDialog} onOpenChange={setShowPhotoViewDialog}>
+        <DialogContent className="sm:max-w-[800px]">
+          <DialogHeader>
+            <DialogTitle>Before & After Photos</DialogTitle>
+            <DialogDescription>
+              View the before and after photos for this entry.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+            {/* Before Photo */}
+            {viewingPhotos?.before && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">Before Photo</label>
+                <div className="border rounded-md overflow-hidden">
+                  <img
+                    src={viewingPhotos.before}
+                    alt="Before"
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* After Photo */}
+            {viewingPhotos?.after && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">After Photo</label>
+                <div className="border rounded-md overflow-hidden">
+                  <img
+                    src={viewingPhotos.after}
+                    alt="After"
+                    className="w-full h-auto object-contain"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <button
+              onClick={() => setShowPhotoViewDialog(false)}
+              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+            >
+              Close
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }
