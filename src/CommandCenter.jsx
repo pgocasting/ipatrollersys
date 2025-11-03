@@ -5199,15 +5199,15 @@ Are you absolutely sure you want to proceed?`;
                                             <span className="text-yellow-600 text-sm">📝</span>
                                             <span className="text-xs font-medium text-yellow-800">Note</span>
                                           </div>
-                                          {/* Tooltip on hover - positioned above */}
-                                          <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 w-72 p-3 bg-yellow-50 border-2 border-yellow-300 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[100] pointer-events-none">
-                                            <div className="flex items-start gap-2 mb-2">
-                                              <span className="text-lg">📝</span>
-                                              <span className="text-xs font-bold text-yellow-900">Remarks:</span>
+                                          {/* Tooltip on hover - positioned above and aligned to right, extends to the left */}
+                                          <div className="absolute right-0 bottom-full mb-2 min-w-[200px] max-w-[280px] p-3 bg-white border-2 border-yellow-400 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] pointer-events-none">
+                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-yellow-200">
+                                              <span className="text-base">📝</span>
+                                              <span className="text-xs font-bold text-yellow-900">Remarks</span>
                                             </div>
-                                            <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap">{entry.remarks}</p>
-                                            {/* Arrow pointing down */}
-                                            <div className="absolute left-1/2 -translate-x-1/2 -bottom-2 w-4 h-4 bg-yellow-50 border-r-2 border-b-2 border-yellow-300 transform rotate-45"></div>
+                                            <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap max-h-32 overflow-y-auto pr-1">{entry.remarks}</p>
+                                            {/* Arrow pointing down to the button */}
+                                            <div className="absolute right-6 -bottom-2 w-3 h-3 bg-white border-r-2 border-b-2 border-yellow-400 transform rotate-45"></div>
                                           </div>
                                         </div>
                                       )}
