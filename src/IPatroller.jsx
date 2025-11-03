@@ -304,14 +304,28 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             );
             
             if (existingData) {
-              // Check if the existing data has any actual values (not all zeros/nulls)
-              const hasActualData = existingData.data && existingData.data.some(val => val !== null && val !== undefined && val !== 0);
+              // Check if the existing data has any actual values (not all nulls)
+              // Include 0 as valid data since it represents an actual entry
+              const hasActualData = existingData.data && existingData.data.some(val => val !== null && val !== undefined);
               
               if (hasActualData) {
-                // Use Firestore data if it has actual patrol counts
-                allMunicipalitiesData.push(existingData);
+                // Recalculate activeDays and inactiveDays to exclude 0 values
+                const requiredBarangays = barangayCounts[municipality] || 0;
+                const activeDays = existingData.data.filter((val) => val !== null && val !== undefined && val > 0 && val >= requiredBarangays).length;
+                const inactiveDays = existingData.data.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
+                const totalPatrols = existingData.data.reduce((sum, val) => sum + (val || 0), 0);
+                const activePercentage = existingData.data.length > 0 ? Math.round((activeDays / existingData.data.length) * 100) : 0;
+                
+                // Use Firestore data but with recalculated stats
+                allMunicipalitiesData.push({
+                  ...existingData,
+                  activeDays,
+                  inactiveDays,
+                  totalPatrols,
+                  activePercentage
+                });
               } else {
-                // Even if data exists in Firestore, if it's all zeros/nulls, treat as "No Entry"
+                // Even if data exists in Firestore, if it's all nulls, treat as "No Entry"
                 const dailyData = selectedDates.map(() => null); // Set all days to null for "No Entry"
                 const itemData = {
                   id: `${district}-${municipality}`,
@@ -402,8 +416,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
               if (Array.isArray(dateEntries)) {
                 dateEntries.forEach(entry => {
-                  // Check if actionTaken field has content
-                  if (entry.actionTaken && entry.actionTaken.trim()) {
+                  // Count only entries that have BOTH before and after photos uploaded
+                  const hasBeforePhoto = entry.photos && entry.photos.before;
+                  const hasAfterPhoto = entry.photos && entry.photos.after;
+                  
+                  if (hasBeforePhoto && hasAfterPhoto) {
                     // Determine which week this date falls into
                     const entryDate = new Date(dateKey);
                     const dayOfMonth = entryDate.getDate();
@@ -534,9 +551,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       setLoading(true);
       const monthYearId = `${String(selectedMonth + 1).padStart(2, "0")}-${selectedYear}`;
       
-      // Find municipalities that have actual data (not all zeros or nulls)
+      // Find municipalities that have actual data (not all nulls)
+      // Include entries with 0 as they represent actual data entry
       const municipalitiesWithData = patrolData.filter(item => 
-        item.data.some(value => value > 0)
+        item.data.some(value => value !== null && value !== undefined)
       );
 
       if (municipalitiesWithData.length === 0) {
@@ -634,6 +652,45 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       ...prev,
       [district]: !prev[district],
     }));
+  };
+
+  // Function to clear all 0 values after a specific day and set them to null (No Entry)
+  const clearZeroValuesAfterDay = (afterDayIndex) => {
+    const updatedData = patrolData.map((item) => {
+      const newData = [...item.data];
+      
+      // Set all values after the specified day to null if they are 0
+      for (let i = afterDayIndex + 1; i < newData.length; i++) {
+        if (newData[i] === 0) {
+          newData[i] = null;
+        }
+      }
+      
+      // Recalculate totals
+      const totalPatrols = newData.reduce((sum, val) => sum + (val || 0), 0);
+      const requiredBarangays = barangayCounts[item.municipality] || 0;
+      const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= requiredBarangays).length;
+      const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
+      const activePercentage = Math.round((activeDays / newData.length) * 100);
+      
+      return {
+        ...item,
+        data: newData,
+        totalPatrols,
+        activeDays,
+        inactiveDays,
+        activePercentage,
+      };
+    });
+    
+    setPatrolData(updatedData);
+    toast.success('Cleared unwanted 0 values', {
+      description: 'All 0 values after the specified day have been set to "No Entry"',
+      duration: 3000,
+      position: 'top-right',
+      style: { background: 'white' },
+    });
+    showSuccess('Cleared unwanted 0 values successfully');
   };
 
   const getStatusColor = (value, municipality) => {
@@ -1060,26 +1117,42 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     };
   };
 
-  // Calculate active and inactive days based on barangay counts
-  const { activeDays, inactiveDays } = patrolData.reduce((acc, municipality) => {
-    const requiredBarangays = barangayCounts[municipality.municipality] || 0;
+  // Calculate active and inactive counts per day, then sum for the month
+  // This shows cumulative monthly totals: how many municipalities were active/inactive each day
+  const { activeDays, inactiveDays } = (() => {
+    let totalActive = 0;
+    let totalInactive = 0;
     
-    municipality.data.forEach((patrols) => {
-      // If there's an actual patrol count (not null/undefined)
-      if (patrols !== null && patrols !== undefined && patrols !== '') {
-        // Count as active if >= required barangays for this municipality
-        if (patrols >= requiredBarangays) {
-          acc.activeDays++;
+    // Iterate through each day of the month
+    const daysInMonth = selectedDates.length;
+    for (let dayIndex = 0; dayIndex < daysInMonth; dayIndex++) {
+      let activeMunicipalitiesThisDay = 0;
+      let inactiveMunicipalitiesThisDay = 0;
+      
+      // For each day, count how many municipalities are active/inactive
+      patrolData.forEach((municipality) => {
+        const patrols = municipality.data[dayIndex];
+        
+        // Only count if there's actual patrol data (not null/undefined)
+        if (patrols !== null && patrols !== undefined && patrols !== '') {
+          // Active: >= 5 patrols (fixed threshold for daily status)
+          if (patrols >= 5) {
+            activeMunicipalitiesThisDay++;
+          }
+          // Inactive: < 5 patrols (including 0)
+          else {
+            inactiveMunicipalitiesThisDay++;
+          }
         }
-        // Count as inactive only if there's a value but it's < required barangays
-        else {
-          acc.inactiveDays++;
-        }
-      }
-      // Don't count "No Entry" days in either active or inactive
-    });
-    return acc;
-  }, { activeDays: 0, inactiveDays: 0 });
+      });
+      
+      // Add this day's counts to the monthly total
+      totalActive += activeMunicipalitiesThisDay;
+      totalInactive += inactiveMunicipalitiesThisDay;
+    }
+    
+    return { activeDays: totalActive, inactiveDays: totalInactive };
+  })();
 
   const overallSummary = {
     totalPatrols: patrolData.reduce((sum, item) => sum + item.totalPatrols, 0),
@@ -1481,10 +1554,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Days</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Active Card Counts</p>
                   <p className="text-2xl font-bold text-green-600">
                     {overallSummary.totalActive.toLocaleString()}
                   </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
                 <div className="p-2 bg-green-100 rounded-lg">
                   <CheckCircle className="w-6 h-6 text-green-600" />
@@ -1497,10 +1571,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Days</p>
+                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Card Counts</p>
                   <p className="text-2xl font-bold text-red-600">
                     {overallSummary.totalInactive.toLocaleString()}
                   </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
                 <div className="p-2 bg-red-100 rounded-lg">
                   <XCircle className="w-6 h-6 text-red-600" />
@@ -1756,7 +1831,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-1.5">
                         <p><strong>Minimum Reports/Week:</strong> 98 (14 × 7).</p>
                         <p><strong>Actual Reports/Week:</strong> Displays Week 1-4 breakdown of patrol reports for the month.</p>
-                        <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports (currently 0 - awaiting data).</p>
+                        <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports. Counts only entries with both before and after photos uploaded from Command Center.</p>
                         <p><strong>% Efficiency:</strong> (Minimum Number of Reports (constant) / Week) ÷ (No. of Report Attended / Week) × 100.</p>
                       </div>
                     </div>
@@ -1920,14 +1995,24 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       type="number"
                                       min="0"
                                       value={item.data[index] !== null && item.data[index] !== undefined ? item.data[index] : ""}
-                                      onChange={(e) =>
+                                      onChange={(e) => {
+                                        const inputValue = e.target.value;
+                                        let parsedValue;
+                                        
+                                        if (inputValue === "" || inputValue === null) {
+                                          parsedValue = null; // Empty input = No Entry
+                                        } else {
+                                          const num = parseInt(inputValue);
+                                          parsedValue = isNaN(num) ? null : num; // Valid number or null
+                                        }
+                                        
                                         handleAddPatrolData(
                                           item.municipality,
                                           item.district,
                                           index,
-                                          e.target.value === "" ? null : parseInt(e.target.value) || 0,
-                                        )
-                                      }
+                                          parsedValue
+                                        );
+                                      }}
                                       disabled={item.isLocked || ([0, 1].includes(selectedMonth) && selectedYear === 2025)}
                                       className={`w-16 h-8 text-center text-xs border transition-all duration-300 ${
                                         item.isLocked || ([0, 1].includes(selectedMonth) && selectedYear === 2025)

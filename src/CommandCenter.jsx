@@ -59,7 +59,7 @@ import { cloudinaryUtils } from './utils/cloudinary';
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
   const { isAdmin, userMunicipality, userAccessLevel } = useAuth();
-  const { notifications, showSuccess, showError, removeNotification } = useNotification();
+  const { notifications, showSuccess, showError, showInfo, showWarning, removeNotification } = useNotification();
   const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
   
   // Access level check - only command-center users should access this page
@@ -1104,7 +1104,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       
       // Try to delete photos from Cloudinary
       if (hasPhotos) {
-        showNotification('Deleting photos from Cloudinary...', 'info');
+        showInfo('Deleting photos from Cloudinary...');
         
         if (entry.photos.before) {
           console.log('🗑️ Deleting before photo:', entry.photos.before);
@@ -1128,7 +1128,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       if (beforeDeleted && afterDeleted) {
         showSuccess('Photos deleted from Cloudinary and reset successfully.');
       } else if (deletionResults.before?.partialSuccess || deletionResults.after?.partialSuccess) {
-        showNotification('Photo links removed. Note: Could not delete from Cloudinary (may require server-side setup). Files remain in cloud storage.', 'warning');
+        showWarning('Photo links removed. Note: Could not delete from Cloudinary (may require server-side setup). Files remain in cloud storage.');
       } else {
         showSuccess('Photo links and remarks reset successfully.');
       }
@@ -3898,14 +3898,6 @@ Are you absolutely sure you want to proceed?`;
     setIsLoadingWeeklyReports(true);
     
     try {
-      // Validate data before saving
-      const validationErrors = validateWeeklyReportData();
-      if (validationErrors.length > 0) {
-        toast.error("Validation errors: " + validationErrors.join(", "));
-        setIsLoadingWeeklyReports(false);
-        return;
-      }
-
       // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
       const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
         if (key && key.trim().length > 0) {
