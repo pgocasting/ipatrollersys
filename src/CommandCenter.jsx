@@ -4103,170 +4103,206 @@ Are you absolutely sure you want to proceed?`;
           }
           setShowCommandCenterHelp(open);
         }}>
-          <DialogContent className="sm:max-w-3xl max-h-[85vh] overflow-y-auto">
-            <DialogHeader className="gap-3">
-              <div className="flex items-center gap-3">
-                <div className="h-12 w-12 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center">
-                  <Shield className="h-6 w-6" />
+          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
+            <DialogHeader className="gap-4 pb-6 border-b border-gray-200">
+              <div className="flex items-center gap-4">
+                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg">
+                  <Shield className="h-8 w-8" />
                 </div>
                 <div>
-                  <DialogTitle className="text-2xl">Welcome to Command Center</DialogTitle>
-                  <DialogDescription className="text-base">Step-by-step guide to using the system</DialogDescription>
+                  <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                    Command Center Guide
+                  </DialogTitle>
+                  <DialogDescription className="text-base text-gray-600 mt-1">
+                    Your complete guide to recording and managing incident reports
+                  </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
             
-            <div className="space-y-6 text-base text-gray-700">
+            <div className="space-y-8 py-6 text-base text-gray-700">
               {/* Overview */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2 flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 shadow-sm">
+                <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2 text-lg">
+                  <Activity className="h-6 w-6" />
                   What is Command Center?
                 </h3>
-                <p className="text-sm text-blue-800">
+                <p className="text-sm text-blue-800 leading-relaxed">
                   Command Center is your central hub for recording and managing weekly incident reports across all barangays in your municipality. 
                   You can track different types of concerns, generate reports, and export data for analysis.
                 </p>
               </div>
 
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">STEP-BY-STEP GUIDE</span>
+                </div>
+              </div>
+
               {/* Step-by-step instructions */}
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <FileText className="h-5 w-5 text-green-600" />
-                  How to Record Daily Incidents
-                </h3>
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md">
+                    <FileText className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-xl">How to Record Daily Incidents</h3>
+                </div>
                 <ol className="space-y-4">
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">1</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Select Barangay</p>
-                      <p className="text-sm text-gray-600 mt-1">Select the barangay with the concern type.</p>
+                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">1</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Select Barangay</p>
+                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Choose the barangay where the incident occurred from the dropdown menu.</p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">2</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Select Type of Concern</p>
-                      <p className="text-sm text-gray-600 mt-1">Select a concern type (e.g., Public Consumption of Alcoholic Beverages, Curfew Violations, Stray Dogs, Smoking in Public Area, No Barangay Tanod on Duty, Improper Garbage Disposal, Busted Street Lights, Road Obstructions).</p>
+                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">2</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Select Type of Concern</p>
+                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Select a concern type from the dropdown menu based on the incident.</p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">3</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Input Daily Data or Counts</p>
-                      <p className="text-sm text-gray-600 mt-1">Input the daily data or counts based on the barangay and type of concern.</p>
+                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">3</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Input Weekly Data or Counts</p>
+                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Enter the number of incidents for each week (Week 1-4). Input at least one week's data.</p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">4</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Action Taken</p>
-                      <p className="text-sm text-gray-600 mt-1">Based on the action taken by the barangay.</p>
+                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">4</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Add Entry (If Needed)</p>
+                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Click <span className="font-semibold text-green-600">"Add Entry"</span> to create another record for the same date. You can add multiple entries per day for different barangays or concern types.</p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">5</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Remarks Optional</p>
-                      <p className="text-sm text-gray-600 mt-1">These remarks are based on the Command Center or barangays.</p>
+                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">5</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Action Taken</p>
+                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Based on the action taken by the barangay (e.g., "Issued verbal warning", "Confiscated items", "Conducted roving patrol", "Coordinated with PNP", "Apprehended violators", "Repaired street lights", "Cleared road obstruction", "Impounded stray animals").</p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">6</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Add Entry</p>
-                      <p className="text-sm text-gray-600 mt-1">Click <span className="font-semibold">"Add Entry"</span> to save this record. You can add multiple entries per day for different barangays or concern types.</p>
+                  <li className="flex gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg shadow-md">6</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Upload Photos (Optional)</p>
+                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB. You can also add remarks while uploading photos.
+                      </p>
                     </div>
                   </li>
-                  <li className="flex gap-3">
-                    <span className="flex-shrink-0 flex items-center justify-center w-7 h-7 rounded-full bg-green-100 text-green-700 font-semibold text-sm">7</span>
-                    <div>
-                      <p className="font-medium text-gray-900">Save Data</p>
-                      <p className="text-sm text-gray-600 mt-1">Always click Save Data to save your weekly input.</p>
+                  <li className="flex gap-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-md">7</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Save Data</p>
+                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                        <span className="font-bold text-red-600">⚠️ Important:</span> Always click <span className="font-semibold text-red-600">"Save Data"</span> at the top of the page to save your weekly input to the database. Unsaved data will be lost.
+                      </p>
                     </div>
                   </li>
                 </ol>
               </div>
 
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t-2 border-gray-300"></div>
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">ADDITIONAL FEATURES</span>
+                </div>
+              </div>
+
               {/* Managing Concern Types */}
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5 text-orange-600" />
-                  Managing Concern Types
-                </h3>
+              <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md">
+                    <AlertTriangle className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">Managing Concern Types</h3>
+                </div>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
                     <div>
-                      <p className="text-sm"><span className="font-medium">View Concern Types:</span> Click <span className="font-semibold">"View Options"</span> (top-right) → <span className="font-semibold">"Concern Types"</span></p>
+                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">View Concern Types:</span> Click <span className="font-semibold">"View Options"</span> (top-right) → <span className="font-semibold">"Concern Types"</span></p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
                     <div>
-                      <p className="text-sm"><span className="font-medium">Add New Type:</span> Click the <span className="font-semibold">"+ Add Concern Type"</span> button and enter the concern name</p>
+                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Add New Type:</span> Click the <span className="font-semibold">"+ Add Concern Type"</span> button and enter the concern name</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-5 w-5 text-orange-600 flex-shrink-0" />
+                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
                     <div>
-                      <p className="text-sm"><span className="font-medium">Edit/Delete:</span> Use the action buttons next to each concern type to modify or remove them</p>
+                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Edit/Delete:</span> Use the action buttons next to each concern type to modify or remove them</p>
                     </div>
                   </li>
                 </ul>
               </div>
 
               {/* Exporting Reports */}
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Download className="h-5 w-5 text-blue-600" />
-                  Exporting Reports
-                </h3>
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-md">
+                    <Download className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">Exporting Reports</h3>
+                </div>
                 <ul className="space-y-3">
                   <li className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
                     <div>
-                      <p className="text-sm">Click the <span className="font-semibold">"Export to Excel"</span> button to download your weekly report as a spreadsheet</p>
+                      <p className="text-sm text-gray-700">Click the <span className="font-semibold text-purple-700">"Export to Excel"</span> button to download your weekly report as a spreadsheet</p>
                     </div>
                   </li>
                   <li className="flex items-start gap-3">
-                    <Check className="mt-0.5 h-5 w-5 text-blue-600 flex-shrink-0" />
+                    <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
                     <div>
-                      <p className="text-sm">The exported file includes all barangays, daily counts, and totals for easy analysis</p>
+                      <p className="text-sm text-gray-700">The exported file includes all barangays, daily counts, and totals for easy analysis</p>
                     </div>
                   </li>
                 </ul>
               </div>
 
               {/* Tips */}
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                <h3 className="font-semibold text-yellow-900 mb-2 flex items-center gap-2">
-                  <Zap className="h-5 w-5" />
-                  Quick Tips
-                </h3>
-                <ul className="space-y-2 text-sm text-yellow-800">
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
+              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-xl p-6 shadow-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-md">
+                    <Zap className="h-5 w-5 text-white" />
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">💡 Quick Tips</h3>
+                </div>
+                <ul className="space-y-3 text-sm text-gray-700">
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
                     <span>You can add multiple entries per day for different barangays or concern types</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
                     <span>Your municipality is automatically selected - you only see data for your area</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
-                    <span>Action reports and remarks are optional but helpful for detailed record-keeping</span>
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
+                    <span>Photos and remarks are optional but helpful for detailed documentation</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
                     <span>Remember to click "Save Data" after adding all your daily entries</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
                     <span>Use View Options menu to manage Concern Types or switch views</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-yellow-600">•</span>
+                  <li className="flex items-start gap-3">
+                    <span className="text-yellow-600 font-bold text-lg">✓</span>
                     <span>You can reopen this guide anytime by clicking "View Instructions" in the sidebar</span>
                   </li>
                 </ul>
@@ -4285,14 +4321,15 @@ Are you absolutely sure you want to proceed?`;
               </label>
             </div>
             
-            <DialogFooter>
+            <DialogFooter className="border-t border-gray-200 pt-6">
               <button
                 onClick={() => {
                   if (dontShowAgain) localStorage.setItem('ccHelpDismissed', '1');
                   setShowCommandCenterHelp(false);
                 }}
-                className="inline-flex items-center rounded-md bg-black px-6 py-2.5 text-white hover:bg-gray-800 font-medium"
+                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-white hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
               >
+                <Check className="h-5 w-5" />
                 Got it, let's start!
               </button>
             </DialogFooter>
