@@ -853,13 +853,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const isEntryIncomplete = (entry) => {
     if (!entry) return true;
     
-    const hasBarangay = entry.barangay && entry.barangay.trim() !== '';
-    const hasConcernType = entry.concernType && entry.concernType.trim() !== '';
-    const hasWeekData = (entry.week1 && entry.week1.trim() !== '') ||
-                        (entry.week2 && entry.week2.trim() !== '') ||
-                        (entry.week3 && entry.week3.trim() !== '') ||
-                        (entry.week4 && entry.week4.trim() !== '');
-    const hasActionTaken = entry.actionTaken && entry.actionTaken.trim() !== '';
+    const hasBarangay = entry.barangay && String(entry.barangay).trim() !== '';
+    const hasConcernType = entry.concernType && String(entry.concernType).trim() !== '';
+    
+    // Handle week data - can be either string or number
+    const hasWeekData = (entry.week1 && (typeof entry.week1 === 'number' ? entry.week1 > 0 : String(entry.week1).trim() !== '')) ||
+                        (entry.week2 && (typeof entry.week2 === 'number' ? entry.week2 > 0 : String(entry.week2).trim() !== '')) ||
+                        (entry.week3 && (typeof entry.week3 === 'number' ? entry.week3 > 0 : String(entry.week3).trim() !== '')) ||
+                        (entry.week4 && (typeof entry.week4 === 'number' ? entry.week4 > 0 : String(entry.week4).trim() !== ''));
+    
+    const hasActionTaken = entry.actionTaken && String(entry.actionTaken).trim() !== '';
     
     // Entry is incomplete if ANY required field is missing
     // All fields must be filled: barangay, concern type, at least one week, and action taken
@@ -5154,6 +5157,17 @@ Are you absolutely sure you want to proceed?`;
                                             <Eye className="w-4 h-4" />
                                             <span className="text-sm font-medium">View</span>
                                           </button>
+                                          {/* Edit button - only show if before OR after photo is missing */}
+                                          {(!entry.photos.before || !entry.photos.after) && (
+                                            <button
+                                              onClick={() => handleOpenPhotoUpload(date, entryIndex)}
+                                              className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
+                                              title="Edit Photos & Remarks"
+                                            >
+                                              <Upload className="w-4 h-4" />
+                                              <span className="text-sm font-medium">Edit</span>
+                                            </button>
+                                          )}
                                           {/* Reset button for administrators only */}
                                           {isAdmin && (
                                             <button
