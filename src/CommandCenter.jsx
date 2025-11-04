@@ -173,17 +173,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showMenuDropdown]);
 
-  // Auto-select district and municipality for Hermosa users when on concern types tab
+  // Auto-select district and municipality for non-admin users when on concern types tab
   useEffect(() => {
-    if (userMunicipality === 'Hermosa' && activeTab === 'concern-types') {
-      // Find the district that contains Hermosa
-      const hermosaDistrict = Object.entries(municipalitiesByDistrict).find(([district, municipalities]) => 
-        municipalities.includes('Hermosa')
+    if (userMunicipality && activeTab === 'concern-types') {
+      // Find the district that contains the user's municipality
+      const userDistrict = Object.entries(municipalitiesByDistrict).find(([district, municipalities]) => 
+        municipalities.includes(userMunicipality)
       );
       
-      if (hermosaDistrict) {
-        setSelectedDistrict(hermosaDistrict[0]); // Set to "District 1"
-        setSelectedMunicipality('Hermosa');
+      if (userDistrict) {
+        setSelectedDistrict(userDistrict[0]); // Set the district
+        setSelectedMunicipality(userMunicipality); // Set the municipality
       }
     }
   }, [userMunicipality, activeTab]);
@@ -6028,7 +6028,7 @@ Are you absolutely sure you want to proceed?`;
                     <textarea
                       id="concern-type-data"
                       name="concern-type-data"
-                      placeholder="Enter concern types separated by commas or new lines&#10;Example:&#10;Security Issue&#10;Traffic Violation&#10;Public Disturbance&#10;Emergency Response&#10;Community Service"
+                      placeholder={`Enter concern types separated by commas or new lines\nExample:\nSecurity Issue\nTraffic Violation\nPublic Disturbance\nEmergency Response\nCommunity Service`}
                       value={concernTypeData}
                       onChange={(e) => setConcernTypeData(e.target.value)}
                       rows={6}

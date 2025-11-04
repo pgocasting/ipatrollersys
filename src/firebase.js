@@ -7,7 +7,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyBeRQNGiuTIqFHIF7m1Z4DMhtlo9BlMQNo",
   authDomain: "ipatrollersys.firebaseapp.com",
   projectId: "ipatrollersys",
-  storageBucket: "ipatrollersys.firebasestorage.app",
+  storageBucket: "ipatrollersys.appspot.com",
   messagingSenderId: "773272104147",
   appId: "1:773272104147:web:7e3266144ed23de1e6f826",
   measurementId: "G-HPK93S27LM"
@@ -24,10 +24,7 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.warn('Failed to set default session persistence:', error);
 });
 
-// Initialize Cloud Firestore with long-polling to avoid QUIC protocol errors
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  experimentalAutoDetectLongPolling: false,
-});
+// Initialize Cloud Firestore
+export const db = getFirestore(app);
 
 export default app;
