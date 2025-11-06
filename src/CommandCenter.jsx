@@ -6837,13 +6837,15 @@ Are you absolutely sure you want to proceed?`;
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[600px] overflow-y-auto">
             {/* Before Photos */}
-            {viewingPhotos?.before && Array.isArray(viewingPhotos.before) && viewingPhotos.before.length > 0 && (
+            {viewingPhotos?.before && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">Before Photos ({viewingPhotos.before.length})</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    Before Photos ({Array.isArray(viewingPhotos.before) ? viewingPhotos.before.length : 1})
+                  </label>
                 </div>
                 <div className="space-y-3">
-                  {viewingPhotos.before.map((photo, index) => (
+                  {(Array.isArray(viewingPhotos.before) ? viewingPhotos.before : [viewingPhotos.before]).map((photo, index) => (
                     <div key={index} className="space-y-1">
                       <div className="border rounded-md overflow-hidden h-[400px]">
                         <img
@@ -6852,18 +6854,22 @@ Are you absolutely sure you want to proceed?`;
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      {viewingPhotos.beforeUploadedAt?.[index] && (
-                        <span className="text-xs text-gray-500 block">
-                          {new Date(viewingPhotos.beforeUploadedAt[index]).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
-                        </span>
-                      )}
+                      {(() => {
+                        const timestamps = viewingPhotos.beforeUploadedAt;
+                        const timestamp = Array.isArray(timestamps) ? timestamps[index] : timestamps;
+                        return timestamp ? (
+                          <span className="text-xs text-gray-500 block">
+                            {new Date(timestamp).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                 </div>
@@ -6878,13 +6884,15 @@ Are you absolutely sure you want to proceed?`;
             )}
 
             {/* After Photos */}
-            {viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0 && (
+            {viewingPhotos?.after && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">After Photos ({viewingPhotos.after.length})</label>
+                  <label className="text-sm font-medium text-gray-700">
+                    After Photos ({Array.isArray(viewingPhotos.after) ? viewingPhotos.after.length : 1})
+                  </label>
                 </div>
                 <div className="space-y-3">
-                  {viewingPhotos.after.map((photo, index) => (
+                  {(Array.isArray(viewingPhotos.after) ? viewingPhotos.after : [viewingPhotos.after]).map((photo, index) => (
                     <div key={index} className="space-y-1">
                       <div className="border rounded-md overflow-hidden h-[400px]">
                         <img
@@ -6893,18 +6901,22 @@ Are you absolutely sure you want to proceed?`;
                           className="w-full h-full object-cover"
                         />
                       </div>
-                      {viewingPhotos.afterUploadedAt?.[index] && (
-                        <span className="text-xs text-gray-500 block">
-                          {new Date(viewingPhotos.afterUploadedAt[index]).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })}
-                        </span>
-                      )}
+                      {(() => {
+                        const timestamps = viewingPhotos.afterUploadedAt;
+                        const timestamp = Array.isArray(timestamps) ? timestamps[index] : timestamps;
+                        return timestamp ? (
+                          <span className="text-xs text-gray-500 block">
+                            {new Date(timestamp).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}
+                          </span>
+                        ) : null;
+                      })()}
                     </div>
                   ))}
                 </div>
