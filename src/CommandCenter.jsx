@@ -1090,7 +1090,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleViewPhotos = (date, entryIndex) => {
     const entry = weeklyReportData[date]?.[entryIndex];
     if (entry?.photos) {
-      setViewingPhotos(entry.photos);
+      setViewingPhotos({
+        ...entry.photos,
+        concernType: entry.concernType,
+        remarks: entry.remarks
+      });
       setShowPhotoViewDialog(true);
     }
   };
@@ -6772,6 +6776,13 @@ Are you absolutely sure you want to proceed?`;
                     className="w-full h-full object-cover"
                   />
                 </div>
+                {/* Concern Type below Before Photo */}
+                {viewingPhotos.concernType && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                    <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
+                    <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -6800,6 +6811,13 @@ Are you absolutely sure you want to proceed?`;
                     className="w-full h-full object-cover"
                   />
                 </div>
+                {/* Remarks below After Photo */}
+                {viewingPhotos.remarks && (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                    <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
+                  </div>
+                )}
               </div>
             )}
           </div>
