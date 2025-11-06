@@ -1036,12 +1036,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         
         if (result.success) {
           photos.before = result.data.url;
+          photos.beforeUploadedAt = new Date().toISOString();
         } else {
           throw new Error('Failed to upload before photo');
         }
       } else if (beforePhotoPreview) {
-        // Keep existing before photo
+        // Keep existing before photo and timestamp
         photos.before = beforePhotoPreview;
+        if (currentPhotoEntry?.entry?.photos?.beforeUploadedAt) {
+          photos.beforeUploadedAt = currentPhotoEntry.entry.photos.beforeUploadedAt;
+        }
       }
       
       // Upload after photo if selected
@@ -1053,12 +1057,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         
         if (result.success) {
           photos.after = result.data.url;
+          photos.afterUploadedAt = new Date().toISOString();
         } else {
           throw new Error('Failed to upload after photo');
         }
       } else if (afterPhotoPreview) {
-        // Keep existing after photo
+        // Keep existing after photo and timestamp
         photos.after = afterPhotoPreview;
+        if (currentPhotoEntry?.entry?.photos?.afterUploadedAt) {
+          photos.afterUploadedAt = currentPhotoEntry.entry.photos.afterUploadedAt;
+        }
       }
       
       // Update the entry with photo URLs
@@ -6742,12 +6750,26 @@ Are you absolutely sure you want to proceed?`;
             {/* Before Photo */}
             {viewingPhotos?.before && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">Before Photo</label>
-                <div className="border rounded-md overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">Before Photo</label>
+                  {viewingPhotos.beforeUploadedAt && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(viewingPhotos.beforeUploadedAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </span>
+                  )}
+                </div>
+                <div className="border rounded-md overflow-hidden h-[400px]">
                   <img
                     src={viewingPhotos.before}
                     alt="Before"
-                    className="w-full h-auto object-contain"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               </div>
@@ -6756,12 +6778,26 @@ Are you absolutely sure you want to proceed?`;
             {/* After Photo */}
             {viewingPhotos?.after && (
               <div className="space-y-2">
-                <label className="text-sm font-medium text-gray-700">After Photo</label>
-                <div className="border rounded-md overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">After Photo</label>
+                  {viewingPhotos.afterUploadedAt && (
+                    <span className="text-xs text-gray-500">
+                      {new Date(viewingPhotos.afterUploadedAt).toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                      })}
+                    </span>
+                  )}
+                </div>
+                <div className="border rounded-md overflow-hidden h-[400px]">
                   <img
                     src={viewingPhotos.after}
                     alt="After"
-                    className="w-full h-auto object-contain"
+                    className="w-full h-full object-cover"
                   />
                 </div>
               </div>
