@@ -226,10 +226,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Photo Upload States
   const [showPhotoUploadDialog, setShowPhotoUploadDialog] = useState(false);
   const [currentPhotoEntry, setCurrentPhotoEntry] = useState(null);
-  const [beforePhoto, setBeforePhoto] = useState(null);
-  const [afterPhoto, setAfterPhoto] = useState(null);
-  const [beforePhotoPreview, setBeforePhotoPreview] = useState(null);
-  const [afterPhotoPreview, setAfterPhotoPreview] = useState(null);
+  const [beforePhotos, setBeforePhotos] = useState([]);
+  const [afterPhotos, setAfterPhotos] = useState([]);
+  const [beforePhotoPreviews, setBeforePhotoPreviews] = useState([]);
+  const [afterPhotoPreviews, setAfterPhotoPreviews] = useState([]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [showPhotoViewDialog, setShowPhotoViewDialog] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState(null);
@@ -881,17 +881,28 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     
     setCurrentPhotoEntry({ date, entryIndex, entry });
     
-    // Load existing photos if available
+    // Load existing photos if available (now as arrays)
+    // Handle backward compatibility: convert old single photo (string) to array
     if (entry?.photos) {
-      setBeforePhotoPreview(entry.photos.before || null);
-      setAfterPhotoPreview(entry.photos.after || null);
+      const beforeData = entry.photos.before;
+      const afterData = entry.photos.after;
+      
+      // Convert to array if it's a string (old format)
+      setBeforePhotoPreviews(
+        Array.isArray(beforeData) ? beforeData : 
+        (beforeData ? [beforeData] : [])
+      );
+      setAfterPhotoPreviews(
+        Array.isArray(afterData) ? afterData : 
+        (afterData ? [afterData] : [])
+      );
     } else {
-      setBeforePhotoPreview(null);
-      setAfterPhotoPreview(null);
+      setBeforePhotoPreviews([]);
+      setAfterPhotoPreviews([]);
     }
     
-    setBeforePhoto(null);
-    setAfterPhoto(null);
+    setBeforePhotos([]);
+    setAfterPhotos([]);
     setShowPhotoUploadDialog(true);
   };
 
@@ -960,61 +971,79 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const handleBeforePhotoChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
       try {
-        // Show loading state
-        const originalSize = (file.size / 1024 / 1024).toFixed(2);
-        console.log(`📸 Original before photo size: ${originalSize}MB`);
+        const compressedFiles = [];
+        const previews = [];
         
-        // Compress image
-        const compressedFile = await compressImage(file, 2);
-        setBeforePhoto(compressedFile);
-        
-        // Create preview
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setBeforePhotoPreview(reader.result);
-        };
-        reader.readAsDataURL(compressedFile);
-        
-        const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
-        if (originalSize > 2) {
-          showSuccess(`Before photo compressed from ${originalSize}MB to ${compressedSize}MB`);
+        for (const file of files) {
+          const originalSize = (file.size / 1024 / 1024).toFixed(2);
+          console.log(`📸 Original before photo size: ${originalSize}MB`);
+          
+          // Compress image
+          const compressedFile = await compressImage(file, 2);
+          compressedFiles.push(compressedFile);
+          
+          // Create preview
+          const reader = new FileReader();
+          const preview = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(compressedFile);
+          });
+          previews.push(preview);
+          
+          const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+          if (originalSize > 2) {
+            console.log(`✅ Before photo compressed from ${originalSize}MB to ${compressedSize}MB`);
+          }
         }
+        
+        setBeforePhotos(prev => [...prev, ...compressedFiles]);
+        setBeforePhotoPreviews(prev => [...prev, ...previews]);
+        showSuccess(`${files.length} before photo(s) added successfully`);
       } catch (error) {
-        console.error('Error compressing before photo:', error);
-        showError('Failed to process image. Please try another photo.');
+        console.error('Error compressing before photos:', error);
+        showError('Failed to process images. Please try again.');
       }
     }
   };
 
   const handleAfterPhotoChange = async (e) => {
-    const file = e.target.files[0];
-    if (file) {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) {
       try {
-        // Show loading state
-        const originalSize = (file.size / 1024 / 1024).toFixed(2);
-        console.log(`📸 Original after photo size: ${originalSize}MB`);
+        const compressedFiles = [];
+        const previews = [];
         
-        // Compress image
-        const compressedFile = await compressImage(file, 2);
-        setAfterPhoto(compressedFile);
-        
-        // Create preview
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          setAfterPhotoPreview(reader.result);
-        };
-        reader.readAsDataURL(compressedFile);
-        
-        const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
-        if (originalSize > 2) {
-          showSuccess(`After photo compressed from ${originalSize}MB to ${compressedSize}MB`);
+        for (const file of files) {
+          const originalSize = (file.size / 1024 / 1024).toFixed(2);
+          console.log(`📸 Original after photo size: ${originalSize}MB`);
+          
+          // Compress image
+          const compressedFile = await compressImage(file, 2);
+          compressedFiles.push(compressedFile);
+          
+          // Create preview
+          const reader = new FileReader();
+          const preview = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(compressedFile);
+          });
+          previews.push(preview);
+          
+          const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
+          if (originalSize > 2) {
+            console.log(`✅ After photo compressed from ${originalSize}MB to ${compressedSize}MB`);
+          }
         }
+        
+        setAfterPhotos(prev => [...prev, ...compressedFiles]);
+        setAfterPhotoPreviews(prev => [...prev, ...previews]);
+        showSuccess(`${files.length} after photo(s) added successfully`);
       } catch (error) {
-        console.error('Error compressing after photo:', error);
-        showError('Failed to process image. Please try another photo.');
+        console.error('Error compressing after photos:', error);
+        showError('Failed to process images. Please try again.');
       }
     }
   };
@@ -1026,58 +1055,82 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     try {
       const { date, entryIndex } = currentPhotoEntry;
       const photos = {};
+      const uploadTimestamp = new Date().toISOString();
       
-      // Upload before photo if selected
-      if (beforePhoto) {
-        const result = await cloudinaryUtils.uploadImage(beforePhoto, {
-          folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-          publicId: `before-${date}-${entryIndex}-${Date.now()}`
-        });
+      // Upload before photos if selected
+      if (beforePhotos.length > 0) {
+        const beforeUrls = [];
+        const beforeTimestamps = [];
         
-        if (result.success) {
-          photos.before = result.data.url;
-          photos.beforeUploadedAt = new Date().toISOString();
-        } else {
-          throw new Error('Failed to upload before photo');
+        for (let i = 0; i < beforePhotos.length; i++) {
+          const result = await cloudinaryUtils.uploadImage(beforePhotos[i], {
+            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+            publicId: `before-${date}-${entryIndex}-${i}-${Date.now()}`
+          });
+          
+          if (result.success) {
+            beforeUrls.push(result.data.url);
+            beforeTimestamps.push(uploadTimestamp);
+          } else {
+            throw new Error(`Failed to upload before photo ${i + 1}`);
+          }
         }
-      } else if (beforePhotoPreview) {
-        // Keep existing before photo and timestamp
-        photos.before = beforePhotoPreview;
-        if (currentPhotoEntry?.entry?.photos?.beforeUploadedAt) {
-          photos.beforeUploadedAt = currentPhotoEntry.entry.photos.beforeUploadedAt;
-        }
+        
+        // Combine with existing photos
+        const existingBefore = Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews : (beforePhotoPreviews ? [beforePhotoPreviews] : []);
+        const existingTimestampsData = currentPhotoEntry?.entry?.photos?.beforeUploadedAt;
+        const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
+        
+        photos.before = [...existingBefore, ...beforeUrls];
+        photos.beforeUploadedAt = [...existingTimestamps, ...beforeTimestamps];
+      } else if (beforePhotoPreviews.length > 0) {
+        // Keep existing before photos and timestamps
+        photos.before = beforePhotoPreviews;
+        photos.beforeUploadedAt = currentPhotoEntry?.entry?.photos?.beforeUploadedAt || [];
       }
       
-      // Upload after photo if selected
-      if (afterPhoto) {
-        const result = await cloudinaryUtils.uploadImage(afterPhoto, {
-          folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-          publicId: `after-${date}-${entryIndex}-${Date.now()}`
-        });
+      // Upload after photos if selected
+      if (afterPhotos.length > 0) {
+        const afterUrls = [];
+        const afterTimestamps = [];
         
-        if (result.success) {
-          photos.after = result.data.url;
-          photos.afterUploadedAt = new Date().toISOString();
-        } else {
-          throw new Error('Failed to upload after photo');
+        for (let i = 0; i < afterPhotos.length; i++) {
+          const result = await cloudinaryUtils.uploadImage(afterPhotos[i], {
+            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+            publicId: `after-${date}-${entryIndex}-${i}-${Date.now()}`
+          });
+          
+          if (result.success) {
+            afterUrls.push(result.data.url);
+            afterTimestamps.push(uploadTimestamp);
+          } else {
+            throw new Error(`Failed to upload after photo ${i + 1}`);
+          }
         }
-      } else if (afterPhotoPreview) {
-        // Keep existing after photo and timestamp
-        photos.after = afterPhotoPreview;
-        if (currentPhotoEntry?.entry?.photos?.afterUploadedAt) {
-          photos.afterUploadedAt = currentPhotoEntry.entry.photos.afterUploadedAt;
-        }
+        
+        // Combine with existing photos
+        const existingAfter = Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews : (afterPhotoPreviews ? [afterPhotoPreviews] : []);
+        const existingTimestampsData = currentPhotoEntry?.entry?.photos?.afterUploadedAt;
+        const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
+        
+        photos.after = [...existingAfter, ...afterUrls];
+        photos.afterUploadedAt = [...existingTimestamps, ...afterTimestamps];
+      } else if (afterPhotoPreviews.length > 0) {
+        // Keep existing after photos and timestamps
+        photos.after = afterPhotoPreviews;
+        photos.afterUploadedAt = currentPhotoEntry?.entry?.photos?.afterUploadedAt || [];
       }
       
       // Update the entry with photo URLs
       updateDateData(date, entryIndex, 'photos', photos);
       
-      showSuccess('Photos uploaded successfully!');
+      const totalUploaded = beforePhotos.length + afterPhotos.length;
+      showSuccess(`${totalUploaded} photo(s) uploaded successfully!`);
       setShowPhotoUploadDialog(false);
-      setBeforePhoto(null);
-      setAfterPhoto(null);
-      setBeforePhotoPreview(null);
-      setAfterPhotoPreview(null);
+      setBeforePhotos([]);
+      setAfterPhotos([]);
+      setBeforePhotoPreviews([]);
+      setAfterPhotoPreviews([]);
       setCurrentPhotoEntry(null);
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -6579,41 +6632,57 @@ Are you absolutely sure you want to proceed?`;
 
           {/* Photo Upload Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Before Photo Card */}
+            {/* Before Photos Card */}
             <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
-                <h3 className="font-semibold text-gray-900">Before Photo</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
+                  <h3 className="font-semibold text-gray-900">Before Photos</h3>
+                </div>
+                <span className="text-xs text-gray-500">{Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews.length : 0} photo(s)</span>
               </div>
               
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleBeforePhotoChange}
                 className="hidden"
                 id="before-photo-input"
               />
               
-              {beforePhotoPreview ? (
-                <div className="relative w-full aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group bg-white">
-                  <img
-                    src={beforePhotoPreview}
-                    alt="Before preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      onClick={() => {
-                        setBeforePhoto(null);
-                        setBeforePhotoPreview(null);
-                        document.getElementById('before-photo-input').value = '';
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-lg"
-                    >
-                      <X className="w-4 h-4" />
-                      Remove
-                    </button>
+              {Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                    {beforePhotoPreviews.map((preview, index) => (
+                      <div key={index} className="relative aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group bg-white">
+                        <img
+                          src={preview}
+                          alt={`Before ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            onClick={() => {
+                              setBeforePhotoPreviews(prev => prev.filter((_, i) => i !== index));
+                              setBeforePhotos(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            <X className="w-3 h-3" />
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  <label
+                    htmlFor="before-photo-input"
+                    className="block w-full py-2 border-2 border-dashed border-blue-300 rounded-lg text-center cursor-pointer hover:border-blue-500 hover:bg-blue-100/50 transition-all bg-white"
+                  >
+                    <Plus className="w-4 h-4 inline mr-1" />
+                    <span className="text-sm font-medium text-blue-600">Add More</span>
+                  </label>
                 </div>
               ) : (
                 <label
@@ -6621,47 +6690,63 @@ Are you absolutely sure you want to proceed?`;
                   className="w-full aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100/50 transition-all bg-white"
                 >
                   <Image className="w-12 h-12 text-blue-400 mb-2" />
-                  <span className="text-sm font-medium text-blue-600">Click to choose photo</span>
-                  <span className="text-xs text-gray-500 mt-1">or drag and drop</span>
+                  <span className="text-sm font-medium text-blue-600">Click to choose photos</span>
+                  <span className="text-xs text-gray-500 mt-1">Multiple selection supported</span>
                 </label>
               )}
             </div>
 
-            {/* After Photo Card */}
+            {/* After Photos Card */}
             <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50/30 hover:bg-green-50/50 transition-colors">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
-                <h3 className="font-semibold text-gray-900">After Photo</h3>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
+                  <h3 className="font-semibold text-gray-900">After Photos</h3>
+                </div>
+                <span className="text-xs text-gray-500">{Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews.length : 0} photo(s)</span>
               </div>
               
               <input
                 type="file"
                 accept="image/*"
+                multiple
                 onChange={handleAfterPhotoChange}
                 className="hidden"
                 id="after-photo-input"
               />
               
-              {afterPhotoPreview ? (
-                <div className="relative w-full aspect-video border-2 border-green-300 rounded-lg overflow-hidden group bg-white">
-                  <img
-                    src={afterPhotoPreview}
-                    alt="After preview"
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <button
-                      onClick={() => {
-                        setAfterPhoto(null);
-                        setAfterPhotoPreview(null);
-                        document.getElementById('after-photo-input').value = '';
-                      }}
-                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 shadow-lg"
-                    >
-                      <X className="w-4 h-4" />
-                      Remove
-                    </button>
+              {Array.isArray(afterPhotoPreviews) && afterPhotoPreviews.length > 0 ? (
+                <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+                    {afterPhotoPreviews.map((preview, index) => (
+                      <div key={index} className="relative aspect-video border-2 border-green-300 rounded-lg overflow-hidden group bg-white">
+                        <img
+                          src={preview}
+                          alt={`After ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            onClick={() => {
+                              setAfterPhotoPreviews(prev => prev.filter((_, i) => i !== index));
+                              setAfterPhotos(prev => prev.filter((_, i) => i !== index));
+                            }}
+                            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                          >
+                            <X className="w-3 h-3" />
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
+                  <label
+                    htmlFor="after-photo-input"
+                    className="block w-full py-2 border-2 border-dashed border-green-300 rounded-lg text-center cursor-pointer hover:border-green-500 hover:bg-green-100/50 transition-all bg-white"
+                  >
+                    <Plus className="w-4 h-4 inline mr-1" />
+                    <span className="text-sm font-medium text-green-600">Add More</span>
+                  </label>
                 </div>
               ) : (
                 <label
@@ -6669,8 +6754,8 @@ Are you absolutely sure you want to proceed?`;
                   className="w-full aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-100/50 transition-all bg-white"
                 >
                   <Image className="w-12 h-12 text-green-400 mb-2" />
-                  <span className="text-sm font-medium text-green-600">Click to choose photo</span>
-                  <span className="text-xs text-gray-500 mt-1">or drag and drop</span>
+                  <span className="text-sm font-medium text-green-600">Click to choose photos</span>
+                  <span className="text-xs text-gray-500 mt-1">Multiple selection supported</span>
                 </label>
               )}
             </div>
@@ -6721,7 +6806,7 @@ Are you absolutely sure you want to proceed?`;
             </button>
             <button
               onClick={handleUploadPhotos}
-              disabled={isUploadingPhotos || (!beforePhoto && !afterPhoto && !beforePhotoPreview && !afterPhotoPreview)}
+              disabled={isUploadingPhotos || (beforePhotos.length === 0 && afterPhotos.length === 0 && beforePhotoPreviews.length === 0 && afterPhotoPreviews.length === 0)}
               className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
             >
               {isUploadingPhotos ? (
@@ -6750,35 +6835,41 @@ Are you absolutely sure you want to proceed?`;
             </DialogDescription>
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-            {/* Before Photo */}
-            {viewingPhotos?.before && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[600px] overflow-y-auto">
+            {/* Before Photos */}
+            {viewingPhotos?.before && Array.isArray(viewingPhotos.before) && viewingPhotos.before.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">Before Photo</label>
-                  {viewingPhotos.beforeUploadedAt && (
-                    <span className="text-xs text-gray-500">
-                      {new Date(viewingPhotos.beforeUploadedAt).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </span>
-                  )}
+                  <label className="text-sm font-medium text-gray-700">Before Photos ({viewingPhotos.before.length})</label>
                 </div>
-                <div className="border rounded-md overflow-hidden h-[400px]">
-                  <img
-                    src={viewingPhotos.before}
-                    alt="Before"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="space-y-3">
+                  {viewingPhotos.before.map((photo, index) => (
+                    <div key={index} className="space-y-1">
+                      <div className="border rounded-md overflow-hidden h-[400px]">
+                        <img
+                          src={photo}
+                          alt={`Before ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {viewingPhotos.beforeUploadedAt?.[index] && (
+                        <span className="text-xs text-gray-500 block">
+                          {new Date(viewingPhotos.beforeUploadedAt[index]).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {/* Concern Type below Before Photo */}
+                {/* Concern Type below Before Photos */}
                 {viewingPhotos.concernType && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-3">
                     <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
                     <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
                   </div>
@@ -6786,34 +6877,40 @@ Are you absolutely sure you want to proceed?`;
               </div>
             )}
 
-            {/* After Photo */}
-            {viewingPhotos?.after && (
+            {/* After Photos */}
+            {viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0 && (
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-sm font-medium text-gray-700">After Photo</label>
-                  {viewingPhotos.afterUploadedAt && (
-                    <span className="text-xs text-gray-500">
-                      {new Date(viewingPhotos.afterUploadedAt).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                      })}
-                    </span>
-                  )}
+                  <label className="text-sm font-medium text-gray-700">After Photos ({viewingPhotos.after.length})</label>
                 </div>
-                <div className="border rounded-md overflow-hidden h-[400px]">
-                  <img
-                    src={viewingPhotos.after}
-                    alt="After"
-                    className="w-full h-full object-cover"
-                  />
+                <div className="space-y-3">
+                  {viewingPhotos.after.map((photo, index) => (
+                    <div key={index} className="space-y-1">
+                      <div className="border rounded-md overflow-hidden h-[400px]">
+                        <img
+                          src={photo}
+                          alt={`After ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      {viewingPhotos.afterUploadedAt?.[index] && (
+                        <span className="text-xs text-gray-500 block">
+                          {new Date(viewingPhotos.afterUploadedAt[index]).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })}
+                        </span>
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {/* Remarks below After Photo */}
+                {/* Remarks below After Photos */}
                 {viewingPhotos.remarks && (
-                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-3">
                     <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
                     <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
                   </div>
