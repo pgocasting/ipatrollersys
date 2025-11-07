@@ -6838,9 +6838,9 @@ Are you absolutely sure you want to proceed?`;
             </DialogDescription>
           </DialogHeader>
           
-          {/* Barangay and Municipality Display */}
+          {/* Fixed Header Section - Barangay and Municipality */}
           {viewingPhotos?.barangay && (
-            <div className="grid grid-cols-2 gap-4 mb-2">
+            <div className="grid grid-cols-2 gap-4 mb-4">
               {/* Barangay - Left Side */}
               <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
                 <p className="text-xs font-semibold text-purple-700 mb-1">Barangay</p>
@@ -6859,11 +6859,12 @@ Are you absolutely sure you want to proceed?`;
             </div>
           )}
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[600px] overflow-y-auto">
+          {/* Scrollable Photos Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[400px] overflow-y-auto border-t border-b">
             {/* Before Photos */}
             {viewingPhotos?.before && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 pb-4">
+                <div className="flex items-center justify-between sticky top-0 bg-white z-10 pb-2 pt-2 border-b border-gray-200 mb-2">
                   <label className="text-sm font-medium text-gray-700">
                     Before Photos ({Array.isArray(viewingPhotos.before) ? viewingPhotos.before.length : 1})
                   </label>
@@ -6871,7 +6872,7 @@ Are you absolutely sure you want to proceed?`;
                 <div className="space-y-3">
                   {(Array.isArray(viewingPhotos.before) ? viewingPhotos.before : [viewingPhotos.before]).map((photo, index) => (
                     <div key={index} className="space-y-1">
-                      <div className="border rounded-md overflow-hidden h-[400px]">
+                      <div className="border rounded-md overflow-hidden h-[300px]">
                         <img
                           src={photo}
                           alt={`Before ${index + 1}`}
@@ -6897,20 +6898,13 @@ Are you absolutely sure you want to proceed?`;
                     </div>
                   ))}
                 </div>
-                {/* Concern Type below Before Photos */}
-                {viewingPhotos.concernType && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mt-3">
-                    <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
-                    <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
-                  </div>
-                )}
               </div>
             )}
 
             {/* After Photos */}
             {viewingPhotos?.after && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
+              <div className="space-y-2 pb-4">
+                <div className="flex items-center justify-between sticky top-0 bg-white z-10 pb-2 pt-2 border-b border-gray-200 mb-2">
                   <label className="text-sm font-medium text-gray-700">
                     After Photos ({Array.isArray(viewingPhotos.after) ? viewingPhotos.after.length : 1})
                   </label>
@@ -6918,7 +6912,7 @@ Are you absolutely sure you want to proceed?`;
                 <div className="space-y-3">
                   {(Array.isArray(viewingPhotos.after) ? viewingPhotos.after : [viewingPhotos.after]).map((photo, index) => (
                     <div key={index} className="space-y-1">
-                      <div className="border rounded-md overflow-hidden h-[400px]">
+                      <div className="border rounded-md overflow-hidden h-[300px]">
                         <img
                           src={photo}
                           alt={`After ${index + 1}`}
@@ -6944,13 +6938,25 @@ Are you absolutely sure you want to proceed?`;
                     </div>
                   ))}
                 </div>
-                {/* Remarks below After Photos */}
-                {viewingPhotos.remarks && (
-                  <div className="bg-green-50 border border-green-200 rounded-md p-3 mt-3">
-                    <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
-                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
-                  </div>
-                )}
+              </div>
+            )}
+          </div>
+
+          {/* Fixed Footer Section - Concern Type and Remarks */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            {/* Concern Type - Left Side */}
+            {viewingPhotos?.concernType && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
+                <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
+              </div>
+            )}
+
+            {/* Remarks - Right Side */}
+            {viewingPhotos?.remarks && (
+              <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
+                <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
               </div>
             )}
           </div>
