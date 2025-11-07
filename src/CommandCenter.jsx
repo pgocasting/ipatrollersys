@@ -6633,135 +6633,148 @@ Are you absolutely sure you want to proceed?`;
             </div>
           </div>
 
-          {/* Photo Upload Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Before Photos Card */}
-            <div className="border-2 border-blue-200 rounded-lg p-4 bg-blue-50/30 hover:bg-blue-50/50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">1</div>
-                  <h3 className="font-semibold text-gray-900">Before Photos</h3>
-                </div>
-                <span className="text-xs text-gray-500">{Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews.length : 0} photo(s)</span>
-              </div>
+          {/* Paired Photo Upload - Side by Side */}
+          <div className="space-y-3 max-h-[400px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
+            {/* Hidden file inputs */}
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  handleBeforePhotoChange(e);
+                }
+              }}
+              className="hidden"
+              id="before-photo-input"
+            />
+            <input
+              type="file"
+              accept="image/*"
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  handleAfterPhotoChange(e);
+                }
+              }}
+              className="hidden"
+              id="after-photo-input"
+            />
+
+            {/* Render photo pairs */}
+            {(() => {
+              const maxLength = Math.max(
+                Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews.length : 0,
+                Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews.length : 0
+              );
               
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleBeforePhotoChange}
-                className="hidden"
-                id="before-photo-input"
-              />
-              
-              {Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
-                    {beforePhotoPreviews.map((preview, index) => (
-                      <div key={index} className="relative aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group bg-white">
-                        <img
-                          src={preview}
-                          alt={`Before ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            onClick={() => {
-                              setBeforePhotoPreviews(prev => prev.filter((_, i) => i !== index));
-                              setBeforePhotos(prev => prev.filter((_, i) => i !== index));
-                            }}
-                            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                          >
-                            <X className="w-3 h-3" />
-                            Remove
-                          </button>
+              const pairs = [];
+              for (let i = 0; i < maxLength; i++) {
+                pairs.push(
+                  <div key={i} className="grid grid-cols-2 gap-4 p-3 bg-white rounded-lg border-2 border-gray-200">
+                    {/* Before Photo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
+                          <label className="text-sm font-semibold text-blue-700">Before Photo</label>
                         </div>
                       </div>
-                    ))}
+                      {beforePhotoPreviews[i] ? (
+                        <div className="relative aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group">
+                          <img
+                            src={beforePhotoPreviews[i]}
+                            alt={`Before ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              onClick={() => {
+                                setBeforePhotoPreviews(prev => prev.filter((_, idx) => idx !== i));
+                                setBeforePhotos(prev => prev.filter((_, idx) => idx !== i));
+                              }}
+                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                            >
+                              <X className="w-3 h-3" />
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label
+                          htmlFor="before-photo-input"
+                          className="aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
+                        >
+                          <Image className="w-8 h-8 text-blue-400 mb-1" />
+                          <span className="text-xs font-medium text-blue-600">Add Before</span>
+                        </label>
+                      )}
+                    </div>
+
+                    {/* After Photo */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
+                          <label className="text-sm font-semibold text-green-700">After Photo</label>
+                        </div>
+                      </div>
+                      {afterPhotoPreviews[i] ? (
+                        <div className="relative aspect-video border-2 border-green-300 rounded-lg overflow-hidden group">
+                          <img
+                            src={afterPhotoPreviews[i]}
+                            alt={`After ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <button
+                              onClick={() => {
+                                setAfterPhotoPreviews(prev => prev.filter((_, idx) => idx !== i));
+                                setAfterPhotos(prev => prev.filter((_, idx) => idx !== i));
+                              }}
+                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                            >
+                              <X className="w-3 h-3" />
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label
+                          htmlFor="after-photo-input"
+                          className="aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all"
+                        >
+                          <Image className="w-8 h-8 text-green-400 mb-1" />
+                          <span className="text-xs font-medium text-green-600">Add After</span>
+                        </label>
+                      )}
+                    </div>
                   </div>
+                );
+              }
+              
+              // Add new pair button
+              pairs.push(
+                <div key="add-new" className="grid grid-cols-2 gap-4 p-3 bg-white rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all">
                   <label
                     htmlFor="before-photo-input"
-                    className="block w-full py-2 border-2 border-dashed border-blue-300 rounded-lg text-center cursor-pointer hover:border-blue-500 hover:bg-blue-100/50 transition-all bg-white"
+                    className="aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
                   >
-                    <Plus className="w-4 h-4 inline mr-1" />
-                    <span className="text-sm font-medium text-blue-600">Add More</span>
+                    <Plus className="w-8 h-8 text-blue-400 mb-1" />
+                    <span className="text-xs font-medium text-blue-600">Add Before Photo</span>
                   </label>
-                </div>
-              ) : (
-                <label
-                  htmlFor="before-photo-input"
-                  className="w-full aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100/50 transition-all bg-white"
-                >
-                  <Image className="w-12 h-12 text-blue-400 mb-2" />
-                  <span className="text-sm font-medium text-blue-600">Click to choose photos</span>
-                  <span className="text-xs text-gray-500 mt-1">Multiple selection supported</span>
-                </label>
-              )}
-            </div>
-
-            {/* After Photos Card */}
-            <div className="border-2 border-green-200 rounded-lg p-4 bg-green-50/30 hover:bg-green-50/50 transition-colors">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div>
-                  <h3 className="font-semibold text-gray-900">After Photos</h3>
-                </div>
-                <span className="text-xs text-gray-500">{Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews.length : 0} photo(s)</span>
-              </div>
-              
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={handleAfterPhotoChange}
-                className="hidden"
-                id="after-photo-input"
-              />
-              
-              {Array.isArray(afterPhotoPreviews) && afterPhotoPreviews.length > 0 ? (
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
-                    {afterPhotoPreviews.map((preview, index) => (
-                      <div key={index} className="relative aspect-video border-2 border-green-300 rounded-lg overflow-hidden group bg-white">
-                        <img
-                          src={preview}
-                          alt={`After ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <button
-                            onClick={() => {
-                              setAfterPhotoPreviews(prev => prev.filter((_, i) => i !== index));
-                              setAfterPhotos(prev => prev.filter((_, i) => i !== index));
-                            }}
-                            className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                          >
-                            <X className="w-3 h-3" />
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
                   <label
                     htmlFor="after-photo-input"
-                    className="block w-full py-2 border-2 border-dashed border-green-300 rounded-lg text-center cursor-pointer hover:border-green-500 hover:bg-green-100/50 transition-all bg-white"
+                    className="aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all"
                   >
-                    <Plus className="w-4 h-4 inline mr-1" />
-                    <span className="text-sm font-medium text-green-600">Add More</span>
+                    <Plus className="w-8 h-8 text-green-400 mb-1" />
+                    <span className="text-xs font-medium text-green-600">Add After Photo</span>
                   </label>
                 </div>
-              ) : (
-                <label
-                  htmlFor="after-photo-input"
-                  className="w-full aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-100/50 transition-all bg-white"
-                >
-                  <Image className="w-12 h-12 text-green-400 mb-2" />
-                  <span className="text-sm font-medium text-green-600">Click to choose photos</span>
-                  <span className="text-xs text-gray-500 mt-1">Multiple selection supported</span>
-                </label>
-              )}
-            </div>
+              );
+              
+              return pairs;
+            })()}
           </div>
 
           {/* Remarks Section */}
