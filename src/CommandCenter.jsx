@@ -1076,8 +1076,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
         
-        // Combine with existing photos
-        const existingBefore = Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews : (beforePhotoPreviews ? [beforePhotoPreviews] : []);
+        // Combine with existing photos from database (not previews)
+        const existingBeforeData = currentPhotoEntry?.entry?.photos?.before;
+        const existingBefore = Array.isArray(existingBeforeData) ? existingBeforeData : (existingBeforeData ? [existingBeforeData] : []);
         const existingTimestampsData = currentPhotoEntry?.entry?.photos?.beforeUploadedAt;
         const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
         
@@ -1108,8 +1109,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
         
-        // Combine with existing photos
-        const existingAfter = Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews : (afterPhotoPreviews ? [afterPhotoPreviews] : []);
+        // Combine with existing photos from database (not previews)
+        const existingAfterData = currentPhotoEntry?.entry?.photos?.after;
+        const existingAfter = Array.isArray(existingAfterData) ? existingAfterData : (existingAfterData ? [existingAfterData] : []);
         const existingTimestampsData = currentPhotoEntry?.entry?.photos?.afterUploadedAt;
         const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
         
