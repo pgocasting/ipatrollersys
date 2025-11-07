@@ -1147,6 +1147,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     if (entry?.photos) {
       setViewingPhotos({
         ...entry.photos,
+        barangay: entry.barangay,
         concernType: entry.concernType,
         remarks: entry.remarks
       });
@@ -6836,6 +6837,27 @@ Are you absolutely sure you want to proceed?`;
               View the before and after photos for this entry.
             </DialogDescription>
           </DialogHeader>
+          
+          {/* Barangay and Municipality Display */}
+          {viewingPhotos?.barangay && (
+            <div className="grid grid-cols-2 gap-4 mb-2">
+              {/* Barangay - Left Side */}
+              <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                <p className="text-xs font-semibold text-purple-700 mb-1">Barangay</p>
+                <p className="text-sm text-gray-800 font-medium">
+                  {viewingPhotos.barangay.split(',')[0].trim()}
+                </p>
+              </div>
+              
+              {/* Municipality - Right Side */}
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                <p className="text-xs font-semibold text-blue-700 mb-1">Municipality</p>
+                <p className="text-sm text-gray-800 font-medium">
+                  {viewingPhotos.barangay.includes(',') ? `${viewingPhotos.barangay.split(',')[1].trim().toUpperCase()}, BATAAN` : 'N/A'}
+                </p>
+              </div>
+            </div>
+          )}
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 max-h-[600px] overflow-y-auto">
             {/* Before Photos */}
