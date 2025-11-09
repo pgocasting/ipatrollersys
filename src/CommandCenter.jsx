@@ -1051,6 +1051,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleUploadPhotos = async () => {
     if (!currentPhotoEntry) return;
     
+    // Check if remarks are required (when after photos exist)
+    const hasAfterPhotos = afterPhotoPreviews.length > 0 || afterPhotos.length > 0;
+    const remarks = currentPhotoEntry?.entry?.remarks || '';
+    
+    if (hasAfterPhotos && !remarks.trim()) {
+      showError('Please add remarks before uploading. Remarks are required when after photos are present.');
+      return;
+    }
+    
     setIsUploadingPhotos(true);
     try {
       const { date, entryIndex } = currentPhotoEntry;
@@ -6777,40 +6786,43 @@ Are you absolutely sure you want to proceed?`;
             })()}
           </div>
 
-          {/* Remarks Section */}
-          <div className="mt-4 border-t pt-4">
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              <MessageSquare className="w-4 h-4 inline mr-1" />
-              Remarks (Optional)
-            </label>
-            <textarea
-              value={currentPhotoEntry?.entry?.remarks || ''}
-              onChange={(e) => {
-                if (currentPhotoEntry) {
-                  const newValue = e.target.value;
-                  
-                  // Update currentPhotoEntry immediately for responsive UI
-                  setCurrentPhotoEntry(prev => ({
-                    ...prev,
-                    entry: { ...prev.entry, remarks: newValue }
-                  }));
-                  
-                  // Debounce the weeklyReportData update to prevent slowness
-                  if (remarksDebounceRef.current) {
-                    clearTimeout(remarksDebounceRef.current);
+          {/* Remarks Section - Only show when after photos exist */}
+          {(afterPhotoPreviews.length > 0 || afterPhotos.length > 0) && (
+            <div className="mt-4 border-t pt-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <MessageSquare className="w-4 h-4 inline mr-1" />
+                Remarks <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={currentPhotoEntry?.entry?.remarks || ''}
+                onChange={(e) => {
+                  if (currentPhotoEntry) {
+                    const newValue = e.target.value;
+                    
+                    // Update currentPhotoEntry immediately for responsive UI
+                    setCurrentPhotoEntry(prev => ({
+                      ...prev,
+                      entry: { ...prev.entry, remarks: newValue }
+                    }));
+                    
+                    // Debounce the weeklyReportData update to prevent slowness
+                    if (remarksDebounceRef.current) {
+                      clearTimeout(remarksDebounceRef.current);
+                    }
+                    
+                    remarksDebounceRef.current = setTimeout(() => {
+                      updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
+                    }, 300); // Wait 300ms after user stops typing
                   }
-                  
-                  remarksDebounceRef.current = setTimeout(() => {
-                    updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
-                  }, 300); // Wait 300ms after user stops typing
-                }
-              }}
-              placeholder="Add any additional notes or remarks about this action..."
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
-            />
-            <p className="text-xs text-gray-500 mt-1">You can add remarks here while uploading photos</p>
-          </div>
+                }}
+                placeholder="Add any additional notes or remarks about this action..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Required: Please add remarks after uploading after photos</p>
+            </div>
+          )}
 
           <DialogFooter className="mt-6">
             <button
