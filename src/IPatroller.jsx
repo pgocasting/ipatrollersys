@@ -223,6 +223,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     "Mariveles": 3
   };
 
+  // Cache for Firestore data to avoid redundant reads
+  const firestoreCache = useRef({});
+  const lastLoadedRef = useRef({ month: null, year: null });
+
   // Load patrol data from Firestore
   useEffect(() => {
     loadPatrolDataFromFirestore();
@@ -275,24 +279,35 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         return;
       }
       
+      // Check cache first to avoid redundant reads
+      const cacheKey = monthYearId;
+      if (firestoreCache.current[cacheKey] && 
+          lastLoadedRef.current.month === selectedMonth && 
+          lastLoadedRef.current.year === selectedYear) {
+        ipatrollerLog('📦 Using cached data for:', monthYearId);
+        setPatrolData(firestoreCache.current[cacheKey]);
+        setFirestoreStatus('connected');
+        setLoading(false);
+        return;
+      }
+
       // Try to get data from Firestore for other months
       const monthDocRef = doc(db, 'patrolData', monthYearId);
       const municipalitiesRef = collection(monthDocRef, 'municipalities');
       
-          // Use onSnapshot for real-time updates but with limit to avoid excessive reads
-      // Only subscribe to changes for the current month to minimize reads
-      const unsubscribe = onSnapshot(municipalitiesRef, (snapshot) => {
-        const firestoreData = [];
-        
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data) {
-            firestoreData.push({
-              id: doc.id,
-              ...data
-            });
-          }
-        });
+      // Use getDocs instead of onSnapshot to reduce reads
+      const snapshot = await getDocs(municipalitiesRef);
+      const firestoreData = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          firestoreData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
 
         // Always create initial structure for all municipalities first
         const allMunicipalitiesData = [];
@@ -357,17 +372,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           });
         });
 
-        setPatrolData(allMunicipalitiesData);
-        setFirestoreStatus('connected');
-      }, (error) => {
-        ipatrollerLog('❌ Firestore error:', error, 'error');
-        setFirestoreStatus('error');
-        // Fallback to local data if Firestore fails
-        createLocalFallbackData();
-      });
+      // Cache the data
+      firestoreCache.current[cacheKey] = allMunicipalitiesData;
+      lastLoadedRef.current = { month: selectedMonth, year: selectedYear };
 
-      // Cleanup subscription
-      return () => unsubscribe();
+      setPatrolData(allMunicipalitiesData);
+      setFirestoreStatus('connected');
       
     } catch (error) {
       ipatrollerLog('❌ Error loading from Firestore:', error, 'error');
@@ -378,6 +388,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       setLoading(false);
     }
   };
+
+  // Cache for Command Center data
+  const commandCenterCache = useRef({});
 
   // Load Command Center Action Taken data for weekly attended reports
   const loadCommandCenterActionData = async () => {
@@ -390,6 +403,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       ];
       const selectedMonthName = monthNames[selectedMonth];
       const monthYear = `${selectedMonthName}_${selectedYear}`;
+      
+      // Check cache first
+      const cacheKey = `${selectedMonth}-${selectedYear}`;
+      if (commandCenterCache.current[cacheKey]) {
+        actionDataGroup.log('📦 Using cached Command Center data for:', monthYear);
+        setCommandCenterActionData(commandCenterCache.current[cacheKey]);
+        actionDataGroup.end();
+        return;
+      }
       
       actionDataGroup.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
       
@@ -458,6 +480,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           actionData[municipality] = [0, 0, 0, 0];
         }
       }
+      
+      // Cache the data
+      commandCenterCache.current[cacheKey] = actionData;
       
       setCommandCenterActionData(actionData);
       actionDataGroup.log('📊 Command Center Action Taken data loaded:', actionData);

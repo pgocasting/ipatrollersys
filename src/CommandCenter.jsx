@@ -210,7 +210,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Weekly Report Data - Individual date entries
   const [weeklyReportData, setWeeklyReportData] = useState({});
+  const weeklyReportCache = useRef({});
+  const lastLoadedWeeklyRef = useRef({ month: null, year: null, municipality: null });
   
+  // Cache for barangays and concern types
+  const barangaysCache = useRef(null);
+  const concernTypesCache = useRef(null);
+
   // Municipality tabs state - moved to top of component
   
   // Clear data options state
@@ -456,40 +462,30 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [importedBarangays, activeMunicipalityTab]);
 
-  // Load weekly report data when year/municipality changes (but not month - handled by dropdown)
+  // Load weekly report data when year/municipality/month changes with debouncing
   useEffect(() => {
-    console.log('🔄 Year/Municipality changed, reloading data:', {
-      selectedMonth,
-      selectedYear,
-      activeMunicipalityTab
-    });
-    console.log('📊 Current allMonthsData state:', Object.keys(allMonthsData));
+    // Check if we already have this data cached
+    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    const isSameAsLast = lastLoadedWeeklyRef.current.month === selectedMonth &&
+                         lastLoadedWeeklyRef.current.year === selectedYear &&
+                         lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab;
     
-    // Only load if we have a valid month and year, and this is not a month change
-    if (selectedMonth && selectedYear) {
-      console.log('✅ Valid month/year, calling loadWeeklyReportData()');
-      loadWeeklyReportData();
-    } else {
-      console.log('❌ Invalid month/year, skipping loadWeeklyReportData()');
+    if (isSameAsLast && weeklyReportCache.current[cacheKey]) {
+      console.log('📦 Using cached weekly report data for:', cacheKey);
+      return;
     }
-  }, [selectedYear, activeMunicipalityTab, allMonthsData]); // Removed selectedMonth from dependencies
-
-  // Load weekly report data when month changes
-  useEffect(() => {
-    console.log('📅 Month changed, reloading data:', {
+    
+    console.log('🔄 Loading weekly report data for:', {
       selectedMonth,
       selectedYear,
       activeMunicipalityTab
     });
     
     // Only load if we have a valid month and year
-    if (selectedMonth && selectedYear) {
-      console.log('✅ Valid month selection, calling loadWeeklyReportData()');
+    if (selectedMonth && selectedYear && activeMunicipalityTab) {
       loadWeeklyReportData();
-    } else {
-      console.log('❌ Invalid month/year for month change, skipping loadWeeklyReportData()');
     }
-  }, [selectedMonth]); // Only watch selectedMonth changes
+  }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
   // Component initialization - removed local storage usage
 
@@ -637,6 +633,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
     
+    // Check cache first
+    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    if (weeklyReportCache.current[cacheKey] &&
+        lastLoadedWeeklyRef.current.month === selectedMonth &&
+        lastLoadedWeeklyRef.current.year === selectedYear &&
+        lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab) {
+      console.log('📦 Using cached data, skipping Firestore read');
+      setWeeklyReportData(weeklyReportCache.current[cacheKey]);
+      return;
+    }
+    
     console.log(`🔄 Loading weekly report data for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
@@ -731,6 +738,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log('✅ Loading weekly data with', Object.keys(weeklyData).length, 'dates');
           console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
           console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
+          
+          // Cache the loaded data
+          weeklyReportCache.current[cacheKey] = weeklyData;
+          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
           setWeeklyReportData(weeklyData);
           
@@ -1257,6 +1268,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         // Save cleared data to nested structure
         const saveResult = await saveWeeklyReportByMunicipality(reportData);
         if (saveResult.success) {
+          // Update cache with cleared data
+          const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+          weeklyReportCache.current[cacheKey] = {};
+          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
+          
           toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
           showSuccess(`Weekly report data cleared for ${activeMunicipalityTab}`);
         } else {
@@ -1896,10 +1912,19 @@ Are you absolutely sure you want to proceed?`;
 
   // Load barangays from Firestore
   const loadBarangaysFromFirestore = async () => {
+    // Check cache first
+    if (barangaysCache.current) {
+      console.log('📦 Using cached barangays data');
+      setImportedBarangays(barangaysCache.current);
+      return;
+    }
+    
     setIsLoadingBarangays(true);
     try {
       const result = await getBarangays();
       if (result.success) {
+        // Cache the data
+        barangaysCache.current = result.data || [];
         setImportedBarangays(result.data || []);
         console.log('✅ Loaded barangays from Firestore:', result.data?.length || 0);
       } else {
@@ -1918,10 +1943,19 @@ Are you absolutely sure you want to proceed?`;
 
   // Load concern types from Firestore
   const loadConcernTypesFromFirestore = async () => {
+    // Check cache first
+    if (concernTypesCache.current) {
+      console.log('📦 Using cached concern types data');
+      setImportedConcernTypes(concernTypesCache.current);
+      return;
+    }
+    
     setIsLoadingConcernTypes(true);
     try {
       const result = await getConcernTypes();
       if (result.success) {
+        // Cache the data
+        concernTypesCache.current = result.data || [];
         setImportedConcernTypes(result.data || []);
         console.log('✅ Loaded concern types from Firestore:', result.data?.length || 0);
       } else {
