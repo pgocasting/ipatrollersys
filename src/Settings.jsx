@@ -117,17 +117,17 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 max-w-5xl">
-        <div className="flex items-center justify-between mb-8">
+      <div className="container mx-auto p-3 sm:p-4 md:p-6 max-w-5xl">
+        <div className="flex items-center justify-between mb-4 sm:mb-6 md:mb-8">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground">Manage your account settings and preferences.</p>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Manage your account settings and preferences.</p>
           </div>
         </div>
 
-        <Tabs defaultValue="account" className="space-y-6 [&_*]:border-gray-200">
-          <TabsList>
-            <TabsTrigger value="account" className="flex items-center gap-2">
+        <Tabs defaultValue="account" className="space-y-4 sm:space-y-6 [&_*]:border-gray-200">
+          <TabsList className="w-full sm:w-auto">
+            <TabsTrigger value="account" className="flex items-center gap-2 text-sm sm:text-base">
               <UserCircle className="h-4 w-4" />
               Account
             </TabsTrigger>
@@ -155,7 +155,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <Progress value={passwordValidation.strength} className="h-2" />
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
                       <div className="flex items-center gap-2">
                         {passwordValidation.isLongEnough ? 
                           <CheckCircle2 className="h-4 w-4 text-green-600" /> : 
@@ -274,11 +274,11 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4 pt-4">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 pt-4">
                   <Button
                     onClick={handlePasswordChange}
                     disabled={isLoading}
-                    className="flex-1 bg-black hover:bg-black/90 text-white"
+                    className="flex-1 bg-black hover:bg-black/90 text-white text-sm sm:text-base"
                   >
                     {isLoading ? (
                       <>
@@ -301,6 +301,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
                         confirmPassword: ""
                       });
                     }}
+                    className="text-sm sm:text-base"
                   >
                     <Save className="mr-2 h-4 w-4" />
                     Clear Form
@@ -327,7 +328,7 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3 pt-4">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <Button
                   variant="outline"
                   className="flex-1 border-gray-200 hover:bg-gray-50"

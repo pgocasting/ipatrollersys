@@ -1528,12 +1528,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8 bg-gray-50 min-h-screen">
+      <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 md:space-y-8 bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">I-Patroller Management</h1>
-            <p className="text-gray-500 mt-2">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">I-Patroller Management</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
                 "en-US",
                 { month: "long", year: "numeric" },
@@ -1570,68 +1570,68 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Patrols</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Patrols</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
                     {overallSummary.totalPatrols.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Card Counts</p>
-                  <p className="text-2xl font-bold text-green-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Card Counts</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">
                     {overallSummary.totalActive.toLocaleString()}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
+                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Card Counts</p>
-                  <p className="text-2xl font-bold text-red-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Inactive Card Counts</p>
+                  <p className="text-xl sm:text-2xl font-bold text-red-600">
                     {overallSummary.totalInactive.toLocaleString()}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="w-6 h-6 text-red-600" />
+                <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Avg Active %</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Avg Active %</p>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600">
                     {overallSummary.avgActivePercentage}%
                   </p>
                 </div>
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Target className="w-6 h-6 text-orange-600" />
+                <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>
@@ -1640,10 +1640,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         {/* Filters and Search */}
         <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
-              <div className="flex gap-2">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filters & Search</h3>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   onClick={() => {
                     setSelectedMonth(new Date().getMonth());
@@ -1669,7 +1669,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
                 <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                   Search
@@ -1750,15 +1750,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         {/* Patrol Data Table */}
         <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
                 "en-US",
                 { month: "long", year: "numeric" },
               )} Patrol Data ({filteredData.length} municipalities)
             </CardTitle>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-1">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0 w-full">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                 <button
                   onClick={() => setActiveTab("daily")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
@@ -1789,11 +1789,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   Top Performers
                 </button>
               </div>
-              <div className="ml-auto">
+              <div className="w-full lg:w-auto lg:ml-auto">
                 <button
                   onClick={() => syncToFirestore()}
                   disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none w-full lg:w-auto"
                 >
                   <Save className="w-4 h-4" />
                   Save Data

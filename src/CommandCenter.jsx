@@ -4442,16 +4442,16 @@ Are you absolutely sure you want to proceed?`;
           </DialogContent>
         </Dialog>
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Command Center</h1>
-            <p className="text-gray-500 mt-2">Real-time monitoring and control system with comprehensive analytics</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage barangays, concern types, and weekly reports</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
             {/* Municipality Badge - for non-admin users */}
             {(activeMunicipalityTab || userMunicipality) && (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0">
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                 <Building2 className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
                 <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
@@ -4486,11 +4486,11 @@ Are you absolutely sure you want to proceed?`;
             )}
             
             {/* View Options Dropdown */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <button
                 id="commandcenter-menu-button"
                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
               >
                 <Menu className="w-5 h-5" />
                 <span className="text-sm font-medium">View Options</span>
@@ -4568,7 +4568,7 @@ Are you absolutely sure you want to proceed?`;
         </div>
 
       {/* Main Dashboard */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
 
 
 
@@ -4577,21 +4577,21 @@ Are you absolutely sure you want to proceed?`;
           <div className="space-y-6">
             {/* Weekly Report Header */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className={`${isCommandUser ? 'p-4' : 'p-6'} pb-0`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
+              <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} pb-0`}>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 w-full lg:w-auto">
+                    <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
                       <FileText className="w-5 h-5 text-green-600" />
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
                       {activeMunicipalityTab && (
-                        <div className="flex items-center gap-4 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
+                            <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-xs sm:text-sm text-gray-600">
                             {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
                             {importedBarangays.filter(b => {
                               if (!activeMunicipalityTab) return false;
@@ -4604,11 +4604,11 @@ Are you absolutely sure you want to proceed?`;
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 sm:gap-4 w-full lg:w-auto">
                     {/* Import Options - Admin Only */}
                     {isAdmin && (
                       <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
                           <input
                             id="import-all-months"
                             name="import-all-months"
@@ -4623,7 +4623,7 @@ Are you absolutely sure you want to proceed?`;
                     )}
                     
                     {/* Action Buttons */}
-                    <div className="flex gap-3 overflow-x-auto">
+                    <div className="flex flex-wrap gap-2 sm:gap-3">
                       
                       {isAdmin && (
                         <button 

@@ -62,35 +62,35 @@ export default function Login({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-start justify-center bg-white p-4 pt-30">
+    <div className="min-h-screen flex items-start justify-center bg-white p-2 sm:p-4 pt-8 sm:pt-30">
       {/* Login Card Container */}
       <div className="relative z-10 w-full max-w-md">
         {/* Login Form Card with Shadow */}
         <Card className="shadow-xl border-gray-200 bg-white">
           {/* Logo Section - Inside Card */}
-          <CardHeader className="text-center pt-8 pb-8">
-            <div className="inline-block mb-4">
+          <CardHeader className="text-center pt-4 sm:pt-8 pb-4 sm:pb-8 px-4">
+            <div className="inline-block mb-2 sm:mb-4">
               <img 
                 src={ipatrollerLogo}
                 alt="IPatroller Logo"
-                className="w-36 h-36 object-contain mx-auto drop-shadow-lg"
+                className="w-24 h-24 sm:w-36 sm:h-36 object-contain mx-auto drop-shadow-lg"
                 onError={(e) => {
                   console.error('Failed to load logo image:', e.target.src);
                   e.target.src = logoFallback;
                 }}
               />
             </div>
-            <CardTitle className="text-4xl font-bold text-gray-900 mb-2">1Bataan I-Patroller</CardTitle>
-            <CardDescription className="text-base text-gray-600">
+            <CardTitle className="text-2xl sm:text-4xl font-bold text-gray-900 mb-1 sm:mb-2">1Bataan I-Patroller</CardTitle>
+            <CardDescription className="text-sm sm:text-base text-gray-600">
               Provincial Government of Bataan
             </CardDescription>
           </CardHeader>
           
-          <CardContent className="px-8 pb-8">
-            <form onSubmit={handleSubmit} className="space-y-6">
+          <CardContent className="px-4 sm:px-8 pb-6 sm:pb-8">
+            <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
               {/* Username Field */}
               <div className="space-y-2">
-                <Label htmlFor="username" className="text-base font-medium text-gray-700">
+                <Label htmlFor="username" className="text-sm sm:text-base font-medium text-gray-700">
                   Username
                 </Label>
                 <Input
@@ -100,7 +100,7 @@ export default function Login({ onLogin }) {
                   value={formData.username}
                   onChange={handleChange}
                   required
-                  className="h-12 text-base bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                  className="h-10 sm:h-12 text-sm sm:text-base bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Enter your username"
                   autoComplete="username"
                 />
@@ -108,7 +108,7 @@ export default function Login({ onLogin }) {
 
               {/* Password Field */}
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-base font-medium text-gray-700">
+                <Label htmlFor="password" className="text-sm sm:text-base font-medium text-gray-700">
                   Password
                 </Label>
                 <div className="relative">
@@ -119,7 +119,7 @@ export default function Login({ onLogin }) {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    className="h-12 text-base pr-12 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                    className="h-10 sm:h-12 text-sm sm:text-base pr-12 bg-white border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="Enter your password"
                     autoComplete="current-password"
                   />
@@ -143,7 +143,7 @@ export default function Login({ onLogin }) {
                   onChange={handleChange}
                   className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
                 />
-                <Label htmlFor="keepLoggedIn" className="ml-2 text-base text-gray-700 cursor-pointer">
+                <Label htmlFor="keepLoggedIn" className="ml-2 text-sm sm:text-base text-gray-700 cursor-pointer">
                   Keep me logged in
                 </Label>
               </div>
@@ -151,7 +151,7 @@ export default function Login({ onLogin }) {
               {/* Error Message */}
               {error && (
                 <Alert variant="destructive" className="border-red-300 bg-red-50">
-                  <AlertDescription className="text-base text-red-800">
+                  <AlertDescription className="text-sm sm:text-base text-red-800">
                     {error}
                   </AlertDescription>
                 </Alert>
@@ -162,7 +162,7 @@ export default function Login({ onLogin }) {
                 type="submit"
                 name="login"
                 disabled={isLoading}
-                className="w-full h-12 text-base bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full h-10 sm:h-12 text-sm sm:text-base bg-blue-600 hover:bg-blue-700 text-white font-medium shadow-sm hover:shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isLoading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -181,8 +181,8 @@ export default function Login({ onLogin }) {
         </Card>
 
         {/* Footer */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-gray-500">
+        <div className="mt-4 sm:mt-8 text-center px-2">
+          <p className="text-xs sm:text-sm text-gray-500">
             © 2025 IPatroller System. All rights reserved.
           </p>
         </div>

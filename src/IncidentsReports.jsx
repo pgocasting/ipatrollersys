@@ -3391,66 +3391,66 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         )}
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Total Incidents</p>
-                  <p className="text-3xl font-bold text-blue-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1 truncate">Total Incidents</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-600">
                     {stats.total.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <AlertTriangle className="w-8 h-8 text-blue-600" />
+                <div className="p-1.5 sm:p-2 lg:p-3 bg-blue-100 rounded-xl flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Action Taken</p>
-                  <p className="text-3xl font-bold text-green-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1 truncate">Action Taken</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-600">
                     {stats.actionTaken.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <CheckCircle className="w-8 h-8 text-green-600" />
+                <div className="p-1.5 sm:p-2 lg:p-3 bg-green-100 rounded-xl flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Drug Related</p>
-                  <p className="text-3xl font-bold text-red-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1 truncate">Drug Related</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-600">
                     {stats.drugs.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-red-100 rounded-xl">
-                  <Shield className="w-8 h-8 text-red-600" />
+                <div className="p-1.5 sm:p-2 lg:p-3 bg-red-100 rounded-xl flex-shrink-0">
+                  <Shield className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-red-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-500 mb-1">Accidents</p>
-                  <p className="text-3xl font-bold text-orange-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-500 mb-1 truncate">Accidents</p>
+                  <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-600">
                     {stats.accidents.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-3 bg-orange-100 rounded-xl">
-                  <Car className="w-8 h-8 text-orange-600" />
+                <div className="p-1.5 sm:p-2 lg:p-3 bg-orange-100 rounded-xl flex-shrink-0">
+                  <Car className="w-5 h-5 sm:w-6 sm:h-6 lg:w-8 lg:h-8 text-orange-600" />
                 </div>
               </div>
             </CardContent>

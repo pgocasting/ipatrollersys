@@ -1,0 +1,363 @@
+/* Mobile Responsive Utilities for IPatroller System */
+
+/* Table Responsiveness - Horizontal Scroll on Mobile */
+@media (max-width: 768px) {
+  .table-container {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0.5rem;
+    border: 1px solid #e5e7eb;
+  }
+
+  .table-container table {
+    min-width: 600px;
+  }
+
+  /* Compact table cells on mobile */
+  .table-container td,
+  .table-container th {
+    padding: 0.5rem !important;
+    font-size: 0.875rem !important;
+  }
+}
+
+/* Card-based table view for very small screens */
+@media (max-width: 640px) {
+  .table-to-cards {
+    display: none;
+  }
+
+  .mobile-card-view {
+    display: block;
+  }
+
+  .mobile-card {
+    background: white;
+    border: 1px solid #e5e7eb;
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .mobile-card-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #f3f4f6;
+  }
+
+  .mobile-card-row:last-child {
+    border-bottom: none;
+  }
+
+  .mobile-card-label {
+    font-weight: 600;
+    color: #6b7280;
+    font-size: 0.875rem;
+  }
+
+  .mobile-card-value {
+    color: #111827;
+    font-size: 0.875rem;
+    text-align: right;
+  }
+}
+
+/* Modal/Dialog Responsiveness */
+@media (max-width: 640px) {
+  [role="dialog"] {
+    max-width: 95vw !important;
+    margin: 0.5rem;
+  }
+
+  .dialog-content {
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+}
+
+/* Button Groups - Stack on Mobile */
+@media (max-width: 640px) {
+  .button-group {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .button-group > button {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .button-group > button:last-child {
+    margin-bottom: 0;
+  }
+}
+
+/* Form Grid - Single Column on Mobile */
+@media (max-width: 640px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Stats Cards - Responsive Grid */
+@media (max-width: 640px) {
+  .stats-grid {
+    grid-template-columns: 1fr !important;
+    gap: 0.75rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* Chart Containers - Responsive */
+@media (max-width: 768px) {
+  .chart-container {
+    height: 250px !important;
+  }
+
+  .chart-container canvas {
+    max-height: 250px !important;
+  }
+}
+
+/* Filter Section - Collapsible on Mobile */
+@media (max-width: 640px) {
+  .filter-section {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .filter-section > * {
+    width: 100%;
+  }
+}
+
+/* Sidebar Adjustments */
+@media (max-width: 768px) {
+  .sidebar-content {
+    padding: 0.75rem;
+  }
+
+  .sidebar-item {
+    padding: 0.5rem;
+    font-size: 0.875rem;
+  }
+}
+
+/* Pagination - Compact on Mobile */
+@media (max-width: 640px) {
+  .pagination {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+
+  .pagination-button {
+    min-width: 2rem;
+    height: 2rem;
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+}
+
+/* Dropdown Menus - Full Width on Mobile */
+@media (max-width: 640px) {
+  [role="menu"],
+  [role="listbox"] {
+    max-width: 95vw;
+  }
+}
+
+/* Tabs - Scrollable on Mobile */
+@media (max-width: 640px) {
+  [role="tablist"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  [role="tablist"]::-webkit-scrollbar {
+    display: none;
+  }
+
+  [role="tab"] {
+    white-space: nowrap;
+    font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+/* Toast/Notification - Adjust Position */
+@media (max-width: 640px) {
+  .toast-container {
+    bottom: 1rem !important;
+    left: 1rem !important;
+    right: 1rem !important;
+    width: auto !important;
+  }
+
+  .toast {
+    font-size: 0.875rem;
+  }
+}
+
+/* Loading Spinner - Center on Mobile */
+@media (max-width: 640px) {
+  .loading-overlay {
+    padding: 1rem;
+  }
+
+  .loading-spinner {
+    width: 2rem;
+    height: 2rem;
+  }
+}
+
+/* Image Gallery - Responsive Grid */
+@media (max-width: 640px) {
+  .image-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.5rem;
+  }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .image-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
+/* Date Picker - Full Width on Mobile */
+@media (max-width: 640px) {
+  .date-picker-container {
+    width: 100%;
+  }
+
+  .date-picker-input {
+    width: 100%;
+  }
+}
+
+/* Search Bar - Full Width on Mobile */
+@media (max-width: 640px) {
+  .search-container {
+    width: 100%;
+  }
+
+  .search-input {
+    width: 100%;
+  }
+}
+
+/* Action Bar - Stack on Mobile */
+@media (max-width: 640px) {
+  .action-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .action-bar > * {
+    width: 100%;
+  }
+}
+
+/* Badge/Tag - Smaller on Mobile */
+@media (max-width: 640px) {
+  .badge,
+  .tag {
+    font-size: 0.75rem;
+    padding: 0.125rem 0.5rem;
+  }
+}
+
+/* Avatar - Smaller on Mobile */
+@media (max-width: 640px) {
+  .avatar {
+    width: 2rem;
+    height: 2rem;
+  }
+
+  .avatar-large {
+    width: 3rem;
+    height: 3rem;
+  }
+}
+
+/* Utility Classes */
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+
+  .desktop-only {
+    display: none;
+  }
+}
+
+/* Text Truncation */
+.truncate-mobile {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .truncate-mobile {
+    max-width: 150px;
+  }
+}
+
+/* Spacing Adjustments */
+@media (max-width: 640px) {
+  .section-spacing {
+    padding: 1rem;
+  }
+
+  .card-spacing {
+    padding: 0.75rem;
+  }
+}
+
+/* Icon Sizes */
+@media (max-width: 640px) {
+  .icon-sm {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .icon-md {
+    width: 1.25rem;
+    height: 1.25rem;
+  }
+
+  .icon-lg {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+}
+
+/* Prevent horizontal scroll */
+body {
+  overflow-x: hidden;
+}
+
+/* Touch-friendly tap targets */
+@media (max-width: 768px) {
+  button,
+  a,
+  input[type="button"],
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}

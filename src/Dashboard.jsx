@@ -1916,12 +1916,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
       )}
 
-      <div className="container mx-auto p-4 space-y-4 bg-gray-50 min-h-screen">
+      <div className="container mx-auto p-2 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-gray-500 mt-2">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
               {userAccessLevel === 'quarry-monitoring' 
                 ? 'Overview of quarry site operations and compliance monitoring'
                 : userAccessLevel === 'command-center'
@@ -1930,7 +1930,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               }
             </p>
             {lastDataUpdate && (
-              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">
                 <RefreshCw className="w-3 h-3" />
                 Last updated: {lastDataUpdate.toLocaleTimeString()} - Showing data for October 2025
               </p>
@@ -1939,7 +1939,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           
           {/* Action Buttons for Admin Users */}
           {userAccessLevel === 'admin' && (
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <Button
                 onClick={() => {
                   dashboardLog('🔄 Refreshing all dashboard data...');
@@ -1953,7 +1953,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   }
                   showSuccess('All dashboard data refreshed for current month (October 2025)');
                 }}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base px-3 py-2"
               >
                 <RefreshCw className="w-4 h-4" />
                 Refresh All Data
@@ -1966,7 +1966,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                     createSampleIPatrollerData();
                     showSuccess('Sample IPatroller data created for testing');
                   }}
-                  className="flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base px-3 py-2"
                 >
                   <FileText className="w-4 h-4" />
                   Create Sample Data
@@ -1977,7 +1977,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           
           {/* Action Buttons for Command Center Users */}
           {userAccessLevel === 'command-center' && (
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto">
               <Button
                 onClick={() => {
                   dashboardLog('🔄 Refreshing Command Center, Action, and Incidents data...');
@@ -1987,7 +1987,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   showSuccess('Command Center data refreshed for current month (October 2025)');
                 }}
                 disabled={isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents}
-                className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 text-sm sm:text-base px-3 py-2 w-full sm:w-auto"
               >
                 <RefreshCw className={`w-4 h-4 ${(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'animate-spin' : ''}`} />
                 {(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'Refreshing...' : 'Refresh Data'}
@@ -1999,66 +1999,66 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         {/* Quick Stats */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Stats */
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Sites</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Sites</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
                       {quarryData.totalSites.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Mountain className="w-6 h-6 text-blue-600" />
+                  <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
+                    <Mountain className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Active Sites</p>
-                    <p className="text-2xl font-bold text-green-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Sites</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">
                       {quarryData.activeSites.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="w-6 h-6 text-green-600" />
+                  <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg">
+                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Compliant</p>
-                    <p className="text-2xl font-bold text-emerald-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Compliant</p>
+                    <p className="text-xl sm:text-2xl font-bold text-emerald-600">
                       {quarryData.compliantSites.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <Shield className="w-6 h-6 text-emerald-600" />
+                  <div className="p-1.5 sm:p-2 bg-emerald-100 rounded-lg">
+                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-6">
+              <CardContent className="p-3 sm:p-4 lg:p-6">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Violations</p>
-                    <p className="text-2xl font-bold text-red-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Violations</p>
+                    <p className="text-xl sm:text-2xl font-bold text-red-600">
                       {quarryData.violations.toLocaleString()}
                     </p>
                   </div>
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <AlertTriangle className="w-6 h-6 text-red-600" />
+                  <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg">
+                    <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                   </div>
                 </div>
               </CardContent>
@@ -2066,7 +2066,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats - Modern shadcn Design */
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
             {/* 1. Total Reports - FIRST */}
             <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-violet-500 via-violet-600 to-violet-700 overflow-hidden relative group">
               <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
@@ -2141,34 +2141,34 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : (
           /* Regular Dashboard Stats */
-          <div className={`grid grid-cols-1 md:grid-cols-2 gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+          <div className={`grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Municipalities</p>
-                  <p className="text-2xl font-bold text-green-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Municipalities</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">
                     {activeCount.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
+                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-6">
+            <CardContent className="p-3 sm:p-4 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Municipalities</p>
-                  <p className="text-2xl font-bold text-red-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Inactive Municipalities</p>
+                  <p className="text-xl sm:text-2xl font-bold text-red-600">
                     {inactiveCount.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="w-6 h-6 text-red-600" />
+                <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                 </div>
               </div>
             </CardContent>
@@ -2177,32 +2177,32 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           {userAccessLevel !== 'ipatroller' && (
             <>
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Actions (October 2025)</p>
-                      <p className="text-2xl font-bold text-blue-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Actions (October 2025)</p>
+                      <p className="text-xl sm:text-2xl font-bold text-blue-600">
                         {getCurrentMonthActionsCount().toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Target className="w-6 h-6 text-blue-600" />
+                    <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                      <Target className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-6">
+                <CardContent className="p-3 sm:p-4 lg:p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Total Incidents (October 2025)</p>
-                      <p className="text-2xl font-bold text-orange-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Incidents (October 2025)</p>
+                      <p className="text-xl sm:text-2xl font-bold text-orange-600">
                         {getCurrentMonthIncidentsCount().toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <AlertTriangle className="w-6 h-6 text-orange-600" />
+                    <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                      <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                     </div>
                   </div>
                 </CardContent>
