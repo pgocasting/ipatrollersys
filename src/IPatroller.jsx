@@ -416,11 +416,23 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
               if (Array.isArray(dateEntries)) {
                 dateEntries.forEach(entry => {
-                  // Count only entries that have BOTH before and after photos uploaded
-                  const hasBeforePhoto = entry.photos && entry.photos.before;
-                  const hasAfterPhoto = entry.photos && entry.photos.after;
+                  // For March to October (months 2-9), count based on action taken
+                  // For other months, count only entries with BOTH before and after photos
+                  const isMarchToOctober = selectedMonth >= 2 && selectedMonth <= 9;
                   
-                  if (hasBeforePhoto && hasAfterPhoto) {
+                  let shouldCount = false;
+                  
+                  if (isMarchToOctober) {
+                    // Count if action taken field has a value
+                    shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
+                  } else {
+                    // Count only entries that have BOTH before and after photos uploaded
+                    const hasBeforePhoto = entry.photos && entry.photos.before;
+                    const hasAfterPhoto = entry.photos && entry.photos.after;
+                    shouldCount = hasBeforePhoto && hasAfterPhoto;
+                  }
+                  
+                  if (shouldCount) {
                     // Determine which week this date falls into
                     const entryDate = new Date(dateKey);
                     const dayOfMonth = entryDate.getDate();
