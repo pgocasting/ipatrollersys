@@ -24,7 +24,10 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.warn('Failed to set default session persistence:', error);
 });
 
-// Initialize Cloud Firestore
-export const db = getFirestore(app);
+// Initialize Cloud Firestore with settings to prevent connection issues
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  useFetchStreams: false
+});
 
 export default app;
