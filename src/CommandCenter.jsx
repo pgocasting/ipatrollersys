@@ -3775,14 +3775,14 @@ const handleSaveAllMonths = async () => {
                         </th>
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
                           <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            ACTION TAKEN
+                            <MessageSquare className="h-4 w-4 text-gray-500" />
+                            REMARKS
                           </div>
                         </th>
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 table-cell-spacing">
                           <div className="flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-gray-500" />
-                            REMARKS
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            ACTION TAKEN
                           </div>
                         </th>
                       </tr>
@@ -3963,13 +3963,13 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip="Action taken for the selected concern type">
+                                <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip="">
                                   <input 
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
-                                    placeholder="Action taken..."
+                                    placeholder=""
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -4107,13 +4107,13 @@ const handleSaveAllMonths = async () => {
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || "Action taken for the selected concern type"}>
+                                  <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
                                     <input 
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
-                                      placeholder="Action taken..."
+                                      placeholder=""
                                       value={entry.actionTaken}
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
                                     />
@@ -5523,15 +5523,19 @@ const handleSaveAllMonths = async () => {
                 <h4 className="text-sm font-bold text-blue-900 mb-2">Quick Instructions</h4>
                 <ul className="space-y-1.5 text-xs text-blue-800">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">•</span>
+                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
                     <span><strong className="text-blue-900">Before Photo:</strong> Capture the situation/area BEFORE taking action</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 font-bold mt-0.5">•</span>
+                    <span className="text-green-500 font-bold mt-0.5">2.</span>
                     <span><strong className="text-green-900">After Photo:</strong> Capture the same area AFTER action completed</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-500 font-bold mt-0.5">•</span>
+                    <span className="text-purple-500 font-bold mt-0.5">3.</span>
+                    <span><strong className="text-purple-900">Action Taken:</strong> Describe what action was taken after uploading photos</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-gray-500 font-bold mt-0.5">•</span>
                     <span>Photos auto-compress to under 2MB • Both optional but recommended</span>
                   </li>
                 </ul>
@@ -5683,12 +5687,12 @@ const handleSaveAllMonths = async () => {
             })()}
           </div>
 
-          {/* Remarks Section - Only show when after photos exist */}
+          {/* Action Taken Section - Only show when after photos exist */}
           {(afterPhotoPreviews.length > 0 || afterPhotos.length > 0) && (
             <div className="mt-4 border-t pt-4">
               <label className="block text-sm font-semibold text-gray-900 mb-2">
                 <MessageSquare className="w-4 h-4 inline mr-1" />
-                Remarks <span className="text-red-500">*</span>
+                Action Taken <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={currentPhotoEntry?.entry?.remarks || ''}
@@ -5712,12 +5716,12 @@ const handleSaveAllMonths = async () => {
                     }, 300); // Wait 300ms after user stops typing
                   }
                 }}
-                placeholder="Add any additional notes or remarks about this action..."
+                placeholder="Add any additional notes or action taken about this concern..."
                 rows={3}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
                 required
               />
-              <p className="text-xs text-gray-500 mt-1">Required: Please add remarks after uploading after photos</p>
+              <p className="text-xs text-gray-500 mt-1">Required: Please add action taken after uploading after photos</p>
             </div>
           )}
 
