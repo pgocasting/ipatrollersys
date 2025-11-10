@@ -2167,7 +2167,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="flex flex-col gap-6">
               {/* Header Section */}
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gray-100 rounded-lg">
@@ -2180,7 +2180,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
               
               {/* Filters Section */}
-              <div className="flex flex-col sm:flex-row items-end gap-4 w-full lg:w-auto">
+              <div className="flex flex-col sm:flex-row items-end gap-4 w-full flex-wrap">
                 {/* Search Filter */}
                 <div className="flex flex-col gap-2 w-full sm:w-[240px]">
                   <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
