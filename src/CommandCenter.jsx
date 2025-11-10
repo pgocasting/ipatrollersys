@@ -5868,7 +5868,7 @@ const handleSaveAllMonths = async () => {
             )}
           </div>
 
-          {/* Fixed Footer Section - Concern Type and Remarks */}
+          {/* Fixed Footer Section - Concern Type and Action Taken */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {/* Concern Type - Left Side */}
             {viewingPhotos?.concernType && (
@@ -5878,10 +5878,10 @@ const handleSaveAllMonths = async () => {
               </div>
             )}
 
-            {/* Remarks - Right Side */}
+            {/* Action Taken - Right Side */}
             {viewingPhotos?.remarks && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
+                <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
               </div>
             )}
