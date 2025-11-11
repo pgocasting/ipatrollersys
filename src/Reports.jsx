@@ -98,6 +98,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [ipatrollerPreviewData, setIpatrollerPreviewData] = useState(null);
   const [isGeneratingIPatrollerReport, setIsGeneratingIPatrollerReport] = useState(false);
 
+  // Quarterly Report Preview modal state
+  const [showQuarterlyPreview, setShowQuarterlyPreview] = useState(false);
+  const [quarterlyPreviewData, setQuarterlyPreviewData] = useState(null);
+
   // Municipalities by district mapping (matching I-Patroller structure)
   const municipalitiesByDistrict = {
     "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
@@ -1927,31 +1931,40 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       let reportData = commandCenterData;
       
       // Always reload data to ensure we have the latest
-      console.log('Loading fresh Command Center data for report...');
+      console.log('⚡ Loading fresh Command Center data for report with parallel queries...');
+      const startTime = performance.now();
       const monthName = months[selectedMonth];
       const monthYear = `${monthName}_${selectedYear}`;
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
+      
+      // Create all Firebase queries in parallel
+      const municipalityQueries = allMunicipalities.map(municipality => {
+        const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+        return getDoc(docRef);
+      });
+      
+      // Load all data in parallel
+      const [municipalityResults, barangaysResult, concernTypesResult] = await Promise.all([
+        Promise.allSettled(municipalityQueries),
+        getBarangays(),
+        getConcernTypes()
+      ]);
+      
+      // Process results
       const commandCenterReports = {};
-      
-      // Load data for each municipality
-      for (const municipality of allMunicipalities) {
-        try {
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            const municipalityData = docSnap.data();
-            console.log(`✅ Loaded ${municipality} for report:`, municipalityData);
-            commandCenterReports[municipality] = municipalityData;
-          }
-        } catch (error) {
-          console.error(`❌ Error loading ${municipality}:`, error);
+      municipalityResults.forEach((result, index) => {
+        const municipality = allMunicipalities[index];
+        if (result.status === 'fulfilled' && result.value.exists()) {
+          const municipalityData = result.value.data();
+          console.log(`✅ Loaded ${municipality} for report`);
+          commandCenterReports[municipality] = municipalityData;
+        } else if (result.status === 'rejected') {
+          console.error(`❌ Error loading ${municipality}:`, result.reason);
         }
-      }
+      });
       
-      // Load barangays and concern types
-      const barangaysResult = await getBarangays();
-      const concernTypesResult = await getConcernTypes();
+      const endTime = performance.now();
+      console.log(`✅ Data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
       
       reportData = {
         reports: commandCenterReports,
@@ -2414,6 +2427,309 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     } catch (error) {
       console.error('Error generating Command Center Report:', error);
       alert('Error generating Command Center Report. Please check the console for details.');
+    } finally {
+      setIsGeneratingCommandCenterReport(false);
+    }
+  };
+
+  // Load and prepare quarterly data for preview
+  const loadQuarterlyReportData = async () => {
+    setIsLoadingCommandCenter(true);
+    try {
+      console.log('⚡ Loading Quarterly Command Center Report data with parallel queries...');
+      const startTime = performance.now();
+      
+      // Load data for all months of the selected year
+      const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
+      
+      // Create all Firebase queries in parallel
+      const allQueries = [];
+      const queryMap = [];
+      
+      for (const municipality of allMunicipalities) {
+        for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
+          const monthName = months[monthIndex];
+          const monthYear = `${monthName}_${selectedYear}`;
+          
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          allQueries.push(getDoc(docRef));
+          queryMap.push({ municipality, monthName });
+        }
+      }
+      
+      // Load barangays and concern types in parallel with data queries
+      const [queryResults, barangaysResult, concernTypesResult] = await Promise.all([
+        Promise.allSettled(allQueries),
+        getBarangays(),
+        getConcernTypes()
+      ]);
+      
+      // Process results
+      const yearlyData = {};
+      queryResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.exists()) {
+          const { municipality, monthName } = queryMap[index];
+          if (!yearlyData[municipality]) {
+            yearlyData[municipality] = {};
+          }
+          const municipalityData = result.value.data();
+          yearlyData[municipality][monthName] = municipalityData.weeklyReportData || {};
+        } else if (result.status === 'rejected') {
+          const { municipality, monthName } = queryMap[index];
+          console.error(`❌ Error loading ${municipality} for ${monthName}:`, result.reason);
+        }
+      });
+      
+      const endTime = performance.now();
+      console.log(`✅ Data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+      
+      // Process data into quarterly format by municipality and concern type
+      const processedData = processQuarterlyData(yearlyData, concernTypesResult.success ? concernTypesResult.data : []);
+      
+      setQuarterlyPreviewData(processedData);
+      setShowQuarterlyPreview(true);
+      
+    } catch (error) {
+      console.error('Error loading Quarterly Report data:', error);
+      alert('Error loading Quarterly Report data. Please check the console for details.');
+    } finally {
+      setIsLoadingCommandCenter(false);
+    }
+  };
+
+  // Process yearly data into quarterly format grouped by municipality and concern type
+  const processQuarterlyData = (yearlyData, concernTypes) => {
+    const quarters = {
+      Q1: ['January', 'February', 'March'],
+      Q2: ['April', 'May', 'June'],
+      Q3: ['July', 'August', 'September'],
+      Q4: ['October', 'November', 'December']
+    };
+    
+    const municipalityData = {};
+    
+    // Process each municipality
+    Object.entries(yearlyData).forEach(([municipality, monthsData]) => {
+      const concernTypeData = {};
+      
+      // Initialize concern type counts
+      concernTypes.forEach(ct => {
+        concernTypeData[ct.name] = {
+          Q1: 0,
+          Q2: 0,
+          Q3: 0,
+          Q4: 0,
+          total: 0,
+          strayDogs: 0 // Special tracking for stray dogs
+        };
+      });
+      
+      // Count entries by quarter and concern type
+      Object.entries(monthsData).forEach(([monthName, weeklyData]) => {
+        // Determine which quarter this month belongs to
+        let quarter = null;
+        Object.entries(quarters).forEach(([q, months]) => {
+          if (months.includes(monthName)) {
+            quarter = q;
+          }
+        });
+        
+        if (!quarter) return;
+        
+        // Process each date's entries
+        Object.values(weeklyData).forEach(dateEntries => {
+          if (!Array.isArray(dateEntries)) return;
+          
+          dateEntries.forEach(entry => {
+            const concernType = entry.concernType || 'Other';
+            
+            if (!concernTypeData[concernType]) {
+              concernTypeData[concernType] = {
+                Q1: 0,
+                Q2: 0,
+                Q3: 0,
+                Q4: 0,
+                total: 0,
+                strayDogs: 0
+              };
+            }
+            
+            concernTypeData[concernType][quarter]++;
+            concernTypeData[concernType].total++;
+            
+            // Track stray dogs separately if mentioned in the entry
+            if (entry.strayDogs || concernType.toLowerCase().includes('stray')) {
+              concernTypeData[concernType].strayDogs++;
+            }
+          });
+        });
+      });
+      
+      // Only include municipalities with data
+      const hasData = Object.values(concernTypeData).some(ct => ct.total > 0);
+      if (hasData) {
+        municipalityData[municipality] = concernTypeData;
+      }
+    });
+    
+    return {
+      municipalityData,
+      year: selectedYear,
+      district: selectedDistrict
+    };
+  };
+
+  // Generate Quarterly Command Center Report PDF from preview data
+  const generateQuarterlyCommandCenterReport = async () => {
+    if (!quarterlyPreviewData || isGeneratingCommandCenterReport) {
+      console.log('No preview data or report generation already in progress...');
+      return;
+    }
+    
+    setIsGeneratingCommandCenterReport(true);
+    try {
+      console.log('Starting Quarterly Command Center Report PDF generation...');
+      
+      const paperConfig = getPaperConfig(paperSize);
+      const pdfDoc = new jsPDF('l', 'mm', paperConfig.format); // Landscape orientation
+      const pageWidth = pdfDoc.internal.pageSize.getWidth();
+      const pageHeight = pdfDoc.internal.pageSize.getHeight();
+      const centerX = pageWidth / 2;
+      
+      // ============ HEADER ============
+      pdfDoc.setFillColor(16, 185, 129);
+      pdfDoc.rect(0, 0, pageWidth, 35, 'F');
+      
+      pdfDoc.setFontSize(22);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setTextColor(255, 255, 255);
+      pdfDoc.text('Quarterly Command Center Report', centerX, 15, { align: 'center' });
+      
+      pdfDoc.setFontSize(12);
+      pdfDoc.setFont('helvetica', 'normal');
+      pdfDoc.text(`Year: ${quarterlyPreviewData.year} | District: ${quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}`, centerX, 25, { align: 'center' });
+      
+      pdfDoc.setTextColor(0, 0, 0);
+      
+      let currentY = 45;
+      
+      // Filter municipalities by selected district
+      let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
+      if (quarterlyPreviewData.district !== 'all') {
+        const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
+        municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
+      }
+      
+      // ============ MUNICIPALITY TABLES ============
+      municipalitiesToShow.forEach((municipality, index) => {
+        const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
+        
+        // Check if we need a new page
+        if (currentY > pageHeight - 60) {
+          pdfDoc.addPage();
+          currentY = 20;
+        }
+        
+        // Municipality header
+        pdfDoc.setFontSize(14);
+        pdfDoc.setFont('helvetica', 'bold');
+        pdfDoc.setFillColor(240, 253, 244);
+        pdfDoc.rect(paperConfig.margin, currentY - 5, pageWidth - (paperConfig.margin * 2), 10, 'F');
+        pdfDoc.text(municipality.toUpperCase(), paperConfig.margin + 3, currentY + 2);
+        currentY += 12;
+        
+        // Prepare table data with trends
+        const tableData = [];
+        Object.entries(concernTypeData).forEach(([concernType, quarters]) => {
+          if (quarters.total > 0) {
+            // Calculate trends
+            const getTrendLabel = (current, previous) => {
+              if (current > previous) return 'Increased';
+              if (current < previous) return 'Decreased';
+              return 'Unchanged';
+            };
+            
+            const q2Trend = getTrendLabel(quarters.Q2, quarters.Q1);
+            const q3Trend = getTrendLabel(quarters.Q3, quarters.Q2);
+            const q4Trend = getTrendLabel(quarters.Q4, quarters.Q3);
+            
+            const row = [
+              concernType,
+              quarters.Q1.toString(),
+              `${quarters.Q2}\n${q2Trend}`,
+              `${quarters.Q3}\n${q3Trend}`,
+              `${quarters.Q4}\n${q4Trend}`,
+              quarters.total.toString()
+            ];
+            
+            tableData.push(row);
+          }
+        });
+        
+        // Add table
+        autoTable(pdfDoc, {
+          head: [['Concern Type', 'Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)', 'Total']],
+          body: tableData,
+          startY: currentY,
+          theme: 'grid',
+          styles: {
+            fontSize: 9,
+            cellPadding: 3,
+            lineColor: [200, 200, 200],
+            lineWidth: 0.5
+          },
+          headStyles: {
+            fillColor: [16, 185, 129],
+            textColor: [255, 255, 255],
+            fontStyle: 'bold',
+            halign: 'center'
+          },
+          columnStyles: {
+            0: { cellWidth: 80, halign: 'left' },
+            1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 30, halign: 'center' },
+            3: { cellWidth: 30, halign: 'center' },
+            4: { cellWidth: 30, halign: 'center' },
+            5: { cellWidth: 30, halign: 'center', fontStyle: 'bold', fillColor: [240, 253, 244] }
+          },
+          margin: { left: paperConfig.margin, right: paperConfig.margin },
+          didParseCell: function(data) {
+            // Apply colored backgrounds to Q2, Q3, Q4 based on trend
+            if (data.section === 'body' && data.column.index >= 2 && data.column.index <= 4) {
+              const cellText = data.cell.text.join('\n');
+              if (cellText.includes('Increased')) {
+                data.cell.styles.fillColor = [254, 202, 202]; // Light red (bg-red-200)
+                data.cell.styles.textColor = [185, 28, 28]; // Dark red (text-red-700)
+              } else if (cellText.includes('Decreased')) {
+                data.cell.styles.fillColor = [187, 247, 208]; // Light green (bg-green-200)
+                data.cell.styles.textColor = [21, 128, 61]; // Dark green (text-green-700)
+              } else if (cellText.includes('Unchanged')) {
+                data.cell.styles.fillColor = [254, 240, 138]; // Light yellow (bg-yellow-200)
+                data.cell.styles.textColor = [161, 98, 7]; // Dark yellow (text-yellow-700)
+              }
+            }
+          }
+        });
+        
+        currentY = pdfDoc.lastAutoTable.finalY + 8;
+      });
+      
+      // Add page numbers
+      const pageCount = pdfDoc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdfDoc.setPage(i);
+        pdfDoc.setFontSize(8);
+        pdfDoc.setTextColor(100, 100, 100);
+        pdfDoc.text(`Page ${i} of ${pageCount}`, pageWidth - paperConfig.margin - 20, pageHeight - 10);
+        pdfDoc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, pageHeight - 10);
+      }
+      
+      pdfDoc.save(`quarterly-command-center-${quarterlyPreviewData.year}-${paperSize}.pdf`);
+      console.log('Quarterly Command Center Report generated successfully!');
+      setShowQuarterlyPreview(false);
+    } catch (error) {
+      console.error('Error generating Quarterly Command Center Report:', error);
+      alert('Error generating Quarterly Command Center Report. Please check the console for details.');
     } finally {
       setIsGeneratingCommandCenterReport(false);
     }
@@ -3470,9 +3786,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               action: generateCommandCenterReport,
               format: "PDF",
               priority: "high"
+            },
+            {
+              name: "Quarterly Report",
+              action: loadQuarterlyReportData,
+              format: "PDF",
+              priority: "high"
             }
           ],
-          formats: ["PDF"],
+          formats: ["PDF", "Modal"],
           priority: "high"
         }
       ]
@@ -3829,7 +4151,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                 <Button
                                   key={actionIndex}
                                   onClick={async () => {
-                                    if (actionItem.name === "Generate Report" && section.id === "commandcenter") {
+                                    if ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter") {
                                       // Handle Command Center report generation with its own loading state
                                       await actionItem.action();
                                     } else {
@@ -3841,19 +4163,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                                       }
                                     }
                                   }}
-                                  disabled={isGenerating || (actionItem.name === "Generate Report" && section.id === "commandcenter" && isGeneratingCommandCenterReport)}
+                                  disabled={isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))}
                                   size="sm"
                                   className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
                                 >
-                                  {(isGenerating || (actionItem.name === "Generate Report" && section.id === "commandcenter" && isGeneratingCommandCenterReport)) ? (
+                                  {(isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))) ? (
                                     <>
                                       <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                      <span>Gen...</span>
+                                      <span>{isLoadingCommandCenter ? 'Loading...' : 'Gen...'}</span>
                                     </>
                                   ) : (
                                     <>
                                       {actionItem.name === "Generate Report" ? (
                                         <FileText className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Quarterly Report" ? (
+                                        <BarChart3 className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "Daily Summary" ? (
                                         <Calendar className="w-3 h-3 mr-1" />
                                       ) : actionItem.name === "Preview Report" ? (
@@ -5024,6 +5348,147 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                       </table>
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Quarterly Report Preview Modal */}
+        {showQuarterlyPreview && quarterlyPreviewData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Quarterly Report Preview</h3>
+                    <p className="text-sm text-gray-600">
+                      Year: {quarterlyPreviewData.year} | District: {quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={generateQuarterlyCommandCenterReport}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                    disabled={isGeneratingCommandCenterReport}
+                  >
+                    {isGeneratingCommandCenterReport ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate PDF
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowQuarterlyPreview(false);
+                      setQuarterlyPreviewData(null);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
+                <div className="space-y-6">
+                  {(() => {
+                    // Filter municipalities by selected district
+                    let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
+                    if (quarterlyPreviewData.district !== 'all') {
+                      const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
+                      municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
+                    }
+
+                    return municipalitiesToShow.map((municipality, index) => {
+                      const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
+                      
+                      return (
+                        <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                          {/* Municipality Header */}
+                          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
+                            <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
+                          </div>
+                          
+                          {/* Table */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
+                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q1<br/><span className="text-xs font-normal">(Jan-Mar)</span></th>
+                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q2<br/><span className="text-xs font-normal">(Apr-Jun)</span></th>
+                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q3<br/><span className="text-xs font-normal">(Jul-Sep)</span></th>
+                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q4<br/><span className="text-xs font-normal">(Oct-Dec)</span></th>
+                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 bg-green-50">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(concernTypeData).map(([concernType, quarters], idx) => {
+                                  if (quarters.total === 0) return null;
+                                  
+                                  // Calculate trends for Q2, Q3, Q4
+                                  const getTrend = (current, previous) => {
+                                    if (current > previous) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
+                                    if (current < previous) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
+                                    return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
+                                  };
+                                  
+                                  const q2Trend = getTrend(quarters.Q2, quarters.Q1);
+                                  const q3Trend = getTrend(quarters.Q3, quarters.Q2);
+                                  const q4Trend = getTrend(quarters.Q4, quarters.Q3);
+                                  
+                                  return (
+                                    <tr key={concernType} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
+                                      <td className="px-4 py-3 text-sm text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
+                                      <td className="px-4 py-3 text-sm text-center text-gray-700 border-r border-gray-200">
+                                        <div className="font-semibold">{quarters.Q1}</div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q2Trend.bg}`}>
+                                        <div className="font-semibold text-gray-900">{quarters.Q2}</div>
+                                        <div className={`text-xs font-medium mt-1 ${q2Trend.color}`}>
+                                          {q2Trend.label}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q3Trend.bg}`}>
+                                        <div className="font-semibold text-gray-900">{quarters.Q3}</div>
+                                        <div className={`text-xs font-medium mt-1 ${q3Trend.color}`}>
+                                          {q3Trend.label}
+                                        </div>
+                                      </td>
+                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q4Trend.bg}`}>
+                                        <div className="font-semibold text-gray-900">{quarters.Q4}</div>
+                                        <div className={`text-xs font-medium mt-1 ${q4Trend.color}`}>
+                                          {q4Trend.label}
+                                        </div>
+                                      </td>
+                                      <td className="px-4 py-3 text-sm text-center font-bold text-green-700 bg-green-50">{quarters.total}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
                 </div>
               </div>
             </div>
