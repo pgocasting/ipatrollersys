@@ -2167,9 +2167,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex flex-col gap-6">
+            <div className="flex items-center gap-6">
               {/* Header Section */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="p-2 bg-gray-100 rounded-lg">
                   <Filter className="w-4 h-4 text-black" />
                 </div>
@@ -2180,9 +2180,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
               
               {/* Filters Section */}
-              <div className="flex flex-col sm:flex-row items-end gap-4 w-full flex-wrap">
+              <div className="flex flex-row items-end gap-3 flex-1 overflow-x-auto">
                 {/* Search Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[240px]">
+                <div className="flex flex-col gap-2 min-w-[180px] flex-shrink-0">
                   <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -2199,7 +2199,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 
                 {/* Month Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[160px]">
+                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
                   <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
                   <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(value === 'all' ? 'all' : parseInt(value))}>
                     <SelectTrigger id="month-filter" name="month-filter">
@@ -2220,7 +2220,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 
                 {/* Department Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                <div className="flex flex-col gap-2 min-w-[160px] flex-shrink-0">
                   <Label htmlFor="department-filter" className="text-sm font-medium text-gray-700">Department</Label>
                   <Select 
                     value={activeTab} 
@@ -2255,7 +2255,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 
                 {/* District Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
                   <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
                   <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
                     <SelectTrigger id="district-filter" name="district-filter">
@@ -2271,7 +2271,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 
                 {/* Municipality Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
+                <div className="flex flex-col gap-2 min-w-[160px] flex-shrink-0">
                   <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
                   <Select value={activeMunicipality} onValueChange={setActiveMunicipality}>
                     <SelectTrigger id="municipality-filter" name="municipality-filter">
