@@ -1424,7 +1424,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     const hasValidDescription = incident.description && 
                                incident.description.trim() !== "" && 
                                incident.description !== "No description available";
-    const matchesStatus = filterStatus === "all" || incident.status === filterStatus;
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
     const matchesDistrict = filterDistrict === "all" || incident.district === filterDistrict;
     const matchesMunicipality = filterMunicipality === "all" || incident.municipality === filterMunicipality;
@@ -1432,7 +1431,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                          (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
-    return hasValidDescription && matchesStatus && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
+    return hasValidDescription && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
   });
   // Get available months from incidents data
   const availableMonths = [...new Set(incidents.map(incident => incident.month).filter(month => month))];
@@ -1478,7 +1477,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   // Reset to first page when filters change
   useEffect(() => {
     setPaginationPage(1);
-  }, [filterStatus, filterDistrict, filterMunicipality, searchTerm, selectedMonth]);
+  }, [filterDistrict, filterMunicipality, searchTerm, selectedMonth]);
 
   const stats = {
     total: filteredIncidents.length,
@@ -3508,22 +3507,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </Select>
                 </div>
                 
-                {/* Status Filter */}
-                <div className="flex flex-col gap-2 w-full sm:w-[180px]">
-                  <Label htmlFor="status-filter" className="text-sm font-medium text-gray-700">Status</Label>
-                  <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger id="status-filter" name="status-filter">
-                      <SelectValue placeholder="All Status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Status</SelectItem>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Under Investigation">Under Investigation</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
                 {/* District Filter */}
                 <div className="flex flex-col gap-2 w-full sm:w-[180px]">
                   <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
@@ -3565,7 +3548,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   <button
                     onClick={() => {
                       setSearchTerm("");
-                      setFilterStatus("all");
                       setFilterDistrict("all");
                       setFilterMunicipality("all");
                     }}
@@ -3578,7 +3560,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
             
             {/* Active Filters Display */}
-            {(searchTerm || filterStatus !== "all" || filterDistrict !== "all" || filterMunicipality !== "all") && (
+            {(searchTerm || filterDistrict !== "all" || filterMunicipality !== "all") && (
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-600">Active filters:</span>
@@ -3592,12 +3574,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Calendar className="w-3 h-3 mr-1" />
                       Month: {selectedMonth}
-                    </span>
-                  )}
-                  {filterStatus !== "all" && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
-                      <Activity className="w-3 h-3 mr-1" />
-                      Status: {filterStatus}
                     </span>
                   )}
                   {filterDistrict !== "all" && (
@@ -3629,7 +3605,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Date</TableHead>
                 <TableHead className="min-w-[150px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Location</TableHead>
                 <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Officer</TableHead>
-                <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Status</TableHead>
                 <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Action Taken</TableHead>
                 <TableHead className="min-w-[100px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Actions</TableHead>
               </TableRow>
@@ -3637,7 +3612,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="p-8 text-center align-middle">
+                  <TableCell colSpan={7} className="p-8 text-center align-middle">
                     <div className="text-lg text-gray-500">
                       <div className="flex items-center justify-center gap-2">
                         <RotateCcw className="w-5 h-5 animate-spin" />
@@ -3648,7 +3623,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </TableRow>
               ) : filteredIncidents.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="p-8 text-center align-middle">
+                  <TableCell colSpan={7} className="p-8 text-center align-middle">
                     <div className="text-lg text-gray-500">
                       {incidents.length === 0 ? (
                         <div>
@@ -3710,20 +3685,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                           <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap">
                             {incident.officer || '-'}
                           </p>
-                        </div>
-                      </TableCell>
-                      <TableCell className="break-all align-top whitespace-normal">
-                        <div className="py-2 px-1 min-w-0">
-                          <span 
-                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
-                              incident.status === 'Active' ? 'bg-red-100 text-red-800 border border-red-200' :
-                              incident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                              incident.status === 'Completed' ? 'bg-green-100 text-green-800 border border-green-200' :
-                              'bg-gray-100 text-gray-800 border border-gray-200'
-                            }`}
-                          >
-                            {incident.status || 'Unknown'}
-                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal">
@@ -3973,6 +3934,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             </div>
             {/* Content with improved spacing and styling */}
             <div className="p-8 overflow-y-auto max-h-[75vh]">
+              <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <Label htmlFor="incidentType" className="text-sm font-semibold text-gray-700">
@@ -4087,31 +4049,39 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     autoComplete="off"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="what" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
-                    What *
-                  </Label>
-                  <Input
-                    id="what"
-                    name="what"
-                    value={newIncident.description}
-                    onChange={(e) => handleDescriptionChange(e.target.value)}
-                    placeholder="Enter incident description"
-                    autoComplete="off"
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="actionType" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
-                    Action Taken *
-                  </Label>
-                  <div className="grid grid-cols-1 gap-3 mt-2">
+              </div>
+              
+              {/* What - Full Width */}
+              <div>
+                <Label htmlFor="what" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                  What *
+                </Label>
+                <textarea
+                  id="what"
+                  name="what"
+                  value={newIncident.description}
+                  onChange={(e) => handleDescriptionChange(e.target.value)}
+                  placeholder="Enter incident description"
+                  autoComplete="off"
+                  rows={3}
+                  className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                />
+              </div>
+              
+              {/* Action Taken Section - Full Width */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="text-lg font-semibold text-gray-900 mb-4">Action Taken</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <Label htmlFor="actionType" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                      Action Type *
+                    </Label>
                     <select
                       id="actionType"
                       name="actionType"
                       value={newIncident.actionType}
                       onChange={(e) => setNewIncident({...newIncident, actionType: e.target.value})}
-                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                     >
                       <option value="">Select Action</option>
                       {actionTypes.map((type) => (
@@ -4120,66 +4090,68 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div>
+                    <Label htmlFor="assignedOfficer" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                      Assigned Officer
+                    </Label>
                     <Input
                       id="assignedOfficer"
                       name="assignedOfficer"
-                      placeholder="Assigned Officer"
+                      placeholder="Enter assigned officer name"
                       value={newIncident.assignedOfficer}
                       onChange={(e) => setNewIncident({...newIncident, assignedOfficer: e.target.value})}
-                      className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                       autoComplete="name"
                     />
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        id="actionDate"
-                        name="actionDate"
-                        type="date"
-                        placeholder="Action Date"
-                        value={newIncident.actionDate}
-                        onChange={(e) => setNewIncident({...newIncident, actionDate: e.target.value})}
-                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
-                        autoComplete="off"
-                      />
-                      <select
-                        id="priority"
-                        name="priority"
-                        value={newIncident.priority}
-                        onChange={(e) => setNewIncident({...newIncident, priority: e.target.value})}
-                        className="p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
-                      >
-                        {priorityLevels.map((level) => (
-                          <option key={level} value={level}>
-                            {level} Priority
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <textarea
-                      id="actionDescription"
-                      name="actionDescription"
-                      placeholder="Action Description"
+                  </div>
+                  <div>
+                    <Label htmlFor="actionDate" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                      Action Date
+                    </Label>
+                    <Input
+                      id="actionDate"
+                      name="actionDate"
+                      type="date"
+                      value={newIncident.actionDate}
+                      onChange={(e) => setNewIncident({...newIncident, actionDate: e.target.value})}
+                      className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      autoComplete="off"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="how" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                      How
+                    </Label>
+                    <Input
+                      id="how"
+                      name="how"
                       value={newIncident.actionDescription}
                       onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
-                      rows={2}
-                      className="w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      placeholder="Enter action method"
+                      className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
+                      autoComplete="off"
                     />
                   </div>
                 </div>
-                <div>
-                  <Label htmlFor="how" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
-                    How
+                <div className="mt-6">
+                  <Label htmlFor="actionDescription" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
+                    Action Description
                   </Label>
-                  <Input
-                    id="how"
-                    name="how"
+                  <textarea
+                    id="actionDescription"
+                    name="actionDescription"
+                    placeholder="Describe the action taken in detail..."
                     value={newIncident.actionDescription}
                     onChange={(e) => setNewIncident({...newIncident, actionDescription: e.target.value})}
-                    placeholder="Enter action description"
-                    className="mt-2 p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
-                    autoComplete="off"
+                    rows={3}
+                    className="mt-2 w-full p-3 rounded-xl border-2 transition-all duration-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500 hover:border-gray-400"
                   />
                 </div>
-                <div className="md:col-span-2">
+              </div>
+              
+              {/* Other Information - Full Width */}
+              <div>
                   <Label htmlFor="otherInfo" className="text-sm font-semibold transition-colors duration-300 text-gray-700">
                     Other Information
                   </Label>
@@ -5199,20 +5171,6 @@ Top Location: ${insights.topLocation}`);
                   </div>
                   
                   <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">Status</div>
-                    <div className="mt-2">
-                      <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
-                        viewingIncident.status === 'Active' ? 'bg-red-100 text-red-800 border border-red-200' :
-                        viewingIncident.status === 'Under Investigation' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                        viewingIncident.status === 'Completed' ? 'bg-green-100 text-green-800 border border-green-200' :
-                        'bg-gray-100 text-gray-800 border border-gray-200'
-                      }`}>
-                        {viewingIncident.status || 'Unknown'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <div className="p-4 bg-gray-50 rounded-lg border border-gray-100">
                     <div className="text-sm font-medium text-gray-600">Reporting Officer</div>
                     <p className="text-sm text-gray-900 mt-2 leading-relaxed">
                       {viewingIncident.officer || 'Not specified'}
@@ -5396,28 +5354,6 @@ Top Location: ${insights.topLocation}`);
                         onChange={(e) => setEditingIncident({...editingIncident, time: e.target.value})}
                         className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900"
                       />
-                    </div>
-                    
-                    {/* Status */}
-                    <div>
-                      <label htmlFor="edit-status" className="block text-sm font-semibold text-gray-700 mb-2">
-                        Status *
-                      </label>
-                      <div className="relative">
-                        <select
-                          id="edit-status"
-                          name="status"
-                          value={editingIncident.status}
-                          onChange={(e) => setEditingIncident({...editingIncident, status: e.target.value})}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white text-gray-900 appearance-none"
-                        >
-                          <option value="">Select Status</option>
-                          <option value="Active">Active</option>
-                          <option value="Under Investigation">Under Investigation</option>
-                          <option value="Completed">Completed</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
-                      </div>
                     </div>
                 
                     {/* District */}
