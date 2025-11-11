@@ -4126,17 +4126,17 @@ const handleSaveAllMonths = async () => {
                                           <button
                                             onClick={() => handleViewPhotos(date, entryIndex)}
                                             className="flex items-center gap-2 px-4 py-1.5 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
-                                            title="View Photos & Remarks"
+                                            title="View Photos"
                                           >
                                             <Eye className="w-4 h-4" />
                                             <span className="text-sm font-medium">View</span>
                                           </button>
-                                          {/* Edit button - only show if before OR after photo is missing */}
-                                          {(!entry.photos.before || !entry.photos.after) && (
+                                          {/* Edit button - show if before OR after photo is missing, OR if user is admin */}
+                                          {((!entry.photos.before || !entry.photos.after) || isAdmin) && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                              title="Edit Photos & Remarks"
+                                              title={isAdmin ? "Edit Photos & Remarks (Admin)" : "Edit Photos & Remarks"}
                                             >
                                               <Upload className="w-4 h-4" />
                                               <span className="text-sm font-medium">Edit</span>
@@ -4173,7 +4173,7 @@ const handleSaveAllMonths = async () => {
                                           <span className="text-sm font-medium">Upload</span>
                                         </button>
                                       )}
-                                      {entry.remarks && (
+                                      {entry.remarks && entry.photos?.after && (
                                         <div className="relative group">
                                           <div className="px-2.5 py-1 bg-yellow-100 border-l-4 border-yellow-400 rounded-r-md shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-1">
                                             <span className="text-yellow-600 text-sm">📝</span>
@@ -4183,7 +4183,7 @@ const handleSaveAllMonths = async () => {
                                           <div className="absolute right-0 bottom-full mb-2 min-w-[200px] max-w-[280px] p-3 bg-white border-2 border-yellow-400 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] pointer-events-none">
                                             <div className="flex items-center gap-2 mb-2 pb-2 border-b border-yellow-200">
                                               <span className="text-base">📝</span>
-                                              <span className="text-xs font-bold text-yellow-900">Remarks</span>
+                                              <span className="text-xs font-bold text-yellow-900">Action Taken</span>
                                             </div>
                                             <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap max-h-32 overflow-y-auto pr-1">{entry.remarks}</p>
                                             {/* Arrow pointing down to the button */}
@@ -5639,8 +5639,21 @@ const handleSaveAllMonths = async () => {
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <button
                               onClick={() => {
-                                setAfterPhotoPreviews(prev => prev.filter((_, idx) => idx !== i));
-                                setAfterPhotos(prev => prev.filter((_, idx) => idx !== i));
+                                const newAfterPreviews = afterPhotoPreviews.filter((_, idx) => idx !== i);
+                                const newAfterPhotos = afterPhotos.filter((_, idx) => idx !== i);
+                                setAfterPhotoPreviews(newAfterPreviews);
+                                setAfterPhotos(newAfterPhotos);
+                                
+                                // Clear remarks if all after photos are removed
+                                if (newAfterPreviews.length === 0 && newAfterPhotos.length === 0) {
+                                  if (currentPhotoEntry) {
+                                    setCurrentPhotoEntry(prev => ({
+                                      ...prev,
+                                      entry: { ...prev.entry, remarks: '' }
+                                    }));
+                                    updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', '');
+                                  }
+                                }
                               }}
                               className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
                             >
@@ -5878,8 +5891,8 @@ const handleSaveAllMonths = async () => {
               </div>
             )}
 
-            {/* Action Taken - Right Side */}
-            {viewingPhotos?.remarks && (
+            {/* Action Taken - Right Side - Only show if after photos exist */}
+            {viewingPhotos?.remarks && viewingPhotos?.after && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3">
                 <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
