@@ -1948,23 +1948,23 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         </div>
 
         {/* Quick Stats */}
-        <div className={`grid grid-cols-1 md:grid-cols-2 gap-4 ${
+        <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${
           isAdmin || (!userDepartment || (userDepartment !== 'agriculture' && userDepartment !== 'pg-enro'))
             ? 'lg:grid-cols-5' 
             : 'lg:grid-cols-2'
         }`}>
           {/* Total Actions Card - Always shown */}
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Actions</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Actions</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
                     {totalActions.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Target className="w-6 h-6 text-blue-600" />
+                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -1973,25 +1973,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           {/* Department-specific card for Agriculture and PG-ENRO users */}
           {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') ? (
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">
                       {userDepartment === 'agriculture' ? 'Agriculture (Bantay Dagat)' : 'PG-Enro (Environment)'}
                     </p>
-                    <p className={`text-2xl font-bold ${
+                    <p className={`text-xl sm:text-2xl font-bold ${
                       userDepartment === 'agriculture' ? 'text-green-600' : 'text-emerald-600'
                     }`}>
                       {(userDepartment === 'agriculture' ? agricultureActions : pgEnroActions).toLocaleString()}
                     </p>
                   </div>
-                  <div className={`p-2 rounded-lg ${
+                  <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${
                     userDepartment === 'agriculture' ? 'bg-green-100' : 'bg-emerald-100'
                   }`}>
                     {userDepartment === 'agriculture' ? (
-                      <Fish className="w-6 h-6 text-green-600" />
+                      <Fish className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                     ) : (
-                      <Trees className="w-6 h-6 text-emerald-600" />
+                      <Trees className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                     )}
                   </div>
                 </div>
@@ -2001,64 +2001,64 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             /* Show all cards for admin and other users */
             <>
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">PNP (Monthly)</p>
-                      <p className="text-2xl font-bold text-red-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">PNP (Monthly)</p>
+                      <p className="text-xl sm:text-2xl font-bold text-red-600">
                         {pnpActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-red-100 rounded-lg">
-                      <Shield className="w-6 h-6 text-red-600" />
+                    <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+                      <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Agriculture (Bantay Dagat)</p>
-                      <p className="text-2xl font-bold text-green-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Agriculture (Bantay Dagat)</p>
+                      <p className="text-xl sm:text-2xl font-bold text-green-600">
                         {agricultureActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <Fish className="w-6 h-6 text-green-600" />
+                    <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                      <Fish className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">PG-Enro (Environment)</p>
-                      <p className="text-2xl font-bold text-emerald-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">PG-Enro (Environment)</p>
+                      <p className="text-xl sm:text-2xl font-bold text-emerald-600">
                         {pgEnroActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <Trees className="w-6 h-6 text-emerald-600" />
+                    <div className="p-1.5 sm:p-2 bg-emerald-100 rounded-lg flex-shrink-0">
+                      <Trees className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-4">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 mb-1">Pending</p>
-                      <p className="text-2xl font-bold text-orange-600">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Pending</p>
+                      <p className="text-xl sm:text-2xl font-bold text-orange-600">
                         {pendingActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-2 bg-orange-100 rounded-lg">
-                      <Clock className="w-6 h-6 text-orange-600" />
+                    <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -2167,7 +2167,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="flex flex-col gap-6">
               {/* Header Section */}
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-gray-100 rounded-lg">
@@ -2180,7 +2180,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
               
               {/* Filters Section */}
-              <div className="flex flex-col sm:flex-row items-end gap-4 w-full lg:w-auto">
+              <div className="flex flex-col sm:flex-row items-end gap-4 w-full flex-wrap">
                 {/* Search Filter */}
                 <div className="flex flex-col gap-2 w-full sm:w-[240px]">
                   <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>

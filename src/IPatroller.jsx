@@ -223,6 +223,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     "Mariveles": 3
   };
 
+  // Cache for Firestore data to avoid redundant reads
+  const firestoreCache = useRef({});
+  const lastLoadedRef = useRef({ month: null, year: null });
+
   // Load patrol data from Firestore
   useEffect(() => {
     loadPatrolDataFromFirestore();
@@ -275,24 +279,35 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         return;
       }
       
+      // Check cache first to avoid redundant reads
+      const cacheKey = monthYearId;
+      if (firestoreCache.current[cacheKey] && 
+          lastLoadedRef.current.month === selectedMonth && 
+          lastLoadedRef.current.year === selectedYear) {
+        ipatrollerLog('📦 Using cached data for:', monthYearId);
+        setPatrolData(firestoreCache.current[cacheKey]);
+        setFirestoreStatus('connected');
+        setLoading(false);
+        return;
+      }
+
       // Try to get data from Firestore for other months
       const monthDocRef = doc(db, 'patrolData', monthYearId);
       const municipalitiesRef = collection(monthDocRef, 'municipalities');
       
-          // Use onSnapshot for real-time updates but with limit to avoid excessive reads
-      // Only subscribe to changes for the current month to minimize reads
-      const unsubscribe = onSnapshot(municipalitiesRef, (snapshot) => {
-        const firestoreData = [];
-        
-        snapshot.forEach((doc) => {
-          const data = doc.data();
-          if (data) {
-            firestoreData.push({
-              id: doc.id,
-              ...data
-            });
-          }
-        });
+      // Use getDocs instead of onSnapshot to reduce reads
+      const snapshot = await getDocs(municipalitiesRef);
+      const firestoreData = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          firestoreData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
 
         // Always create initial structure for all municipalities first
         const allMunicipalitiesData = [];
@@ -357,17 +372,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           });
         });
 
-        setPatrolData(allMunicipalitiesData);
-        setFirestoreStatus('connected');
-      }, (error) => {
-        ipatrollerLog('❌ Firestore error:', error, 'error');
-        setFirestoreStatus('error');
-        // Fallback to local data if Firestore fails
-        createLocalFallbackData();
-      });
+      // Cache the data
+      firestoreCache.current[cacheKey] = allMunicipalitiesData;
+      lastLoadedRef.current = { month: selectedMonth, year: selectedYear };
 
-      // Cleanup subscription
-      return () => unsubscribe();
+      setPatrolData(allMunicipalitiesData);
+      setFirestoreStatus('connected');
       
     } catch (error) {
       ipatrollerLog('❌ Error loading from Firestore:', error, 'error');
@@ -378,6 +388,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       setLoading(false);
     }
   };
+
+  // Cache for Command Center data
+  const commandCenterCache = useRef({});
 
   // Load Command Center Action Taken data for weekly attended reports
   const loadCommandCenterActionData = async () => {
@@ -390,6 +403,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       ];
       const selectedMonthName = monthNames[selectedMonth];
       const monthYear = `${selectedMonthName}_${selectedYear}`;
+      
+      // Check cache first
+      const cacheKey = `${selectedMonth}-${selectedYear}`;
+      if (commandCenterCache.current[cacheKey]) {
+        actionDataGroup.log('📦 Using cached Command Center data for:', monthYear);
+        setCommandCenterActionData(commandCenterCache.current[cacheKey]);
+        actionDataGroup.end();
+        return;
+      }
       
       actionDataGroup.log(`🔄 Loading Command Center Action Taken data for: ${selectedMonthName} ${selectedYear}`);
       
@@ -416,11 +438,23 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
               if (Array.isArray(dateEntries)) {
                 dateEntries.forEach(entry => {
-                  // Count only entries that have BOTH before and after photos uploaded
-                  const hasBeforePhoto = entry.photos && entry.photos.before;
-                  const hasAfterPhoto = entry.photos && entry.photos.after;
+                  // For March to October (months 2-9), count based on action taken
+                  // For other months, count only entries with BOTH before and after photos
+                  const isMarchToOctober = selectedMonth >= 2 && selectedMonth <= 9;
                   
-                  if (hasBeforePhoto && hasAfterPhoto) {
+                  let shouldCount = false;
+                  
+                  if (isMarchToOctober) {
+                    // Count if action taken field has a value
+                    shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
+                  } else {
+                    // Count only entries that have BOTH before and after photos uploaded
+                    const hasBeforePhoto = entry.photos && entry.photos.before;
+                    const hasAfterPhoto = entry.photos && entry.photos.after;
+                    shouldCount = hasBeforePhoto && hasAfterPhoto;
+                  }
+                  
+                  if (shouldCount) {
                     // Determine which week this date falls into
                     const entryDate = new Date(dateKey);
                     const dayOfMonth = entryDate.getDate();
@@ -446,6 +480,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           actionData[municipality] = [0, 0, 0, 0];
         }
       }
+      
+      // Cache the data
+      commandCenterCache.current[cacheKey] = actionData;
       
       setCommandCenterActionData(actionData);
       actionDataGroup.log('📊 Command Center Action Taken data loaded:', actionData);
@@ -699,9 +736,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0)
       return "bg-red-600 text-white";
     
-    // Daily status uses fixed threshold: Active if >= 5, Inactive if <= 4
+    // Daily status: >= 5 = Active (green), 4 = Warning (yellow), <= 3 = Inactive (red)
     if (value >= 5)
       return "bg-green-600 text-white";
+    if (value === 4)
+      return "bg-yellow-500 text-white";
     return "bg-red-600 text-white";
   };
 
@@ -709,8 +748,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    // Daily status uses fixed threshold: Active if >= 5, Inactive if <= 4
+    // Daily status: >= 5 = Active, 4 = Warning (still inactive), <= 3 = Inactive
     if (value >= 5) return "Active";
+    if (value === 4) return "Warning";
     return "Inactive";
   };
 
@@ -1491,12 +1531,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8 bg-gray-50 min-h-screen">
+      <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 md:space-y-8 bg-gray-50 min-h-screen">
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">I-Patroller Management</h1>
-            <p className="text-gray-500 mt-2">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">I-Patroller Management</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
                 "en-US",
                 { month: "long", year: "numeric" },
@@ -1533,68 +1573,68 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Total Patrols</p>
-                  <p className="text-2xl font-bold text-blue-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Patrols</p>
+                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
                     {overallSummary.totalPatrols.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-blue-600" />
+                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Active Card Counts</p>
-                  <p className="text-2xl font-bold text-green-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Card Counts</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">
                     {overallSummary.totalActive.toLocaleString()}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <CheckCircle className="w-6 h-6 text-green-600" />
+                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Inactive Card Counts</p>
-                  <p className="text-2xl font-bold text-red-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Inactive Card Counts</p>
+                  <p className="text-xl sm:text-2xl font-bold text-red-600">
                     {overallSummary.totalInactive.toLocaleString()}
                   </p>
                   <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
                 </div>
-                <div className="p-2 bg-red-100 rounded-lg">
-                  <XCircle className="w-6 h-6 text-red-600" />
+                <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-4">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">Avg Active %</p>
-                  <p className="text-2xl font-bold text-orange-600">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Avg Active %</p>
+                  <p className="text-xl sm:text-2xl font-bold text-orange-600">
                     {overallSummary.avgActivePercentage}%
                   </p>
                 </div>
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Target className="w-6 h-6 text-orange-600" />
+                <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                 </div>
               </div>
             </CardContent>
@@ -1603,10 +1643,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         {/* Filters and Search */}
         <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">Filters & Search</h3>
-              <div className="flex gap-2">
+          <CardContent className="p-4 sm:p-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
+              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filters & Search</h3>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                 <Button
                   onClick={() => {
                     setSelectedMonth(new Date().getMonth());
@@ -1632,7 +1672,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
               <div>
                 <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
                   Search
@@ -1713,15 +1753,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         {/* Patrol Data Table */}
         <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardHeader>
-            <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
               {new Date(selectedYear, selectedMonth).toLocaleDateString(
                 "en-US",
                 { month: "long", year: "numeric" },
               )} Patrol Data ({filteredData.length} municipalities)
             </CardTitle>
-            <div className="flex items-center justify-between w-full">
-              <div className="flex items-center gap-1">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0 w-full">
+              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                 <button
                   onClick={() => setActiveTab("daily")}
                   className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
@@ -1752,11 +1792,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   Top Performers
                 </button>
               </div>
-              <div className="ml-auto">
+              <div className="w-full lg:w-auto lg:ml-auto">
                 <button
                   onClick={() => syncToFirestore()}
                   disabled={loading}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none w-full lg:w-auto"
                 >
                   <Save className="w-4 h-4" />
                   Save Data
@@ -1769,9 +1809,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <div className="flex items-center gap-2 text-sm text-blue-800">
                 <BarChart3 className="w-4 h-4" />
                 <span className="font-medium">Required Counts per Daily:</span>
-                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 Above = Green</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 = Active</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">5 Below = Red</span>
+                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">4 = Warning</span>
+                <span className="text-gray-500">•</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">4 = Inactive</span>
               </div>
             </div>
 

@@ -370,16 +370,16 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
           <p className="text-gray-600">Admin access required.</p>
         </div>
       ) : (
-        <div className="container mx-auto p-6 space-y-6 bg-gray-50 min-h-screen">
+        <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
           {/* Header Section */}
-          <div className="flex justify-between items-center">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-gray-500 mt-2">Manage system users and their access levels</p>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">User Management</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage system users and their access levels</p>
             </div>
             <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="bg-black hover:bg-black/90 text-white">
+                <Button className="bg-black hover:bg-black/90 text-white text-sm sm:text-base w-full sm:w-auto">
                   <UserPlus className="mr-2 h-4 w-4" />
                   Add New User
                 </Button>
@@ -392,7 +392,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleCreateUser} className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
                       <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="given-name" required />
@@ -402,7 +402,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="family-name" required />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="email" required />
@@ -423,7 +423,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="accessLevel">Access Level</Label>
                       <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
@@ -517,7 +517,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleUpdateUser} className="space-y-4 py-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="editFirstName">First Name</Label>
                       <Input 
@@ -545,7 +545,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="editUsername">Username</Label>
                       <Input 
@@ -575,7 +575,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       </div>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="editAccessLevel">Access Level</Label>
                       <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
@@ -695,66 +695,66 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Total Users</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Users</p>
+                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
                       {users.filter(u => u.role !== "Admin").length}
                     </p>
                   </div>
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <UsersIcon className="w-6 h-6 text-blue-600" />
+                  <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <UsersIcon className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Command Center</p>
-                    <p className="text-2xl font-bold text-green-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Command Center</p>
+                    <p className="text-xl sm:text-2xl font-bold text-green-600">
                       {users.filter(u => u.accessLevel === "command-center").length}
                     </p>
                   </div>
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <Shield className="w-6 h-6 text-green-600" />
+                  <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
+                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Action Center</p>
-                    <p className="text-2xl font-bold text-purple-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Action Center</p>
+                    <p className="text-xl sm:text-2xl font-bold text-purple-600">
                       {users.filter(u => u.accessLevel === "action-center").length}
                     </p>
                   </div>
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Building2 className="w-6 h-6 text-purple-600" />
+                  <div className="p-1.5 sm:p-2 bg-purple-100 rounded-lg flex-shrink-0">
+                    <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-4">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-gray-500 mb-1">Other Access</p>
-                    <p className="text-2xl font-bold text-orange-600">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Other Access</p>
+                    <p className="text-xl sm:text-2xl font-bold text-orange-600">
                       {users.filter(u => !['command-center', 'action-center', 'Admin'].includes(u.accessLevel) && u.role !== "Admin").length}
                     </p>
                   </div>
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <User className="w-6 h-6 text-orange-600" />
+                  <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                    <User className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                   </div>
                 </div>
               </CardContent>

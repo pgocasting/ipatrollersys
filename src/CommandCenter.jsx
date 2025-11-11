@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "./Layout";
 import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import { useFirebase } from "./hooks/useFirebase";
+import { useFirestoreQuota } from "./hooks/useFirestoreQuota";
 import { useAuth } from "./contexts/AuthContext";
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
@@ -60,6 +61,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
   const { isAdmin, userMunicipality, userAccessLevel } = useAuth();
   const { notifications, showSuccess, showError, showInfo, showWarning, removeNotification } = useNotification();
+  const { isBlocked, blockedUntil, timeLeft, executeWithQuotaCheck, resetQuotaBlock } = useFirestoreQuota();
   const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
   
   // Access level check - only command-center users should access this page
@@ -210,7 +212,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Weekly Report Data - Individual date entries
   const [weeklyReportData, setWeeklyReportData] = useState({});
+  const weeklyReportCache = useRef({});
+  const lastLoadedWeeklyRef = useRef({ month: null, year: null, municipality: null });
   
+  // Cache for barangays and concern types
+  const barangaysCache = useRef(null);
+  const concernTypesCache = useRef(null);
+
   // Municipality tabs state - moved to top of component
   
   // Clear data options state
@@ -313,6 +321,37 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   const currentDates = generateDates(selectedMonth, selectedYear);
+
+  // Wrapper function for Firestore save operations with quota checking
+  const saveWithQuotaCheck = useCallback(async (saveOperation, operationName = "Save") => {
+    if (isBlocked) {
+      const message = `⚠️ Firestore quota exceeded! You can save data again at ${blockedUntil?.toLocaleString("en-PH", {
+        dateStyle: "medium",
+        timeStyle: "short",
+      })}. Time remaining: ${timeLeft}`;
+      toast.error(message);
+      showError(message);
+      return { success: false, error: message, quotaExceeded: true };
+    }
+
+    try {
+      const result = await executeWithQuotaCheck(saveOperation);
+      
+      if (result.quotaExceeded) {
+        const message = `⚠️ Firestore quota exceeded! Pwede ka ulit mag-save sa ${result.resetTime?.toLocaleString("en-PH", {
+          dateStyle: "medium",
+          timeStyle: "short",
+        })}.`;
+        toast.error(message);
+        showError(message);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error(`❌ Error in ${operationName}:`, error);
+      return { success: false, error: error.message };
+    }
+  }, [isBlocked, blockedUntil, timeLeft, executeWithQuotaCheck, showError]);
 
   // Enhanced debug function to check all Firestore collections and data
   const debugFirestoreDocuments = async () => {
@@ -456,40 +495,30 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [importedBarangays, activeMunicipalityTab]);
 
-  // Load weekly report data when year/municipality changes (but not month - handled by dropdown)
+  // Load weekly report data when year/municipality/month changes with debouncing
   useEffect(() => {
-    console.log('🔄 Year/Municipality changed, reloading data:', {
-      selectedMonth,
-      selectedYear,
-      activeMunicipalityTab
-    });
-    console.log('📊 Current allMonthsData state:', Object.keys(allMonthsData));
+    // Check if we already have this data cached
+    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    const isSameAsLast = lastLoadedWeeklyRef.current.month === selectedMonth &&
+                         lastLoadedWeeklyRef.current.year === selectedYear &&
+                         lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab;
     
-    // Only load if we have a valid month and year, and this is not a month change
-    if (selectedMonth && selectedYear) {
-      console.log('✅ Valid month/year, calling loadWeeklyReportData()');
-      loadWeeklyReportData();
-    } else {
-      console.log('❌ Invalid month/year, skipping loadWeeklyReportData()');
+    if (isSameAsLast && weeklyReportCache.current[cacheKey]) {
+      console.log('📦 Using cached weekly report data for:', cacheKey);
+      return;
     }
-  }, [selectedYear, activeMunicipalityTab, allMonthsData]); // Removed selectedMonth from dependencies
-
-  // Load weekly report data when month changes
-  useEffect(() => {
-    console.log('📅 Month changed, reloading data:', {
+    
+    console.log('🔄 Loading weekly report data for:', {
       selectedMonth,
       selectedYear,
       activeMunicipalityTab
     });
     
     // Only load if we have a valid month and year
-    if (selectedMonth && selectedYear) {
-      console.log('✅ Valid month selection, calling loadWeeklyReportData()');
+    if (selectedMonth && selectedYear && activeMunicipalityTab) {
       loadWeeklyReportData();
-    } else {
-      console.log('❌ Invalid month/year for month change, skipping loadWeeklyReportData()');
     }
-  }, [selectedMonth]); // Only watch selectedMonth changes
+  }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
   // Component initialization - removed local storage usage
 
@@ -637,6 +666,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
     
+    // Check cache first
+    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    if (weeklyReportCache.current[cacheKey] &&
+        lastLoadedWeeklyRef.current.month === selectedMonth &&
+        lastLoadedWeeklyRef.current.year === selectedYear &&
+        lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab) {
+      console.log('📦 Using cached data, skipping Firestore read');
+      setWeeklyReportData(weeklyReportCache.current[cacheKey]);
+      return;
+    }
+    
     console.log(`🔄 Loading weekly report data for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
@@ -731,6 +771,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log('✅ Loading weekly data with', Object.keys(weeklyData).length, 'dates');
           console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
           console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
+          
+          // Cache the loaded data
+          weeklyReportCache.current[cacheKey] = weeklyData;
+          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
           setWeeklyReportData(weeklyData);
           
@@ -1051,6 +1095,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const handleUploadPhotos = async () => {
     if (!currentPhotoEntry) return;
     
+    // Check if remarks are required (when after photos exist)
+    const hasAfterPhotos = afterPhotoPreviews.length > 0 || afterPhotos.length > 0;
+    const remarks = currentPhotoEntry?.entry?.remarks || '';
+    
+    if (hasAfterPhotos && !remarks.trim()) {
+      showError('Please add remarks before uploading. Remarks are required when after photos are present.');
+      return;
+    }
+    
     setIsUploadingPhotos(true);
     try {
       const { date, entryIndex } = currentPhotoEntry;
@@ -1245,9 +1298,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           clearedAt: new Date().toISOString()
         };
 
-        // Save cleared data to nested structure
-        const saveResult = await saveWeeklyReportByMunicipality(reportData);
+        // Save cleared data to nested structure with quota check
+        const saveResult = await saveWithQuotaCheck(
+          () => saveWeeklyReportByMunicipality(reportData),
+          "Clear Weekly Report Data"
+        );
         if (saveResult.success) {
+          // Update cache with cleared data
+          const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+          weeklyReportCache.current[cacheKey] = {};
+          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
+          
           toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
           showSuccess(`Weekly report data cleared for ${activeMunicipalityTab}`);
         } else {
@@ -1301,8 +1362,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           clearedAt: new Date().toISOString()
         };
 
-        // Save cleared data to nested structure
-        const saveResult = await saveWeeklyReportByMunicipality(reportData);
+        // Save cleared data to nested structure with quota check
+        const saveResult = await saveWithQuotaCheck(
+          () => saveWeeklyReportByMunicipality(reportData),
+          "Clear Municipality Weekly Report"
+        );
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${selectedClearMunicipality}`);
           showSuccess(`Weekly report data cleared for ${selectedClearMunicipality}`);
@@ -1887,10 +1951,19 @@ Are you absolutely sure you want to proceed?`;
 
   // Load barangays from Firestore
   const loadBarangaysFromFirestore = async () => {
+    // Check cache first
+    if (barangaysCache.current) {
+      console.log('📦 Using cached barangays data');
+      setImportedBarangays(barangaysCache.current);
+      return;
+    }
+    
     setIsLoadingBarangays(true);
     try {
       const result = await getBarangays();
       if (result.success) {
+        // Cache the data
+        barangaysCache.current = result.data || [];
         setImportedBarangays(result.data || []);
         console.log('✅ Loaded barangays from Firestore:', result.data?.length || 0);
       } else {
@@ -1909,10 +1982,19 @@ Are you absolutely sure you want to proceed?`;
 
   // Load concern types from Firestore
   const loadConcernTypesFromFirestore = async () => {
+    // Check cache first
+    if (concernTypesCache.current) {
+      console.log('📦 Using cached concern types data');
+      setImportedConcernTypes(concernTypesCache.current);
+      return;
+    }
+    
     setIsLoadingConcernTypes(true);
     try {
       const result = await getConcernTypes();
       if (result.success) {
+        // Cache the data
+        concernTypesCache.current = result.data || [];
         setImportedConcernTypes(result.data || []);
         console.log('✅ Loaded concern types from Firestore:', result.data?.length || 0);
       } else {
@@ -2109,8 +2191,11 @@ Are you absolutely sure you want to proceed?`;
       setImportedBarangays(updatedBarangays);
       setBarangayData("");
       
-      // Save to Firestore
-      const saveResult = await saveBarangays(updatedBarangays);
+      // Save to Firestore with quota check
+      const saveResult = await saveWithQuotaCheck(
+        () => saveBarangays(updatedBarangays),
+        "Import Barangays"
+      );
       if (saveResult.success) {
         toast.success(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
         showSuccess(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
@@ -2427,1473 +2512,25 @@ Are you absolutely sure you want to proceed?`;
     if (importedBarangays.length === 0) {
       toast.error("No barangays to clear");
       showError('No barangays to clear');
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to clear all ${importedBarangays.length} imported barangays? This action cannot be undone.`)) {
-      try {
-        // Save empty array to Firestore
-        const saveResult = await saveBarangays([]);
-        if (saveResult.success) {
-          setImportedBarangays([]);
-          setSelectedBarangays([]);
-          toast.success("All barangays cleared successfully");
-          showSuccess('All barangays cleared successfully!');
-        } else {
-          toast.error("Failed to clear barangays from database: " + saveResult.error);
-          showError('Failed to clear barangays from database: ' + saveResult.error);
-        }
-      } catch (error) {
-        toast.error("Error clearing barangays: " + error.message);
-        showError('Error clearing barangays: ' + error.message);
-      }
-    }
-  };
-
-  const handleClearSelectedBarangays = async () => {
-    if (selectedBarangays.length === 0) {
-      toast.error("No barangays selected to clear");
-      showError('No barangays selected to clear');
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to clear ${selectedBarangays.length} selected barangays? This action cannot be undone.`)) {
-      try {
-        // Filter out selected barangays
-        const remainingBarangays = importedBarangays.filter(barangay => !selectedBarangays.includes(barangay.id));
-        
-        // Save updated array to Firestore
-        const saveResult = await saveBarangays(remainingBarangays);
-        if (saveResult.success) {
-          setImportedBarangays(remainingBarangays);
-          setSelectedBarangays([]);
-          toast.success(`${selectedBarangays.length} selected barangays cleared successfully`);
-          showSuccess(`${selectedBarangays.length} selected barangays cleared successfully!`);
-        } else {
-          toast.error("Failed to clear selected barangays from database: " + saveResult.error);
-          showError('Failed to clear selected barangays from database: ' + saveResult.error);
-        }
-      } catch (error) {
-        toast.error("Error clearing selected barangays: " + error.message);
-        showError('Error clearing selected barangays: ' + error.message);
-      }
-    }
-  };
-
-  const handleEditSelectedBarangays = () => {
-    if (selectedBarangays.length === 0) {
-      toast.error("No barangays selected to edit");
-      showError('No barangays selected to edit');
-      return;
-    }
-
-    const selectedBarangayData = importedBarangays.filter(barangay => selectedBarangays.includes(barangay.id));
-    setEditingBarangay({
-      id: 'bulk-edit',
-      name: selectedBarangayData.map(b => b.name).join(', '),
-      municipality: selectedBarangayData[0]?.municipality || '',
-      district: selectedBarangayData[0]?.district || '',
-      isBulkEdit: true,
-      selectedIds: selectedBarangays
-    });
-    setIsEditingBarangays(true);
-  };
-
-  // Handle barangay selection
-  const handleBarangaySelection = (barangayId, isSelected) => {
-    if (isSelected) {
-      setSelectedBarangays(prev => [...prev, barangayId]);
-    } else {
-      setSelectedBarangays(prev => prev.filter(id => id !== barangayId));
-    }
-  };
-
-  // Handle select all barangays
-  const handleSelectAllBarangays = () => {
-    if (selectedBarangays.length === importedBarangays.length) {
-      setSelectedBarangays([]);
-    } else {
-      setSelectedBarangays(importedBarangays.map(brgy => brgy.id));
-    }
-  };
-
-  // Handle remove selected barangays
-  const handleRemoveSelectedBarangays = async () => {
-    if (selectedBarangays.length === 0) {
-      toast.error("No barangays selected for removal");
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to remove ${selectedBarangays.length} selected barangays? This action cannot be undone.`)) {
-      try {
-        const updatedBarangays = importedBarangays.filter(brgy => !selectedBarangays.includes(brgy.id));
-        
-        // Save to Firestore
-        const saveResult = await saveBarangays(updatedBarangays);
-        if (saveResult.success) {
-          setImportedBarangays(updatedBarangays);
-          setSelectedBarangays([]);
-          toast.success(`${selectedBarangays.length} barangays removed successfully`);
-        } else {
-          toast.error("Failed to remove barangays from database: " + saveResult.error);
-        }
-      } catch (error) {
-        toast.error("Error removing barangays: " + error.message);
-      }
-    }
-  };
-
-
-  // Handle save edited barangay
-  const handleSaveEditedBarangay = async () => {
-    if (!editingBarangay) return;
-
     try {
-      let updatedBarangays;
-      
-      if (editingBarangay.isBulkEdit) {
-        // Handle bulk edit
-        const barangayNames = editingBarangay.name.split(',').map(name => name.trim()).filter(name => name);
-        
-        if (barangayNames.length !== editingBarangay.selectedIds.length) {
-          toast.error(`Please provide exactly ${editingBarangay.selectedIds.length} barangay names (one for each selected barangay)`);
-          return;
-        }
-
-        updatedBarangays = importedBarangays.map(brgy => {
-          if (editingBarangay.selectedIds.includes(brgy.id)) {
-            const nameIndex = editingBarangay.selectedIds.indexOf(brgy.id);
-            return {
-              ...brgy,
-              name: barangayNames[nameIndex],
-              municipality: editingBarangay.municipality,
-              district: editingBarangay.district
-            };
-          }
-          return brgy;
-        });
-      } else {
-        // Handle single edit
-        updatedBarangays = importedBarangays.map(brgy => 
-          brgy.id === editingBarangay.id ? editingBarangay : brgy
-        );
-      }
-
-      // Save to Firestore
-      const saveResult = await saveBarangays(updatedBarangays);
-      if (saveResult.success) {
-        setImportedBarangays(updatedBarangays);
-        setEditingBarangay(null);
-        setIsEditingBarangays(false);
-        setSelectedBarangays([]);
-        toast.success(editingBarangay.isBulkEdit ? 
-          `${editingBarangay.selectedIds.length} barangays updated successfully` : 
-          "Barangay updated successfully"
-        );
-      } else {
-        toast.error("Failed to update barangay in database: " + saveResult.error);
-      }
-    } catch (error) {
-      toast.error("Error updating barangay: " + error.message);
-    }
-  };
-
-  // Handle cancel edit
-  const handleCancelEdit = () => {
-    setEditingBarangay(null);
-    setIsEditingBarangays(false);
-    setSelectedBarangays([]);
-  };
-
-  const handleConcernTypeImport = async () => {
-    if (!selectedDistrict || !selectedMunicipality || !concernTypeData.trim()) {
-      toast.error("Please select district, municipality and enter concern types to import");
-      return;
-    }
-
-    setIsImporting(true);
-    try {
-      const lines = concernTypeData.trim().split('\n');
-      const newConcernTypes = lines
-        .map(line => line.trim())
-        .filter(line => line.length > 0)
-        .map((concernType, index) => ({
-          id: `${selectedDistrict}-${selectedMunicipality}-${Date.now()}-${index}`,
-          name: concernType,
-          district: selectedDistrict,
-          municipality: selectedMunicipality,
-          importedAt: new Date().toISOString()
-        }));
-
-      // Update local state
-      const updatedConcernTypes = [...importedConcernTypes, ...newConcernTypes];
-      setImportedConcernTypes(updatedConcernTypes);
-      setConcernTypeData("");
-      
-      // Save to Firestore
-      const saveResult = await saveConcernTypes(updatedConcernTypes);
-      if (saveResult.success) {
-        toast.success(`${newConcernTypes.length} concern types imported successfully for ${selectedMunicipality}`);
-      } else {
-        toast.error("Failed to save concern types to database: " + saveResult.error);
-        // Revert local state if save failed
-        setImportedConcernTypes(importedConcernTypes);
-      }
-    } catch (error) {
-      console.error("Error importing concern types:", error);
-      toast.error("Failed to import concern types");
-    } finally {
-      setIsImporting(false);
-    }
-  };
-
-  const handleClearConcernTypes = async () => {
-    if (importedConcernTypes.length === 0) {
-      toast.error("No concern types to clear");
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to clear all ${importedConcernTypes.length} imported concern types? This action cannot be undone.`)) {
-      try {
-        // Save empty array to Firestore
-        const saveResult = await saveConcernTypes([]);
-        if (saveResult.success) {
-          setImportedConcernTypes([]);
-          setSelectedConcernTypes([]);
-          toast.success("All concern types cleared successfully");
-        } else {
-          toast.error("Failed to clear concern types from database: " + saveResult.error);
-        }
-      } catch (error) {
-        toast.error("Error clearing concern types: " + error.message);
-      }
-    }
-  };
-
-  const handleClearSelectedConcernTypes = async () => {
-    if (selectedConcernTypes.length === 0) {
-      toast.error("No concern types selected to clear");
-      return;
-    }
-
-    if (window.confirm(`Are you sure you want to clear ${selectedConcernTypes.length} selected concern types? This action cannot be undone.`)) {
-      try {
-        // Filter out selected concern types
-        const remainingConcernTypes = importedConcernTypes.filter(concernType => !selectedConcernTypes.includes(concernType.id));
-        
-        // Save updated array to Firestore
-        const saveResult = await saveConcernTypes(remainingConcernTypes);
-        if (saveResult.success) {
-          setImportedConcernTypes(remainingConcernTypes);
-          setSelectedConcernTypes([]);
-          toast.success(`${selectedConcernTypes.length} selected concern types cleared successfully`);
-        } else {
-          toast.error("Failed to clear selected concern types from database: " + saveResult.error);
-        }
-      } catch (error) {
-        toast.error("Error clearing selected concern types: " + error.message);
-      }
-    }
-  };
-
-  const handleEditSelectedConcernTypes = () => {
-    if (selectedConcernTypes.length === 0) {
-      toast.error("No concern types selected to edit");
-      return;
-    }
-
-    const selectedConcernTypeData = importedConcernTypes.filter(concernType => selectedConcernTypes.includes(concernType.id));
-    setEditingConcernType({
-      id: 'bulk-edit',
-      name: selectedConcernTypeData.map(ct => ct.name).join(', '),
-      municipality: selectedConcernTypeData[0]?.municipality || '',
-      district: selectedConcernTypeData[0]?.district || '',
-      isBulkEdit: true,
-      selectedIds: selectedConcernTypes
-    });
-    setIsEditingConcernTypes(true);
-  };
-
-  // Handle save edited concern type
-  const handleSaveEditedConcernType = async () => {
-    if (!editingConcernType) return;
-
-    try {
-      let updatedConcernTypes;
-      
-      if (editingConcernType.isBulkEdit) {
-        // Handle bulk edit
-        const concernTypeNames = editingConcernType.name.split(',').map(name => name.trim()).filter(name => name);
-        
-        if (concernTypeNames.length !== editingConcernType.selectedIds.length) {
-          toast.error(`Please provide exactly ${editingConcernType.selectedIds.length} concern type names (one for each selected concern type)`);
-          return;
-        }
-
-        updatedConcernTypes = importedConcernTypes.map(concernType => {
-          if (editingConcernType.selectedIds.includes(concernType.id)) {
-            const nameIndex = editingConcernType.selectedIds.indexOf(concernType.id);
-            return {
-              ...concernType,
-              name: concernTypeNames[nameIndex],
-              municipality: editingConcernType.municipality,
-              district: editingConcernType.district
-            };
-          }
-          return concernType;
-        });
-      } else {
-        // Handle single edit
-        updatedConcernTypes = importedConcernTypes.map(concernType => 
-          concernType.id === editingConcernType.id ? editingConcernType : concernType
-        );
-      }
-
-      // Save to Firestore
-      const saveResult = await saveConcernTypes(updatedConcernTypes);
-      if (saveResult.success) {
-        setImportedConcernTypes(updatedConcernTypes);
-        setEditingConcernType(null);
-        setIsEditingConcernTypes(false);
-        setSelectedConcernTypes([]);
-        toast.success(editingConcernType.isBulkEdit ? 
-          `${editingConcernType.selectedIds.length} concern types updated successfully` : 
-          "Concern type updated successfully"
-        );
-      } else {
-        toast.error("Failed to update concern type in database: " + saveResult.error);
-      }
-    } catch (error) {
-      toast.error("Error updating concern type: " + error.message);
-    }
-  };
-
-  // Excel Import Functions
-  const handleExcelFileSelect = (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    // Validate file type
-    const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-      'application/vnd.ms-excel', // .xls
-      'text/csv' // .csv
-    ];
-
-    if (!validTypes.includes(file.type)) {
-      toast.error("Please select a valid Excel file (.xlsx, .xls) or CSV file");
-      return;
-    }
-
-    setExcelFile(file);
-    
-    // Check if user wants to import all months
-    if (importAllMonths) {
-      handleImportAllMonths(file);
-    } else {
-    parseExcelFile(file);
-    }
-  };
-
-  const parseExcelFile = (file) => {
-    setIsImportingExcel(true);
-    
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // Get all worksheet names
-        const sheetNames = workbook.SheetNames;
-        console.log('Available worksheets:', sheetNames);
-        
-        // Find the worksheet that matches the selected month
-        let targetSheetName = null;
-        let targetWorksheet = null;
-        
-        // First, try to find exact month match
-        for (const sheetName of sheetNames) {
-          const sheetNameLower = sheetName.toLowerCase();
-          const selectedMonthLower = selectedMonth.toLowerCase();
-          
-          if (sheetNameLower.includes(selectedMonthLower)) {
-            targetSheetName = sheetName;
-            targetWorksheet = workbook.Sheets[sheetName];
-            console.log(`Found matching worksheet: ${sheetName} for month: ${selectedMonth}`);
-            break;
-          }
-        }
-        
-        // If no exact match, try to find by month number or abbreviation
-        if (!targetSheetName) {
-          const monthMappings = {
-            'january': ['jan', '01', '1'],
-            'february': ['feb', '02', '2'],
-            'march': ['mar', '03', '3'],
-            'april': ['apr', '04', '4'],
-            'may': ['may', '05', '5'],
-            'june': ['jun', '06', '6'],
-            'july': ['jul', '07', '7'],
-            'august': ['aug', '08', '8'],
-            'september': ['sep', '09', '9'],
-            'october': ['oct', '10'],
-            'november': ['nov', '11'],
-            'december': ['dec', '12']
-          };
-          
-          const selectedMonthLower = selectedMonth.toLowerCase();
-          const possibleMatches = monthMappings[selectedMonthLower] || [];
-          
-          for (const sheetName of sheetNames) {
-            const sheetNameLower = sheetName.toLowerCase();
-            for (const match of possibleMatches) {
-              if (sheetNameLower.includes(match)) {
-                targetSheetName = sheetName;
-                targetWorksheet = workbook.Sheets[sheetName];
-                console.log(`Found worksheet by abbreviation: ${sheetName} for month: ${selectedMonth}`);
-                break;
-              }
-            }
-            if (targetSheetName) break;
-          }
-        }
-        
-        // If still no match, use the first worksheet but show a warning
-        if (!targetSheetName) {
-          targetSheetName = sheetNames[0];
-          targetWorksheet = workbook.Sheets[targetSheetName];
-          console.log(`No matching worksheet found, using first worksheet: ${targetSheetName}`);
-          toast.warning(`No worksheet found for "${selectedMonth}". Using first worksheet "${targetSheetName}". Please ensure your Excel file has a worksheet named with the month.`);
-        }
-        
-        // Convert to JSON
-        const jsonData = XLSX.utils.sheet_to_json(targetWorksheet, { header: 1 });
-        
-        if (jsonData.length === 0) {
-          toast.error("The Excel file appears to be empty");
-          setIsImportingExcel(false);
-          return;
-        }
-
-        // Validate Excel structure based on photo format
-        const headers = jsonData[0];
-        const expectedHeaders = ['DATE', 'BARANGAY', 'TYPE OF CONCERN', 'Week 1', 'Week 2', 'Week 3', 'Week 4', 'STATUS', 'REMARKS'];
-        
-        if (!headers || headers.length < 6) {
-          toast.error("Invalid Excel format. Please ensure the file has the correct columns: DATE, BARANGAY, TYPE OF CONCERN, Week 1-4, STATUS, REMARKS");
-          setIsImportingExcel(false);
-          return;
-        }
-
-        // VERIFICATION 1: Check if current selected municipality exists in filename (more flexible matching)
-        const fileName = file.name.toLowerCase();
-        const currentMunicipality = activeMunicipalityTab?.toLowerCase();
-        
-        if (currentMunicipality) {
-          // Try multiple variations of the municipality name
-          const municipalityVariations = [
-            currentMunicipality,
-            currentMunicipality.replace(/\s+/g, ''), // Remove spaces
-            currentMunicipality.replace(/\s+/g, '-'), // Replace spaces with hyphens
-            currentMunicipality.replace(/\s+/g, '_'), // Replace spaces with underscores
-            currentMunicipality.substring(0, 3), // First 3 characters
-            currentMunicipality.substring(0, 4), // First 4 characters
-          ];
-          
-          const foundMatch = municipalityVariations.some(variation => 
-            fileName.includes(variation)
-          );
-          
-          if (!foundMatch) {
-            console.log('Filename:', fileName);
-            console.log('Looking for municipality:', currentMunicipality);
-            console.log('Tried variations:', municipalityVariations);
-            
-            // Ask user if they want to proceed anyway
-            const proceed = window.confirm(
-              `Municipality verification failed!\n\n` +
-              `File: "${file.name}"\n` +
-              `Selected Municipality: "${activeMunicipalityTab}"\n\n` +
-              `The filename doesn't contain the municipality name. Do you want to proceed with the import anyway?\n\n` +
-              `(The system will try to import data and match it to the selected municipality)`
-            );
-            
-            if (!proceed) {
-              setIsImportingExcel(false);
-              return;
-            } else {
-              console.log('User chose to proceed despite municipality verification failure');
-              toast.warning('Proceeding with import despite municipality verification failure. Please verify the data is correct.');
-            }
-          } else {
-            console.log('Municipality verification passed for:', currentMunicipality);
-          }
-        }
-
-        // VERIFICATION 2: Since we found the correct worksheet, month verification is already done
-        // The worksheet selection above ensures we're reading from the correct month tab
-        console.log(`Using worksheet "${targetSheetName}" for month "${selectedMonth}"`);
-        
-        // Optional: Double-check dates in the selected worksheet
-        const dataRows = jsonData.slice(1).filter(row => row[0]); // Get data rows with dates
-        if (dataRows.length > 0) {
-          const firstDate = dataRows[0][0];
-          if (firstDate) {
-            try {
-              const excelDate = new Date(firstDate);
-              const excelMonth = excelDate.toLocaleDateString("en-US", { month: "long" });
-              const selectedMonthName = selectedMonth;
-              
-              // Only warn if there's a mismatch, but don't block import since we selected the correct worksheet
-              if (excelMonth.toLowerCase() !== selectedMonthName.toLowerCase()) {
-                console.warn(`Date in worksheet doesn't match selected month: ${excelMonth} vs ${selectedMonthName}`);
-                toast.warning(`Note: Dates in the worksheet are from "${excelMonth}" but you selected "${selectedMonthName}". Proceeding with import from the correct worksheet.`);
-              }
-            } catch (error) {
-              console.warn('Could not parse date for verification:', firstDate);
-            }
-          }
-        }
-
-        // Check if required columns are present (flexible matching)
-        const headerText = headers.join(' ').toLowerCase();
-        const hasRequiredColumns = 
-          headerText.includes('date') && 
-          headerText.includes('barangay') && 
-          headerText.includes('concern') && 
-          (headerText.includes('week') || headerText.includes('1') || headerText.includes('2') || headerText.includes('3') || headerText.includes('4'));
-        
-        if (!hasRequiredColumns) {
-          toast.error("Missing required columns. Please ensure the file contains: DATE, BARANGAY, TYPE OF CONCERN, and Week columns (1-4)");
-          setIsImportingExcel(false);
-          return;
-        }
-
-        // Process data rows (skip header) - based on photo structure
-        const processedData = jsonData.slice(1).map((row, index) => {
-          // Keep barangay field as-is (format: "Barangay, Municipality")
-          const barangayField = row[1] || '';
-          const barangayParts = barangayField.split(',').map(part => part.trim());
-          const barangay = barangayParts[0] || '';
-          const municipality = barangayParts[1] || '';
-          
-          console.log(`Processing row ${index}:`, {
-            rawBarangay: row[1],
-            barangayField,
-            barangay,
-            municipality,
-            rawDate: row[0]
-          });
-          
-          // Handle Excel date properly
-          let processedDate = row[0] || '';
-          if (typeof processedDate === 'number') {
-            // Convert Excel serial date to proper date
-            try {
-              const excelEpoch = new Date(1900, 0, 1);
-              const daysSinceEpoch = processedDate - 2;
-              const dateObj = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
-              if (!isNaN(dateObj.getTime()) && dateObj.getFullYear() > 1900) {
-                processedDate = dateObj.toLocaleDateString("en-US", { 
-                  month: "long", 
-                  day: "numeric", 
-                  year: "numeric" 
-                });
-              }
-            } catch (error) {
-              console.warn('Error converting Excel date:', processedDate, error);
-            }
-          }
-          
-          return {
-            id: `excel-${Date.now()}-${index}`,
-            date: processedDate,
-            municipality: municipality,
-            barangay: barangayField, // Keep full "Barangay, Municipality" format
-            concernType: row[2] || '',
-            week1: row[3] || '',
-            week2: row[4] || '',
-            week3: row[5] || '',
-            week4: row[6] || '',
-            status: row[7] || '',
-            remarks: row[8] || '',
-            importedAt: new Date().toISOString()
-          };
-        }).filter(row => row.date || row.barangay || row.municipality); // Filter out completely empty rows
-
-        // Auto-detect month and year from Excel data
-        const detectedMonthYear = detectMonthYearFromData(processedData);
-        if (detectedMonthYear.month && detectedMonthYear.year) {
-          setSelectedMonth(detectedMonthYear.month);
-          setSelectedYear(detectedMonthYear.year);
-          toast.info(`Auto-detected: ${detectedMonthYear.month} ${detectedMonthYear.year}`);
-        }
-
-        // Group data by municipality
-        const municipalityGroups = {};
-        processedData.forEach(row => {
-          const municipality = row.municipality || 'Unknown Municipality';
-          if (!municipalityGroups[municipality]) {
-            municipalityGroups[municipality] = [];
-          }
-          municipalityGroups[municipality].push(row);
-        });
-
-        // AUTO-IMPORT: Since verification passed, automatically import data to the table
-        let municipalityData = null;
-        
-        if (currentMunicipality && municipalityGroups[currentMunicipality]) {
-          municipalityData = municipalityGroups[currentMunicipality];
-        } else if (currentMunicipality && Object.keys(municipalityGroups).length > 0) {
-          // If exact municipality not found, try to find a close match or use the first available
-          const availableMunicipalities = Object.keys(municipalityGroups);
-          console.log('Available municipalities in Excel:', availableMunicipalities);
-          console.log('Looking for:', currentMunicipality);
-          
-          // Try to find a close match
-          const closeMatch = availableMunicipalities.find(mun => 
-            mun.toLowerCase().includes(currentMunicipality) || 
-            currentMunicipality.includes(mun.toLowerCase())
-          );
-          
-          if (closeMatch) {
-            console.log('Found close match:', closeMatch);
-            municipalityData = municipalityGroups[closeMatch];
-            toast.warning(`Using municipality "${closeMatch}" from Excel file (close match to "${currentMunicipality}")`);
-          } else {
-            // Use the first available municipality
-            const firstMunicipality = availableMunicipalities[0];
-            console.log('Using first available municipality:', firstMunicipality);
-            municipalityData = municipalityGroups[firstMunicipality];
-            toast.warning(`Using municipality "${firstMunicipality}" from Excel file (no match found for "${currentMunicipality}")`);
-          }
-        } else if (currentMunicipality) {
-          // No municipality data found at all
-          toast.error(`No data found for municipality "${currentMunicipality}" in the Excel file.`);
-          setIsImportingExcel(false);
-          return;
-        } else {
-          // No municipality selected
-          toast.error('No municipality selected. Please select a municipality first.');
-          setIsImportingExcel(false);
-          return;
-        }
-        
-        if (municipalityData) {
-          
-          // Debug: Show available barangays for this municipality
-          const availableBarangays = importedBarangays.filter(b => b.municipality === currentMunicipality);
-          console.log(`Available barangays for ${currentMunicipality}:`, availableBarangays.map(b => `${b.name}, ${b.municipality}`));
-          
-          // CLEAR EXISTING DATA: Clear current weekly report data before importing new data
-          console.log('🧹 Clearing existing weekly report data before import...');
-          
-          // Check if there's existing data and ask for confirmation
-          const hasExistingData = Object.keys(weeklyReportData).length > 0;
-          if (hasExistingData) {
-            const confirmClear = window.confirm(
-              `⚠️ WARNING: This will clear all existing data for ${currentMunicipality} municipality.\n\n` +
-              `Current data: ${Object.keys(weeklyReportData).length} dates with entries\n` +
-              `New data: ${municipalityData.length} rows from Excel\n\n` +
-              `Do you want to proceed and replace the existing data?`
-            );
-            
-            if (!confirmClear) {
-              console.log('❌ Import cancelled by user');
-              toast.info('Import cancelled - existing data preserved');
-              setIsImportingExcel(false);
-              return;
-            }
-          }
-          
-          const updatedWeeklyData = {};
-          const currentDates = generateDates(selectedMonth, selectedYear);
-          
-          municipalityData.forEach(row => {
-            // Parse the date from Excel with better handling
-            const excelDate = row.date;
-            if (excelDate) {
-              try {
-                let parsedDate;
-                
-                // Handle different Excel date formats
-                if (typeof excelDate === 'number') {
-                  // Excel serial date number - convert from Excel's epoch (1900-01-01)
-                  // Excel incorrectly treats 1900 as a leap year, so we need to adjust
-                  const excelEpoch = new Date(1900, 0, 1); // January 1, 1900
-                  const daysSinceEpoch = excelDate - 2; // Subtract 2 to account for Excel's leap year bug
-                  parsedDate = new Date(excelEpoch.getTime() + daysSinceEpoch * 24 * 60 * 60 * 1000);
-                } else if (typeof excelDate === 'string') {
-                  // Try parsing as string date
-                  parsedDate = new Date(excelDate);
-                } else {
-                  // Try direct conversion
-                  parsedDate = new Date(excelDate);
-                }
-                
-                // Validate the parsed date
-                if (!isNaN(parsedDate.getTime()) && parsedDate.getFullYear() > 1900) {
-                  const formattedDate = parsedDate.toLocaleDateString("en-US", { 
-                    month: "long", 
-                    day: "numeric", 
-                    year: "numeric" 
-                  });
-                  
-                  console.log(`Excel date: ${excelDate} -> Parsed: ${formattedDate}`);
-                  console.log('Available dates to match:', currentDates.slice(0, 5)); // Show first 5 dates
-                  
-                  // Find matching date in current dates with better matching
-                  const matchingDate = currentDates.find(date => {
-                    // Exact match
-                    if (date === formattedDate) {
-                      console.log(`Exact match found: ${date} === ${formattedDate}`);
-                      return true;
-                    }
-                    
-                    // Check if the day numbers match
-                    const excelDay = parsedDate.getDate();
-                    const dateDay = parseInt(date.split(' ')[1].replace(',', ''));
-                    if (excelDay === dateDay) {
-                      console.log(`Day match found: ${excelDay} === ${dateDay} for date ${date}`);
-                      return true;
-                    }
-                    
-                    // Check if the month and day match
-                    const excelMonth = parsedDate.toLocaleDateString("en-US", { month: "long" });
-                    const dateMonth = date.split(' ')[0];
-                    if (excelMonth === dateMonth && excelDay === dateDay) {
-                      console.log(`Month and day match found: ${excelMonth} ${excelDay} === ${dateMonth} ${dateDay} for date ${date}`);
-                      return true;
-                    }
-                    
-                    return false;
-                  });
-                  
-                  if (matchingDate) {
-                    const dateKey = matchingDate;
-                    if (!updatedWeeklyData[dateKey]) {
-                      updatedWeeklyData[dateKey] = [];
-                    }
-                    
-                    // Find the correct barangay name from the imported barangays list
-                    let correctBarangayName = row.barangay || 'Unknown Barangay';
-                    
-                    // Helper function for case-insensitive barangay matching
-                    const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
-                      if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
-                        return null;
-                      }
-
-                      return barangayList.find(barangay => {
-                        // Extract just the barangay name without municipality and (Poblacion)
-                        const barangayName = barangay.name.split(' (')[0].trim();
-                        const municipality = barangay.municipality;
-                        
-                        // Case-insensitive comparison
-                        const nameMatch = barangayName.toLowerCase() === excelBarangayName.toLowerCase();
-                        const municipalityMatch = municipality.toLowerCase() === excelMunicipality.toLowerCase();
-                        
-                        return nameMatch && municipalityMatch;
-                      });
-                    };
-                    
-                    // Try to match with imported barangays to get the correct format
-                    if (importedBarangays.length > 0) {
-                      // Extract just the barangay name without municipality
-                      const excelBarangayName = row.barangay?.split(',')[0]?.trim();
-                      const excelMunicipality = row.barangay?.split(',')[1]?.trim();
-                      
-                      const barangayMatch = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
-                      
-                      if (barangayMatch) {
-                        correctBarangayName = barangayMatch.name; // Use the full name with (Poblacion) if it exists
-                        console.log(`Matched barangay: ${row.barangay} -> ${correctBarangayName}`);
-                      } else {
-                        console.warn(`No match found for barangay: ${row.barangay}`);
-                      }
-                    }
-                    
-                    // Create entry for this barangay and concern type
-                    // Format barangay name to match what the dropdown expects: "Barangay Name, Municipality"
-                    const excelMunicipality = row.barangay?.split(',')[1]?.trim();
-                    const barangayValue = `${correctBarangayName}, ${excelMunicipality}`;
-                    
-                    const newEntry = {
-                      id: `excel-${Date.now()}-${Math.random()}`,
-                      barangay: barangayValue, // Use the format expected by the dropdown
-                      concernType: row.concernType || 'Unknown Concern',
-                      week1: parseInt(row.week1) || 0,
-                      week2: parseInt(row.week2) || 0,
-                      week3: parseInt(row.week3) || 0,
-                      week4: parseInt(row.week4) || 0,
-                      actionTaken: row.status || '',
-                      remarks: row.remarks || '',
-                      importedFromExcel: true
-                    };
-                    
-                    // Add the entry to the array for this date
-                    updatedWeeklyData[dateKey].push(newEntry);
-                    console.log(`Added entry for ${dateKey}:`, {
-                      barangay: newEntry.barangay,
-                      concernType: newEntry.concernType,
-                      week1: newEntry.week1,
-                      week2: newEntry.week2,
-                      week3: newEntry.week3,
-                      week4: newEntry.week4
-                    });
-                    console.log(`Barangay value format: "${barangayValue}" (should match dropdown format)`);
-                  } else {
-                    console.warn(`No matching date found for: ${formattedDate} in current dates:`, currentDates);
-                  }
-                } else {
-                  console.warn('Invalid date parsed:', excelDate, '->', parsedDate);
-                }
-              } catch (error) {
-                console.warn('Error parsing date:', excelDate, error);
-              }
-            }
-          });
-          
-          // Update the weekly report data
-          setWeeklyReportData(updatedWeeklyData);
-          
-          // Clear Excel data after successful import
-          setExcelFile(null);
-          
-          toast.success(`✅ Successfully imported ${municipalityData.length} rows for ${currentMunicipality} municipality from worksheet "${targetSheetName}"!`);
-          
-          // Add to terminal history
-          const newEntry = {
-            id: Date.now(),
-            command: "excel.auto.import",
-            output: `Auto-imported ${municipalityData.length} rows from Excel file for ${currentMunicipality} municipality`,
-            type: "success",
-            timestamp: new Date()
-          };
-          setTerminalHistory(prev => [...prev, newEntry]);
-          
-        } else {
-          // If municipality not found, show error and don't show preview
-          toast.error(`Municipality "${currentMunicipality}" not found in Excel file. Please ensure the Excel file contains data for the selected municipality.`);
-          setIsImportingExcel(false);
-          return;
-        }
-        
-      } catch (error) {
-        console.error('Error parsing Excel file:', error);
-        toast.error("Error parsing Excel file. Please ensure the file is not corrupted and has the correct format.");
-      } finally {
-        setIsImportingExcel(false);
-      }
-    };
-
-    reader.onerror = () => {
-      toast.error("Error reading the file");
-      setIsImportingExcel(false);
-    };
-
-    reader.readAsArrayBuffer(file);
-  };
-
-  // Function to import all months from Excel
-  const handleImportAllMonths = async (file) => {
-    setIsImportingAllMonths(true);
-    
-    try {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          
-          console.log('📊 Excel file loaded for all months. Worksheets:', workbook.SheetNames);
-          
-          // CLEAR EXISTING DATA: Clear current all months data and weekly report data before importing new data
-          console.log('🧹 Clearing existing data before import all months...');
-          
-          // Check if there's existing data and ask for confirmation
-          const hasExistingAllMonthsData = Object.keys(allMonthsData).length > 0;
-          const hasExistingWeeklyData = Object.keys(weeklyReportData).length > 0;
-          
-          if (hasExistingAllMonthsData || hasExistingWeeklyData) {
-            const confirmClear = window.confirm(
-              `⚠️ WARNING: This will clear ALL existing data.\n\n` +
-              `Current all months data: ${Object.keys(allMonthsData).length} months\n` +
-              `Current weekly report data: ${Object.keys(weeklyReportData).length} dates\n\n` +
-              `This action will replace ALL data with the new Excel import.\n\n` +
-              `Do you want to proceed and replace all existing data?`
-            );
-            
-            if (!confirmClear) {
-              console.log('❌ Import all months cancelled by user');
-              toast.info('Import cancelled - existing data preserved');
-              setIsImportingAllMonths(false);
-              return;
-            }
-          }
-          
-          setAllMonthsData({});
-          setWeeklyReportData({});
-          
-          const newAllMonthsData = {};
-          const monthNames = [
-            'january', 'february', 'march', 'april', 'may', 'june',
-            'july', 'august', 'september', 'october', 'november', 'december'
-          ];
-          const monthAbbreviations = [
-            'jan', 'feb', 'mar', 'apr', 'may', 'jun',
-            'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
-          ];
-          const monthNumbers = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'];
-          
-          // Process each worksheet
-          workbook.SheetNames.forEach(sheetName => {
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            if (jsonData.length === 0) return;
-            
-            // Try to determine which month this sheet represents
-            let detectedMonth = null;
-            const sheetLower = sheetName.toLowerCase();
-            
-            // Check for exact month name match
-            for (let i = 0; i < monthNames.length; i++) {
-              if (sheetLower.includes(monthNames[i])) {
-                detectedMonth = monthNames[i];
-                break;
-              }
-            }
-            
-            // Check for abbreviation match
-            if (!detectedMonth) {
-              for (let i = 0; i < monthAbbreviations.length; i++) {
-                if (sheetLower.includes(monthAbbreviations[i])) {
-                  detectedMonth = monthNames[i];
-                  break;
-                }
-              }
-            }
-            
-            // Check for number match
-            if (!detectedMonth) {
-              for (let i = 0; i < monthNumbers.length; i++) {
-                if (sheetLower.includes(monthNumbers[i])) {
-                  detectedMonth = monthNames[i];
-                  break;
-                }
-              }
-            }
-            
-            // If no month detected, try to get it from the data
-            if (!detectedMonth && jsonData.length > 1) {
-              const firstRow = jsonData[1];
-              const dateIndex = firstRow.findIndex(cell => 
-                cell && cell.toString().toLowerCase().includes('date')
-              );
-              if (dateIndex !== -1 && firstRow[dateIndex]) {
-                try {
-                  const dateValue = firstRow[dateIndex];
-                  let date;
-                  if (typeof dateValue === 'number') {
-                    date = new Date((dateValue - 25569) * 86400 * 1000);
-                  } else {
-                    date = new Date(dateValue);
-                  }
-                  if (!isNaN(date.getTime())) {
-                    detectedMonth = monthNames[date.getMonth()];
-                  }
-                } catch (error) {
-                  console.warn(`Could not detect month from date in sheet: ${sheetName}`);
-                }
-              }
-            }
-            
-            if (!detectedMonth) {
-              console.warn(`⚠️ Could not detect month for sheet: ${sheetName}. Skipping.`);
-              return;
-            }
-            
-            console.log(`📅 Processing sheet "${sheetName}" as month: ${detectedMonth}`);
-            
-            // Process the data for this month
-            const processedData = processSheetDataForAllMonths(jsonData, detectedMonth);
-            if (processedData.length > 0) {
-              newAllMonthsData[detectedMonth] = processedData;
-              console.log(`✅ Added ${processedData.length} entries for ${detectedMonth}`);
-            } else {
-              console.log(`⚠️ No data processed for ${detectedMonth} (sheet: ${sheetName})`);
-            }
-          });
-          
-          console.log(`✅ Processed data for months:`, Object.keys(newAllMonthsData));
-          
-          // Data stored in memory only (no local storage)
-          setAllMonthsData(newAllMonthsData);
-          
-          // Debug: Show what's being stored in memory
-          console.log(`💾 Stored data in memory:`, Object.keys(newAllMonthsData));
-          Object.keys(newAllMonthsData).forEach(month => {
-            console.log(`📊 ${month}: ${newAllMonthsData[month].length} entries`);
-            if (newAllMonthsData[month].length > 0) {
-              console.log(`📋 Sample entry for ${month}:`, newAllMonthsData[month][0]);
-            }
-          });
-          
-          // AUTO-POPULATE: If current month data exists, populate it in the table
-          const currentMonthKey = selectedMonth?.toLowerCase();
-          if (currentMonthKey && newAllMonthsData[currentMonthKey]) {
-            console.log(`🔄 Auto-populating current month (${currentMonthKey}) data in table...`);
-            
-            // Convert the stored data to the format expected by weeklyReportData
-            const convertedData = {};
-            newAllMonthsData[currentMonthKey].forEach(entry => {
-              const dateKey = entry.date;
-              if (!convertedData[dateKey]) {
-                convertedData[dateKey] = [];
-              }
-              
-              // Fix barangay name case sensitivity for dropdown matching
-              let fixedEntry = { ...entry };
-              if (entry.barangay && importedBarangays.length > 0) {
-                // Extract barangay name and municipality from the entry
-                const barangayParts = entry.barangay.split(',').map(part => part.trim());
-                const excelBarangayName = barangayParts[0] || '';
-                const excelMunicipality = barangayParts[1] || '';
-                
-                // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
-                const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
-                  if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
-                    return null;
-                  }
-
-                  const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const excelNameNorm = normalize(excelBarangayName);
-                  const excelMuniNorm = normalize(excelMunicipality);
-
-                  return barangayList.find(barangay => {
-                    const barangayName = barangay.name.split(' (')[0].trim();
-                    const municipality = barangay.municipality;
-                    const nameNorm = normalize(barangayName);
-                    const muniNorm = normalize(municipality);
-
-                    const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
-                    const municipalityMatch = muniNorm === excelMuniNorm;
-
-                    return nameMatch && municipalityMatch;
-                  });
-                };
-                
-                // Try to find a matching barangay with correct case
-                const matchingBarangay = findMatchingBarangay(excelBarangayName, excelMunicipality, importedBarangays);
-                if (matchingBarangay) {
-                  // Use the correctly cased barangay name from the imported list
-                  fixedEntry.barangay = `${matchingBarangay.name}, ${excelMunicipality}`;
-                  console.log(`🔧 Fixed barangay case: "${entry.barangay}" -> "${fixedEntry.barangay}"`);
-                }
-              }
-              
-              convertedData[dateKey].push(fixedEntry);
-            });
-            
-            setWeeklyReportData(convertedData);
-            console.log(`✅ Auto-populated ${Object.keys(convertedData).length} dates for current month (${currentMonthKey})`);
-          }
-          
-          toast.success(`Successfully imported data for ${Object.keys(newAllMonthsData).length} months! ${currentMonthKey && newAllMonthsData[currentMonthKey] ? `Current month (${currentMonthKey}) data is now visible in the table.` : ''}`);
-          
-        } catch (error) {
-          console.error('❌ Error parsing all months from Excel:', error);
-          toast.error("Error parsing Excel file for all months");
-        } finally {
-          setIsImportingAllMonths(false);
-        }
-      };
-      
-      reader.onerror = () => {
-        toast.error("Error reading the file");
-        setIsImportingAllMonths(false);
-      };
-      
-      reader.readAsArrayBuffer(file);
-    } catch (error) {
-      console.error('Error importing all months:', error);
-      toast.error("Error importing all months from Excel");
-      setIsImportingAllMonths(false);
-    }
-  };
-
-  // Helper function to process sheet data for all months (using same logic as parseExcelFile)
-  const processSheetDataForAllMonths = (jsonData, monthName) => {
-    const headers = jsonData[0];
-    if (!headers) {
-      console.log(`❌ No headers found in sheet for ${monthName}`);
-      return [];
-    }
-    
-    console.log(`📋 Headers for ${monthName}:`, headers);
-    console.log(`📊 Total rows in ${monthName}:`, jsonData.length);
-    
-    // Use the same logic as parseExcelFile - expect specific column structure
-    const expectedHeaders = ['DATE', 'BARANGAY', 'TYPE OF CONCERN', 'Week 1', 'Week 2', 'Week 3', 'Week 4', 'STATUS', 'REMARKS'];
-    
-    if (!headers || headers.length < 6) {
-      console.log(`❌ Invalid Excel format for ${monthName}. Expected columns:`, expectedHeaders);
-      return [];
-    }
-    
-    // Use the same column indices as parseExcelFile
-    const dateIndex = 0;
-    const barangayIndex = 1;
-    const concernTypeIndex = 2;
-    const week1Index = 3;
-    const week2Index = 4;
-    const week3Index = 5;
-    const week4Index = 6;
-    const statusIndex = 7;
-    const remarksIndex = 8;
-    
-    console.log(`🔍 Using standard column indices for ${monthName}:`, {
-      date: dateIndex,
-      barangay: barangayIndex,
-      concernType: concernTypeIndex,
-      week1: week1Index,
-      week2: week2Index,
-      week3: week3Index,
-      week4: week4Index,
-      status: statusIndex,
-      remarks: remarksIndex
-    });
-    
-    const processedData = [];
-    const currentMunicipality = activeMunicipalityTab;
-    
-    console.log(`🔍 Processing ${jsonData.length - 1} data rows for ${monthName}`);
-    console.log(`📋 Available imported barangays:`, importedBarangays.map(b => `${b.name}, ${b.municipality}`));
-    
-    // Show first few rows of actual data to understand the structure
-    console.log(`📊 First 3 data rows for ${monthName}:`, jsonData.slice(1, 4));
-    
-    // Process data rows (skip header) - same logic as parseExcelFile
-    for (let i = 1; i < jsonData.length; i++) {
-      const row = jsonData[i];
-      if (!row || row.length === 0) continue;
-      
-      // Keep barangay field as-is (format: "Barangay, Municipality")
-      const barangayField = row[barangayIndex] || '';
-      const barangayParts = barangayField.split(',').map(part => part.trim());
-      const barangay = barangayParts[0] || '';
-      const municipality = barangayParts[1] || '';
-      
-      console.log(`🔍 Row ${i} for ${monthName}:`, {
-        rawBarangay: row[barangayIndex],
-        barangayField,
-        barangay,
-        municipality,
-        rawDate: row[dateIndex]
-      });
-      
-      // Normalize date to exact key using UTC to avoid timezone jumps
-      const processedDate = parseExcelDateToKey(row[dateIndex]) || '';
-      if (!processedDate) {
-        // Skip rows without a valid date to avoid creating empty keys
-        continue;
-      }
-      
-      // Find the correct barangay name from the imported barangays list (same as parseExcelFile)
-      let correctBarangayName = barangayField || 'Unknown Barangay';
-      
-      // Helper function for tolerant barangay matching (ignores spaces/punct, allows substring)
-      const findMatchingBarangay = (excelBarangayName, excelMunicipality, barangayList) => {
-        if (!excelBarangayName || !excelMunicipality || !barangayList.length) {
-          return null;
-        }
-
-        const normalize = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const excelNameNorm = normalize(excelBarangayName);
-        const excelMuniNorm = normalize(excelMunicipality);
-
-        return barangayList.find(barangay => {
-          const barangayName = barangay.name.split(' (')[0].trim();
-          const municipality = barangay.municipality;
-          const nameNorm = normalize(barangayName);
-          const muniNorm = normalize(municipality);
-
-          const nameMatch = nameNorm === excelNameNorm || nameNorm.includes(excelNameNorm) || excelNameNorm.includes(nameNorm);
-          const municipalityMatch = muniNorm === excelMuniNorm;
-
-          return nameMatch && municipalityMatch;
-        });
-      };
-      
-      // Try to match with imported barangays to get the correct format
-      let barangayMatch = null;
-      if (importedBarangays.length > 0) {
-        barangayMatch = findMatchingBarangay(barangay, municipality, importedBarangays);
-      }
-      
-      if (barangayMatch) {
-        correctBarangayName = barangayMatch.name; // Use the full name with (Poblacion) if it exists
-        console.log(`Matched barangay: ${barangayField} -> ${correctBarangayName}`);
-      } else {
-        console.warn(`No match found for barangay: ${barangayField}`);
-      }
-      
-      // Create entry for each week that has data (same logic as parseExcelFile)
-      const weeks = [
-        { index: week1Index, week: 'week1' },
-        { index: week2Index, week: 'week2' },
-        { index: week3Index, week: 'week3' },
-        { index: week4Index, week: 'week4' }
-      ];
-      
-      weeks.forEach(({ index, week }) => {
-        if (index !== -1 && row[index] !== undefined && row[index] !== null && row[index] !== '') {
-          const weekValue = parseInt(row[index]) || 0;
-          if (weekValue > 0) {
-            const newEntry = {
-              id: `excel-${monthName}-${Date.now()}-${Math.random()}`,
-              date: processedDate,
-              municipality: municipality,
-              barangay: `${correctBarangayName}, ${municipality}`, // Use corrected barangay name
-              concernType: row[concernTypeIndex] || '',
-              week1: week === 'week1' ? weekValue : 0,
-              week2: week === 'week2' ? weekValue : 0,
-              week3: week === 'week3' ? weekValue : 0,
-              week4: week === 'week4' ? weekValue : 0,
-              actionTaken: row[statusIndex] || '',
-              remarks: row[remarksIndex] || '',
-              importedFromExcel: true
-            };
-            
-            processedData.push(newEntry);
-          }
-        }
-      });
-    }
-    
-    console.log(`📊 Final processed data for ${monthName}:`, processedData.length, 'entries');
-    if (processedData.length > 0) {
-      console.log(`✅ Sample entry for ${monthName}:`, processedData[0]);
-    }
-    return processedData;
-  };
-
-  const handleImportExcelData = async () => {
-    if (excelData.length === 0) {
-      toast.error("No data to import");
-      return;
-    }
-
-    if (!selectedExcelMunicipality) {
-      toast.error("Please select a municipality to import data for");
-      return;
-    }
-
-    setIsImportingExcel(true);
-    try {
-      // Get data for selected municipality
-      const municipalityData = excelMunicipalityData[selectedExcelMunicipality] || [];
-      
-      if (municipalityData.length === 0) {
-        toast.error(`No data found for municipality: ${selectedExcelMunicipality}`);
-        return;
-      }
-
-      // Set the municipality in the report form
-      setSelectedReportMunicipality(selectedExcelMunicipality);
-      
-      // Import data into weeklyReportData structure
-      const updatedWeeklyData = { ...weeklyReportData };
-      
-      municipalityData.forEach(row => {
-        // Parse the date from Excel (format: "March 1, 2025")
-        const excelDate = row.date;
-        if (excelDate) {
-          try {
-            // Convert Excel date to our format
-            const parsedDate = new Date(excelDate);
-            if (!isNaN(parsedDate.getTime())) {
-              // Format as "Month Day, Year" to match our date format
-              const formattedDate = parsedDate.toLocaleDateString("en-US", { 
-                month: "long", 
-                day: "numeric", 
-                year: "numeric" 
-              });
-              
-              // Normalize to exact key and match strictly
-              const normalizedKey = parseExcelDateToKey(excelDate);
-              const matchingDate = normalizedKey && currentDates.includes(normalizedKey) ? normalizedKey : null;
-              
-              if (matchingDate) {
-                // Create new entry for this date
-                const newEntry = {
-                  id: `imported-${Date.now()}-${Math.random()}`,
-                  barangay: row.barangay || "", // This will be "Barangay, Municipality" format
-                  concernType: row.concernType || "",
-                  week1: row.week1 ? String(row.week1) : "",
-                  week2: row.week2 ? String(row.week2) : "",
-                  week3: row.week3 ? String(row.week3) : "",
-                  week4: row.week4 ? String(row.week4) : "",
-                  actionTaken: row.status || "", // Map status to actionTaken
-                  remarks: row.remarks || ""
-                };
-                
-                // Add to existing entries for this date
-                if (!updatedWeeklyData[matchingDate]) {
-                  updatedWeeklyData[matchingDate] = [];
-                }
-                updatedWeeklyData[matchingDate].push(newEntry);
-              }
-            }
-          } catch (error) {
-            console.warn('Error parsing date:', excelDate, error);
-            // Fallback: try to find by partial match
-            const matchingDate = currentDates.find(date => 
-              date.includes(excelDate) || excelDate.includes(date.split(' ')[1].replace(',', ''))
-            );
-            
-            if (matchingDate) {
-              // Create new entry for this date
-              const newEntry = {
-                id: `imported-${Date.now()}-${Math.random()}`,
-                barangay: row.barangay || "", // This will be "Barangay, Municipality" format
-                concernType: row.concernType || "",
-                week1: row.week1 ? String(row.week1) : "",
-                week2: row.week2 ? String(row.week2) : "",
-                week3: row.week3 ? String(row.week3) : "",
-                week4: row.week4 ? String(row.week4) : "",
-                actionTaken: row.status || "",
-                remarks: row.remarks || ""
-              };
-              
-              // Add to existing entries for this date
-              if (!updatedWeeklyData[matchingDate]) {
-                updatedWeeklyData[matchingDate] = [];
-              }
-              updatedWeeklyData[matchingDate].push(newEntry);
-            }
-          }
-        }
-      });
-      
-      setWeeklyReportData(updatedWeeklyData);
-      
-      // Populate form fields with the first row's data from selected municipality (for backward compatibility)
-      const firstRow = municipalityData[0];
-      setSelectedBarangay(firstRow.barangay);
-      setSelectedConcernType(firstRow.concernType);
-      setActionTaken(firstRow.actionTaken);
-      setRemarks(firstRow.remarks);
-      
-      toast.success(`Imported ${municipalityData.length} rows for ${selectedExcelMunicipality} municipality`);
-      
-      // Add to terminal history
-      const newEntry = {
-        id: Date.now(),
-        command: "excel.import",
-        output: `Imported ${municipalityData.length} rows from Excel file for ${selectedExcelMunicipality} municipality`,
-        type: "success",
-        timestamp: new Date()
-      };
-      setTerminalHistory(prev => [...prev, newEntry]);
-      
-      // Clear Excel data after import
-      setExcelData([]);
-      setExcelPreview([]);
-      setShowExcelPreview(false);
-      setExcelFile(null);
-      setExcelMunicipalityData({});
-      setSelectedExcelMunicipality("");
-      
-    } catch (error) {
-      console.error('Error importing Excel data:', error);
-      toast.error("Error importing Excel data");
-    } finally {
-      setIsImportingExcel(false);
-    }
-  };
-
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "active": return "bg-green-500";
-      case "standby": return "bg-yellow-500";
-      case "inactive": return "bg-red-500";
-      default: return "bg-gray-500";
-    }
-  };
-
-  const getAlertTypeColor = (type) => {
-    switch (type) {
-      case "high": return "bg-red-500";
-      case "medium": return "bg-yellow-500";
-      case "low": return "bg-blue-500";
-      default: return "bg-gray-500";
-    }
-  };
-
-  const getAlertTypeIcon = (type) => {
-    switch (type) {
-      case "high": return <AlertTriangle className="h-4 w-4" />;
-      case "medium": return <Clock className="h-4 w-4" />;
-      case "low": return <CheckCircle className="h-4 w-4" />;
-      default: return <Activity className="h-4 w-4" />;
-    }
-  };
-
-  const getCommTypeIcon = (type) => {
-    switch (type) {
-      case "radio": return <Radio className="h-4 w-4" />;
-      case "broadcast": return <MessageSquare className="h-4 w-4" />;
-      case "emergency": return <AlertTriangle className="h-4 w-4" />;
-      default: return <MessageSquare className="h-4 w-4" />;
-    }
-  };
-
-  // Load weekly reports from collection
-  const loadWeeklyReportsCollection = async (filters = {}) => {
-    setIsLoadingCollection(true);
-    try {
-      const result = await getWeeklyReportsFromCollection(filters);
+      const result = await deleteWeeklyReportFromCollection(docId);
       if (result.success) {
-        setWeeklyReportsCollection(result.data);
-        console.log('✅ Loaded weekly reports from collection:', result.data.length);
+        toast.success('Weekly report deleted successfully');
+        // Reload the collection
+        await loadWeeklyReportsCollection();
       } else {
-        console.error('❌ Error loading weekly reports collection:', result.error);
-        toast.error('Failed to load weekly reports collection');
+        toast.error(`Failed to delete weekly report: ${result.error}`);
       }
     } catch (error) {
-      console.error('❌ Error loading weekly reports collection:', error);
-      toast.error('Error loading weekly reports collection');
-    } finally {
-      setIsLoadingCollection(false);
+      console.error('❌ Error deleting weekly report:', error);
+      toast.error('Error deleting weekly report');
     }
-  };
+  }
+};
 
-  // Delete weekly report from collection
-  const handleDeleteWeeklyReport = async (docId) => {
-    if (window.confirm('Are you sure you want to delete this weekly report? This action cannot be undone.')) {
-      try {
-        const result = await deleteWeeklyReportFromCollection(docId);
-        if (result.success) {
-          toast.success('Weekly report deleted successfully');
-          // Reload the collection
-          await loadWeeklyReportsCollection();
-        } else {
-          toast.error(`Failed to delete weekly report: ${result.error}`);
-        }
-      } catch (error) {
-        console.error('❌ Error deleting weekly report:', error);
-        toast.error('Error deleting weekly report');
-      }
-    }
-  };
-
-  // Bulk delete ALL weekly reports from ALL locations in Firestore
-  const handleDeleteAllWeeklyReports = async () => {
-    const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
+// Bulk delete ALL weekly reports from ALL locations in Firestore
+const handleDeleteAllWeeklyReports = async () => {
+  const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
 
 This will permanently delete ALL weekly reports from:
 • weeklyReports collection
@@ -3905,226 +2542,392 @@ This action CANNOT be undone.
 
 Are you absolutely sure you want to proceed?`;
 
-    if (window.confirm(confirmMessage)) {
-      // Double confirmation for safety
-      const doubleConfirm = window.prompt(
-        'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
-      );
+  if (window.confirm(confirmMessage)) {
+    // Double confirmation for safety
+    const doubleConfirm = window.prompt(
+      'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
+    );
+    
+    if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
+      try {
+        toast.loading('Deleting all weekly reports...', { duration: 0, id: 'bulk-delete' });
+        
+        const result = await deleteAllWeeklyReports();
+        
+        toast.dismiss('bulk-delete');
+        
+        if (result.success) {
+          if (result.errors && result.errors.length > 0) {
+            toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
+            console.warn('❌ Deletion errors:', result.errors);
+          } else {
+            toast.success(`Successfully deleted all ${result.deletedCount} weekly reports`);
+          }
+          
+          // Clear local state
+          initializeWeeklyReportData();
+          setSelectedBarangay("");
+          setSelectedConcernType("");
+          setActionTaken("");
+          setRemarks("");
+          
+          // Reload collection view
+          await loadWeeklyReportsCollection();
+          
+          // Add to terminal history
+          const newEntry = {
+            id: Date.now(),
+            command: "bulk.delete.weekly.reports",
+            output: `Deleted ${result.deletedCount} weekly reports from all locations`,
+            type: "warning",
+            timestamp: new Date()
+          };
+          setTerminalHistory(prev => [...prev, newEntry]);
+          
+        } else {
+          toast.error(`Failed to delete weekly reports: ${result.error}`);
+        }
+      } catch (error) {
+        toast.dismiss('bulk-delete');
+        console.error('❌ Error in bulk delete:', error);
+        toast.error('Error deleting weekly reports');
+      }
+    } else {
+      toast.info('Bulk deletion cancelled - confirmation text did not match');
+    }
+  }
+};
+
+// Save weekly report data to Firestore
+const handleSaveWeeklyReport = async () => {
+  const monthYear = `${selectedMonth}_${selectedYear}`;
+  const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
+  const reportKey = `${monthYear}${municipalityKey}`;
+  setIsLoadingWeeklyReports(true);
+  
+  try {
+    // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
+    const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
+      if (key && key.trim().length > 0) {
+        acc[key] = weeklyReportData[key];
+      }
+      return acc;
+    }, {});
+
+    // Collect all form data from the weekly report table
+    const reportData = {
+      selectedMonth,
+      selectedYear,
+      activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
+      selectedBarangay,
+      selectedConcernType,
+      actionTaken,
+      remarks,
+      weeklyReportData: sanitizedWeeklyReportData, // Include individual date data
+      savedAt: new Date().toISOString()
+    };
+
+    console.log('💾 Saving weekly report data:', {
+      reportKey,
+      dataCount: Object.keys(weeklyReportData).length,
+      sampleData: Object.keys(weeklyReportData).slice(0, 3)
+    });
+
+    // Save to the nested structure: commandCenter > weeklyReports > Municipality > MonthYear
+    let nestedSaveResult = { success: false };
+    if (activeMunicipalityTab) {
+      try {
+        const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
+        await setDoc(docRef, reportData);
+        nestedSaveResult = { success: true };
+        console.log('✅ Saved to nested structure successfully');
+      } catch (error) {
+        console.error('❌ Error saving to nested structure:', error);
+        nestedSaveResult = { success: false, error };
+      }
+    }
+    
+    // Only use nested structure save - no more root level saves
+    if (nestedSaveResult.success) {
+      toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
       
-      if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
-        try {
-          toast.loading('Deleting all weekly reports...', { duration: 0, id: 'bulk-delete' });
+      // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
+      const monthKey = selectedMonth.toLowerCase();
+      if (allMonthsData[monthKey]) {
+        console.log('🧹 Clearing memory data for this month to prevent conflicts');
+        const updatedAllMonthsData = { ...allMonthsData };
+        delete updatedAllMonthsData[monthKey];
+        setAllMonthsData(updatedAllMonthsData);
+      }
+      
+      // Add to terminal history
+      const newEntry = {
+        id: Date.now(),
+        command: "weekly.save",
+        output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}`,
+        type: "success",
+        timestamp: new Date()
+      };
+      setTerminalHistory(prev => [...prev, newEntry]);
+      
+    } else {
+      toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
+    }
+  } catch (error) {
+    console.error("Error saving weekly report:", error);
+    toast.error("Error saving weekly report");
+  } finally {
+    setIsLoadingWeeklyReports(false);
+  }
+};
+
+// Handle Excel file selection and import
+const handleExcelFileSelect = async (event) => {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  setIsImportingExcel(true);
+  setExcelFile(file);
+
+  try {
+    const reader = new FileReader();
+    
+    reader.onload = async (e) => {
+      try {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        
+        if (importAllMonths) {
+          // Import all months mode
+          setIsImportingAllMonths(true);
+          const importedData = {};
           
-          const result = await deleteAllWeeklyReports();
-          
-          toast.dismiss('bulk-delete');
-          
-          if (result.success) {
-            if (result.errors && result.errors.length > 0) {
-              toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
-              console.warn('❌ Deletion errors:', result.errors);
-            } else {
-              toast.success(`Successfully deleted all ${result.deletedCount} weekly reports`);
+          // Process each sheet as a month
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            
+            // Skip empty sheets
+            if (jsonData.length < 2) return;
+            
+            // Parse the sheet data
+            const monthKey = sheetName.toLowerCase().trim();
+            const entries = [];
+            
+            // Assuming first row is headers
+            const headers = jsonData[0];
+            for (let i = 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length === 0) continue;
+              
+              const entry = {};
+              headers.forEach((header, index) => {
+                const headerStr = String(header).toLowerCase().trim();
+                const value = row[index];
+                
+                // Map common column names
+                if (headerStr.includes('date')) {
+                  entry.date = parseExcelDateToKey(value) || value;
+                } else if (headerStr.includes('barangay')) {
+                  entry.barangay = value;
+                } else if (headerStr.includes('concern') || headerStr.includes('type')) {
+                  entry.concernType = value;
+                } else if (headerStr.includes('action')) {
+                  entry.actionTaken = value;
+                } else if (headerStr.includes('remark')) {
+                  entry.remarks = value;
+                } else if (headerStr.includes('municipal')) {
+                  entry.municipality = value;
+                }
+              });
+              
+              if (entry.date) {
+                entries.push(entry);
+              }
             }
             
-            // Clear local state
-            initializeWeeklyReportData();
-            setSelectedBarangay("");
-            setSelectedConcernType("");
-            setActionTaken("");
-            setRemarks("");
-            
-            // Reload collection view
-            await loadWeeklyReportsCollection();
-            
-            // Add to terminal history
-            const newEntry = {
-              id: Date.now(),
-              command: "bulk.delete.weekly.reports",
-              output: `Deleted ${result.deletedCount} weekly reports from all locations`,
-              type: "warning",
-              timestamp: new Date()
-            };
-            setTerminalHistory(prev => [...prev, newEntry]);
-            
-          } else {
-            toast.error(`Failed to delete weekly reports: ${result.error}`);
+            if (entries.length > 0) {
+              importedData[monthKey] = entries;
+            }
+          });
+          
+          setAllMonthsData(importedData);
+          setIsImportingAllMonths(false);
+          toast.success(`Imported ${Object.keys(importedData).length} months from Excel. Click "Save All Months" to save to database.`);
+          
+        } else {
+          // Import single month mode (current month)
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+          
+          if (jsonData.length < 2) {
+            toast.error('Excel file is empty or has no data');
+            return;
           }
-        } catch (error) {
-          toast.dismiss('bulk-delete');
-          console.error('❌ Error in bulk delete:', error);
-          toast.error('Error deleting weekly reports');
+          
+          const headers = jsonData[0];
+          const entries = [];
+          
+          for (let i = 1; i < jsonData.length; i++) {
+            const row = jsonData[i];
+            if (!row || row.length === 0) continue;
+            
+            const entry = {};
+            headers.forEach((header, index) => {
+              const headerStr = String(header).toLowerCase().trim();
+              const value = row[index];
+              
+              if (headerStr.includes('date')) {
+                entry.date = parseExcelDateToKey(value) || value;
+              } else if (headerStr.includes('barangay')) {
+                entry.barangay = value;
+              } else if (headerStr.includes('concern') || headerStr.includes('type')) {
+                entry.concernType = value;
+              } else if (headerStr.includes('action')) {
+                entry.actionTaken = value;
+              } else if (headerStr.includes('remark')) {
+                entry.remarks = value;
+              } else if (headerStr.includes('municipal')) {
+                entry.municipality = value;
+              }
+            });
+            
+            if (entry.date) {
+              entries.push(entry);
+            }
+          }
+          
+          // Group entries by date and add to weeklyReportData
+          const newWeeklyData = { ...weeklyReportData };
+          entries.forEach(entry => {
+            if (!newWeeklyData[entry.date]) {
+              newWeeklyData[entry.date] = [];
+            }
+            newWeeklyData[entry.date].push({
+              id: Date.now() + Math.random(),
+              barangay: entry.barangay || '',
+              concernType: entry.concernType || '',
+              actionTaken: entry.actionTaken || '',
+              remarks: entry.remarks || '',
+              municipality: entry.municipality || activeMunicipalityTab
+            });
+          });
+          
+          setWeeklyReportData(newWeeklyData);
+          toast.success(`Imported ${entries.length} entries from Excel for ${selectedMonth}`);
         }
-      } else {
-        toast.info('Bulk deletion cancelled - confirmation text did not match');
+        
+      } catch (error) {
+        console.error('Error parsing Excel file:', error);
+        toast.error('Error parsing Excel file: ' + error.message);
+      } finally {
+        setIsImportingExcel(false);
+        // Reset file input
+        event.target.value = '';
       }
-    }
-  };
-
-  // Save weekly report data to Firestore
-  const handleSaveWeeklyReport = async () => {
-    const monthYear = `${selectedMonth}_${selectedYear}`;
-    const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
-    const reportKey = `${monthYear}${municipalityKey}`;
-    setIsLoadingWeeklyReports(true);
+    };
     
-    try {
-      // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
-      const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
-        if (key && key.trim().length > 0) {
-          acc[key] = weeklyReportData[key];
+    reader.onerror = () => {
+      toast.error('Error reading Excel file');
+      setIsImportingExcel(false);
+      event.target.value = '';
+    };
+    
+    reader.readAsArrayBuffer(file);
+    
+  } catch (error) {
+    console.error('Error importing Excel:', error);
+    toast.error('Error importing Excel file');
+    setIsImportingExcel(false);
+    event.target.value = '';
+  }
+};
+
+// Save all imported months (from local storage import) to Firestore
+const handleSaveAllMonths = async () => {
+  try {
+    const monthKeys = Object.keys(allMonthsData || {});
+    if (!monthKeys.length) {
+      toast.error('No imported months found to save');
+      return;
+    }
+
+    setIsSavingAllMonths(true);
+    setSaveAllProgress({ current: 0, total: monthKeys.length });
+
+    for (let i = 0; i < monthKeys.length; i++) {
+      const monthKeyLower = monthKeys[i];
+      const monthEntries = allMonthsData[monthKeyLower] || [];
+      if (!monthEntries.length) continue;
+
+      // Derive displayed month name (capitalize first letter)
+      const displayMonth = monthKeyLower.charAt(0).toUpperCase() + monthKeyLower.slice(1);
+
+      // Derive year from first entry date like "January 5, 2025"
+      let derivedYear = selectedYear;
+      try {
+        const sampleDate = monthEntries.find(e => e && e.date)?.date;
+        if (sampleDate) {
+          const yearMatch = /\b(20\d{2}|19\d{2})\b/.exec(String(sampleDate));
+          if (yearMatch) derivedYear = yearMatch[1];
         }
-        return acc;
-      }, {});
+      } catch (_) {}
 
-      // Collect all form data from the weekly report table
-      const reportData = {
-        selectedMonth,
-        selectedYear,
-        activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
-        selectedBarangay,
-        selectedConcernType,
-        actionTaken,
-        remarks,
-        weeklyReportData: sanitizedWeeklyReportData, // Include individual date data
-        savedAt: new Date().toISOString()
-      };
-
-      console.log('💾 Saving weekly report data:', {
-        reportKey,
-        dataCount: Object.keys(weeklyReportData).length,
-        sampleData: Object.keys(weeklyReportData).slice(0, 3)
+      // Convert entries into weeklyReportData shape: { [dateKey]: [rows] }
+      const aggregated = {};
+      monthEntries.forEach((entry) => {
+        if (!entry || !entry.date) return;
+        const dateKey = entry.date;
+        if (!aggregated[dateKey]) aggregated[dateKey] = [];
+        aggregated[dateKey].push(entry);
       });
 
-      // Save to the nested structure: commandCenter > weeklyReports > Municipality > MonthYear
-      let nestedSaveResult = { success: false };
-      if (activeMunicipalityTab) {
-        try {
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
-          await setDoc(docRef, reportData);
-          nestedSaveResult = { success: true };
-          console.log('✅ Saved to nested structure successfully');
-        } catch (error) {
-          console.error('❌ Error saving to nested structure:', error);
-          nestedSaveResult = { success: false, error };
-        }
-      }
-      
-      // Only use nested structure save - no more root level saves
-      if (nestedSaveResult.success) {
-        toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
-        
-        // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
-        const monthKey = selectedMonth.toLowerCase();
-        if (allMonthsData[monthKey]) {
-          console.log('🧹 Clearing memory data for this month to prevent conflicts');
-          const updatedAllMonthsData = { ...allMonthsData };
-          delete updatedAllMonthsData[monthKey];
-          setAllMonthsData(updatedAllMonthsData);
-        }
-        
-        // Add to terminal history
-        const newEntry = {
-          id: Date.now(),
-          command: "weekly.save",
-          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}`,
-          type: "success",
-          timestamp: new Date()
-        };
-        setTerminalHistory(prev => [...prev, newEntry]);
-      } else {
-        toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
-      }
-    } catch (error) {
-      console.error("Error saving weekly report:", error);
-      toast.error("Error saving weekly report");
-    } finally {
-      setIsLoadingWeeklyReports(false);
-    }
-  };
+      // Group entries by municipality and save per municipality
+      const municipalityToEntries = {};
+      monthEntries.forEach((entry) => {
+        const muni = entry?.municipality || 'All';
+        if (!municipalityToEntries[muni]) municipalityToEntries[muni] = [];
+        municipalityToEntries[muni].push(entry);
+      });
 
-  // Save all imported months (from local storage import) to Firestore
-  const handleSaveAllMonths = async () => {
-    try {
-      const monthKeys = Object.keys(allMonthsData || {});
-      if (!monthKeys.length) {
-        toast.error('No imported months found to save');
-        return;
-      }
+      const municipalities = Object.keys(municipalityToEntries);
+      for (let m = 0; m < municipalities.length; m++) {
+        const municipality = municipalities[m];
 
-      setIsSavingAllMonths(true);
-      setSaveAllProgress({ current: 0, total: monthKeys.length });
-
-      for (let i = 0; i < monthKeys.length; i++) {
-        const monthKeyLower = monthKeys[i];
-        const monthEntries = allMonthsData[monthKeyLower] || [];
-        if (!monthEntries.length) continue;
-
-        // Derive displayed month name (capitalize first letter)
-        const displayMonth = monthKeyLower.charAt(0).toUpperCase() + monthKeyLower.slice(1);
-
-        // Derive year from first entry date like "January 5, 2025"
-        let derivedYear = selectedYear;
-        try {
-          const sampleDate = monthEntries.find(e => e && e.date)?.date;
-          if (sampleDate) {
-            const yearMatch = /\b(20\d{2}|19\d{2})\b/.exec(String(sampleDate));
-            if (yearMatch) derivedYear = yearMatch[1];
-          }
-        } catch (_) {}
-
-        // Convert entries into weeklyReportData shape: { [dateKey]: [rows] }
-        const aggregated = {};
-        monthEntries.forEach((entry) => {
+        // Aggregate per municipality into weeklyReportData shape
+        const muniAggregated = {};
+        municipalityToEntries[municipality].forEach((entry) => {
           if (!entry || !entry.date) return;
           const dateKey = entry.date;
-          if (!aggregated[dateKey]) aggregated[dateKey] = [];
-          aggregated[dateKey].push(entry);
+          if (!muniAggregated[dateKey]) muniAggregated[dateKey] = [];
+          muniAggregated[dateKey].push(entry);
         });
 
-        // Group entries by municipality and save per municipality
-        const municipalityToEntries = {};
-        monthEntries.forEach((entry) => {
-          const muni = entry?.municipality || 'All';
-          if (!municipalityToEntries[muni]) municipalityToEntries[muni] = [];
-          municipalityToEntries[muni].push(entry);
-        });
+        const reportData = {
+          selectedMonth: displayMonth,
+          selectedYear: derivedYear,
+          activeMunicipalityTab: municipality,
+          selectedBarangay: '',
+          selectedConcernType: '',
+          actionTaken: '',
+          remarks: '',
+          weeklyReportData: muniAggregated,
+          savedAt: new Date().toISOString()
+        };
 
-        const municipalities = Object.keys(municipalityToEntries);
-        for (let m = 0; m < municipalities.length; m++) {
-          const municipality = municipalities[m];
+        const reportKey = `${displayMonth}_${derivedYear}`;
 
-          // Aggregate per municipality into weeklyReportData shape
-          const muniAggregated = {};
-          municipalityToEntries[municipality].forEach((entry) => {
-            if (!entry || !entry.date) return;
-            const dateKey = entry.date;
-            if (!muniAggregated[dateKey]) muniAggregated[dateKey] = [];
-            muniAggregated[dateKey].push(entry);
-          });
-
-          const reportData = {
-            selectedMonth: displayMonth,
-            selectedYear: derivedYear,
-            activeMunicipalityTab: municipality,
-            selectedBarangay: '',
-            selectedConcernType: '',
-            actionTaken: '',
-            remarks: '',
-            weeklyReportData: muniAggregated,
-            savedAt: new Date().toISOString()
-          };
-
-          const reportKey = `${displayMonth}_${derivedYear}`;
-
-          try {
-            // Only save to nested structure
-            const muniSaveResult = await saveWeeklyReportByMunicipality(reportData);
-            if (muniSaveResult.success) {
-              toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
-            } else {
-              const msg = `byMunicipality: ${muniSaveResult.error || 'failed'}`;
-              toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
+        try {
+          // Only save to nested structure with quota check
+          const muniSaveResult = await saveWithQuotaCheck(
+            () => saveWeeklyReportByMunicipality(reportData),
+            "Save Weekly Report"
+          );
+          if (muniSaveResult.success) {
+            toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
+          } else {
+            const msg = `byMunicipality: ${muniSaveResult.error || 'failed'}`;
+            toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
             }
           } catch (err) {
             console.error('Error saving month by municipality', displayMonth, derivedYear, municipality, err);
@@ -4146,6 +2949,47 @@ Are you absolutely sure you want to proceed?`;
   return (
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout} onShowHelp={() => setShowCommandCenterHelp(true)}>
       <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
+        {/* Firestore Quota Warning Banner */}
+        {isBlocked && blockedUntil && (
+          <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-4 shadow-md">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="font-bold text-red-900 text-lg mb-1">
+                  ⚠️ Firestore Quota Exceeded
+                </h3>
+                <p className="text-red-800 text-sm mb-2">
+                  You have reached the daily Firestore write limit. All save operations are temporarily disabled.
+                </p>
+                <div className="bg-white/50 rounded-md p-3 space-y-1">
+                  <p className="text-sm text-red-900">
+                    <strong>Pwede ka ulit mag-save sa:</strong>{" "}
+                    <span className="font-mono font-semibold">
+                      {blockedUntil.toLocaleString("en-PH", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </span>
+                  </p>
+                  <p className="text-sm text-red-900">
+                    <Clock className="inline h-4 w-4 mr-1" />
+                    <strong>Time remaining:</strong>{" "}
+                    <span className="font-mono font-semibold">{timeLeft}</span>
+                  </p>
+                </div>
+                {isAdmin && (
+                  <button
+                    onClick={resetQuotaBlock}
+                    className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+                  >
+                    Reset Quota Block (Admin Only)
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
         {isCommandUser && (
           <style>{`
             /* Compact table for command-center users */
@@ -4160,6 +3004,68 @@ Are you absolutely sure you want to proceed?`;
             .cc-compact .add-entry-row td { padding-top: 0.25rem; padding-bottom: 0.25rem; }
           `}</style>
         )}
+        
+        <style>{`
+          /* Hover tooltip for table cells */
+          .table-cell-hover {
+            position: relative;
+          }
+          
+          .table-cell-hover input,
+          .table-cell-hover select {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+          
+          .table-cell-hover[data-tooltip]:not([data-tooltip=""]):hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.95);
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            white-space: normal;
+            word-wrap: break-word;
+            max-width: 350px;
+            min-width: 150px;
+            z-index: 10000;
+            pointer-events: none;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            margin-bottom: 8px;
+            animation: tooltipFadeIn 0.2s ease-in-out;
+          }
+          
+          .table-cell-hover[data-tooltip]:not([data-tooltip=""]):hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 7px solid transparent;
+            border-top-color: rgba(0, 0, 0, 0.95);
+            z-index: 10000;
+            pointer-events: none;
+            margin-bottom: 1px;
+            animation: tooltipFadeIn 0.2s ease-in-out;
+          }
+          
+          @keyframes tooltipFadeIn {
+            from {
+              opacity: 0;
+              transform: translateX(-50%) translateY(5px);
+            }
+            to {
+              opacity: 1;
+              transform: translateX(-50%) translateY(0);
+            }
+          }
+        `}</style>
         <Dialog open={showCommandCenterHelp} onOpenChange={(open) => {
           if (!open && dontShowAgain) {
             localStorage.setItem('ccHelpDismissed', '1');
@@ -4399,16 +3305,16 @@ Are you absolutely sure you want to proceed?`;
           </DialogContent>
         </Dialog>
         {/* Header */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Command Center</h1>
-            <p className="text-gray-500 mt-2">Real-time monitoring and control system with comprehensive analytics</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage barangays, concern types, and weekly reports</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
             {/* Municipality Badge - for non-admin users */}
             {(activeMunicipalityTab || userMunicipality) && (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0">
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                 <Building2 className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
                 <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
@@ -4443,11 +3349,11 @@ Are you absolutely sure you want to proceed?`;
             )}
             
             {/* View Options Dropdown */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto">
               <button
                 id="commandcenter-menu-button"
                 onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
               >
                 <Menu className="w-5 h-5" />
                 <span className="text-sm font-medium">View Options</span>
@@ -4525,7 +3431,7 @@ Are you absolutely sure you want to proceed?`;
         </div>
 
       {/* Main Dashboard */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
 
 
 
@@ -4534,21 +3440,21 @@ Are you absolutely sure you want to proceed?`;
           <div className="space-y-6">
             {/* Weekly Report Header */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className={`${isCommandUser ? 'p-4' : 'p-6'} pb-0`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
+              <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} pb-0`}>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+                  <div className="flex items-start gap-3 w-full lg:w-auto">
+                    <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
                       <FileText className="w-5 h-5 text-green-600" />
                     </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
                       {activeMunicipalityTab && (
-                        <div className="flex items-center gap-4 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-green-600" />
-                            <span className="text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
+                            <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
                           </div>
-                          <div className="text-sm text-gray-600">
+                          <div className="text-xs sm:text-sm text-gray-600">
                             {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
                             {importedBarangays.filter(b => {
                               if (!activeMunicipalityTab) return false;
@@ -4561,11 +3467,11 @@ Are you absolutely sure you want to proceed?`;
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-3 sm:gap-4 w-full lg:w-auto">
                     {/* Import Options - Admin Only */}
                     {isAdmin && (
                       <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
                           <input
                             id="import-all-months"
                             name="import-all-months"
@@ -4580,7 +3486,7 @@ Are you absolutely sure you want to proceed?`;
                     )}
                     
                     {/* Action Buttons */}
-                    <div className="flex gap-3 overflow-x-auto">
+                    <div className="flex flex-wrap gap-2 sm:gap-3">
                       
                       {isAdmin && (
                         <button 
@@ -4869,14 +3775,14 @@ Are you absolutely sure you want to proceed?`;
                         </th>
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
                           <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            ACTION TAKEN
+                            <MessageSquare className="h-4 w-4 text-gray-500" />
+                            REMARKS
                           </div>
                         </th>
                         <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 table-cell-spacing">
                           <div className="flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-gray-500" />
-                            REMARKS
+                            <CheckCircle className="h-4 w-4 text-green-500" />
+                            ACTION TAKEN
                           </div>
                         </th>
                       </tr>
@@ -5057,13 +3963,13 @@ Are you absolutely sure you want to proceed?`;
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2 table-cell-spacing">
+                                <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip="">
                                   <input 
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
                                     type="text" 
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
-                                    placeholder="Action taken..."
+                                    placeholder=""
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -5091,7 +3997,7 @@ Are you absolutely sure you want to proceed?`;
                                       </div>
                                     </td>
                                   )}
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-2 table-cell-hover" data-tooltip={entry.barangay || "Select barangay"}>
                                     <div className="flex items-center gap-2">
                                       <select 
                                         id={`existing-barangay-${date}-${entryIndex}`}
@@ -5124,7 +4030,7 @@ Are you absolutely sure you want to proceed?`;
                                       </button>
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-2 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
                                     <select 
                                       id={`existing-concern-type-${date}-${entryIndex}`}
                                       name={`existing-concern-type-${date}-${entryIndex}`}
@@ -5201,13 +4107,13 @@ Are you absolutely sure you want to proceed?`;
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2 table-cell-spacing">
+                                  <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
                                     <input 
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
-                                      placeholder="Action taken..."
+                                      placeholder=""
                                       value={entry.actionTaken}
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
                                     />
@@ -6617,15 +5523,19 @@ Are you absolutely sure you want to proceed?`;
                 <h4 className="text-sm font-bold text-blue-900 mb-2">Quick Instructions</h4>
                 <ul className="space-y-1.5 text-xs text-blue-800">
                   <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">•</span>
+                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
                     <span><strong className="text-blue-900">Before Photo:</strong> Capture the situation/area BEFORE taking action</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-green-500 font-bold mt-0.5">•</span>
+                    <span className="text-green-500 font-bold mt-0.5">2.</span>
                     <span><strong className="text-green-900">After Photo:</strong> Capture the same area AFTER action completed</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="text-purple-500 font-bold mt-0.5">•</span>
+                    <span className="text-purple-500 font-bold mt-0.5">3.</span>
+                    <span><strong className="text-purple-900">Action Taken:</strong> Describe what action was taken after uploading photos</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-gray-500 font-bold mt-0.5">•</span>
                     <span>Photos auto-compress to under 2MB • Both optional but recommended</span>
                   </li>
                 </ul>
@@ -6777,40 +5687,43 @@ Are you absolutely sure you want to proceed?`;
             })()}
           </div>
 
-          {/* Remarks Section */}
-          <div className="mt-4 border-t pt-4">
-            <label className="block text-sm font-semibold text-gray-900 mb-2">
-              <MessageSquare className="w-4 h-4 inline mr-1" />
-              Remarks (Optional)
-            </label>
-            <textarea
-              value={currentPhotoEntry?.entry?.remarks || ''}
-              onChange={(e) => {
-                if (currentPhotoEntry) {
-                  const newValue = e.target.value;
-                  
-                  // Update currentPhotoEntry immediately for responsive UI
-                  setCurrentPhotoEntry(prev => ({
-                    ...prev,
-                    entry: { ...prev.entry, remarks: newValue }
-                  }));
-                  
-                  // Debounce the weeklyReportData update to prevent slowness
-                  if (remarksDebounceRef.current) {
-                    clearTimeout(remarksDebounceRef.current);
+          {/* Action Taken Section - Only show when after photos exist */}
+          {(afterPhotoPreviews.length > 0 || afterPhotos.length > 0) && (
+            <div className="mt-4 border-t pt-4">
+              <label className="block text-sm font-semibold text-gray-900 mb-2">
+                <MessageSquare className="w-4 h-4 inline mr-1" />
+                Action Taken <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={currentPhotoEntry?.entry?.remarks || ''}
+                onChange={(e) => {
+                  if (currentPhotoEntry) {
+                    const newValue = e.target.value;
+                    
+                    // Update currentPhotoEntry immediately for responsive UI
+                    setCurrentPhotoEntry(prev => ({
+                      ...prev,
+                      entry: { ...prev.entry, remarks: newValue }
+                    }));
+                    
+                    // Debounce the weeklyReportData update to prevent slowness
+                    if (remarksDebounceRef.current) {
+                      clearTimeout(remarksDebounceRef.current);
+                    }
+                    
+                    remarksDebounceRef.current = setTimeout(() => {
+                      updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
+                    }, 300); // Wait 300ms after user stops typing
                   }
-                  
-                  remarksDebounceRef.current = setTimeout(() => {
-                    updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
-                  }, 300); // Wait 300ms after user stops typing
-                }
-              }}
-              placeholder="Add any additional notes or remarks about this action..."
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
-            />
-            <p className="text-xs text-gray-500 mt-1">You can add remarks here while uploading photos</p>
-          </div>
+                }}
+                placeholder="Add any additional notes or action taken about this concern..."
+                rows={3}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
+                required
+              />
+              <p className="text-xs text-gray-500 mt-1">Required: Please add action taken after uploading after photos</p>
+            </div>
+          )}
 
           <DialogFooter className="mt-6">
             <button
@@ -6955,7 +5868,7 @@ Are you absolutely sure you want to proceed?`;
             )}
           </div>
 
-          {/* Fixed Footer Section - Concern Type and Remarks */}
+          {/* Fixed Footer Section - Concern Type and Action Taken */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             {/* Concern Type - Left Side */}
             {viewingPhotos?.concernType && (
@@ -6965,10 +5878,10 @@ Are you absolutely sure you want to proceed?`;
               </div>
             )}
 
-            {/* Remarks - Right Side */}
+            {/* Action Taken - Right Side */}
             {viewingPhotos?.remarks && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-green-700 mb-1">Remarks</p>
+                <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
               </div>
             )}
