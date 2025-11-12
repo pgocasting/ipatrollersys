@@ -5503,7 +5503,7 @@ const handleSaveAllMonths = async () => {
 
       {/* Photo Upload Dialog */}
       <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
-        <DialogContent className="sm:max-w-[700px]">
+        <DialogContent className="sm:max-w-[900px]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold text-gray-900">Upload Before & After Photos</DialogTitle>
             <DialogDescription className="text-gray-600">
@@ -5520,8 +5520,8 @@ const handleSaveAllMonths = async () => {
                 </div>
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-bold text-blue-900 mb-2">Quick Instructions</h4>
-                <ul className="space-y-1.5 text-xs text-blue-800">
+                <h4 className="text-sm font-bold text-blue-900 mb-3">Quick Instructions</h4>
+                <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-blue-800">
                   <li className="flex items-start gap-2">
                     <span className="text-blue-500 font-bold mt-0.5">1.</span>
                     <span><strong className="text-blue-900">Before Photo:</strong> Capture the situation/area BEFORE taking action</span>
@@ -5544,7 +5544,7 @@ const handleSaveAllMonths = async () => {
           </div>
 
           {/* Paired Photo Upload - Side by Side */}
-          <div className="space-y-3 max-h-[400px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
+          <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
             {/* Hidden file inputs */}
             <input
               type="file"
