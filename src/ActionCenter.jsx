@@ -377,6 +377,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               whenValue = new Date(item.createdAt);
             }
             
+            const rawActionTaken = item.actionTaken || item.status || item.result || '';
+            const actionTakenValue = rawActionTaken && rawActionTaken.trim() 
+              ? translateAndCorrectGrammar(rawActionTaken) 
+              : 'Pending';
+            
             return {
               id: item.id || `action_${index}_${Date.now()}`,
               department: item.department || item.dept || item.agency || null,
@@ -385,7 +390,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               what: item.what || item.action || item.description || item.activity || null,
               when: whenValue,
               where: item.where || item.place || item.venue || item.location || null,
-              actionTaken: translateAndCorrectGrammar(item.actionTaken || item.status || item.result || 'Pending'),
+              actionTaken: actionTakenValue,
               // Additional metadata
               sourceCollection: item.sourceCollection,
               sourceDocument: item.sourceDocument,
@@ -627,7 +632,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   // Statistics
   const totalActions = filteredItems.length;
   const arrestedActions = filteredItems.filter(item => item.actionTaken === 'Arrested').length;
-  const pendingActions = filteredItems.filter(item => item.actionTaken !== 'Arrested').length;
+  const pendingActions = filteredItems.filter(item => item.actionTaken === 'Pending' || !item.actionTaken || !item.actionTaken.trim()).length;
   // Count PNP actions from filtered data (respects month selection)
   const pnpActions = filteredItems.filter(item => 
     item.department && item.department.toLowerCase() === 'pnp'
@@ -2405,12 +2410,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         <div className="py-2 px-1 min-w-0 text-center">
                           <span 
                             className={`inline-flex items-center px-2 py-1 text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
-                              item.actionTaken && item.actionTaken.toLowerCase().includes('arrested') ? 'bg-red-100 text-red-800 border border-red-200' :
-                              item.actionTaken === 'Pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                              item.actionTaken && item.actionTaken.trim() && item.actionTaken.toLowerCase().includes('arrested') ? 'bg-red-100 text-red-800 border border-red-200' :
+                              !item.actionTaken || !item.actionTaken.trim() || item.actionTaken === 'Pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
                               'bg-gray-100 text-gray-800 border border-gray-200'
                             }`}
                           >
-                            {item.actionTaken || 'Pending'}
+                            {(item.actionTaken && item.actionTaken.trim()) || 'Pending'}
                           </span>
                         </div>
                       </TableCell>
@@ -3131,15 +3136,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="text-sm font-medium text-gray-600">Action Taken/Status</div>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
-                        selectedAction.actionTaken && selectedAction.actionTaken.toLowerCase().includes('arrested') 
+                        selectedAction.actionTaken && selectedAction.actionTaken.trim() && selectedAction.actionTaken.toLowerCase().includes('arrested') 
                           ? 'bg-red-100 text-red-800 border border-red-200' :
-                        selectedAction.actionTaken === 'Pending' 
+                        !selectedAction.actionTaken || !selectedAction.actionTaken.trim() || selectedAction.actionTaken === 'Pending' 
                           ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
                         selectedAction.actionTaken === 'In Progress'
                           ? 'bg-blue-100 text-blue-800 border border-blue-200' :
                           'bg-green-100 text-green-800 border border-green-200'
                       }`}>
-                        {selectedAction.actionTaken || 'Pending'}
+                        {(selectedAction.actionTaken && selectedAction.actionTaken.trim()) || 'Pending'}
                       </span>
                     </div>
                   </div>
