@@ -103,6 +103,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [loadingTopPerformers, setLoadingTopPerformers] = useState(false);
   const topPerformersPreviewRef = useRef(null);
 
+  // Date Range PDF Modal state variables
+  const [showDateRangeModal, setShowDateRangeModal] = useState(false);
+  const [pdfFromMonth, setPdfFromMonth] = useState(new Date().getMonth());
+  const [pdfFromYear, setPdfFromYear] = useState(new Date().getFullYear());
+  const [pdfToMonth, setPdfToMonth] = useState(new Date().getMonth());
+  const [pdfToYear, setPdfToYear] = useState(new Date().getFullYear());
+  const [isGeneratingRangePdf, setIsGeneratingRangePdf] = useState(false);
+
   // Calculate daily summary data for a specific day
   const getDailySummaryData = (dayIndex) => {
     const summaryData = {};
@@ -813,7 +821,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           // March-October: Performance % based on Total Patrols
           // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
           const expectedMaxPatrols = totalDays * 5;
-          activePercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
+          const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
+          activePercentage = Math.min(rawPercentage, 100); // Cap at 100% maximum
         } else {
           // Other months: Use complex weekly efficiency calculation
           // Based on weekly efficiency: (Reports Attended / 98) × 100, summed across 4 weeks
@@ -988,6 +997,28 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           fillColor: [248, 250, 252]
         },
         didParseCell: function(data) {
+          // Color coding for Rank column (Gold, Silver, Bronze)
+          if (data.column.index === 0 && data.section === 'body') {
+            const rank = parseInt(data.cell.text[0]);
+            if (rank === 1) {
+              data.cell.styles.fillColor = [255, 215, 0]; // Gold
+              data.cell.styles.textColor = [255, 255, 255];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (rank === 2) {
+              data.cell.styles.fillColor = [192, 192, 192]; // Silver
+              data.cell.styles.textColor = [0, 0, 0];
+              data.cell.styles.fontStyle = 'bold';
+            } else if (rank === 3) {
+              data.cell.styles.fillColor = [205, 127, 50]; // Bronze
+              data.cell.styles.textColor = [255, 255, 255];
+              data.cell.styles.fontStyle = 'bold';
+            } else {
+              data.cell.styles.fillColor = [156, 163, 175]; // Gray
+              data.cell.styles.textColor = [255, 255, 255];
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+          
           // Color coding for status column
           if (data.column.index === 6 && data.section === 'body') {
             const status = data.cell.text[0];
@@ -1120,6 +1151,441 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         style: { background: 'white' },
       });
       showError('Failed to generate PDF report');
+    }
+  };
+
+  // Function to generate Range PDF report for Top Performers (multiple months)
+  const generateRangePDF = async () => {
+    try {
+      // Create new PDF document
+      const doc = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
+      
+      // Get page dimensions
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      
+      // Calculate the range of months to include
+      const fromDate = new Date(pdfFromYear, pdfFromMonth);
+      const toDate = new Date(pdfToYear, pdfToMonth);
+      
+      let currentDate = new Date(fromDate);
+      let pageCount = 0;
+      
+      // Loop through each month in the range
+      while (currentDate <= toDate) {
+        const currentMonth = currentDate.getMonth();
+        const currentYear = currentDate.getFullYear();
+        
+        // Load data for this specific month directly
+        console.log(`🔍 Loading data for ${new Date(currentYear, currentMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
+        const monthData = await loadTopPerformersDataForMonth(currentMonth, currentYear);
+        console.log(`📊 Loaded ${monthData.length} performers for ${new Date(currentYear, currentMonth).toLocaleDateString("en-US", { month: "long" })}:`, monthData.slice(0, 3));
+        
+        if (pageCount > 0) {
+          doc.addPage(); // Add new page for each month after the first
+        }
+        pageCount++;
+        
+        // Add border around the page
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(1);
+        doc.rect(20, 20, pageWidth - 40, pageHeight - 40);
+        
+        // Add title
+        doc.setFontSize(20);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(59, 130, 246); // Blue color
+        doc.text('Top Performers Ranking Report', pageWidth / 2, 50, { align: 'center' });
+        
+        // Add subtitle with current month
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        doc.text(`Performance Analysis for ${new Date(currentYear, currentMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`, pageWidth / 2, 70, { align: 'center' });
+        
+        // Add generation date
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric'
+        })}`, pageWidth / 2, 85, { align: 'center' });
+        
+        if (monthData && monthData.length > 0) {
+          // Prepare table data for this month
+          const tableData = monthData.map((performer, index) => {
+            const activePercentage = performer.activePercentage;
+            
+            const getStatusText = () => {
+              if (activePercentage >= 96) return 'Very Satisfactory';
+              if (activePercentage >= 86) return 'Very Good';
+              if (activePercentage >= 75) return 'Good';
+              return 'Needs Improvement';
+            };
+
+            return [
+              index + 1,
+              performer.municipality,
+              performer.district,
+              performer.activeDays,
+              performer.totalPatrols,
+              `${activePercentage}%`,
+              getStatusText()
+            ];
+          });
+
+          // Add table using autoTable
+          autoTable(doc, {
+            head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Performa\nnce', 'Status']],
+            body: tableData,
+            startY: 105,
+            margin: { left: 30, right: 30 },
+            tableWidth: 'auto',
+            styles: {
+              fontSize: 9,
+              cellPadding: 5,
+              halign: 'center',
+              valign: 'middle',
+              lineColor: [200, 200, 200],
+              lineWidth: 0.5
+            },
+            headStyles: {
+              fillColor: [59, 130, 246],
+              textColor: [255, 255, 255],
+              fontStyle: 'bold',
+              fontSize: 9,
+              cellPadding: 6,
+              halign: 'center'
+            },
+            columnStyles: {
+              0: { halign: 'center', cellWidth: 'auto', minCellWidth: 30 },
+              1: { halign: 'left', cellWidth: 'auto', minCellWidth: 80 },
+              2: { halign: 'center', cellWidth: 'auto', minCellWidth: 70 },
+              3: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },
+              4: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },
+              5: { halign: 'center', cellWidth: 'auto', minCellWidth: 55 },
+              6: { halign: 'center', cellWidth: 'auto', minCellWidth: 90 }
+            },
+            alternateRowStyles: {
+              fillColor: [248, 250, 252]
+            },
+            didParseCell: function(data) {
+              // Color coding for Rank column (Gold, Silver, Bronze)
+              if (data.column.index === 0 && data.section === 'body') {
+                const rank = parseInt(data.cell.text[0]);
+                if (rank === 1) {
+                  data.cell.styles.fillColor = [255, 215, 0]; // Gold
+                  data.cell.styles.textColor = [255, 255, 255];
+                  data.cell.styles.fontStyle = 'bold';
+                } else if (rank === 2) {
+                  data.cell.styles.fillColor = [192, 192, 192]; // Silver
+                  data.cell.styles.textColor = [0, 0, 0];
+                  data.cell.styles.fontStyle = 'bold';
+                } else if (rank === 3) {
+                  data.cell.styles.fillColor = [205, 127, 50]; // Bronze
+                  data.cell.styles.textColor = [255, 255, 255];
+                  data.cell.styles.fontStyle = 'bold';
+                } else {
+                  data.cell.styles.fillColor = [156, 163, 175]; // Gray
+                  data.cell.styles.textColor = [255, 255, 255];
+                  data.cell.styles.fontStyle = 'bold';
+                }
+              }
+              
+              // Color coding for status column
+              if (data.column.index === 6 && data.section === 'body') {
+                const status = data.cell.text[0];
+                if (status === 'Very Satisfactory') {
+                  data.cell.styles.fillColor = [59, 130, 246];
+                  data.cell.styles.textColor = [255, 255, 255];
+                } else if (status === 'Very Good') {
+                  data.cell.styles.fillColor = [34, 197, 94];
+                  data.cell.styles.textColor = [255, 255, 255];
+                } else if (status === 'Good') {
+                  data.cell.styles.fillColor = [245, 158, 11];
+                  data.cell.styles.textColor = [0, 0, 0];
+                } else if (status === 'Needs Improvement') {
+                  data.cell.styles.fillColor = [239, 68, 68];
+                  data.cell.styles.textColor = [255, 255, 255];
+                }
+              }
+              
+              // Color coding for columns
+              if (data.column.index === 3 && data.section === 'body') {
+                data.cell.styles.textColor = [34, 197, 94]; // Green
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 4 && data.section === 'body') {
+                data.cell.styles.textColor = [59, 130, 246]; // Blue
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 5 && data.section === 'body') {
+                data.cell.styles.textColor = [147, 51, 234]; // Purple
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          });
+
+          // Add summary statistics
+          const finalY = doc.lastAutoTable.finalY + 40;
+          
+          doc.setFontSize(13);
+          doc.setFont('helvetica', 'bold');
+          doc.setTextColor(0, 0, 0);
+          doc.text('Summary Statistics', 30, finalY);
+          
+          // Calculate summary stats for this month
+          const totalActiveDays = monthData.reduce((sum, p) => sum + p.activeDays, 0);
+          const totalPatrols = monthData.reduce((sum, p) => sum + p.totalPatrols, 0);
+          const avgActiveDays = (totalActiveDays / monthData.length).toFixed(1);
+          const avgPatrols = (totalPatrols / monthData.length).toFixed(1);
+          const avgPercentage = Math.round(monthData.reduce((sum, p) => sum + p.activePercentage, 0) / monthData.length);
+          
+          const summaryTableData = [
+            ['Most Active Municipality', `${monthData[0]?.municipality || 'N/A'} (${monthData[0]?.activeDays || 0} days)`],
+            ['Total Active Days', totalActiveDays.toString()],
+            ['Average Active Days', avgActiveDays],
+            ['Total Patrols', totalPatrols.toLocaleString()],
+            ['Average Patrols', avgPatrols],
+            ['Average Performance', `${avgPercentage}%`]
+          ];
+          
+          autoTable(doc, {
+            body: summaryTableData,
+            startY: finalY + 10,
+            margin: { left: 30, right: 30 },
+            theme: 'grid',
+            styles: {
+              fontSize: 10,
+              cellPadding: 6,
+              lineColor: [200, 200, 200],
+              lineWidth: 0.5,
+              halign: 'left',
+              valign: 'middle'
+            },
+            columnStyles: {
+              0: { 
+                fontStyle: 'bold', 
+                cellWidth: 140,
+                fillColor: [248, 250, 252],
+                textColor: [0, 0, 0],
+                halign: 'left'
+              },
+              1: { 
+                cellWidth: 'auto',
+                textColor: [0, 0, 0],
+                halign: 'left'
+              }
+            },
+            didParseCell: function(data) {
+              if (data.row.index === 0 && data.column.index === 1) {
+                data.cell.styles.textColor = [34, 197, 94];
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 1 && data.row.index > 0) {
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          });
+        } else {
+          // No data available for this month
+          doc.setFontSize(14);
+          doc.setFont('helvetica', 'normal');
+          doc.setTextColor(100, 100, 100);
+          doc.text('No performance data available for this month', pageWidth / 2, 200, { align: 'center' });
+        }
+        
+        // Add footer
+        const footerY = pageHeight - 40;
+        doc.setFontSize(8);
+        doc.setFont('helvetica', 'italic');
+        doc.setTextColor(0, 0, 0);
+        doc.text('Report generated by iPatroller Management System', pageWidth / 2, footerY, { align: 'center' });
+        
+        // Calculate total pages
+        const totalMonths = Math.ceil((toDate.getYear() - fromDate.getYear()) * 12 + (toDate.getMonth() - fromDate.getMonth())) + 1;
+        doc.text(`Page ${pageCount} of ${totalMonths}`, pageWidth / 2, footerY + 15, { align: 'center' });
+        
+        // Move to next month
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      }
+      
+      // Save the PDF
+      const fromMonthName = new Date(pdfFromYear, pdfFromMonth).toLocaleDateString("en-US", { month: "short" });
+      const toMonthName = new Date(pdfToYear, pdfToMonth).toLocaleDateString("en-US", { month: "short" });
+      const fileName = `top-performers-range-${fromMonthName}-${toMonthName}-${pdfFromYear}.pdf`;
+      doc.save(fileName);
+      
+      toast.success('Range PDF report generated successfully', {
+        description: `Top Performers Range report saved as ${fileName}`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showSuccess('Range PDF report generated successfully!');
+      
+    } catch (error) {
+      console.error('Error generating range PDF:', error);
+      toast.error('Failed to generate range PDF report', {
+        description: 'Please try again or contact support if the issue persists',
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showError('Failed to generate range PDF report');
+      throw error;
+    }
+  };
+
+  // Helper function to load Top Performers data for a specific month
+  const loadTopPerformersDataForMonth = async (month, year) => {
+    try {
+      console.log(`🔄 loadTopPerformersDataForMonth called for ${new Date(year, month).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
+      
+      // Load the actual Top Performers data for the specified month/year
+      const tempFilteredData = await loadTopPerformersDataDirectly(month, year);
+      console.log(`📥 Raw data loaded:`, tempFilteredData.length, 'items');
+      
+      if (!tempFilteredData || tempFilteredData.length === 0) {
+        console.log(`❌ No data available for ${new Date(year, month).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`);
+        return [];
+      }
+
+      // Apply the same ranking logic as getTopPerformers() but for this specific month's data
+      const isMarchToOctober = month >= 2 && month <= 9;
+      console.log(`📅 Month ${month + 1} is ${isMarchToOctober ? 'March-October' : 'Other months'} - using ${isMarchToOctober ? 'Total Patrols' : 'Performance %'} priority`);
+      
+      const sortedData = [...tempFilteredData].sort((a, b) => {
+        if (isMarchToOctober) {
+          // March-October: Primary = Total Patrols, Secondary = Active Days, Tertiary = Performance %
+          if (b.totalPatrols !== a.totalPatrols) return b.totalPatrols - a.totalPatrols;
+          if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
+          return b.activePercentage - a.activePercentage;
+        } else {
+          // Other months: Primary = Performance %, Secondary = Active Days, Tertiary = Total Patrols
+          if (b.activePercentage !== a.activePercentage) return b.activePercentage - a.activePercentage;
+          if (b.activeDays !== a.activeDays) return b.activeDays - a.activeDays;
+          return b.totalPatrols - a.totalPatrols;
+        }
+      });
+
+      // Return top 12 performers
+      const top12 = sortedData.slice(0, 12);
+      console.log(`🏆 Top 3 performers for ${new Date(year, month).toLocaleDateString("en-US", { month: "long" })}:`);
+      top12.slice(0, 3).forEach((performer, index) => {
+        console.log(`${index + 1}. ${performer.municipality}: ${performer.activeDays} active days, ${performer.totalPatrols} patrols, ${performer.activePercentage}%`);
+      });
+      return top12;
+      
+    } catch (error) {
+      console.error('Error loading data for month:', month, year, error);
+      return [];
+    }
+  };
+
+  // Function to directly load Top Performers data for any month/year
+  const loadTopPerformersDataDirectly = async (month, year) => {
+    try {
+      // Create month-year ID for the specified month
+      const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+      console.log(`🔍 Loading Firestore data for monthYearId: ${monthYearId}`);
+      
+      // Check if it's a locked "No Entry" month
+      const lockedNoEntryMonths = [0, 1]; // January, February 2025
+      const isLockedNoEntry = lockedNoEntryMonths.includes(month) && year === 2025;
+      
+      if (isLockedNoEntry) {
+        return []; // No data for locked months
+      }
+
+      // Try to get data from Firestore for this specific month
+      const monthDocRef = doc(db, 'patrolData', monthYearId);
+      const municipalitiesRef = collection(monthDocRef, 'municipalities');
+      
+      const snapshot = await getDocs(municipalitiesRef);
+      const firestoreData = [];
+      
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data) {
+          firestoreData.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      });
+      
+      console.log(`📦 Found ${firestoreData.length} documents in Firestore for ${monthYearId}`);
+
+      // If no Firestore data, create default structure
+      if (firestoreData.length === 0) {
+        const defaultData = [];
+        Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+          municipalities.forEach((municipality) => {
+            defaultData.push({
+              id: `${district}-${municipality}`,
+              municipality,
+              district,
+              data: new Array(31).fill(0), // Default to 0 patrols
+              totalPatrols: 0,
+              activeDays: 0,
+              inactiveDays: 0,
+              activePercentage: 0,
+            });
+          });
+        });
+        return defaultData;
+      }
+
+      // Process the Firestore data to ensure it has all the calculated fields
+      const processedData = firestoreData.map(item => {
+        // Always recalculate the fields to ensure they're correct for this month
+        console.log(`🔧 Processing ${item.municipality} for ${new Date(year, month).toLocaleDateString("en-US", { month: "long" })}`);
+        console.log(`📊 Raw item data:`, { totalPatrols: item.totalPatrols, activeDays: item.activeDays, activePercentage: item.activePercentage });
+        
+        // Always recalculate instead of using stored values
+        if (true) { // Changed from checking undefined to always recalculate
+          // Calculate from raw data if needed
+          const dailyData = item.data || [];
+          console.log(`📅 ${item.municipality} daily data (first 10 days):`, dailyData.slice(0, 10));
+          const totalPatrols = dailyData.reduce((sum, day) => sum + (day || 0), 0);
+          const activeDays = dailyData.filter(day => (day || 0) >= 5).length;
+          console.log(`📈 ${item.municipality}: ${totalPatrols} total patrols, ${activeDays} active days from ${dailyData.length} days`);
+          
+          // Calculate performance percentage based on month type
+          const isMarchToOctober = month >= 2 && month <= 9;
+          let activePercentage = 0;
+          
+          if (isMarchToOctober) {
+            // March-October: (Total Patrols / Expected Max Patrols) × 100 - CAPPED AT 100%
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const expectedMaxPatrols = daysInMonth * 5;
+            const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
+            activePercentage = Math.min(rawPercentage, 100); // Cap at 100%
+            console.log(`🧮 ${item.municipality}: ${totalPatrols} patrols / ${expectedMaxPatrols} expected = ${rawPercentage}% → capped at ${activePercentage}%`);
+          } else {
+            // Other months: Use existing percentage or calculate from active days
+            activePercentage = item.activePercentage || (dailyData.length > 0 ? Math.round((activeDays / dailyData.length) * 100) : 0);
+            console.log(`🧮 ${item.municipality}: ${activeDays} active days / ${dailyData.length} total days = ${activePercentage}%`);
+          }
+          
+          return {
+            ...item,
+            totalPatrols,
+            activeDays,
+            activePercentage
+          };
+        }
+        
+        return item;
+      });
+
+      return processedData;
+      
+    } catch (error) {
+      console.error('Error loading direct data for month:', month, year, error);
+      return [];
     }
   };
 
@@ -2554,6 +3020,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       {/* Top Performers Modal */}
       {showTopPerformersModal && (
         <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
+          {console.log('🔵 Top Performers Modal is rendering, showDateRangeModal:', showDateRangeModal)}
           <div className="rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
@@ -2617,7 +3084,19 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     size="sm"
                   >
                     <FileText className="w-4 h-4 mr-2" />
-                    Generate Top Performer's PDF
+                    Generate Current Month PDF
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      console.log('🟡 Generate Range PDF button clicked, setting showDateRangeModal to true');
+                      setShowDateRangeModal(true);
+                    }}
+                    disabled={loadingTopPerformers}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Range PDF
                   </Button>
                   <Button
                     onClick={() => setShowTopPerformersModal(false)}
@@ -2870,9 +3349,164 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </div>
               )}
             </div>
+
+            {/* Date Range PDF Modal - Inside Top Performers Modal */}
+            {showDateRangeModal && (
+              <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
+                {console.log('🟢 Date Range Modal is rendering inside Top Performers Modal')}
+                <div className="absolute inset-0 bg-navy-900 bg-opacity-70" onClick={() => setShowDateRangeModal(false)}></div>
+                <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                  {/* Header */}
+                  <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-full flex items-center justify-center bg-green-100">
+                        <Calendar className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">Select Date Range</h3>
+                        <p className="text-sm text-gray-600">Choose the period for your PDF report</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date Range Selection */}
+                  <div className="space-y-6">
+                    {/* From Date */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">From</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          value={pdfFromMonth}
+                          onChange={(e) => setPdfFromMonth(parseInt(e.target.value))}
+                          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                        >
+                          {[
+                            "January", "February", "March", "April", "May", "June",
+                            "July", "August", "September", "October", "November", "December"
+                          ].map((month, index) => (
+                            <option key={index} value={index}>
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={pdfFromYear}
+                          onChange={(e) => setPdfFromYear(parseInt(e.target.value))}
+                          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                        >
+                          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* To Date */}
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700 mb-2 block">To</Label>
+                      <div className="grid grid-cols-2 gap-3">
+                        <select
+                          value={pdfToMonth}
+                          onChange={(e) => setPdfToMonth(parseInt(e.target.value))}
+                          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                        >
+                          {[
+                            "January", "February", "March", "April", "May", "June",
+                            "July", "August", "September", "October", "November", "December"
+                          ].map((month, index) => (
+                            <option key={index} value={index}>
+                              {month}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          value={pdfToYear}
+                          onChange={(e) => setPdfToYear(parseInt(e.target.value))}
+                          className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
+                        >
+                          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Date Range Validation */}
+                    {(() => {
+                      const fromDate = new Date(pdfFromYear, pdfFromMonth);
+                      const toDate = new Date(pdfToYear, pdfToMonth);
+                      const isInvalidRange = fromDate > toDate;
+                      
+                      return isInvalidRange && (
+                        <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-red-600" />
+                            <span className="text-sm text-red-700 font-medium">Invalid date range</span>
+                          </div>
+                          <p className="text-xs text-red-600 mt-1">The "From" date must be earlier than or equal to the "To" date.</p>
+                        </div>
+                      );
+                    })()}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-end gap-3 mt-8">
+                    <Button
+                      onClick={() => setShowDateRangeModal(false)}
+                      variant="outline"
+                      size="sm"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        setIsGeneratingRangePdf(true);
+                        try {
+                          await generateRangePDF();
+                          setShowDateRangeModal(false);
+                        } catch (error) {
+                          console.error('Error generating range PDF:', error);
+                          toast.error('Failed to generate range PDF', {
+                            description: error.message,
+                            duration: 3000
+                          });
+                        } finally {
+                          setIsGeneratingRangePdf(false);
+                        }
+                      }}
+                      disabled={(() => {
+                        const fromDate = new Date(pdfFromYear, pdfFromMonth);
+                        const toDate = new Date(pdfToYear, pdfToMonth);
+                        return fromDate > toDate || isGeneratingRangePdf;
+                      })()}
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      size="sm"
+                    >
+                      {isGeneratingRangePdf ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          Generate PDF
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
+
+
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </Layout>
   );
