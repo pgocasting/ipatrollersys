@@ -119,13 +119,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = patrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        const isActive = dailyCount >= 14;
+        const isActive = dailyCount >= 5;
         
         return {
           municipality,
           dailyCount,
           isActive,
-          percentage: dailyCount >= 14 ? 100 : Math.round((dailyCount / 14) * 100)
+          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
         };
       });
     });
@@ -767,10 +767,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0)
       return "bg-red-600 text-white";
     
-    // Daily status: >= 14 = Active (green), 13 = Warning (yellow), <= 12 = Inactive (red)
-    if (value >= 14)
+    // Daily status: >= 5 = Active (green), 4 = Warning (yellow), <= 3 = Inactive (red)
+    if (value >= 5)
       return "bg-green-600 text-white";
-    if (value === 13)
+    if (value === 4)
       return "bg-yellow-500 text-white";
     return "bg-red-600 text-white";
   };
@@ -779,9 +779,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    // Daily status: >= 14 = Active, 13 = Warning, <= 12 = Inactive
-    if (value >= 14) return "Active";
-    if (value === 13) return "Warning";
+    // Daily status: >= 5 = Active, 4 = Warning (still inactive), <= 3 = Inactive
+    if (value >= 5) return "Active";
+    if (value === 4) return "Warning";
     return "Inactive";
   };
 
@@ -826,9 +826,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return dataToUse
       .filter(item => item && (item.municipality || item.id))
       .map(item => {
-        // Calculate Active Days from Daily Counts tab logic (days with >= 14 patrols)
-        const activeDays = item.data.filter(count => count >= 14).length;
-        const inactiveDays = item.data.filter(count => count < 14 && count > 0).length;
+        // Calculate Active Days from Daily Counts tab logic (days with >= 5 patrols)
+        const activeDays = item.data.filter(count => count >= 5).length;
+        const inactiveDays = item.data.filter(count => count < 5 && count > 0).length;
         const totalDays = item.data.length;
         
         // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
@@ -842,8 +842,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         
         if (isMarchToOctober) {
           // March-October: Performance % based on Total Patrols
-          // Calculate expected maximum patrols (assuming 14 patrols per day for all days)
-          const expectedMaxPatrols = totalDays * 14;
+          // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
+          const expectedMaxPatrols = totalDays * 5;
           const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
           activePercentage = Math.min(rawPercentage, 100); // Cap at 100% maximum
         } else {
@@ -863,7 +863,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             if (weekStart < totalDays) {
               // Use Action Taken count from Command Center data
               const attended = municipalityActionCounts[week] || 0;
-              const efficiency = Math.round((attended / WEEKLY_MIN) * 100);
+              const efficiency = Math.floor((attended / WEEKLY_MIN) * 100);
               weeklyEfficiency.push(efficiency);
             } else {
               weeklyEfficiency.push(0);
@@ -1573,7 +1573,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           const dailyData = item.data || [];
           console.log(`📅 ${item.municipality} daily data (first 10 days):`, dailyData.slice(0, 10));
           const totalPatrols = dailyData.reduce((sum, day) => sum + (day || 0), 0);
-          const activeDays = dailyData.filter(day => (day || 0) >= 14).length;
+          const activeDays = dailyData.filter(day => (day || 0) >= 5).length;
           console.log(`📈 ${item.municipality}: ${totalPatrols} total patrols, ${activeDays} active days from ${dailyData.length} days`);
           
           // Calculate performance percentage based on month type
@@ -1583,7 +1583,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           if (isMarchToOctober) {
             // March-October: (Total Patrols / Expected Max Patrols) × 100 - CAPPED AT 100%
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const expectedMaxPatrols = daysInMonth * 14;
+            const expectedMaxPatrols = daysInMonth * 5;
             const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
             activePercentage = Math.min(rawPercentage, 100); // Cap at 100%
             console.log(`🧮 ${item.municipality}: ${totalPatrols} patrols / ${expectedMaxPatrols} expected = ${rawPercentage}% → capped at ${activePercentage}%`);
@@ -1695,11 +1695,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         
         // Only count if there's actual patrol data (not null/undefined)
         if (patrols !== null && patrols !== undefined && patrols !== '') {
-          // Active: >= 14 patrols (fixed threshold for daily status)
-          if (patrols >= 14) {
+          // Active: >= 5 patrols (fixed threshold for daily status)
+          if (patrols >= 5) {
             activeMunicipalitiesThisDay++;
           }
-          // Inactive: < 14 patrols (including 0)
+          // Inactive: < 5 patrols (including 0)
           else {
             inactiveMunicipalitiesThisDay++;
           }
@@ -2329,11 +2329,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <div className="flex items-center gap-2 text-sm text-blue-800">
                 <BarChart3 className="w-4 h-4" />
                 <span className="font-medium">Required Counts per Daily:</span>
-                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">14+ = Active</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 = Active</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">13 = Warning</span>
+                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">4 = Warning</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">≤12 = Inactive</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">4 = Inactive</span>
               </div>
             </div>
 
@@ -2364,10 +2364,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                       <div className="space-y-2">
                         <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
-                        <p><strong>Color Coding:</strong> Green for 14+ patrols (Active), Yellow for 13 patrols (Warning), Red for 12 or below (Inactive)</p>
+                        <p><strong>Color Coding:</strong> Green for 5+ patrols (Active), Red for below 5 (Inactive)</p>
                       </div>
                       <div className="space-y-2">
-                        <p><strong>Minimum Requirement:</strong> At least 14 patrols per day to be considered active</p>
+                        <p><strong>Minimum Requirement:</strong> At least 5 patrols per day to be considered active</p>
                         <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
                       </div>
                     </div>
