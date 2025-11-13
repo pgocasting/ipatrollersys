@@ -2542,41 +2542,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="top-performers-month" className="text-sm font-medium text-gray-700">Month:</Label>
-                  <select
-                    id="top-performers-month"
-                    name="top-performers-month"
-                    value={selectedTopPerformersMonth}
-                    onChange={(e) => setSelectedTopPerformersMonth(parseInt(e.target.value))}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value={0}>January</option>
-                    <option value={1}>February</option>
-                    <option value={2}>March</option>
-                    <option value={3}>April</option>
-                    <option value={4}>May</option>
-                    <option value={5}>June</option>
-                    <option value={6}>July</option>
-                    <option value={7}>August</option>
-                    <option value={8}>September</option>
-                    <option value={9}>October</option>
-                    <option value={10}>November</option>
-                    <option value={11}>December</option>
-                  </select>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="top-performers-year" className="text-sm font-medium text-gray-700">Year:</Label>
-                  <select
-                    id="top-performers-year"
-                    name="top-performers-year"
-                    value={selectedTopPerformersYear}
-                    onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                  >
-                    <option value={2025}>2025</option>
-                  </select>
-                </div>
                 <Button
                   onClick={generateTopPerformersPDF}
                   disabled={loadingTopPerformers || !getTopPerformers().length}
