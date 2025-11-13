@@ -2436,6 +2436,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                         <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[120px] align-top">
                           <div className="leading-tight">Minimum<br/>Number of<br/>Reports<br/>(Constant)/<br/>Day</div>
                         </th>
+                        <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[120px] align-top">
+                          <div className="leading-tight">Target no. of<br/>Barangays<br/>per Day</div>
+                        </th>
                         <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 min-w-[100px] align-top">
                           <div className="leading-tight">No. of<br/>Days to<br/>Complete<br/>a C/M</div>
                         </th>
@@ -2486,7 +2489,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <tr className="border-b transition-all duration-300 bg-gray-50 border-gray-200">
                         <td
                           colSpan={
-                            activeTab === "daily" ? selectedDates.length + 2 : 20
+                            activeTab === "daily" ? selectedDates.length + 2 : 21
                           }
                           className="px-6 py-3"
                         >
@@ -2647,6 +2650,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     </td>
                                     <td className="px-6 py-4 text-center text-sm text-gray-700">{brgy}</td>
                                     <td className="px-6 py-4 text-center text-sm text-gray-700">{DAILY_MIN}</td>
+                                    <td className="px-6 py-4 text-center text-sm text-gray-700">7</td>
                                     <td className="px-6 py-4 text-center text-sm text-gray-700">{daysToComplete}</td>
                                     <td className="px-6 py-4 text-center text-sm text-gray-700">{frequencyPerWeek}</td>
                                     <td className="px-6 py-4 text-center text-sm text-gray-700">{WEEKLY_MIN}</td>
