@@ -456,14 +456,37 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     // Count if action taken field has a value
                     shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
                   } else {
-                    // Count only entries that have BOTH before and after photos uploaded
+                    // Count total after photos for entries that have BOTH before and after photos uploaded
                     const hasBeforePhoto = entry.photos && entry.photos.before;
-                    const hasAfterPhoto = entry.photos && entry.photos.after;
-                    shouldCount = hasBeforePhoto && hasAfterPhoto;
+                    
+                    // Count the total number of after photos
+                    let afterPhotoCount = 0;
+                    if (entry.photos && entry.photos.after && hasBeforePhoto) {
+                      if (Array.isArray(entry.photos.after)) {
+                        // Multiple after photos - count all photos in the array
+                        afterPhotoCount = entry.photos.after.length;
+                      } else {
+                        // Single after photo (backward compatibility)
+                        afterPhotoCount = entry.photos.after ? 1 : 0;
+                      }
+                    }
+                    
+                    // Only count if there are after photos and before photo exists
+                    if (afterPhotoCount > 0) {
+                      // Determine which week this date falls into
+                      const entryDate = new Date(dateKey);
+                      const dayOfMonth = entryDate.getDate();
+                      const weekIndex = Math.floor((dayOfMonth - 1) / 7);
+                      
+                      // Ensure weekIndex is within bounds (0-3)
+                      if (weekIndex >= 0 && weekIndex < 4) {
+                        weeklyActionCounts[weekIndex] += afterPhotoCount; // Add the count of after photos
+                      }
+                    }
                   }
                   
-                  if (shouldCount) {
-                    // Determine which week this date falls into
+                  if (isMarchToOctober && shouldCount) {
+                    // For March-October, still use the old logic (count entries with action taken)
                     const entryDate = new Date(dateKey);
                     const dayOfMonth = entryDate.getDate();
                     const weekIndex = Math.floor((dayOfMonth - 1) / 7);
@@ -2370,7 +2393,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <div className="space-y-1.5">
                         <p><strong>Minimum Reports/Week:</strong> 98 (14 × 7).</p>
                         <p><strong>Actual Reports/Week:</strong> Displays Week 1-4 breakdown of patrol reports for the month.</p>
-                        <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports. Counts only entries with both before and after photos uploaded from Command Center.</p>
+                        <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports. Counts the total number of after photos uploaded from Command Center for entries that have both before and after photos. Multiple after photos per entry are counted individually.</p>
                         <p><strong>% Efficiency:</strong> (Minimum Number of Reports (constant) / Week) ÷ (No. of Report Attended / Week) × 100.</p>
                       </div>
                     </div>
