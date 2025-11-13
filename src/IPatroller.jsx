@@ -803,31 +803,44 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
         const totalPatrols = item.data.reduce((sum, count) => sum + (count || 0), 0);
         
-        // Calculate Performance % from Criteria tab logic (Overall Percentage)
-        // Based on weekly efficiency: (Reports Attended / 98) × 100, summed across 4 weeks
-        const WEEKLY_MIN = 98; // Minimum reports per week (14 × 7)
-        const weeklyEfficiency = [];
+        // Calculate Performance % based on selected month
+        let activePercentage;
         
-        // Get Action Taken counts from Command Center data for this municipality
-        const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+        // For March to October (months 2-9), use Total Patrols percentage
+        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
         
-        // Calculate efficiency for each of the 4 weeks
-        for (let week = 0; week < 4; week++) {
-          const weekStart = week * 7;
-          const weekEnd = Math.min(weekStart + 7, totalDays);
+        if (isMarchToOctober) {
+          // March-October: Performance % based on Total Patrols
+          // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
+          const expectedMaxPatrols = totalDays * 5;
+          activePercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
+        } else {
+          // Other months: Use complex weekly efficiency calculation
+          // Based on weekly efficiency: (Reports Attended / 98) × 100, summed across 4 weeks
+          const WEEKLY_MIN = 98; // Minimum reports per week (14 × 7)
+          const weeklyEfficiency = [];
           
-          if (weekStart < totalDays) {
-            // Use Action Taken count from Command Center data
-            const attended = municipalityActionCounts[week] || 0;
-            const efficiency = Math.round((attended / WEEKLY_MIN) * 100);
-            weeklyEfficiency.push(efficiency);
-          } else {
-            weeklyEfficiency.push(0);
+          // Get Action Taken counts from Command Center data for this municipality
+          const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+          
+          // Calculate efficiency for each of the 4 weeks
+          for (let week = 0; week < 4; week++) {
+            const weekStart = week * 7;
+            const weekEnd = Math.min(weekStart + 7, totalDays);
+            
+            if (weekStart < totalDays) {
+              // Use Action Taken count from Command Center data
+              const attended = municipalityActionCounts[week] || 0;
+              const efficiency = Math.round((attended / WEEKLY_MIN) * 100);
+              weeklyEfficiency.push(efficiency);
+            } else {
+              weeklyEfficiency.push(0);
+            }
           }
+          
+          // Overall Percentage is the sum of all weekly efficiency percentages
+          activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
         }
-        
-        // Overall Percentage is the sum of all weekly efficiency percentages
-        const activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
         
         return {
           ...item,
@@ -839,15 +852,33 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         };
       })
       .sort((a, b) => {
-        // Sort by performance percentage first (primary metric), then by active days (secondary), then by total patrols (tertiary)
-        // This ensures municipalities with higher performance rank higher
-        if (b.activePercentage !== a.activePercentage) {
+        // For March to October (months 2-9), sort by total patrols first (primary metric)
+        // For other months, sort by performance percentage first
+        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
+        
+        if (isMarchToOctober) {
+          // March to October: Total Patrols is primary metric
+          if (b.totalPatrols !== a.totalPatrols) {
+            return b.totalPatrols - a.totalPatrols;
+          }
+          // Secondary: Active Days
+          if (b.activeDays !== a.activeDays) {
+            return b.activeDays - a.activeDays;
+          }
+          // Tertiary: Performance Percentage
           return b.activePercentage - a.activePercentage;
+        } else {
+          // Other months: Performance Percentage is primary metric
+          if (b.activePercentage !== a.activePercentage) {
+            return b.activePercentage - a.activePercentage;
+          }
+          // Secondary: Active Days
+          if (b.activeDays !== a.activeDays) {
+            return b.activeDays - a.activeDays;
+          }
+          // Tertiary: Total Patrols
+          return b.totalPatrols - a.totalPatrols;
         }
-        if (b.activeDays !== a.activeDays) {
-          return b.activeDays - a.activeDays;
-        }
-        return b.totalPatrols - a.totalPatrols;
       })
       .slice(0, 12); // Top 12 performers
   };
@@ -2541,23 +2572,61 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={generateTopPerformersPDF}
-                  disabled={loadingTopPerformers || !getTopPerformers().length}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  size="sm"
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Generate Top Performer's PDF
-                </Button>
-                <Button
-                  onClick={() => setShowTopPerformersModal(false)}
-                  variant="outline"
-                  size="sm"
-                >
-                  Close
-                </Button>
+              <div className="flex items-center gap-4">
+                {/* Month and Year Selection */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-gray-600" />
+                    <span className="text-sm font-medium text-gray-700">Select Period:</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedTopPerformersMonth}
+                      onChange={(e) => setSelectedTopPerformersMonth(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                    >
+                      {[
+                        "January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December"
+                      ].map((month, index) => (
+                        <option key={index} value={index}>
+                          {month}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={selectedTopPerformersYear}
+                      onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
+                      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                {/* Action Buttons */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={generateTopPerformersPDF}
+                    disabled={loadingTopPerformers || !getTopPerformers().length}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Generate Top Performer's PDF
+                  </Button>
+                  <Button
+                    onClick={() => setShowTopPerformersModal(false)}
+                    variant="outline"
+                    size="sm"
+                  >
+                    Close
+                  </Button>
+                </div>
               </div>
             </div>
 
@@ -2571,12 +2640,18 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     <h4 className="font-semibold text-gray-900 mb-3">How Top Performers Ranking Works</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                       <div className="space-y-2">
-                        <p><strong>Ranking Criteria:</strong> Municipalities are ranked by performance % first, then by active days, then by total patrols as tiebreakers</p>
+                        <p><strong>Ranking Criteria:</strong> {selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9 
+                          ? 'March-October: Ranked by total patrols first, then active days, then performance %' 
+                          : 'Other months: Ranked by performance % first, then active days, then total patrols'
+                        }</p>
                         <p><strong>Active Days:</strong> Days with 5 or more patrols (from Daily Counts tab)</p>
                         <p><strong>Total Patrols:</strong> Sum of Week 1-4 actual reports (from Criteria tab)</p>
                       </div>
                       <div className="space-y-2">
-                        <p><strong>Performance %:</strong> Overall percentage from Criteria tab (sum of weekly efficiency)</p>
+                        <p><strong>Performance %:</strong> {selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9 
+                          ? 'March-October: (Total Patrols / Expected Max Patrols) × 100' 
+                          : 'Other months: Overall percentage from Criteria tab (sum of weekly efficiency)'
+                        }</p>
                         <p><strong>Status Levels:</strong> Very Satisfactory (96-100%), Very Good (86-95%), Good (75-85%), Needs Improvement (&lt;75%)</p>
                         <p><strong>Top 12 Display:</strong> Shows the best performing municipalities for the selected month</p>
                       </div>
