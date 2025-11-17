@@ -2224,6 +2224,68 @@ Are you absolutely sure you want to proceed?`;
     }
   };
 
+  const handleConcernTypeImport = async () => {
+    if (!selectedDistrict || !selectedMunicipality || !concernTypeData.trim()) {
+      toast.error("Please select district, municipality and enter concern type data");
+      showError('Please select district, municipality and enter concern type data');
+      return;
+    }
+
+    setIsImporting(true);
+    
+    try {
+      // Parse concern type data (assuming comma-separated or line-separated)
+      const concernTypes = concernTypeData
+        .split(/[,\n]/)
+        .map(type => type.trim())
+        .filter(type => type.length > 0);
+
+      const newConcernTypes = concernTypes.map((concernType, index) => ({
+        id: `${selectedDistrict}-${selectedMunicipality}-${Date.now()}-${index}`,
+        name: concernType,
+        district: selectedDistrict,
+        municipality: selectedMunicipality,
+        importedAt: new Date().toISOString()
+      }));
+
+      // Update local state
+      const updatedConcernTypes = [...importedConcernTypes, ...newConcernTypes];
+      setImportedConcernTypes(updatedConcernTypes);
+      setConcernTypeData("");
+      
+      // Save to Firestore with quota check
+      const saveResult = await saveWithQuotaCheck(
+        () => saveConcernTypes(updatedConcernTypes),
+        "Import Concern Types"
+      );
+      if (saveResult.success) {
+        toast.success(`Successfully imported ${concernTypes.length} concern types for ${selectedMunicipality}`);
+        showSuccess(`Successfully imported ${concernTypes.length} concern types for ${selectedMunicipality}`);
+        
+        // Add to terminal history
+        const newEntry = {
+          id: Date.now(),
+          command: "concernTypes.import",
+          output: `Imported ${concernTypes.length} concern types to ${selectedMunicipality}, ${selectedDistrict}`,
+          type: "success",
+          timestamp: new Date()
+        };
+        setTerminalHistory(prev => [...prev, newEntry]);
+      } else {
+        toast.error("Failed to save concern types to database: " + saveResult.error);
+        showError('Failed to save concern types to database: ' + saveResult.error);
+        // Revert local state if save failed
+        setImportedConcernTypes(importedConcernTypes);
+      }
+      
+    } catch (error) {
+      toast.error("Error importing concern types: " + error.message);
+      showError('Error importing concern types: ' + error.message);
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const handleExportBarangays = () => {
     if (importedBarangays.length === 0) {
       toast.error("No barangays to export");
@@ -2470,6 +2532,147 @@ Are you absolutely sure you want to proceed?`;
 
   const handleDeselectAllConcernTypes = () => {
     setSelectedConcernTypes([]);
+  };
+
+  // Edit selected concern types
+  const handleEditSelectedConcernTypes = () => {
+    if (selectedConcernTypes.length === 0) {
+      toast.error("No concern types selected");
+      showError('No concern types selected');
+      return;
+    }
+
+    if (selectedConcernTypes.length === 1) {
+      // Single edit
+      const concernType = importedConcernTypes.find(ct => ct.id === selectedConcernTypes[0]);
+      if (concernType) {
+        setEditingConcernType({
+          ...concernType,
+          isBulkEdit: false
+        });
+        setIsEditingConcernTypes(true);
+      }
+    } else {
+      // Bulk edit - get the first selected concern type's district and municipality as defaults
+      const firstConcernType = importedConcernTypes.find(ct => ct.id === selectedConcernTypes[0]);
+      const selectedConcernTypeNames = selectedConcernTypes
+        .map(id => importedConcernTypes.find(ct => ct.id === id)?.name)
+        .filter(name => name)
+        .join(', ');
+
+      setEditingConcernType({
+        id: 'bulk-edit',
+        name: selectedConcernTypeNames,
+        district: firstConcernType?.district || Object.keys(municipalitiesByDistrict)[0],
+        municipality: firstConcernType?.municipality || '',
+        isBulkEdit: true,
+        selectedIds: selectedConcernTypes
+      });
+      setIsEditingConcernTypes(true);
+    }
+  };
+
+  // Clear selected concern types
+  const handleClearSelectedConcernTypes = () => {
+    setSelectedConcernTypes([]);
+    toast.success("Selection cleared");
+    showSuccess('Selection cleared');
+  };
+
+  // Save edited concern type(s)
+  const handleSaveEditedConcernType = async () => {
+    if (!editingConcernType.name.trim() || !editingConcernType.district || !editingConcernType.municipality) {
+      toast.error("Please fill in all required fields");
+      showError('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      let updatedConcernTypes = [...importedConcernTypes];
+
+      if (editingConcernType.isBulkEdit) {
+        // Bulk edit - parse comma-separated names
+        const newNames = editingConcernType.name
+          .split(',')
+          .map(name => name.trim())
+          .filter(name => name.length > 0);
+
+        if (newNames.length !== editingConcernType.selectedIds.length) {
+          toast.error(`Please provide exactly ${editingConcernType.selectedIds.length} concern type names (comma-separated)`);
+          showError(`Please provide exactly ${editingConcernType.selectedIds.length} concern type names (comma-separated)`);
+          return;
+        }
+
+        // Update each selected concern type
+        editingConcernType.selectedIds.forEach((id, index) => {
+          const concernTypeIndex = updatedConcernTypes.findIndex(ct => ct.id === id);
+          if (concernTypeIndex !== -1) {
+            updatedConcernTypes[concernTypeIndex] = {
+              ...updatedConcernTypes[concernTypeIndex],
+              name: newNames[index],
+              district: editingConcernType.district,
+              municipality: editingConcernType.municipality,
+              updatedAt: new Date().toISOString()
+            };
+          }
+        });
+
+        toast.success(`Updated ${editingConcernType.selectedIds.length} concern types`);
+        showSuccess(`Updated ${editingConcernType.selectedIds.length} concern types`);
+      } else {
+        // Single edit
+        const concernTypeIndex = updatedConcernTypes.findIndex(ct => ct.id === editingConcernType.id);
+        if (concernTypeIndex !== -1) {
+          updatedConcernTypes[concernTypeIndex] = {
+            ...updatedConcernTypes[concernTypeIndex],
+            name: editingConcernType.name.trim(),
+            district: editingConcernType.district,
+            municipality: editingConcernType.municipality,
+            updatedAt: new Date().toISOString()
+          };
+        }
+
+        toast.success("Concern type updated successfully");
+        showSuccess('Concern type updated successfully');
+      }
+
+      // Update local state
+      setImportedConcernTypes(updatedConcernTypes);
+      
+      // Save to Firestore
+      const saveResult = await saveWithQuotaCheck(
+        () => saveConcernTypes(updatedConcernTypes),
+        "Update Concern Types"
+      );
+      
+      if (!saveResult.success) {
+        toast.error("Failed to save changes to database: " + saveResult.error);
+        showError('Failed to save changes to database: ' + saveResult.error);
+        // Revert local state if save failed
+        setImportedConcernTypes(importedConcernTypes);
+        return;
+      }
+
+      // Clear cache to force reload
+      concernTypesCache.current = null;
+      
+      // Close modal and clear selection
+      setIsEditingConcernTypes(false);
+      setEditingConcernType(null);
+      setSelectedConcernTypes([]);
+
+    } catch (error) {
+      toast.error("Error updating concern types: " + error.message);
+      showError('Error updating concern types: ' + error.message);
+    }
+  };
+
+  // Cancel edit modal
+  const handleCancelEdit = () => {
+    setIsEditingBarangays(false);
+    setEditingBarangay(null);
+    setIsEditingConcernTypes(false);
+    setEditingConcernType(null);
   };
 
   // Export concern types to CSV
