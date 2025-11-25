@@ -1149,22 +1149,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       // Add roughly 1 inch (72pt) of space above the signature blocks
       const signatureY = Math.min(doc.lastAutoTable.finalY + 72, pageHeight - 120);
 
-      // Approved By: placed further to the right of Prepared By block
-      const approvedX = 404; // shift about 2 inches (144pt) from original 260
+      // Common horizontal padding inside the page border
+      const signatureMarginX = 40; // left & right padding from border
 
-      // Prepared By: aligned with left side of Summary Statistics table (margin left 30)
+      // X positions for the two blocks
+      const preparedX = signatureMarginX; // left block
+      // Right block: keep a right padding while allowing enough width for the full title on one line
+      const approvedX = pageWidth - signatureMarginX - 220;
+
+      // Prepared By: aligned using common left padding
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(0, 0, 0);
-      doc.text('Prepared By:', 30, signatureY);
+      doc.text('Prepared By:', preparedX, signatureY);
 
       // Prepared By name (add ~0.5 inch ≈ 36pt below label)
       doc.setFont('helvetica', 'bold');
-      doc.text('Peter Carlos V. Ronquillo', 30, signatureY + 36);
+      doc.text('Peter Carlos V. Ronquillo', preparedX, signatureY + 36);
 
       // Prepared By position (smaller gap below name)
       doc.setFont('helvetica', 'normal');
-      doc.text('Security Agent I', 30, signatureY + 52);
+      doc.text('Security Agent I', preparedX, signatureY + 52);
 
       // Approved By label
       doc.setFontSize(11);
@@ -1174,11 +1179,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Approved By name (add ~0.5 inch ≈ 36pt below label)
       doc.setFont('helvetica', 'bold');
-      doc.text('Jose Enrique S. Garcia III', approvedX, signatureY + 36);
+      doc.text('Jeffrey T. Calma', approvedX, signatureY + 36);
 
-      // Approved By position (smaller gap below name)
+      // Approved By position (single line title, kept within right margin)
       doc.setFont('helvetica', 'normal');
-      doc.text('Provincial Governor', approvedX, signatureY + 52);
+      doc.text('OIC - Office of the Provincial Governor', approvedX, signatureY + 52);
 
       // Add footer
       const footerY = pageHeight - 40;
@@ -1446,40 +1451,44 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               }
             }
           });
-          
-          // Add Prepared By and Approved By sections for this month (same layout as single-month PDF)
-          const rangeSignatureY = Math.min(doc.lastAutoTable.finalY + 72, pageHeight - 120);
+
+          // Signatures for range PDF (match single-month layout)
+          const rangeSignatureY = doc.lastAutoTable.finalY + 80;
+
+          // Common horizontal padding inside the page border
+          const rangeSignatureMarginX = 40; // same as single-month
+
+          // X positions for the two blocks
+          const rangePreparedX = rangeSignatureMarginX;
+          const rangeApprovedX = pageWidth - rangeSignatureMarginX - 220;
 
           // Prepared By block (left)
           doc.setFontSize(11);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(0, 0, 0);
-          doc.text('Prepared By:', 30, rangeSignatureY);
+          doc.text('Prepared By:', rangePreparedX, rangeSignatureY);
 
           doc.setFont('helvetica', 'bold');
-          doc.text('Peter Carlos V. Ronquillo', 30, rangeSignatureY + 36);
+          doc.text('Peter Carlos V. Ronquillo', rangePreparedX, rangeSignatureY + 36);
 
           doc.setFont('helvetica', 'normal');
-          doc.text('Security Agent I', 30, rangeSignatureY + 52);
+          doc.text('Security Agent I', rangePreparedX, rangeSignatureY + 52);
 
           // Approved By block (right)
-          const rangeApprovedX = 404;
           doc.setFontSize(11);
           doc.setFont('helvetica', 'normal');
           doc.setTextColor(0, 0, 0);
           doc.text('Approved By:', rangeApprovedX, rangeSignatureY);
 
           doc.setFont('helvetica', 'bold');
-          doc.text('Jose Enrique S. Garcia III', rangeApprovedX, rangeSignatureY + 36);
+          doc.text('Jeffrey T. Calma', rangeApprovedX, rangeSignatureY + 36);
 
           doc.setFont('helvetica', 'normal');
-          doc.text('Provincial Governor', rangeApprovedX, rangeSignatureY + 52);
-          
+          doc.text('OIC - Office of the Provincial Governor', rangeApprovedX, rangeSignatureY + 52);
         } else {
-          // No data available for this month
-          doc.setFontSize(14);
-          doc.setFont('helvetica', 'normal');
+          // No data for this month in range PDF
           doc.setTextColor(100, 100, 100);
+          doc.setFontSize(11);
           doc.text('No performance data available for this month', pageWidth / 2, 200, { align: 'center' });
         }
 
