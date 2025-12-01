@@ -5765,6 +5765,16 @@ const handleSaveAllMonths = async () => {
               type="file"
               accept="image/*"
               onChange={(e) => {
+                // Prevent after photo upload when no before photos exist
+                const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+                  (Array.isArray(beforePhotos) && beforePhotos.length > 0);
+                if (!hasBefore) {
+                  showError('Please upload at least one before photo first before adding after photos.');
+                  // Clear any selected files to avoid accidental uploads
+                  e.target.value = '';
+                  return;
+                }
+
                 const files = Array.from(e.target.files || []);
                 if (files.length > 0) {
                   handleAfterPhotoChange(e);
@@ -5866,13 +5876,34 @@ const handleSaveAllMonths = async () => {
                           </div>
                         </div>
                       ) : (
-                        <label
-                          htmlFor="after-photo-input"
-                          className="aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all"
-                        >
-                          <Image className="w-8 h-8 text-green-400 mb-1" />
-                          <span className="text-xs font-medium text-green-600">Add After</span>
-                        </label>
+                        <>
+                          <label
+                            htmlFor="after-photo-input"
+                            className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
+                              (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+                              (Array.isArray(beforePhotos) && beforePhotos.length > 0)
+                                ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-50'
+                                : 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-60'
+                            }`}
+                            onClick={(e) => {
+                              const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+                                (Array.isArray(beforePhotos) && beforePhotos.length > 0);
+                              if (!hasBefore) {
+                                e.preventDefault();
+                                showError('Please upload at least one before photo first before adding after photos.');
+                              }
+                            }}
+                          >
+                            <Image className="w-8 h-8 text-green-400 mb-1" />
+                            <span className="text-xs font-medium text-green-600">Add After</span>
+                          </label>
+                          {(!Array.isArray(beforePhotoPreviews) || beforePhotoPreviews.length === 0) &&
+                            (!Array.isArray(beforePhotos) || beforePhotos.length === 0) && (
+                              <p className="mt-1 text-[11px] text-gray-500">
+                                Upload a before photo on the left first to enable after photos.
+                              </p>
+                            )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -5891,7 +5922,20 @@ const handleSaveAllMonths = async () => {
                   </label>
                   <label
                     htmlFor="after-photo-input"
-                    className="aspect-video border-2 border-dashed border-green-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-green-500 hover:bg-green-50 transition-all"
+                    className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
+                      (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+                      (Array.isArray(beforePhotos) && beforePhotos.length > 0)
+                        ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-50'
+                        : 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-60'
+                    }`}
+                    onClick={(e) => {
+                      const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+                        (Array.isArray(beforePhotos) && beforePhotos.length > 0);
+                      if (!hasBefore) {
+                        e.preventDefault();
+                        showError('Please upload at least one before photo first before adding after photos.');
+                      }
+                    }}
                   >
                     <Plus className="w-8 h-8 text-green-400 mb-1" />
                     <span className="text-xs font-medium text-green-600">Add After Photo</span>
@@ -5903,8 +5947,10 @@ const handleSaveAllMonths = async () => {
             })()}
           </div>
 
-          {/* Action Taken Section - Only show when after photos exist */}
-          {(afterPhotoPreviews.length > 0 || afterPhotos.length > 0) && (
+          {/* Action Taken Section - Only show when both before and after photos exist */}
+          {(((Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
+            (Array.isArray(beforePhotos) && beforePhotos.length > 0)) &&
+            (afterPhotoPreviews.length > 0 || afterPhotos.length > 0)) && (
             <div className="mt-4 border-t pt-4">
               <label className="block text-sm font-semibold text-gray-900 mb-2">
                 <MessageSquare className="w-4 h-4 inline mr-1" />
