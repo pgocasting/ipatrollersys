@@ -55,7 +55,7 @@ import {
 } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
 import { cloudinaryUtils } from './utils/cloudinary';
-
+import PhotoCarousel from './components/PhotoCarousel';
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
@@ -234,13 +234,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Photo Upload States
   const [showPhotoUploadDialog, setShowPhotoUploadDialog] = useState(false);
   const [currentPhotoEntry, setCurrentPhotoEntry] = useState(null);
-  const [beforePhotos, setBeforePhotos] = useState([]);
-  const [afterPhotos, setAfterPhotos] = useState([]);
-  const [beforePhotoPreviews, setBeforePhotoPreviews] = useState([]);
-  const [afterPhotoPreviews, setAfterPhotoPreviews] = useState([]);
+  const [photoRows, setPhotoRows] = useState([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
   const [showPhotoViewDialog, setShowPhotoViewDialog] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState(null);
+  const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
@@ -925,28 +923,49 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     
     setCurrentPhotoEntry({ date, entryIndex, entry });
     
-    // Load existing photos if available (now as arrays)
-    // Handle backward compatibility: convert old single photo (string) to array
-    if (entry?.photos) {
-      const beforeData = entry.photos.before;
-      const afterData = entry.photos.after;
+    // Initialize photoRows from existing data
+    let initialRows = [];
+    
+    // Check if entry has rows structure (new format)
+    if (entry?.photos?.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.length > 0) {
+      // Load existing rows with their photos as previews
+      initialRows = entry.photos.rows.map(row => ({
+        id: row.rowId,
+        beforePhotos: [],
+        afterPhotos: [],
+        beforePreviews: row.before || [],
+        afterPreviews: row.after || []
+      }));
+    } else {
+      // Fallback to old format (single row with before/after)
+      const beforeData = entry?.photos?.before;
+      const afterData = entry?.photos?.after;
       
       // Convert to array if it's a string (old format)
-      setBeforePhotoPreviews(
-        Array.isArray(beforeData) ? beforeData : 
-        (beforeData ? [beforeData] : [])
-      );
-      setAfterPhotoPreviews(
-        Array.isArray(afterData) ? afterData : 
-        (afterData ? [afterData] : [])
-      );
-    } else {
-      setBeforePhotoPreviews([]);
-      setAfterPhotoPreviews([]);
+      const beforePhotos = Array.isArray(beforeData) ? beforeData : (beforeData ? [beforeData] : []);
+      const afterPhotos = Array.isArray(afterData) ? afterData : (afterData ? [afterData] : []);
+      
+      initialRows = [{
+        id: 1,
+        beforePhotos: [],
+        afterPhotos: [],
+        beforePreviews: beforePhotos,
+        afterPreviews: afterPhotos
+      }];
     }
     
-    setBeforePhotos([]);
-    setAfterPhotos([]);
+    // If no rows exist, create an empty first row
+    if (initialRows.length === 0) {
+      initialRows = [{
+        id: 1,
+        beforePhotos: [],
+        afterPhotos: [],
+        beforePreviews: [],
+        afterPreviews: []
+      }];
+    }
+    
+    setPhotoRows(initialRows);
     setShowPhotoUploadDialog(true);
   };
 
@@ -1096,7 +1115,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     if (!currentPhotoEntry) return;
     
     // Check if remarks are required (when after photos exist)
-    const hasAfterPhotos = afterPhotoPreviews.length > 0 || afterPhotos.length > 0;
+    const hasAfterPhotos = photoRows.some(row => row.afterPreviews.length > 0 || row.afterPhotos.length > 0);
     const remarks = currentPhotoEntry?.entry?.remarks || '';
     
     if (hasAfterPhotos && !remarks.trim()) {
@@ -1110,82 +1129,140 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       const photos = {};
       const uploadTimestamp = new Date().toISOString();
       
-      // Upload before photos if selected
-      if (beforePhotos.length > 0) {
-        const beforeUrls = [];
-        const beforeTimestamps = [];
+      // Process each row separately to maintain row organization
+      let totalNewPhotos = 0;
+      photos.rows = [];
+      
+      // First, collect existing rows from database
+      const existingRows = currentPhotoEntry?.entry?.photos?.rows || [];
+      
+      // Get existing before/after photos from old format
+      const existingBeforeData = currentPhotoEntry?.entry?.photos?.before;
+      const existingBefore = Array.isArray(existingBeforeData) ? existingBeforeData : (existingBeforeData ? [existingBeforeData] : []);
+      const existingAfterData = currentPhotoEntry?.entry?.photos?.after;
+      const existingAfter = Array.isArray(existingAfterData) ? existingAfterData : (existingAfterData ? [existingAfterData] : []);
+      const existingBeforeTimestamps = currentPhotoEntry?.entry?.photos?.beforeUploadedAt || [];
+      const existingAfterTimestamps = currentPhotoEntry?.entry?.photos?.afterUploadedAt || [];
+      
+      for (const row of photoRows) {
+        const rowPhotos = {};
         
-        for (let i = 0; i < beforePhotos.length; i++) {
-          const result = await cloudinaryUtils.uploadImage(beforePhotos[i], {
-            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-            publicId: `before-${date}-${entryIndex}-${i}-${Date.now()}`
-          });
+        // Check if this row already exists in database
+        const existingRow = existingRows.find(r => r.rowId === row.id);
+        
+        // Upload before photos for this row
+        if (row.beforePhotos.length > 0) {
+          const beforeUrls = [];
+          const beforeTimestamps = [];
           
-          if (result.success) {
-            beforeUrls.push(result.data.url);
-            beforeTimestamps.push(uploadTimestamp);
-          } else {
-            throw new Error(`Failed to upload before photo ${i + 1}`);
+          for (let i = 0; i < row.beforePhotos.length; i++) {
+            const result = await cloudinaryUtils.uploadImage(row.beforePhotos[i], {
+              folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+              publicId: `before-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
+            });
+            
+            if (result.success) {
+              beforeUrls.push(result.data.url);
+              beforeTimestamps.push(uploadTimestamp);
+              totalNewPhotos++;
+            } else {
+              throw new Error(`Failed to upload before photo in row ${row.id}`);
+            }
           }
+          
+          // Combine with existing before photos from this row
+          const existingRowBefore = existingRow?.before || [];
+          const existingRowBeforeTimestamps = existingRow?.beforeUploadedAt || [];
+          
+          // For Row 1, also include old format photos if they exist
+          let allBefore = [...existingRowBefore];
+          let allBeforeTimestamps = [...existingRowBeforeTimestamps];
+          if (row.id === 1 && existingBefore.length > 0) {
+            allBefore = [...existingBefore, ...existingRowBefore];
+            allBeforeTimestamps = [...existingBeforeTimestamps, ...existingRowBeforeTimestamps];
+          }
+          
+          rowPhotos.before = [...allBefore, ...beforeUrls];
+          rowPhotos.beforeUploadedAt = [...allBeforeTimestamps, ...beforeTimestamps];
+        } else if (existingRow?.before) {
+          // Keep existing before photos if no new ones
+          rowPhotos.before = existingRow.before;
+          rowPhotos.beforeUploadedAt = existingRow.beforeUploadedAt || [];
+        } else if (row.id === 1 && existingBefore.length > 0) {
+          // For Row 1, include old format photos if they exist
+          rowPhotos.before = existingBefore;
+          rowPhotos.beforeUploadedAt = existingBeforeTimestamps;
         }
         
-        // Combine with existing photos from database (not previews)
-        const existingBeforeData = currentPhotoEntry?.entry?.photos?.before;
-        const existingBefore = Array.isArray(existingBeforeData) ? existingBeforeData : (existingBeforeData ? [existingBeforeData] : []);
-        const existingTimestampsData = currentPhotoEntry?.entry?.photos?.beforeUploadedAt;
-        const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
+        // Upload after photos for this row
+        if (row.afterPhotos.length > 0) {
+          const afterUrls = [];
+          const afterTimestamps = [];
+          
+          for (let i = 0; i <row.afterPhotos.length; i++) {
+            const result = await cloudinaryUtils.uploadImage(row.afterPhotos[i], {
+              folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+              publicId: `after-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
+            });
+            
+            if (result.success) {
+              afterUrls.push(result.data.url);
+              afterTimestamps.push(uploadTimestamp);
+              totalNewPhotos++;
+            } else {
+              throw new Error(`Failed to upload after photo in row ${row.id}`);
+            }
+          }
+          
+          // Combine with existing after photos from this row
+          const existingRowAfter = existingRow?.after || [];
+          const existingRowAfterTimestamps = existingRow?.afterUploadedAt || [];
+          
+          // For Row 1, also include old format photos if they exist
+          let allAfter = [...existingRowAfter];
+          let allAfterTimestamps = [...existingRowAfterTimestamps];
+          if (row.id === 1 && existingAfter.length > 0) {
+            allAfter = [...existingAfter, ...existingRowAfter];
+            allAfterTimestamps = [...existingAfterTimestamps, ...existingRowAfterTimestamps];
+          }
+          
+          rowPhotos.after = [...allAfter, ...afterUrls];
+          rowPhotos.afterUploadedAt = [...allAfterTimestamps, ...afterTimestamps];
+        } else if (existingRow?.after) {
+          // Keep existing after photos if no new ones
+          rowPhotos.after = existingRow.after;
+          rowPhotos.afterUploadedAt = existingRow.afterUploadedAt || [];
+        } else if (row.id === 1 && existingAfter.length > 0) {
+          // For Row 1, include old format photos if they exist
+          rowPhotos.after = existingAfter;
+          rowPhotos.afterUploadedAt = existingAfterTimestamps;
+        }
         
-        photos.before = [...existingBefore, ...beforeUrls];
-        photos.beforeUploadedAt = [...existingTimestamps, ...beforeTimestamps];
-      } else if (beforePhotoPreviews.length > 0) {
-        // Keep existing before photos and timestamps
-        photos.before = beforePhotoPreviews;
-        photos.beforeUploadedAt = currentPhotoEntry?.entry?.photos?.beforeUploadedAt || [];
+        // Add row photos if there are any photos in this row
+        if (Object.keys(rowPhotos).length > 0) {
+          photos.rows.push({
+            rowId: row.id,
+            ...rowPhotos
+          });
+        }
       }
       
-      // Upload after photos if selected
-      if (afterPhotos.length > 0) {
-        const afterUrls = [];
-        const afterTimestamps = [];
-        
-        for (let i = 0; i < afterPhotos.length; i++) {
-          const result = await cloudinaryUtils.uploadImage(afterPhotos[i], {
-            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-            publicId: `after-${date}-${entryIndex}-${i}-${Date.now()}`
-          });
-          
-          if (result.success) {
-            afterUrls.push(result.data.url);
-            afterTimestamps.push(uploadTimestamp);
-          } else {
-            throw new Error(`Failed to upload after photo ${i + 1}`);
-          }
-        }
-        
-        // Combine with existing photos from database (not previews)
-        const existingAfterData = currentPhotoEntry?.entry?.photos?.after;
-        const existingAfter = Array.isArray(existingAfterData) ? existingAfterData : (existingAfterData ? [existingAfterData] : []);
-        const existingTimestampsData = currentPhotoEntry?.entry?.photos?.afterUploadedAt;
-        const existingTimestamps = Array.isArray(existingTimestampsData) ? existingTimestampsData : (existingTimestampsData ? [existingTimestampsData] : []);
-        
-        photos.after = [...existingAfter, ...afterUrls];
-        photos.afterUploadedAt = [...existingTimestamps, ...afterTimestamps];
-      } else if (afterPhotoPreviews.length > 0) {
-        // Keep existing after photos and timestamps
-        photos.after = afterPhotoPreviews;
-        photos.afterUploadedAt = currentPhotoEntry?.entry?.photos?.afterUploadedAt || [];
+      // Also keep existing photos for backward compatibility
+      if (existingBefore.length > 0) {
+        photos.before = existingBefore;
+        photos.beforeUploadedAt = existingBeforeTimestamps;
+      }
+      if (existingAfter.length > 0) {
+        photos.after = existingAfter;
+        photos.afterUploadedAt = existingAfterTimestamps;
       }
       
       // Update the entry with photo URLs
       updateDateData(date, entryIndex, 'photos', photos);
       
-      const totalUploaded = beforePhotos.length + afterPhotos.length;
-      showSuccess(`${totalUploaded} photo(s) uploaded successfully!`);
+      showSuccess(`${totalNewPhotos} photo(s) uploaded successfully!`);
       setShowPhotoUploadDialog(false);
-      setBeforePhotos([]);
-      setAfterPhotos([]);
-      setBeforePhotoPreviews([]);
-      setAfterPhotoPreviews([]);
+      setPhotoRows([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
       setCurrentPhotoEntry(null);
     } catch (error) {
       console.error('Error uploading photos:', error);
@@ -4323,7 +4400,10 @@ const handleSaveAllMonths = async () => {
                                   </td>
                                   <td className="px-3 py-2 table-cell-spacing">
                                     <div className="flex items-center justify-center gap-2 h-full">
-                                      {entry.photos && (entry.photos.before || entry.photos.after) ? (
+                                      {entry.photos && (
+                                        (entry.photos.before || entry.photos.after) ||
+                                        (entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.length > 0)
+                                      ) ? (
                                         <>
                                           {/* View button when photos exist */}
                                           <button
@@ -4335,7 +4415,7 @@ const handleSaveAllMonths = async () => {
                                             <span className="text-sm font-medium">View</span>
                                           </button>
                                           {/* Edit button - show if before OR after photo is missing, OR if user is admin */}
-                                          {((!entry.photos.before || !entry.photos.after) || isAdmin) && (
+                                          {(isAdmin || (!entry.remarks && ((!entry.photos.before || !entry.photos.after) || (entry.photos.rows && entry.photos.rows.some(row => !row.after || !row.after.length))))) && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
@@ -4376,11 +4456,14 @@ const handleSaveAllMonths = async () => {
                                           <span className="text-sm font-medium">Upload</span>
                                         </button>
                                       )}
-                                      {entry.remarks && entry.photos?.after && (
+                                      {entry.remarks && (
+                                        (entry.photos?.after && Array.isArray(entry.photos.after) && entry.photos.after.length > 0) ||
+                                        (entry.photos?.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
+                                      ) && (
                                         <div className="relative group">
                                           <div className="px-2.5 py-1 bg-yellow-100 border-l-4 border-yellow-400 rounded-r-md shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-1">
                                             <span className="text-yellow-600 text-sm">📝</span>
-                                            <span className="text-xs font-medium text-yellow-800">Note</span>
+                                            <span className="text-xs font-medium text-yellow-800">Action Taken</span>
                                           </div>
                                           {/* Tooltip on hover - positioned above and aligned to right, extends to the left */}
                                           <div className="absolute right-0 bottom-full mb-2 min-w-[200px] max-w-[280px] p-3 bg-white border-2 border-yellow-400 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] pointer-events-none">
@@ -5707,250 +5790,231 @@ const handleSaveAllMonths = async () => {
       {/* Photo Upload Dialog */}
       <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
         <DialogContent className="sm:max-w-[900px]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-gray-900">Upload Before & After Photos</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Document the before and after state of your action with photos.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Instructions Card */}
-          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-l-4 border-blue-500 rounded-lg p-4 mb-4">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 mt-0.5">
-                <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-                  <span className="text-white text-lg">📋</span>
+          <div className="flex items-start justify-between gap-2">
+
+            <div className="flex-1">
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold text-gray-900">Upload Before & After Photos</DialogTitle>
+                <DialogDescription className="text-gray-600">
+                  Document the before and after state of your action with photos.
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+            <button
+              onClick={() => setShowInstructionsModal(true)}
+              className="mt-[0.66rem] flex items-center px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm flex-shrink-0 mr-2"
+              title="View Quick Instructions"
+            >
+
+              <HelpCircle className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Paired Photo Upload - Multiple Rows */}
+          <div className="space-y-4">
+            {/* Photo Rows */}
+            <div className="space-y-4 max-h-[500px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
+              {photoRows.map((row, rowIndex) => (
+                <div key={row.id} className="bg-white rounded-lg border-2 border-gray-300 p-4">
+                  {/* Row Header */}
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</span>
+                    </div>
+                    {photoRows.length > 1 && (
+                      <button
+                        onClick={() => {
+                          setPhotoRows(photoRows.filter(r => r.id !== row.id));
+                        }}
+                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        title="Delete this row"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Row Content - Before and After side by side */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Before Photos */}
+                    <div className="bg-blue-50 rounded-lg border-2 border-blue-200 p-3 min-h-[260px]">
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">B</div>
+                        <label className="text-xs font-semibold text-blue-700">Before Photos</label>
+                      </div>
+                      <div className="space-y-2">
+                        {row.beforePreviews.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {row.beforePreviews.map((preview, index) => (
+                              <div key={index} className="relative aspect-square border-2 border-blue-300 rounded-lg overflow-hidden bg-gray-100 group">
+                                <img src={preview} alt={`Before ${index + 1}`} className="w-full h-full object-cover" />
+                                <div className="absolute top-1 right-1 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button
+                                    onClick={() => {
+                                      const newRows = photoRows.map(r => {
+                                        if (r.id === row.id) {
+                                          return {
+                                            ...r,
+                                            beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index),
+                                            beforePhotos: r.beforePhotos.filter((_, idx) => idx !== index)
+                                          };
+                                        }
+                                        return r;
+                                      });
+                                      setPhotoRows(newRows);
+                                    }}
+                                    className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <label
+                          htmlFor={`before-photo-input-${row.id}`}
+                          className="block aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all"
+                        >
+                          <Plus className="w-5 h-5 text-blue-400 mb-1" />
+                          <span className="text-xs font-medium text-blue-600">+ Add 1 or more photos</span>
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => {
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 0) {
+                              Promise.all(files.map(file => {
+                                return new Promise((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => resolve(event.target.result);
+                                  reader.readAsDataURL(file);
+                                });
+                              })).then(previews => {
+                                const newRows = photoRows.map(r => {
+                                  if (r.id === row.id) {
+                                    return {
+                                      ...r,
+                                      beforePreviews: [...r.beforePreviews, ...previews],
+                                      beforePhotos: [...r.beforePhotos, ...files]
+                                    };
+                                  }
+                                  return r;
+                                });
+                                setPhotoRows(newRows);
+                              });
+                            }
+                          }}
+                          className="hidden"
+                          id={`before-photo-input-${row.id}`}
+                        />
+                      </div>
+                    </div>
+
+                    {/* After Photos */}
+                    <div className="bg-green-50 rounded-lg border-2 border-green-200 p-3 min-h-[260px]">
+
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">A</div>
+                        <label className="text-xs font-semibold text-green-700">After Photos</label>
+                      </div>
+                      <div className="space-y-2">
+                        {row.afterPreviews.length > 0 && (
+                          <div className="grid grid-cols-2 gap-2">
+                            {row.afterPreviews.map((preview, index) => (
+                              <div key={index} className="relative aspect-square border-2 border-green-300 rounded-lg overflow-hidden bg-gray-100 group">
+                                <img src={preview} alt={`After ${index + 1}`} className="w-full h-full object-cover" />
+                                <div className="absolute top-1 right-1 bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button
+                                    onClick={() => {
+                                      const newRows = photoRows.map(r => {
+                                        if (r.id === row.id) {
+                                          return {
+                                            ...r,
+                                            afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index),
+                                            afterPhotos: r.afterPhotos.filter((_, idx) => idx !== index)
+                                          };
+                                        }
+                                        return r;
+                                      });
+                                      setPhotoRows(newRows);
+                                    }}
+                                    className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                                  >
+                                    <X className="w-2.5 h-2.5" />
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <label
+                          htmlFor={`after-photo-input-${row.id}`}
+                          className={`block aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
+                            row.beforePreviews.length > 0
+                              ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-100'
+                              : 'cursor-not-allowed border-gray-300 bg-gray-100 opacity-50'
+                          }`}
+                          onClick={(e) => {
+                            if (row.beforePreviews.length === 0) {
+                              e.preventDefault();
+                              showError('Please upload before photos first');
+                            }
+                          }}
+                        >
+                          <Plus className="w-5 h-5 text-green-400 mb-1" />
+                          <span className="text-xs font-medium text-green-600">+ Add 1 or more photos</span>
+                        </label>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={(e) => {
+                            if (row.beforePreviews.length === 0) {
+                              showError('Please upload before photos first');
+                              return;
+                            }
+                            const files = Array.from(e.target.files || []);
+                            if (files.length > 0) {
+                              Promise.all(files.map(file => {
+                                return new Promise((resolve) => {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => resolve(event.target.result);
+                                  reader.readAsDataURL(file);
+                                });
+                              })).then(previews => {
+                                const newRows = photoRows.map(r => {
+                                  if (r.id === row.id) {
+                                    return {
+                                      ...r,
+                                      afterPreviews: [...r.afterPreviews, ...previews],
+                                      afterPhotos: [...r.afterPhotos, ...files]
+                                    };
+                                  }
+                                  return r;
+                                });
+                                setPhotoRows(newRows);
+                              });
+                            }
+                          }}
+                          className="hidden"
+                          id={`after-photo-input-${row.id}`}
+                        />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-bold text-blue-900 mb-3">Quick Instructions</h4>
-                <ul className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs text-blue-800">
-                  <li className="flex items-start gap-2">
-                    <span className="text-blue-500 font-bold mt-0.5">1.</span>
-                    <span><strong className="text-blue-900">Before Photo:</strong> Capture the situation/area BEFORE taking action</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-green-500 font-bold mt-0.5">2.</span>
-                    <span><strong className="text-green-900">After Photo:</strong> Capture the same area AFTER action completed</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-purple-500 font-bold mt-0.5">3.</span>
-                    <span><strong className="text-purple-900">Action Taken:</strong> Describe what action was taken after uploading photos</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-gray-500 font-bold mt-0.5">•</span>
-                    <span>Photos auto-compress to under 2MB • Both optional but recommended</span>
-                  </li>
-                </ul>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Paired Photo Upload - Side by Side */}
-          <div className="space-y-3 max-h-[300px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
-            {/* Hidden file inputs */}
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) {
-                  handleBeforePhotoChange(e);
-                }
-              }}
-              className="hidden"
-              id="before-photo-input"
-            />
-            <input
-              type="file"
-              accept="image/*"
-              onChange={(e) => {
-                // Prevent after photo upload when no before photos exist
-                const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-                  (Array.isArray(beforePhotos) && beforePhotos.length > 0);
-                if (!hasBefore) {
-                  showError('Please upload at least one before photo first before adding after photos.');
-                  // Clear any selected files to avoid accidental uploads
-                  e.target.value = '';
-                  return;
-                }
-
-                const files = Array.from(e.target.files || []);
-                if (files.length > 0) {
-                  handleAfterPhotoChange(e);
-                }
-              }}
-              className="hidden"
-              id="after-photo-input"
-            />
-
-            {/* Render photo pairs */}
-            {(() => {
-              const maxLength = Math.max(
-                Array.isArray(beforePhotoPreviews) ? beforePhotoPreviews.length : 0,
-                Array.isArray(afterPhotoPreviews) ? afterPhotoPreviews.length : 0
-              );
-              
-              const pairs = [];
-              for (let i = 0; i < maxLength; i++) {
-                pairs.push(
-                  <div key={i} className="grid grid-cols-2 gap-4 p-3 bg-white rounded-lg border-2 border-gray-200">
-                    {/* Before Photo */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
-                          <label className="text-sm font-semibold text-blue-700">Before Photo</label>
-                        </div>
-                      </div>
-                      {beforePhotoPreviews[i] ? (
-                        <div className="relative aspect-video border-2 border-blue-300 rounded-lg overflow-hidden group">
-                          <img
-                            src={beforePhotoPreviews[i]}
-                            alt={`Before ${i + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              onClick={() => {
-                                setBeforePhotoPreviews(prev => prev.filter((_, idx) => idx !== i));
-                                setBeforePhotos(prev => prev.filter((_, idx) => idx !== i));
-                              }}
-                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                            >
-                              <X className="w-3 h-3" />
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <label
-                          htmlFor="before-photo-input"
-                          className="aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
-                        >
-                          <Image className="w-8 h-8 text-blue-400 mb-1" />
-                          <span className="text-xs font-medium text-blue-600">Add Before</span>
-                        </label>
-                      )}
-                    </div>
-
-                    {/* After Photo */}
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">{i + 1}</div>
-                          <label className="text-sm font-semibold text-green-700">After Photo</label>
-                        </div>
-                      </div>
-                      {afterPhotoPreviews[i] ? (
-                        <div className="relative aspect-video border-2 border-green-300 rounded-lg overflow-hidden group">
-                          <img
-                            src={afterPhotoPreviews[i]}
-                            alt={`After ${i + 1}`}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <button
-                              onClick={() => {
-                                const newAfterPreviews = afterPhotoPreviews.filter((_, idx) => idx !== i);
-                                const newAfterPhotos = afterPhotos.filter((_, idx) => idx !== i);
-                                setAfterPhotoPreviews(newAfterPreviews);
-                                setAfterPhotos(newAfterPhotos);
-                                
-                                // Clear remarks if all after photos are removed
-                                if (newAfterPreviews.length === 0 && newAfterPhotos.length === 0) {
-                                  if (currentPhotoEntry) {
-                                    setCurrentPhotoEntry(prev => ({
-                                      ...prev,
-                                      entry: { ...prev.entry, remarks: '' }
-                                    }));
-                                    updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', '');
-                                  }
-                                }
-                              }}
-                              className="px-2 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                            >
-                              <X className="w-3 h-3" />
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <label
-                            htmlFor="after-photo-input"
-                            className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
-                              (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-                              (Array.isArray(beforePhotos) && beforePhotos.length > 0)
-                                ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-50'
-                                : 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-60'
-                            }`}
-                            onClick={(e) => {
-                              const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-                                (Array.isArray(beforePhotos) && beforePhotos.length > 0);
-                              if (!hasBefore) {
-                                e.preventDefault();
-                                showError('Please upload at least one before photo first before adding after photos.');
-                              }
-                            }}
-                          >
-                            <Image className="w-8 h-8 text-green-400 mb-1" />
-                            <span className="text-xs font-medium text-green-600">Add After</span>
-                          </label>
-                          {(!Array.isArray(beforePhotoPreviews) || beforePhotoPreviews.length === 0) &&
-                            (!Array.isArray(beforePhotos) || beforePhotos.length === 0) && (
-                              <p className="mt-1 text-[11px] text-gray-500">
-                                Upload a before photo on the left first to enable after photos.
-                              </p>
-                            )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                );
-              }
-              
-              // Add new pair button
-              pairs.push(
-                <div key="add-new" className="grid grid-cols-2 gap-4 p-3 bg-white rounded-lg border-2 border-dashed border-gray-300 hover:border-blue-400 transition-all">
-                  <label
-                    htmlFor="before-photo-input"
-                    className="aspect-video border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50 transition-all"
-                  >
-                    <Plus className="w-8 h-8 text-blue-400 mb-1" />
-                    <span className="text-xs font-medium text-blue-600">Add Before Photo</span>
-                  </label>
-                  <label
-                    htmlFor="after-photo-input"
-                    className={`aspect-video border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
-                      (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-                      (Array.isArray(beforePhotos) && beforePhotos.length > 0)
-                        ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-50'
-                        : 'cursor-not-allowed border-gray-300 bg-gray-50 opacity-60'
-                    }`}
-                    onClick={(e) => {
-                      const hasBefore = (Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-                        (Array.isArray(beforePhotos) && beforePhotos.length > 0);
-                      if (!hasBefore) {
-                        e.preventDefault();
-                        showError('Please upload at least one before photo first before adding after photos.');
-                      }
-                    }}
-                  >
-                    <Plus className="w-8 h-8 text-green-400 mb-1" />
-                    <span className="text-xs font-medium text-green-600">Add After Photo</span>
-                  </label>
-                </div>
-              );
-              
-              return pairs;
-            })()}
-          </div>
-
           {/* Action Taken Section - Only show when both before and after photos exist */}
-          {(((Array.isArray(beforePhotoPreviews) && beforePhotoPreviews.length > 0) ||
-            (Array.isArray(beforePhotos) && beforePhotos.length > 0)) &&
-            (afterPhotoPreviews.length > 0 || afterPhotos.length > 0)) && (
+          {(photoRows.some(row => row.beforePreviews.length > 0) && photoRows.some(row => row.afterPreviews.length > 0)) && (
             <div className="mt-4 border-t pt-4">
               <label className="block text-sm font-semibold text-gray-900 mb-2">
                 <MessageSquare className="w-4 h-4 inline mr-1" />
@@ -5987,31 +6051,43 @@ const handleSaveAllMonths = async () => {
             </div>
           )}
 
-          <DialogFooter className="mt-6">
+          <DialogFooter className="mt-6 flex items-center gap-3">
             <button
-              onClick={() => setShowPhotoUploadDialog(false)}
-              className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-              disabled={isUploadingPhotos}
+              onClick={() => {
+                const newId = Math.max(...photoRows.map(r => r.id), 0) + 1;
+                setPhotoRows([...photoRows, { id: newId, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
+              }}
+              className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors font-medium"
             >
-              Cancel
+              <Plus className="w-4 h-4" />
+              Add Row
             </button>
-            <button
-              onClick={handleUploadPhotos}
-              disabled={isUploadingPhotos || (beforePhotos.length === 0 && afterPhotos.length === 0 && beforePhotoPreviews.length === 0 && afterPhotoPreviews.length === 0)}
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
-            >
-              {isUploadingPhotos ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  Upload Photos
-                </>
-              )}
-            </button>
+            <div className="flex gap-3 ml-auto">
+              <button
+                onClick={() => setShowPhotoUploadDialog(false)}
+                className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                disabled={isUploadingPhotos}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUploadPhotos}
+                disabled={isUploadingPhotos || !photoRows.some(row => row.beforePhotos.length > 0 || row.afterPhotos.length > 0)}
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
+              >
+                {isUploadingPhotos ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Upload Photos
+                  </>
+                )}
+              </button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -6048,84 +6124,55 @@ const handleSaveAllMonths = async () => {
           )}
           
           {/* Scrollable Photos Section */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-[400px] overflow-y-auto border-t border-b">
-            {/* Before Photos */}
-            {viewingPhotos?.before && (
-              <div className="space-y-2 pb-4">
-                <div className="flex items-center justify-between sticky top-0 bg-white z-10 pb-2 pt-2 border-b border-gray-200 mb-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    Before Photos ({Array.isArray(viewingPhotos.before) ? viewingPhotos.before.length : 1})
-                  </label>
-                </div>
-                <div className="space-y-3">
-                  {(Array.isArray(viewingPhotos.before) ? viewingPhotos.before : [viewingPhotos.before]).map((photo, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="border rounded-md overflow-hidden h-[300px]">
-                        <img
-                          src={photo}
-                          alt={`Before ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      {(() => {
-                        const timestamps = viewingPhotos.beforeUploadedAt;
-                        const timestamp = Array.isArray(timestamps) ? timestamps[index] : timestamps;
-                        return timestamp ? (
-                          <span className="text-xs text-gray-500 block">
-                            {new Date(timestamp).toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+          <div className="max-h-[500px] overflow-y-auto border-t border-b space-y-6 p-4">
+            {/* Display photos by row if available */}
+            {viewingPhotos?.rows && viewingPhotos.rows.length > 0 ? (
+              viewingPhotos.rows.map((row, rowIndex) => (
+                <div key={rowIndex} className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50">
+                  <div className="mb-4 pb-2 border-b">
+                    <h3 className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</h3>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Before Photos for this row */}
+                    {row.before && Array.isArray(row.before) && row.before.length > 0 && (
+                      <PhotoCarousel
+                        photos={row.before}
+                        timestamps={row.beforeUploadedAt || []}
+                        title={`Before Photos (Row ${rowIndex + 1})`}
+                      />
+                    )}
 
-            {/* After Photos */}
-            {viewingPhotos?.after && (
-              <div className="space-y-2 pb-4">
-                <div className="flex items-center justify-between sticky top-0 bg-white z-10 pb-2 pt-2 border-b border-gray-200 mb-2">
-                  <label className="text-sm font-medium text-gray-700">
-                    After Photos ({Array.isArray(viewingPhotos.after) ? viewingPhotos.after.length : 1})
-                  </label>
+                    {/* After Photos for this row */}
+                    {row.after && Array.isArray(row.after) && row.after.length > 0 && (
+                      <PhotoCarousel
+                        photos={row.after}
+                        timestamps={row.afterUploadedAt || []}
+                        title={`After Photos (Row ${rowIndex + 1})`}
+                      />
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-3">
-                  {(Array.isArray(viewingPhotos.after) ? viewingPhotos.after : [viewingPhotos.after]).map((photo, index) => (
-                    <div key={index} className="space-y-1">
-                      <div className="border rounded-md overflow-hidden h-[300px]">
-                        <img
-                          src={photo}
-                          alt={`After ${index + 1}`}
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                      {(() => {
-                        const timestamps = viewingPhotos.afterUploadedAt;
-                        const timestamp = Array.isArray(timestamps) ? timestamps[index] : timestamps;
-                        return timestamp ? (
-                          <span className="text-xs text-gray-500 block">
-                            {new Date(timestamp).toLocaleString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true
-                            })}
-                          </span>
-                        ) : null;
-                      })()}
-                    </div>
-                  ))}
-                </div>
+              ))
+            ) : (
+              // Fallback for old format (backward compatibility)
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Before Photos Carousel */}
+                {viewingPhotos?.before && Array.isArray(viewingPhotos.before) && viewingPhotos.before.length > 0 && (
+                  <PhotoCarousel
+                    photos={viewingPhotos.before}
+                    timestamps={viewingPhotos.beforeUploadedAt || []}
+                    title="Before Photos"
+                  />
+                )}
+
+                {/* After Photos Carousel */}
+                {viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0 && (
+                  <PhotoCarousel
+                    photos={viewingPhotos.after}
+                    timestamps={viewingPhotos.afterUploadedAt || []}
+                    title="After Photos"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -6141,7 +6188,10 @@ const handleSaveAllMonths = async () => {
             )}
 
             {/* Action Taken - Right Side - Only show if after photos exist */}
-            {viewingPhotos?.remarks && viewingPhotos?.after && (
+            {viewingPhotos?.remarks && (
+              (viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0) ||
+              (viewingPhotos?.rows && viewingPhotos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
+            ) && (
               <div className="bg-green-50 border border-green-200 rounded-md p-3">
                 <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
                 <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
@@ -6155,6 +6205,75 @@ const handleSaveAllMonths = async () => {
               className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
             >
               Close
+            </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Instructions Modal */}
+      <Dialog open={showInstructionsModal} onOpenChange={setShowInstructionsModal}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-gray-900">Quick Instructions</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              Step-by-step guide for uploading before and after photos
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 max-h-[500px] overflow-y-auto">
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white font-bold text-sm">1</div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">Before Photo</h4>
+                <p className="text-sm text-gray-600">Capture the situation/area BEFORE taking action</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-green-500 text-white font-bold text-sm">2</div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">After Photo</h4>
+                <p className="text-sm text-gray-600">Capture the same area AFTER action completed</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-500 text-white font-bold text-sm">3</div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">Multiple Rows</h4>
+                <p className="text-sm text-gray-600">Click "Add Row" to upload photos for different areas/concerns</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-shrink-0">
+                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-orange-500 text-white font-bold text-sm">4</div>
+              </div>
+              <div>
+                <h4 className="font-semibold text-gray-900">Action Taken</h4>
+                <p className="text-sm text-gray-600">Describe what action was taken (required when after photos exist)</p>
+              </div>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <p className="text-sm text-blue-900">
+                <strong>💡 Tips:</strong> Photos auto-compress to under 2MB • Upload both before & after for complete documentation
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <button
+              onClick={() => setShowInstructionsModal(false)}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            >
+              Got it!
             </button>
           </DialogFooter>
         </DialogContent>

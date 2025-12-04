@@ -456,23 +456,26 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     // Count if action taken field has a value
                     shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
                   } else {
-                    // Count total after photos for entries that have BOTH before and after photos uploaded
-                    const hasBeforePhoto = entry.photos && entry.photos.before;
+                    // Count 1 per row that has after photos (not per photo)
+                    let rowsWithAfterPhotos = 0;
                     
-                    // Count the total number of after photos
-                    let afterPhotoCount = 0;
-                    if (entry.photos && entry.photos.after && hasBeforePhoto) {
-                      if (Array.isArray(entry.photos.after)) {
-                        // Multiple after photos - count all photos in the array
-                        afterPhotoCount = entry.photos.after.length;
-                      } else {
-                        // Single after photo (backward compatibility)
-                        afterPhotoCount = entry.photos.after ? 1 : 0;
+                    // Check new format: rows array
+                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
+                      rowsWithAfterPhotos = entry.photos.rows.filter(row => 
+                        row.after && Array.isArray(row.after) && row.after.length > 0
+                      ).length;
+                    } else {
+                      // Check old format: before/after arrays
+                      const hasBeforePhoto = entry.photos && entry.photos.before;
+                      const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
+                      
+                      if (hasAfterPhoto) {
+                        rowsWithAfterPhotos = 1; // Count as 1 row in old format
                       }
                     }
                     
-                    // Only count if there are after photos and before photo exists
-                    if (afterPhotoCount > 0) {
+                    // Only count if there are rows with after photos
+                    if (rowsWithAfterPhotos > 0) {
                       // Determine which week this date falls into
                       const entryDate = new Date(dateKey);
                       const dayOfMonth = entryDate.getDate();
@@ -480,7 +483,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       
                       // Ensure weekIndex is within bounds (0-3)
                       if (weekIndex >= 0 && weekIndex < 4) {
-                        weeklyActionCounts[weekIndex] += afterPhotoCount; // Add the count of after photos
+                        weeklyActionCounts[weekIndex] += rowsWithAfterPhotos; // Count 1 per row with after photos
                       }
                     }
                   }
