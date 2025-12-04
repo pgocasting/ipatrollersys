@@ -38,11 +38,11 @@ export const PhotoCarousel = ({ photos, timestamps, title }) => {
       {/* Carousel Container */}
       <div className="relative">
         {/* Main Image */}
-        <div className="border rounded-md overflow-hidden h-[300px] bg-gray-100 flex items-center justify-center">
+        <div className="border rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
           <img
             src={currentPhoto}
             alt={`${title} ${currentIndex + 1}`}
-            className="w-full h-full object-cover"
+            className="w-full h-auto max-h-[500px] object-contain"
           />
         </div>
 
