@@ -840,11 +840,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Calculate Performance % based on selected month
         let activePercentage;
         
-        // For March to October (months 2-9), use Total Patrols percentage
-        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
+        // For March to December (months 2-11), use Total Patrols percentage
+        const isMarchToDecember = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 11;
         
-        if (isMarchToOctober) {
-          // March-October: Performance % based on Total Patrols
+        if (isMarchToDecember) {
+          // March-December: Performance % based on Total Patrols
           // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
           const expectedMaxPatrols = totalDays * 5;
           const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
@@ -887,12 +887,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         };
       })
       .sort((a, b) => {
-        // For March to October (months 2-9), sort by total patrols first (primary metric)
+        // For March to December (months 2-11), sort by total patrols first (primary metric)
         // For other months, sort by performance percentage first
-        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
+        const isMarchToDecember = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 11;
         
-        if (isMarchToOctober) {
-          // March to October: Total Patrols is primary metric
+        if (isMarchToDecember) {
+          // March to December: Total Patrols is primary metric
           if (b.totalPatrols !== a.totalPatrols) {
             return b.totalPatrols - a.totalPatrols;
           }
