@@ -837,21 +837,40 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
         const totalPatrols = item.data.reduce((sum, count) => sum + (count || 0), 0);
         
-        // Calculate Performance % based on selected month
+        // Calculate Performance % based on selected month and year
         let activePercentage;
+        
+        // Check if it's November or December 2025 (months 10-11 in 0-based index)
+        const isNovDec2025 = selectedTopPerformersYear === 2025 && (selectedTopPerformersMonth === 10 || selectedTopPerformersMonth === 11);
         
         // For March to October (months 2-9), use Total Patrols percentage
         const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
         
-        if (isMarchToOctober) {
+        if (isNovDec2025) {
+          // November-December 2025: Performance % based on reports attended per week
+          const WEEKLY_TARGET = 98; // Target reports per week (14 × 7)
+          const weeklyEfficiency = [];
+          
+          // Get Action Taken counts from Command Center data for this municipality
+          const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+          
+          // Calculate efficiency for each of the 4 weeks based on reports attended
+          for (let week = 0; week < 4; week++) {
+            const reportsAttended = municipalityActionCounts[week] || 0;
+            const efficiency = Math.min(Math.floor((reportsAttended / WEEKLY_TARGET) * 100), 100); // Cap at 100% per week
+            weeklyEfficiency.push(efficiency);
+          }
+          
+          // Calculate average weekly efficiency (sum of weekly percentages / 4)
+          activePercentage = Math.round(weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0) / 4);
+          
+        } else if (isMarchToOctober) {
           // March-October: Performance % based on Total Patrols
-          // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
           const expectedMaxPatrols = totalDays * 5;
           const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
-          activePercentage = Math.min(rawPercentage, 100); // Cap at 100% maximum
+          activePercentage = Math.min(rawPercentage, 100);
         } else {
           // Other months: Use complex weekly efficiency calculation
-          // Based on weekly efficiency: (Reports Attended / 98) × 100, summed across 4 weeks
           const WEEKLY_MIN = 98; // Minimum reports per week (14 × 7)
           const weeklyEfficiency = [];
           
@@ -864,7 +883,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             const weekEnd = Math.min(weekStart + 7, totalDays);
             
             if (weekStart < totalDays) {
-              // Use Action Taken count from Command Center data
               const attended = municipalityActionCounts[week] || 0;
               const efficiency = Math.floor((attended / WEEKLY_MIN) * 100);
               weeklyEfficiency.push(efficiency);
@@ -887,9 +905,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         };
       })
       .sort((a, b) => {
-        // For March to October (months 2-9), sort by total patrols first (primary metric)
+        // For March to October (months 2-9), sort by total patrols first
+        // For November-December 2025, sort by performance percentage (reports attended) first
         // For other months, sort by performance percentage first
         const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
+        const isNovDec2025 = selectedTopPerformersYear === 2025 && (selectedTopPerformersMonth === 10 || selectedTopPerformersMonth === 11);
         
         if (isMarchToOctober) {
           // March to October: Total Patrols is primary metric
@@ -902,6 +922,17 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           }
           // Tertiary: Performance Percentage
           return b.activePercentage - a.activePercentage;
+        } else if (isNovDec2025) {
+          // November-December 2025: Performance % (reports attended) is primary metric
+          if (b.activePercentage !== a.activePercentage) {
+            return b.activePercentage - a.activePercentage;
+          }
+          // Secondary: Total Patrols
+          if (b.totalPatrols !== a.totalPatrols) {
+            return b.totalPatrols - a.totalPatrols;
+          }
+          // Tertiary: Active Days
+          return b.activeDays - a.activeDays;
         } else {
           // Other months: Performance Percentage is primary metric
           if (b.activePercentage !== a.activePercentage) {
