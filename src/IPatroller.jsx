@@ -114,19 +114,18 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   // Calculate daily summary data for a specific day
   const getDailySummaryData = (dayIndex) => {
     const summaryData = {};
-    const thresholds = getThresholds(selectedMonth, selectedYear);
     
     Object.keys(municipalitiesByDistrict).forEach(district => {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = patrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        const isActive = dailyCount >= thresholds.active;
+        const isActive = dailyCount >= 5;
         
         return {
           municipality,
           dailyCount,
           isActive,
-          percentage: dailyCount >= thresholds.active ? 100 : Math.round((dailyCount / thresholds.active) * 100)
+          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
         };
       });
     });
@@ -765,43 +764,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     showSuccess('Cleared unwanted 0 values successfully');
   };
 
-  // Helper function to get thresholds based on date
-  const getThresholds = (month, year) => {
-    // Starting from January 2026, use new thresholds
-    const isNewThresholdPeriod = year > 2026 || (year === 2026 && month >= 0);
-    
-    if (isNewThresholdPeriod) {
-      return { active: 14, warning: 13, inactive: 12 };
-    } else {
-      return { active: 5, warning: 4, inactive: 3 };
-    }
-  };
-
-  const getStatusColor = (value, municipality, month = selectedMonth, year = selectedYear) => {
+  const getStatusColor = (value, municipality) => {
     if (value === null || value === undefined)
       return "bg-gray-100 text-gray-800";
     if (value === 0)
       return "bg-red-600 text-white";
     
-    const thresholds = getThresholds(month, year);
-    
-    // Daily status: >= active = Active (green), warning = Warning (yellow), <= inactive = Inactive (red)
-    if (value >= thresholds.active)
+    // Daily status: >= 5 = Active (green), 4 = Warning (yellow), <= 3 = Inactive (red)
+    if (value >= 5)
       return "bg-green-600 text-white";
-    if (value === thresholds.warning)
+    if (value === 4)
       return "bg-yellow-500 text-white";
     return "bg-red-600 text-white";
   };
 
-  const getStatusText = (value, municipality, month = selectedMonth, year = selectedYear) => {
+  const getStatusText = (value, municipality) => {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    const thresholds = getThresholds(month, year);
-    
-    // Daily status: >= active = Active, warning = Warning, <= inactive = Inactive
-    if (value >= thresholds.active) return "Active";
-    if (value === thresholds.warning) return "Warning";
+    // Daily status: >= 5 = Active, 4 = Warning (still inactive), <= 3 = Inactive
+    if (value >= 5) return "Active";
+    if (value === 4) return "Warning";
     return "Inactive";
   };
 
@@ -846,10 +829,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return dataToUse
       .filter(item => item && (item.municipality || item.id))
       .map(item => {
-        // Calculate Active Days from Daily Counts tab logic (days with >= active threshold)
-        const thresholds = getThresholds(selectedTopPerformersMonth, selectedTopPerformersYear);
-        const activeDays = item.data.filter(count => count >= thresholds.active).length;
-        const inactiveDays = item.data.filter(count => count < thresholds.active && count > 0).length;
+        // Calculate Active Days from Daily Counts tab logic (days with >= 5 patrols)
+        const activeDays = item.data.filter(count => count >= 5).length;
+        const inactiveDays = item.data.filter(count => count < 5 && count > 0).length;
         const totalDays = item.data.length;
         
         // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
@@ -858,11 +840,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Calculate Performance % based on selected month
         let activePercentage;
         
-        // For March to December (months 2-11), use Total Patrols percentage
-        const isMarchToDecember = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 11;
+        // For March to October (months 2-9), use Total Patrols percentage
+        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
         
-        if (isMarchToDecember) {
-          // March-December: Performance % based on Total Patrols
+        if (isMarchToOctober) {
+          // March-October: Performance % based on Total Patrols
           // Calculate expected maximum patrols (assuming 5 patrols per day for all days)
           const expectedMaxPatrols = totalDays * 5;
           const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
@@ -905,12 +887,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         };
       })
       .sort((a, b) => {
-        // For March to December (months 2-11), sort by total patrols first (primary metric)
+        // For March to October (months 2-9), sort by total patrols first (primary metric)
         // For other months, sort by performance percentage first
-        const isMarchToDecember = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 11;
+        const isMarchToOctober = selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
         
-        if (isMarchToDecember) {
-          // March to December: Total Patrols is primary metric
+        if (isMarchToOctober) {
+          // March to October: Total Patrols is primary metric
           if (b.totalPatrols !== a.totalPatrols) {
             return b.totalPatrols - a.totalPatrols;
           }
@@ -1659,14 +1641,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const processedData = firestoreData.map(item => {
         // Always recalculate the fields to ensure they're correct for this month
         console.log(`🔧 Processing ${item.municipality} for ${new Date(year, month).toLocaleDateString("en-US", { month: "long" })}`);
+        console.log(`📊 Raw item data:`, { totalPatrols: item.totalPatrols, activeDays: item.activeDays, activePercentage: item.activePercentage });
+        
         // Always recalculate instead of using stored values
         if (true) { // Changed from checking undefined to always recalculate
           // Calculate from raw data if needed
           const dailyData = item.data || [];
           console.log(`📅 ${item.municipality} daily data (first 10 days):`, dailyData.slice(0, 10));
           const totalPatrols = dailyData.reduce((sum, day) => sum + (day || 0), 0);
-          const thresholds = getThresholds(month, year);
-          const activeDays = dailyData.filter(day => (day || 0) >= thresholds.active).length;
+          const activeDays = dailyData.filter(day => (day || 0) >= 5).length;
           console.log(`📈 ${item.municipality}: ${totalPatrols} total patrols, ${activeDays} active days from ${dailyData.length} days`);
           
           // Calculate performance percentage based on month type
@@ -1783,17 +1766,16 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       let inactiveMunicipalitiesThisDay = 0;
       
       // For each day, count how many municipalities are active/inactive
-      const thresholds = getThresholds(selectedMonth, selectedYear);
       patrolData.forEach((municipality) => {
         const patrols = municipality.data[dayIndex];
         
         // Only count if there's actual patrol data (not null/undefined)
         if (patrols !== null && patrols !== undefined && patrols !== '') {
-          // Active: >= active threshold for daily status
-          if (patrols >= thresholds.active) {
+          // Active: >= 5 patrols (fixed threshold for daily status)
+          if (patrols >= 5) {
             activeMunicipalitiesThisDay++;
           }
-          // Inactive: < active threshold (including 0)
+          // Inactive: < 5 patrols (including 0)
           else {
             inactiveMunicipalitiesThisDay++;
           }
@@ -2413,46 +2395,62 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none w-full lg:w-auto"
                 >
                   <Save className="w-4 h-4" />
-                  Save to Firestore
+                  Save Data
                 </button>
               </div>
             </div>
+            
+            {/* Required Counts Information */}
+            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-blue-800">
+                <BarChart3 className="w-4 h-4" />
+                <span className="font-medium">Required Counts per Daily:</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 = Active</span>
+                <span className="text-gray-500">•</span>
+                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">4 = Warning</span>
+                <span className="text-gray-500">•</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">4 = Inactive</span>
+              </div>
+            </div>
+
+            {/* Action Taken Data Status - HIDDEN */}
+            {/* {Object.keys(commandCenterActionData).length > 0 && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center gap-2 text-sm text-green-800">
+                  <CheckCircle className="w-4 h-4" />
+                  <span className="font-medium">Command Center Integration:</span>
+                  <span className="text-gray-600">
+                    Action Taken data loaded for {Object.keys(commandCenterActionData).length} municipalities
+                  </span>
+                  <span className="text-gray-500">•</span>
+                  <span className="text-xs text-gray-600">
+                    "No. of Report Attended / Week" now shows Action Taken counts from Command Center
+                  </span>
+                </div>
+              </div>
+            )} */}
 
             {/* Daily Counts Tab Description */}
-            {activeTab === "daily" && (() => {
-              const thresholds = getThresholds(selectedMonth, selectedYear);
-              return (
-                <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <div className="flex items-start gap-3">
-                    <Calendar className="w-5 h-5 text-gray-600 mt-0.5" />
-                    <div className="w-full">
-                      <h4 className="font-semibold text-gray-900 mb-3">How Daily Counts Work</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                        <div className="space-y-2">
-                          <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
-                          <p><strong>Color Coding:</strong> Green for {thresholds.active}+ patrols (Active), Red for below {thresholds.active} (Inactive)</p>
-                        </div>
-                        <div className="space-y-2">
-                          <p><strong>Minimum Requirement:</strong> At least {thresholds.active} patrols per day to be considered active</p>
-                          <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
-                        </div>
+            {activeTab === "daily" && (
+              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <Calendar className="w-5 h-5 text-gray-600 mt-0.5" />
+                  <div className="w-full">
+                    <h4 className="font-semibold text-gray-900 mb-3">How Daily Counts Work</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
+                      <div className="space-y-2">
+                        <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
+                        <p><strong>Color Coding:</strong> Green for 5+ patrols (Active), Red for below 5 (Inactive)</p>
                       </div>
-                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                        <div className="flex items-center gap-2 text-sm text-blue-800 flex-wrap">
-                          <BarChart3 className="w-4 h-4" />
-                          <span className="font-medium">Required Counts per Daily:</span>
-                          <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">{thresholds.active} = Active</span>
-                          <span className="text-gray-500">•</span>
-                          <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">{thresholds.warning} = Warning</span>
-                          <span className="text-gray-500">•</span>
-                          <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">{thresholds.inactive} = Inactive</span>
-                        </div>
+                      <div className="space-y-2">
+                        <p><strong>Minimum Requirement:</strong> At least 5 patrols per day to be considered active</p>
+                        <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
                       </div>
                     </div>
                   </div>
                 </div>
-              );
-            })()}
+              </div>
+            )}
 
             {/* Criteria Tab Description */}
             {activeTab === "criteria" && (
