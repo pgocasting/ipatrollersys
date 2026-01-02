@@ -816,6 +816,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       dashboardLog('⚠️ No ipatrollerPatrolData available');
       return {
         active: [],
+        warning: [],
         inactive: []
       };
     }
@@ -2621,11 +2622,11 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2 mb-3">
                     <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                    <h3 className="text-sm font-semibold text-yellow-600">Warning ({municipalityLists.warning.length})</h3>
+                    <h3 className="text-sm font-semibold text-yellow-600">Warning ({municipalityLists.warning?.length || 0})</h3>
                   </div>
                   <div className="space-y-1 max-h-80 overflow-y-auto pr-2">
-                    {municipalityLists.warning.length > 0 ? (
-                      municipalityLists.warning.map((municipality, index) => (
+                    {(municipalityLists.warning?.length || 0) > 0 ? (
+                      (municipalityLists.warning || []).map((municipality, index) => (
                         <div key={index} className="flex items-center justify-between p-2.5 bg-yellow-50 rounded-lg border border-yellow-100 hover:bg-yellow-100 transition-colors">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
