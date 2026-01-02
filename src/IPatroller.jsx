@@ -73,6 +73,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [loading, setLoading] = useState(false);
   const [firestoreStatus, setFirestoreStatus] = useState('connecting');
   const { notifications, showSuccess, showError, removeNotification } = useNotification();
+  const DAILY_ACTIVE_COUNT = 14;
+  const DAILY_WARNING_COUNT = 13;
+  const DAILY_INACTIVE_MAX = 12;
+  const YEAR_OPTIONS_START = 2023;
+  const YEAR_OPTIONS_END = new Date().getFullYear() + 10;
   const [selectedDistrict, setSelectedDistrict] = useState("ALL");
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -119,13 +124,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = patrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        const isActive = dailyCount >= 5;
+        const isActive = dailyCount >= DAILY_ACTIVE_COUNT;
         
         return {
           municipality,
           dailyCount,
           isActive,
-          percentage: dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100)
+          percentage: dailyCount >= DAILY_ACTIVE_COUNT ? 100 : Math.round((dailyCount / DAILY_ACTIVE_COUNT) * 100)
         };
       });
     });
@@ -334,8 +339,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               if (hasActualData) {
                 // Recalculate activeDays and inactiveDays to exclude 0 values
                 const requiredBarangays = barangayCounts[municipality] || 0;
-                const activeDays = existingData.data.filter((val) => val !== null && val !== undefined && val > 0 && val >= requiredBarangays).length;
-                const inactiveDays = existingData.data.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
+                const activeDays = existingData.data.filter((val) => val !== null && val !== undefined && val >= DAILY_ACTIVE_COUNT).length;
+                const inactiveDays = existingData.data.filter((val) => val !== null && val !== undefined && val > 0 && val <= DAILY_INACTIVE_MAX).length;
                 const totalPatrols = existingData.data.reduce((sum, val) => sum + (val || 0), 0);
                 const activePercentage = existingData.data.length > 0 ? Math.round((activeDays / existingData.data.length) * 100) : 0;
                 
@@ -664,6 +669,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         style: { background: 'white' },
       });
       showSuccess('Changes saved successfully!');
+
     } catch (error) {
       ipatrollerLog('❌ Error syncing to Firestore:', error, 'error');
       setFirestoreStatus('error');
@@ -699,8 +705,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         
         // Calculate active/inactive days based on barangay count for this municipality
         const requiredBarangays = barangayCounts[municipality] || 0;
-        const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= requiredBarangays).length;
-        const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
+        const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= DAILY_ACTIVE_COUNT).length;
+        const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val <= DAILY_INACTIVE_MAX).length;
         const activePercentage = Math.round((activeDays / newData.length) * 100);
         
         return {
@@ -740,8 +746,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       // Recalculate totals
       const totalPatrols = newData.reduce((sum, val) => sum + (val || 0), 0);
       const requiredBarangays = barangayCounts[item.municipality] || 0;
-      const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= requiredBarangays).length;
-      const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val < requiredBarangays).length;
+      const activeDays = newData.filter((val) => val !== null && val !== undefined && val >= DAILY_ACTIVE_COUNT).length;
+      const inactiveDays = newData.filter((val) => val !== null && val !== undefined && val > 0 && val <= DAILY_INACTIVE_MAX).length;
       const activePercentage = Math.round((activeDays / newData.length) * 100);
       
       return {
@@ -770,10 +776,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === 0)
       return "bg-red-600 text-white";
     
-    // Daily status: >= 5 = Active (green), 4 = Warning (yellow), <= 3 = Inactive (red)
-    if (value >= 5)
+    if (value >= DAILY_ACTIVE_COUNT)
       return "bg-green-600 text-white";
-    if (value === 4)
+    if (value === DAILY_WARNING_COUNT)
       return "bg-yellow-500 text-white";
     return "bg-red-600 text-white";
   };
@@ -782,9 +787,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     if (value === null || value === undefined) return "No Entry";
     if (value === 0) return "Inactive";
     
-    // Daily status: >= 5 = Active, 4 = Warning (still inactive), <= 3 = Inactive
-    if (value >= 5) return "Active";
-    if (value === 4) return "Warning";
+    if (value >= DAILY_ACTIVE_COUNT) return "Active";
+    if (value === DAILY_WARNING_COUNT) return "Warning";
     return "Inactive";
   };
 
@@ -829,9 +833,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return dataToUse
       .filter(item => item && (item.municipality || item.id))
       .map(item => {
-        // Calculate Active Days from Daily Counts tab logic (days with >= 5 patrols)
-        const activeDays = item.data.filter(count => count >= 5).length;
-        const inactiveDays = item.data.filter(count => count < 5 && count > 0).length;
+        // Calculate Active Days from Daily Counts tab logic (days with >= 14 patrols)
+        const activeDays = item.data.filter(count => count >= DAILY_ACTIVE_COUNT).length;
+        const inactiveDays = item.data.filter(count => count <= DAILY_INACTIVE_MAX && count > 0).length;
         const totalDays = item.data.length;
         
         // Calculate Total Patrols from Criteria tab logic (sum of all daily patrols)
@@ -866,7 +870,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           
         } else if (isMarchToOctober) {
           // March-October: Performance % based on Total Patrols
-          const expectedMaxPatrols = totalDays * 5;
+          const expectedMaxPatrols = totalDays * DAILY_ACTIVE_COUNT;
           const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
           activePercentage = Math.min(rawPercentage, 100);
         } else {
@@ -1680,7 +1684,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           const dailyData = item.data || [];
           console.log(`📅 ${item.municipality} daily data (first 10 days):`, dailyData.slice(0, 10));
           const totalPatrols = dailyData.reduce((sum, day) => sum + (day || 0), 0);
-          const activeDays = dailyData.filter(day => (day || 0) >= 5).length;
+          const activeDays = dailyData.filter(day => (day || 0) >= DAILY_ACTIVE_COUNT).length;
           console.log(`📈 ${item.municipality}: ${totalPatrols} total patrols, ${activeDays} active days from ${dailyData.length} days`);
           
           // Calculate performance percentage based on month type
@@ -1690,7 +1694,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           if (isMarchToOctober) {
             // March-October: (Total Patrols / Expected Max Patrols) × 100 - CAPPED AT 100%
             const daysInMonth = new Date(year, month + 1, 0).getDate();
-            const expectedMaxPatrols = daysInMonth * 5;
+            const expectedMaxPatrols = daysInMonth * DAILY_ACTIVE_COUNT;
             const rawPercentage = expectedMaxPatrols > 0 ? Math.round((totalPatrols / expectedMaxPatrols) * 100) : 0;
             activePercentage = Math.min(rawPercentage, 100); // Cap at 100%
             console.log(`🧮 ${item.municipality}: ${totalPatrols} patrols / ${expectedMaxPatrols} expected = ${rawPercentage}% → capped at ${activePercentage}%`);
@@ -1789,12 +1793,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const { activeDays, inactiveDays } = (() => {
     let totalActive = 0;
     let totalInactive = 0;
+    let totalWarning = 0;
     
     // Iterate through each day of the month
     const daysInMonth = selectedDates.length;
     for (let dayIndex = 0; dayIndex < daysInMonth; dayIndex++) {
       let activeMunicipalitiesThisDay = 0;
       let inactiveMunicipalitiesThisDay = 0;
+      let warningMunicipalitiesThisDay = 0;
       
       // For each day, count how many municipalities are active/inactive
       patrolData.forEach((municipality) => {
@@ -1802,11 +1808,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         
         // Only count if there's actual patrol data (not null/undefined)
         if (patrols !== null && patrols !== undefined && patrols !== '') {
-          // Active: >= 5 patrols (fixed threshold for daily status)
-          if (patrols >= 5) {
+          if (patrols >= DAILY_ACTIVE_COUNT) {
             activeMunicipalitiesThisDay++;
           }
-          // Inactive: < 5 patrols (including 0)
+          else if (patrols === DAILY_WARNING_COUNT) {
+            warningMunicipalitiesThisDay++;
+          }
           else {
             inactiveMunicipalitiesThisDay++;
           }
@@ -2350,11 +2357,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                 >
-                  <option value={2023}>2023</option>
-                  <option value={2024}>2024</option>
-                  <option value={2025}>2025</option>
-                  <option value={2026}>2026</option>
-                  <option value={2027}>2027</option>
+                  {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
                 </select>
               </div>
               <div>
@@ -2436,11 +2443,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               <div className="flex items-center gap-2 text-sm text-blue-800">
                 <BarChart3 className="w-4 h-4" />
                 <span className="font-medium">Required Counts per Daily:</span>
-                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">5 = Active</span>
+                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">14 = Active</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">4 = Warning</span>
+                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">13 = Warning</span>
                 <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">4 = Inactive</span>
+                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">12 = Inactive</span>
               </div>
             </div>
 
@@ -2471,10 +2478,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
                       <div className="space-y-2">
                         <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
-                        <p><strong>Color Coding:</strong> Green for 5+ patrols (Active), Red for below 5 (Inactive)</p>
+                        <p><strong>Color Coding:</strong> Green for 14+ patrols (Active), Red for below 14 (Inactive)</p>
                       </div>
                       <div className="space-y-2">
-                        <p><strong>Minimum Requirement:</strong> At least 5 patrols per day to be considered active</p>
+                        <p><strong>Minimum Requirement:</strong> At least 14 patrols per day to be considered active</p>
                         <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
                       </div>
                     </div>
@@ -3113,7 +3120,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                               <tr key={data.municipality}>
                                 <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
                                 <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
-                                <td className="px-4 py-2 text-center">
+                                <td className="px-4 py-2">
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
                                     ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                                     {data.isActive ? 'Active' : 'Inactive'}
@@ -3200,7 +3207,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
                       className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
                     >
-                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                      {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
                         <option key={year} value={year}>
                           {year}
                         </option>
@@ -3257,7 +3264,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           ? 'March-October: Ranked by total patrols first, then active days, then performance %' 
                           : 'Other months: Ranked by performance % first, then active days, then total patrols'
                         }</p>
-                        <p><strong>Active Days:</strong> Days with 5 or more patrols (from Daily Counts tab)</p>
+                        <p><strong>Active Days:</strong> Days with 14 or more patrols (from Daily Counts tab)</p>
                         <p><strong>Total Patrols:</strong> Sum of Week 1-4 actual reports (from Criteria tab)</p>
                       </div>
                       <div className="space-y-2">
@@ -3528,7 +3535,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           onChange={(e) => setPdfFromYear(parseInt(e.target.value))}
                           className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                         >
-                          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                          {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
                             <option key={year} value={year}>
                               {year}
                             </option>
@@ -3560,7 +3567,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           onChange={(e) => setPdfToYear(parseInt(e.target.value))}
                           className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white"
                         >
-                          {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                          {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
                             <option key={year} value={year}>
                               {year}
                             </option>
