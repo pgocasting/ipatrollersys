@@ -646,70 +646,83 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Calculate active/inactive municipalities based on yesterday's data (using IPatroller data)
+  const DAILY_ACTIVE_COUNT = 14;
+  const DAILY_WARNING_COUNT = 13;
+  const DAILY_INACTIVE_MAX = 12;
+
+  const getDashboardReferenceDate = () => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const dayIndex = yesterday.getDate() - 1;
+    return { date: yesterday, dayIndex };
+  };
+
+  // Calculate active/inactive municipalities based on today's data (using IPatroller data)
   const calculateActiveInactiveCounts = () => {
     if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) {
       dashboardLog('⚠️ No ipatrollerPatrolData for counting');
-      return { activeCount: 0, inactiveCount: 0, totalMunicipalities: 0 };
+      return { activeCount: 0, warningCount: 0, inactiveCount: 0, totalMunicipalities: 0 };
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayIndex = yesterday.getDate() - 1;
+    const { date: referenceDate, dayIndex: referenceIndex } = getDashboardReferenceDate();
 
-    dashboardLog('📊 Calculating counts for', yesterday.toDateString(), 'at index', yesterdayIndex);
+    dashboardLog('📊 Calculating counts for', referenceDate.toDateString(), 'at index', referenceIndex);
     dashboardLog('📊 Processing', ipatrollerPatrolData.length, 'municipalities');
 
     let activeCount = 0;
+    let warningCount = 0;
     let inactiveCount = 0;
 
     ipatrollerPatrolData.forEach(item => {
-      let yesterdayPatrols = 0;
+      let patrolsCount = 0;
       
-      if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-        const rawValue = item.data[yesterdayIndex];
+      if (item.data && Array.isArray(item.data) && referenceIndex >= 0 && referenceIndex < item.data.length) {
+        const rawValue = item.data[referenceIndex];
         if (rawValue === null || rawValue === undefined) {
-          yesterdayPatrols = 0; // Treat "No Entry" as 0
+          patrolsCount = 0; // Treat "No Entry" as 0
         } else {
-          yesterdayPatrols = rawValue;
+          patrolsCount = rawValue;
         }
-        dashboardLog(`📊 ${item.municipality}: ${rawValue} → ${yesterdayPatrols >= 5 ? 'ACTIVE' : 'INACTIVE'}`);
+        dashboardLog(`📊 ${item.municipality}: ${rawValue} → ${patrolsCount >= DAILY_ACTIVE_COUNT ? 'ACTIVE' : patrolsCount === DAILY_WARNING_COUNT ? 'WARNING' : 'INACTIVE'}`);
       } else {
-        dashboardLog(`📊 ${item.municipality}: No data at index ${yesterdayIndex} → INACTIVE`);
+        dashboardLog(`📊 ${item.municipality}: No data at index ${referenceIndex} → INACTIVE`);
       }
 
-      // Use IPatroller logic: Active if >= 5, Inactive if < 5
-      if (yesterdayPatrols >= 5) {
+      if (patrolsCount >= DAILY_ACTIVE_COUNT) {
         activeCount++;
+      } else if (patrolsCount === DAILY_WARNING_COUNT) {
+        warningCount++;
       } else {
         inactiveCount++;
       }
     });
 
-    dashboardLog('📊 Final counts - Active:', activeCount, 'Inactive:', inactiveCount);
+    dashboardLog('📊 Final counts - Active:', activeCount, 'Warning:', warningCount, 'Inactive:', inactiveCount);
 
     return {
       activeCount,
+      warningCount,
       inactiveCount,
       totalMunicipalities: ipatrollerPatrolData.length
     };
   };
 
-  const { activeCount, inactiveCount, totalMunicipalities } = calculateActiveInactiveCounts();
+  const { activeCount, warningCount, inactiveCount, totalMunicipalities } = calculateActiveInactiveCounts();
   const activePercentage = totalMunicipalities > 0 ? (activeCount / totalMunicipalities) * 100 : 0;
 
   // Debug logging for admin users
   useEffect(() => {
     if (userAccessLevel === 'admin' && ipatrollerPatrolData.length > 0) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      dashboardLog('📊 Active/Inactive Counts for', yesterday.toDateString());
+      const { date: referenceDate } = getDashboardReferenceDate();
+      dashboardLog('📊 Active/Inactive Counts for', referenceDate.toDateString());
       dashboardLog('✅ Active Municipalities:', activeCount);
+      dashboardLog('⚠️ Warning Municipalities:', warningCount);
       dashboardLog('❌ Inactive Municipalities:', inactiveCount);
       dashboardLog('📈 Total Municipalities:', totalMunicipalities);
       dashboardLog('📅 Data Source: IPatroller Firebase data');
     }
-  }, [activeCount, inactiveCount, totalMunicipalities, ipatrollerPatrolData, userAccessLevel]);
+  }, [activeCount, warningCount, inactiveCount, totalMunicipalities, ipatrollerPatrolData, userAccessLevel]);
 
   // Calculate district distribution with fallback data (using IPatroller data source)
   const getDistrictData = () => {
@@ -723,27 +736,25 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
     // Count active municipalities per district from IPatroller data
     if (ipatrollerPatrolData && ipatrollerPatrolData.length > 0) {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yesterdayIndex = yesterday.getDate() - 1;
+      const { date: referenceDate, dayIndex: referenceIndex } = getDashboardReferenceDate();
 
-      dashboardLog(`📊 Counting active municipalities by district for ${yesterday.toDateString()}`);
+      dashboardLog(`📊 Counting active municipalities by district for ${referenceDate.toDateString()}`);
 
       ipatrollerPatrolData.forEach(item => {
         if (item.district && districtCounts.hasOwnProperty(item.district)) {
-          let yesterdayPatrols = 0;
+          let patrolsCount = 0;
           
-          if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-            const rawValue = item.data[yesterdayIndex];
+          if (item.data && Array.isArray(item.data) && referenceIndex >= 0 && referenceIndex < item.data.length) {
+            const rawValue = item.data[referenceIndex];
             if (rawValue === null || rawValue === undefined) {
-              yesterdayPatrols = 0;
+              patrolsCount = 0;
             } else {
-              yesterdayPatrols = rawValue;
+              patrolsCount = rawValue;
             }
           }
 
-          // Count as active if >= 5 patrols yesterday
-          if (yesterdayPatrols >= 5) {
+          // Count as active if >= 14 patrols
+          if (patrolsCount >= DAILY_ACTIVE_COUNT) {
             districtCounts[item.district]++;
             dashboardLog(`✅ ${item.municipality} (${item.district}): Active - adding to district count`);
           } else {
@@ -809,13 +820,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       };
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayIndex = yesterday.getDate() - 1;
+    const { date: referenceDate, dayIndex: referenceIndex } = getDashboardReferenceDate();
 
-    dashboardLog(`📅 Yesterday was ${yesterday.toDateString()}, looking at index ${yesterdayIndex}`);
+    dashboardLog(`📅 Reference date is ${referenceDate.toDateString()}, looking at index ${referenceIndex}`);
 
     const active = [];
+    const warning = [];
     const inactive = [];
 
     ipatrollerPatrolData.forEach(item => {
@@ -825,21 +835,20 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         hasData: !!item.data,
         isArray: Array.isArray(item.data),
         dataLength: item.data ? item.data.length : 0,
-        yesterdayIndex,
+        referenceIndex,
         rawData: item.data
       });
       
-      if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-        const rawValue = item.data[yesterdayIndex];
-        // Use IPatroller logic: null/undefined = "No Entry" = Inactive, 0 = Inactive, >= 5 = Active, < 5 = Inactive
+      if (item.data && Array.isArray(item.data) && referenceIndex >= 0 && referenceIndex < item.data.length) {
+        const rawValue = item.data[referenceIndex];
         if (rawValue === null || rawValue === undefined) {
           yesterdayPatrols = 0; // Treat "No Entry" as 0 for counting purposes
         } else {
           yesterdayPatrols = rawValue;
         }
-        dashboardLog(`📊 ${item.municipality}: Found ${rawValue} (${yesterdayPatrols}) patrols at index ${yesterdayIndex}`);
+        dashboardLog(`📊 ${item.municipality}: Found ${rawValue} (${yesterdayPatrols}) patrols at index ${referenceIndex}`);
       } else {
-        dashboardLog(`❌ ${item.municipality}: No data at index ${yesterdayIndex}`);
+        dashboardLog(`❌ ${item.municipality}: No data at index ${referenceIndex}`);
       }
 
       const municipalityInfo = {
@@ -848,10 +857,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         patrols: yesterdayPatrols
       };
 
-      // Use IPatroller logic: Active if >= 5, Inactive if < 5 (including null/undefined/0)
-      if (yesterdayPatrols >= 5) {
+      if (yesterdayPatrols >= DAILY_ACTIVE_COUNT) {
         active.push(municipalityInfo);
         dashboardLog(`✅ ${item.municipality}: ACTIVE (${yesterdayPatrols} patrols)`);
+      } else if (yesterdayPatrols === DAILY_WARNING_COUNT) {
+        warning.push(municipalityInfo);
+        dashboardLog(`⚠️ ${item.municipality}: WARNING (${yesterdayPatrols} patrols)`);
       } else {
         inactive.push(municipalityInfo);
         dashboardLog(`❌ ${item.municipality}: INACTIVE (${yesterdayPatrols} patrols)`);
@@ -875,6 +886,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
     return {
       active: active.sort(sortMunicipalities),
+      warning: warning.sort(sortMunicipalities),
       inactive: inactive.sort(sortMunicipalities)
     };
   };
@@ -898,16 +910,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       return [];
     }
 
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
-    const yesterdayIndex = yesterday.getDate() - 1;
+    const { date: referenceDate, dayIndex: referenceIndex } = getDashboardReferenceDate();
 
-    dashboardLog(`📊 Calculating district stats for ${yesterday.toDateString()} at index ${yesterdayIndex}`);
+    dashboardLog(`📊 Calculating district stats for ${referenceDate.toDateString()} at index ${referenceIndex}`);
 
     const districtStats = {
-      '1ST DISTRICT': { active: 0, total: 0, color: 'blue' },
-      '2ND DISTRICT': { active: 0, total: 0, color: 'emerald' },
-      '3RD DISTRICT': { active: 0, total: 0, color: 'orange' }
+      '1ST DISTRICT': { active: 0, warning: 0, total: 0, color: 'blue' },
+      '2ND DISTRICT': { active: 0, warning: 0, total: 0, color: 'emerald' },
+      '3RD DISTRICT': { active: 0, warning: 0, total: 0, color: 'orange' }
     };
 
     ipatrollerPatrolData.forEach(item => {
@@ -915,9 +925,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         districtStats[item.district].total++;
         
         let yesterdayPatrols = 0;
-        if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-          const rawValue = item.data[yesterdayIndex];
-          // Use IPatroller logic: null/undefined = "No Entry" = Inactive, >= 5 = Active
+        if (item.data && Array.isArray(item.data) && referenceIndex >= 0 && referenceIndex < item.data.length) {
+          const rawValue = item.data[referenceIndex];
           if (rawValue === null || rawValue === undefined) {
             yesterdayPatrols = 0;
           } else {
@@ -925,9 +934,12 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           }
         }
 
-        if (yesterdayPatrols >= 5) {
+        if (yesterdayPatrols >= DAILY_ACTIVE_COUNT) {
           districtStats[item.district].active++;
           dashboardLog(`✅ ${item.municipality} (${item.district}): ACTIVE with ${yesterdayPatrols} patrols`);
+        } else if (yesterdayPatrols === DAILY_WARNING_COUNT) {
+          districtStats[item.district].warning++;
+          dashboardLog(`⚠️ ${item.municipality} (${item.district}): WARNING with ${yesterdayPatrols} patrols`);
         } else {
           dashboardLog(`❌ ${item.municipality} (${item.district}): INACTIVE with ${yesterdayPatrols} patrols`);
         }
@@ -937,8 +949,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     const result = Object.entries(districtStats).map(([district, stats]) => ({
       name: district,
       active: stats.active,
+      warning: stats.warning,
       total: stats.total,
-      inactive: stats.total - stats.active,
+      inactive: stats.total - stats.active - stats.warning,
       percentage: stats.total > 0 ? Math.round((stats.active / stats.total) * 100) : 0,
       color: stats.color
     }));
@@ -2546,10 +2559,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <div>
                   <CardTitle className="text-lg font-semibold text-gray-900">Municipality List</CardTitle>
                   <p className="text-sm text-gray-600">
-                    {summaryStats.yesterdayDate 
-                      ? `Active and inactive municipalities for ${summaryStats.yesterdayDate}`
-                      : 'Active and inactive municipalities for yesterday'
-                    }
+                    {`Active, warning, and inactive municipalities for ${getDashboardReferenceDate().date.toDateString()}`}
                   </p>
                 </div>
               </div>
@@ -2566,14 +2576,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   <div className="flex-1">
                     <p className="text-xs font-medium text-blue-900 mb-1">How to read this data:</p>
                     <ul className="text-xs text-blue-800 space-y-0.5">
-                      <li>• <span className="font-semibold">Active:</span> Municipalities with 5 or more patrols yesterday</li>
-                      <li>• <span className="font-semibold">Inactive:</span> Municipalities with less than 5 patrols or no entry</li>
+                      <li>• <span className="font-semibold">Active:</span> 14 or more patrols</li>
+                      <li>• <span className="font-semibold">Warning:</span> exactly 13 patrols</li>
+                      <li>• <span className="font-semibold">Inactive:</span> 12 or fewer patrols or no entry</li>
                       <li>• Numbers shown represent the total patrol count for yesterday</li>
                     </ul>
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 h-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-auto">
                   
                 {/* Active Municipalities */}
                 <div className="space-y-2">
@@ -2601,6 +2612,37 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       <div className="text-center py-6 text-gray-500">
                         <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
                         <p className="text-xs">No active municipalities</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Warning Municipalities */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 mb-3">
+                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
+                    <h3 className="text-sm font-semibold text-yellow-600">Warning ({municipalityLists.warning.length})</h3>
+                  </div>
+                  <div className="space-y-1 max-h-80 overflow-y-auto pr-2">
+                    {municipalityLists.warning.length > 0 ? (
+                      municipalityLists.warning.map((municipality, index) => (
+                        <div key={index} className="flex items-center justify-between p-2.5 bg-yellow-50 rounded-lg border border-yellow-100 hover:bg-yellow-100 transition-colors">
+                          <div className="flex items-center gap-2">
+                            <Building2 className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium text-gray-900 truncate">{municipality.name}</p>
+                              <p className="text-xs text-gray-500">{municipality.district}</p>
+                            </div>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-xs font-semibold text-yellow-700">{municipality.patrols}</p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-6 text-gray-500">
+                        <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
+                        <p className="text-xs">No warning municipalities</p>
                       </div>
                     )}
                   </div>
@@ -2651,10 +2693,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               <div>
                 <CardTitle className="text-sm font-semibold text-gray-900">District Distribution</CardTitle>
                 <p className="text-xs text-gray-600">
-                  {summaryStats.yesterdayDate 
-                    ? `Active municipalities by district (${summaryStats.yesterdayDate})`
-                    : 'Active municipalities by district (yesterday)'
-                  }
+                  {`Municipality status by district (${getDashboardReferenceDate().date.toDateString()})`}
                 </p>
               </div>
             </div>
@@ -2720,6 +2759,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       <div className="flex items-center gap-1">
                         <CheckCircle className="w-3 h-3 text-emerald-500" />
                         <span className="text-xs text-emerald-600 font-medium">{district.active}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 text-yellow-500" />
+                        <span className="text-xs text-yellow-700 font-medium">{district.warning || 0}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <XCircle className="w-3 h-3 text-red-500" />
