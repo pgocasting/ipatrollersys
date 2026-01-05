@@ -386,6 +386,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [filterMunicipality, setFilterMunicipality] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   
   // Pagination state
   const [paginationPage, setPaginationPage] = useState(1);
@@ -456,9 +457,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const documentsToDelete = [];
       // First pass: identify duplicates and collect documents to delete
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         const incidentData = {
-          id: doc.id,
-          ...doc.data()
+          ...data,
+          legacyId: data?.id,
+          id: doc.id
         };
         if (seenIds.has(incidentData.id)) {
           duplicateIds.add(incidentData.id);
@@ -470,9 +473,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       });
       // Second pass: collect clean data (excluding duplicates)
       querySnapshot.forEach((doc) => {
+        const data = doc.data();
         const incidentData = {
-          id: doc.id,
-          ...doc.data()
+          ...data,
+          legacyId: data?.id,
+          id: doc.id
         };
         // Only include non-duplicate incidents
         if (!duplicateIds.has(incidentData.id) || !seenIds.has(incidentData.id)) {
@@ -571,7 +576,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     try {
       setLoading(true);
       setFirestoreStatus('saving');
-      const incidentRef = doc(db, 'incidents', incidentId);
+      if (!incidentId) {
+        throw new Error('Missing incident id');
+      }
+
+      // Allow callers to pass a Firestore DocumentReference directly
+      const isDocRef = typeof incidentId === 'object' && incidentId !== null && typeof incidentId.path === 'string';
+      const incidentRef = isDocRef ? incidentId : doc(db, 'incidents', String(incidentId));
+
       await deleteDoc(incidentRef);
       setFirestoreStatus('connected');
     } catch (error) {
@@ -1425,13 +1437,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                                incident.description.trim() !== "" && 
                                incident.description !== "No description available";
     const matchesMonth = selectedMonth === "all" || incident.month === selectedMonth;
+    const incidentYear = incident.year != null ? String(incident.year) : "";
+    const matchesYear = selectedYear === "all" || incidentYear === selectedYear;
     const matchesDistrict = filterDistrict === "all" || incident.district === filterDistrict;
-    const matchesMunicipality = filterMunicipality === "all" || incident.municipality === filterMunicipality;
     const matchesSearch = searchTerm === "" || 
                          (incident.incidentType && incident.incidentType.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.location && incident.location.toLowerCase().includes(searchTerm.toLowerCase())) ||
                          (incident.municipality && incident.municipality.toLowerCase().includes(searchTerm.toLowerCase()));
-    return hasValidDescription && matchesMonth && matchesDistrict && matchesMunicipality && matchesSearch;
+    return hasValidDescription && matchesMonth && matchesYear && matchesDistrict && matchesSearch;
   });
   // Get available months from incidents data
   const availableMonths = [...new Set(incidents.map(incident => incident.month).filter(month => month))];
@@ -1439,6 +1452,9 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const availableDistricts = [...new Set(incidents.map(incident => incident.district).filter(district => district))];
   // Get available municipalities from incidents data
   const availableMunicipalities = [...new Set(incidents.map(incident => incident.municipality).filter(municipality => municipality))];
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
   const getStatusColor = (status) => {
     switch (status) {
       case "Completed":
@@ -1477,7 +1493,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   // Reset to first page when filters change
   useEffect(() => {
     setPaginationPage(1);
-  }, [filterDistrict, filterMunicipality, searchTerm, selectedMonth]);
+  }, [filterDistrict, searchTerm, selectedMonth, selectedYear]);
 
   const stats = {
     total: filteredIncidents.length,
@@ -3458,109 +3474,104 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-6">
-              {/* Header Section */}
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Filter className="w-4 h-4 text-black" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Report Filters</h3>
-                  <p className="text-sm text-gray-500">Refine your incident data</p>
-                </div>
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-900">Filters &amp; Search</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedMonth(now.toLocaleString('en-US', { month: 'long' }));
+                    setSelectedYear(String(now.getFullYear()));
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Current Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedMonth(new Date().toLocaleString('en-US', { month: 'long' }));
+                    setSelectedYear(new Date().getFullYear().toString());
+                    setFilterDistrict("all");
+                    setFilterMunicipality("all");
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Clear Filters
+                </button>
               </div>
-              
-              {/* Filters Section */}
-              <div className="flex flex-row items-end gap-3 flex-1 overflow-x-auto">
-                {/* Search Filter */}
-                <div className="flex flex-col gap-2 min-w-[180px] flex-shrink-0">
-                  <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      id="search"
-                      name="search"
-                      placeholder="Search incidents..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-                
-                {/* Month Filter */}
-                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
-                  <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger id="month-filter" name="month-filter">
-                      <SelectValue placeholder="All Months" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Months</SelectItem>
-                      {availableMonths.map((month) => (
-                        <SelectItem key={month} value={month}>
-                          {month}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* District Filter */}
-                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
-                  <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
-                  <Select value={filterDistrict} onValueChange={setFilterDistrict}>
-                    <SelectTrigger id="district-filter" name="district-filter">
-                      <SelectValue placeholder="All Districts" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Districts</SelectItem>
-                      {availableDistricts.map((district) => (
-                        <SelectItem key={district} value={district}>
-                          {district}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Municipality Filter */}
-                <div className="flex flex-col gap-2 min-w-[160px] flex-shrink-0">
-                  <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
-                  <Select value={filterMunicipality} onValueChange={setFilterMunicipality}>
-                    <SelectTrigger id="municipality-filter" name="municipality-filter">
-                      <SelectValue placeholder="All Municipalities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Municipalities</SelectItem>
-                      {availableMunicipalities.map((municipality) => (
-                        <SelectItem key={municipality} value={municipality}>
-                          {municipality}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Clear Filters Button */}
-                <div className="flex items-end">
-                  <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setFilterDistrict("all");
-                      setFilterMunicipality("all");
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
+                <Input
+                  id="search"
+                  name="search"
+                  placeholder="Search municipalities..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger id="month-filter" name="month-filter">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ].map((month) => (
+                      <SelectItem key={month} value={month}>
+                        {month}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="year-filter" className="text-sm font-medium text-gray-700">Year</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger id="year-filter" name="year-filter">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
+                <Select value={filterDistrict} onValueChange={setFilterDistrict}>
+                  <SelectTrigger id="district-filter" name="district-filter">
+                    <SelectValue placeholder="All Districts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    {availableDistricts.map((district) => (
+                      <SelectItem key={district} value={district}>
+                        {district}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             
             {/* Active Filters Display */}
-            {(searchTerm || filterDistrict !== "all" || filterMunicipality !== "all") && (
+            {(searchTerm || filterDistrict !== "all") && (
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm font-medium text-gray-600">Active filters:</span>
@@ -3570,22 +3581,14 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                       Search: "{searchTerm}"
                     </span>
                   )}
-                  {selectedMonth !== "all" && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
-                      <Calendar className="w-3 h-3 mr-1" />
-                      Month: {selectedMonth}
-                    </span>
-                  )}
+                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {selectedMonth} {selectedYear}
+                  </span>
                   {filterDistrict !== "all" && (
                     <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
                       <Building2 className="w-3 h-3 mr-1" />
                       District: {filterDistrict}
-                    </span>
-                  )}
-                  {filterMunicipality !== "all" && (
-                    <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-black border border-gray-200">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      Municipality: {filterMunicipality}
                     </span>
                   )}
                 </div>
@@ -5649,7 +5652,7 @@ Top Location: ${insights.topLocation}`);
               <button
                 onClick={async () => {
                   try {
-                    await deleteIncident(deletingIncident.id);
+                    await deleteIncident(deletingIncident?.id);
                     await loadIncidents();
                     setShowDeleteModal(false);
                     setDeletingIncident(null);

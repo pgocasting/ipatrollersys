@@ -51,7 +51,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   
   // State management
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
-  const [selectedYear, setSelectedYear] = useState('all');
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const { notifications, showSuccess, removeNotification } = useNotification();
@@ -572,6 +572,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       );
     const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
+    const matchesYear = selectedYear === 'all' || (() => {
+      if (item.when instanceof Date) {
+        return String(item.when.getFullYear()) === selectedYear;
+      }
+      if (typeof item.when === 'string') {
+        try {
+          const parsedDate = new Date(item.when);
+          if (!isNaN(parsedDate.getTime())) {
+            return String(parsedDate.getFullYear()) === selectedYear;
+          }
+        } catch (e) {
+          // ignore
+        }
+
+        // If parsing fails but we can detect a relative date/month, assume current year
+        const detectedMonth = detectMonthFromText(item.when);
+        if (detectedMonth !== -1) {
+          return String(new Date().getFullYear()) === selectedYear;
+        }
+      }
+      return false;
+    })();
     
     // Department filtering logic
     let matchesDepartment;
@@ -587,7 +609,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
     
     const matchesMunicipality = activeMunicipality === "all" || item.municipality === activeMunicipality;
-    const matchesMonth = selectedMonth === 'all' || (() => {
+    const matchesMonth = (() => {
       if (item.when instanceof Date) {
         return item.when.getMonth() === selectedMonth;
       } else if (typeof item.when === 'string') {
@@ -621,8 +643,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       item.where.toLowerCase() !== 'unknown location' &&
       item.where.toLowerCase() !== 'unknown';
     
-    return matchesSearch && matchesDistrict && matchesDepartment && matchesMunicipality && matchesMonth && hasValidData;
+    return matchesSearch && matchesDistrict && matchesYear && matchesDepartment && matchesMunicipality && matchesMonth && hasValidData;
   });
+
+  const currentYear = new Date().getFullYear();
+  const yearOptions = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
 
   // Pagination
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
@@ -2172,143 +2197,98 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         {/* Report Filters */}
         <Card className="bg-white shadow-sm border border-gray-200">
           <CardContent className="p-6">
-            <div className="flex items-center gap-6">
-              {/* Header Section */}
-              <div className="flex items-center gap-3 flex-shrink-0">
-                <div className="p-2 bg-gray-100 rounded-lg">
-                  <Filter className="w-4 h-4 text-black" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Report Filters</h3>
-                  <p className="text-sm text-gray-500">Refine your action data</p>
-                </div>
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-gray-900">Filters &amp; Search</h3>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedMonth(now.getMonth());
+                    setSelectedYear(String(now.getFullYear()));
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Current Month
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm("");
+                    setSelectedDistrict("all");
+                    setSelectedMonth(new Date().getMonth());
+                    setSelectedYear(new Date().getFullYear().toString());
+                    setActiveMunicipality("all");
+                    setActiveTab("all");
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                >
+                  Clear Filters
+                </button>
               </div>
-              
-              {/* Filters Section */}
-              <div className="flex flex-row items-end gap-3 flex-1 overflow-x-auto">
-                {/* Search Filter */}
-                <div className="flex flex-col gap-2 min-w-[180px] flex-shrink-0">
-                  <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-                    <Input
-                      id="search"
-                      name="search"
-                      placeholder="Search actions..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                      autoComplete="off"
-                    />
-                  </div>
-                </div>
-                
-                {/* Month Filter */}
-                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
-                  <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
-                  <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(value === 'all' ? 'all' : parseInt(value))}>
-                    <SelectTrigger id="month-filter" name="month-filter">
-                      <SelectValue placeholder="All Months" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Months</SelectItem>
-                      {[
-                        'January', 'February', 'March', 'April', 'May', 'June',
-                        'July', 'August', 'September', 'October', 'November', 'December'
-                      ].map((month, index) => (
-                        <SelectItem key={month} value={index.toString()}>
-                          {month}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Department Filter */}
-                <div className="flex flex-col gap-2 min-w-[160px] flex-shrink-0">
-                  <Label htmlFor="department-filter" className="text-sm font-medium text-gray-700">Department</Label>
-                  <Select 
-                    value={activeTab} 
-                    onValueChange={setActiveTab}
-                    disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
-                  >
-                    <SelectTrigger id="department-filter" name="department-filter">
-                      <SelectValue placeholder="All Departments" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {isAdmin ? (
-                        <>
-                          <SelectItem value="all">All Departments</SelectItem>
-                          <SelectItem value="pnp">PNP</SelectItem>
-                          <SelectItem value="agriculture">Agriculture</SelectItem>
-                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                        </>
-                      ) : userDepartment === 'agriculture' ? (
-                        <SelectItem value="agriculture">Agriculture</SelectItem>
-                      ) : userDepartment === 'pg-enro' ? (
-                        <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                      ) : (
-                        <>
-                          <SelectItem value="all">All Departments</SelectItem>
-                          <SelectItem value="pnp">PNP</SelectItem>
-                          <SelectItem value="agriculture">Agriculture</SelectItem>
-                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                        </>
-                      )}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* District Filter */}
-                <div className="flex flex-col gap-2 min-w-[140px] flex-shrink-0">
-                  <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
-                  <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                    <SelectTrigger id="district-filter" name="district-filter">
-                      <SelectValue placeholder="All Districts" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Districts</SelectItem>
-                      <SelectItem value="1ST DISTRICT">1st District</SelectItem>
-                      <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
-                      <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Municipality Filter */}
-                <div className="flex flex-col gap-2 min-w-[160px] flex-shrink-0">
-                  <Label htmlFor="municipality-filter" className="text-sm font-medium text-gray-700">Municipality</Label>
-                  <Select value={activeMunicipality} onValueChange={setActiveMunicipality}>
-                    <SelectTrigger id="municipality-filter" name="municipality-filter">
-                      <SelectValue placeholder="All Municipalities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Municipalities</SelectItem>
-                      {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
-                        <SelectItem key={municipality} value={municipality}>
-                          {municipality}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                
-                {/* Clear Filters Button */}
-                <div className="flex items-end">
-                  <button
-                    onClick={() => {
-                      setSearchTerm("");
-                      setSelectedDistrict("all");
-                      setSelectedMonth(new Date().getMonth());
-                      setSelectedYear("all");
-                      setActiveMunicipality("all");
-                      setActiveTab("all");
-                    }}
-                    className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
-                  >
-                    Clear Filters
-                  </button>
-                </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
+                <Input
+                  id="search"
+                  name="search"
+                  placeholder="Search municipalities..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  autoComplete="off"
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
+                <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                  <SelectTrigger id="month-filter" name="month-filter">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      'January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ].map((month, index) => (
+                      <SelectItem key={month} value={index.toString()}>
+                        {month}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="year-filter" className="text-sm font-medium text-gray-700">Year</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
+                  <SelectTrigger id="year-filter" name="year-filter">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
+                <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                  <SelectTrigger id="district-filter" name="district-filter">
+                    <SelectValue placeholder="All Districts" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Districts</SelectItem>
+                    <SelectItem value="1ST DISTRICT">1st District</SelectItem>
+                    <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
+                    <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>
