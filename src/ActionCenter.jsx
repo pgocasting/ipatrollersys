@@ -565,6 +565,37 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return -1; // Could not determine month
   };
 
+  const detectYearFromItem = (item) => {
+    if (!item) return null;
+
+    if (item.when instanceof Date && !isNaN(item.when.getTime())) {
+      return item.when.getFullYear();
+    }
+
+    if (typeof item.when === 'string') {
+      try {
+        const parsedDate = new Date(item.when);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.getFullYear();
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // Month-based documents commonly use monthKey like "YYYY-MM"
+    if (typeof item.sourceDocument === 'string') {
+      const match = item.sourceDocument.match(/^(\d{4})-(\d{2})$/);
+      if (match) return Number(match[1]);
+    }
+
+    const rawYear = item.originalData?.year;
+    if (typeof rawYear === 'number' && rawYear > 1900 && rawYear < 3000) return rawYear;
+    if (typeof rawYear === 'string' && /^\d{4}$/.test(rawYear)) return Number(rawYear);
+
+    return null;
+  };
+
   // Filter and sort data
   const filteredItems = actionItems.filter(item => {
     const matchesSearch = searchTerm === "" || 
@@ -572,40 +603,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         String(value).toLowerCase().includes(searchTerm.toLowerCase())
       );
     const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
-    const matchesYear = selectedYear === 'all' || (() => {
-      if (item.when instanceof Date) {
-        return String(item.when.getFullYear()) === selectedYear;
-      }
-      if (typeof item.when === 'string') {
-        try {
-          const parsedDate = new Date(item.when);
-          if (!isNaN(parsedDate.getTime())) {
-            return String(parsedDate.getFullYear()) === selectedYear;
-          }
-        } catch (e) {
-          // ignore
-        }
-
-        // If parsing fails but we can detect a relative date/month, assume current year
-        const detectedMonth = detectMonthFromText(item.when);
-        if (detectedMonth !== -1) {
-          return String(new Date().getFullYear()) === selectedYear;
-        }
-      }
-      return false;
+    const matchesYear = (() => {
+      // If we cannot reliably determine a year for this row, do not exclude it.
+      const detectedYear = detectYearFromItem(item);
+      if (detectedYear === null) return true;
+      return String(detectedYear) === selectedYear;
     })();
     
     // Department filtering logic
     let matchesDepartment;
     if (isAdmin) {
       // Admin users can see all departments
-      matchesDepartment = activeTab === 'all' || item.department === activeTab;
+      matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
     } else if (userDepartment === 'agriculture' || userDepartment === 'pg-enro') {
       // Agriculture and PG-ENRO users can only see their own department data
       matchesDepartment = item.department && item.department.toLowerCase() === userDepartment.toLowerCase();
     } else {
       // Other users (like PNP) can see all departments
-      matchesDepartment = activeTab === 'all' || item.department === activeTab;
+      matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
     }
     
     const matchesMunicipality = activeMunicipality === "all" || item.municipality === activeMunicipality;
@@ -2219,7 +2234,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     setSelectedMonth(new Date().getMonth());
                     setSelectedYear(new Date().getFullYear().toString());
                     setActiveMunicipality("all");
-                    setActiveTab("all");
+                    setActiveTab(userDepartment === 'agriculture' || userDepartment === 'pg-enro' ? userDepartment : "all");
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
                 >
@@ -2228,7 +2243,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="flex flex-col gap-2">
                 <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
                 <Input
@@ -2239,6 +2254,25 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   autoComplete="off"
                 />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="department-filter" className="text-sm font-medium text-gray-700">Department</Label>
+                <Select
+                  value={activeTab}
+                  onValueChange={setActiveTab}
+                  disabled={userDepartment === 'agriculture' || userDepartment === 'pg-enro'}
+                >
+                  <SelectTrigger id="department-filter" name="department-filter">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    <SelectItem value="pnp">PNP</SelectItem>
+                    <SelectItem value="agriculture">Agriculture</SelectItem>
+                    <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex flex-col gap-2">
