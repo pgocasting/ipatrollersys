@@ -391,6 +391,14 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               when: whenValue,
               where: item.where || item.place || item.venue || item.location || null,
               actionTaken: actionTakenValue,
+              // Department-specific fields
+              who: item.who || null,
+              why: item.why || null,
+              how: item.how || null,
+              gender: item.gender || null,
+              source: item.source || null,
+              otherInformation: item.otherInformation || item.other_information || null,
+              photos: Array.isArray(item.photos) ? item.photos : [],
               // Additional metadata
               sourceCollection: item.sourceCollection,
               sourceDocument: item.sourceDocument,
