@@ -568,7 +568,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           r.municipality,
           String(r.dailyCount),
           r.status,
-          `${r.percentage}% (${r.dailyCount} / ${r.totalTarget})`
+          `${r.percentage}% (${Math.min(r.dailyCount, r.totalTarget)} / ${r.totalTarget})`
+        ]);
+        // Append TOTAL row per district
+        const totalCount = rows.reduce((sum, r) => sum + (r.dailyCount || 0), 0);
+        const totalTargetAll = rows.reduce((sum, r) => sum + (r.totalTarget || 14), 0);
+        const overallNumerator = Math.min(totalCount, totalTargetAll);
+        const overallPct = totalTargetAll > 0 ? Math.round((overallNumerator / totalTargetAll) * 100) : 0;
+        const activeCount = rows.filter(r => r.status === 'Active').length;
+        const warningCount = rows.filter(r => r.status === 'Warning').length;
+        const inactiveCount = rows.filter(r => r.status === 'Inactive').length;
+        body.push([
+          'TOTAL',
+          String(totalCount),
+          `A:${activeCount} W:${warningCount} I:${inactiveCount}`,
+          `${overallPct}% (${overallNumerator} / ${totalTargetAll})`
         ]);
         autoTable(doc, {
           startY: startY + 8,
@@ -5197,6 +5211,12 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
 
               {/* Modal Content */}
               <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                {/* Legend */}
+                <div className="mb-4 text-xs text-gray-600 flex items-center gap-4">
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Active ≥ 14</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500" /> Warning = 13</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Inactive ≤ 12</span>
+                </div>
                 <div className="space-y-6">
                   {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
                     <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
@@ -5240,7 +5260,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                       <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
                                     </div>
                                     <div className="text-xs text-gray-500 text-center">
-                                      {data.dailyCount} / {data.totalTarget} total
+                                      {Math.min(data.dailyCount, data.totalTarget)} / {data.totalTarget} total
                                     </div>
                                   </div>
                                 </td>
