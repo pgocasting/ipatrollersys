@@ -4,7 +4,7 @@ import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/co
 import { useFirebase } from "./hooks/useFirebase";
 import { useFirestoreQuota } from "./hooks/useFirestoreQuota";
 import { useAuth } from "./contexts/AuthContext";
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from './firebase';
 import { 
   Command, 
@@ -39,7 +39,8 @@ import {
   Edit,
   HelpCircle,
   Image,
-  Eye
+  Eye,
+  Copy
 } from "lucide-react";
 import { toast } from "sonner";
 import { useNotification, NotificationContainer } from './components/ui/notification';
@@ -158,6 +159,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
   const [showCommandCenterHelp, setShowCommandCenterHelp] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(true);
+  const [isDuplicatingJan, setIsDuplicatingJan] = useState(false);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -272,6 +274,116 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Fixed list to ensure 2025 is always available in the dropdown
   const years = ["2024", "2025", "2026", "2027"];
+
+  // Duplicate January 2025 data to January 2026 for all municipalities
+  const duplicateJan2025To2026 = async () => {
+    if (!isAdmin) return;
+    if (isDuplicatingJan) return;
+
+    try {
+      setIsDuplicatingJan(true);
+      // Build municipality list from both configured list and actual Firestore subcollections
+      const configured = Object.values(municipalitiesByDistrict).flat();
+      const muniSet = new Set(configured);
+      try {
+        const weeklyReportsRef = collection(db, 'commandCenter', 'weeklyReports');
+        const muniSnap = await getDocs(weeklyReportsRef);
+        muniSnap.forEach(docRef => muniSet.add(docRef.id));
+      } catch (e) {
+        console.warn('⚠️ Unable to enumerate municipalities from Firestore, proceeding with configured list only');
+      }
+      const municipalities = Array.from(muniSet);
+      let duplicated = 0;
+      let skipped = 0;
+      let missing = 0;
+
+      for (const municipality of municipalities) {
+        try {
+          const sourceId = `January_2025`;
+          const targetId = `January_2026`;
+          const sourceRef = doc(db, 'commandCenter', 'weeklyReports', municipality, sourceId);
+          const targetRef = doc(db, 'commandCenter', 'weeklyReports', municipality, targetId);
+
+          const [sourceSnap, targetSnap] = await Promise.all([getDoc(sourceRef), getDoc(targetRef)]);
+
+          if (!sourceSnap.exists()) {
+            missing++;
+            continue;
+          }
+          // If target exists but has no useful data, allow overwrite
+          let targetHasData = false;
+          if (targetSnap.exists()) {
+            const tData = targetSnap.data() || {};
+            const tWeekly = tData.weeklyReportData || (tData.data && tData.data.weeklyReportData) || {};
+            targetHasData = tWeekly && Object.keys(tWeekly).length > 0;
+          }
+          if (targetSnap.exists() && targetHasData) {
+            skipped++;
+            continue;
+          }
+
+          const data = sourceSnap.data() || {};
+          // Handle various legacy/new shapes
+          let srcWeekly = null;
+          if (data.weeklyReportData) {
+            srcWeekly = data.weeklyReportData;
+          } else if (data.data && data.data.weeklyReportData) {
+            srcWeekly = data.data.weeklyReportData;
+          } else if (data.data && typeof data.data === 'object') {
+            // Legacy shape: direct date keys under data
+            srcWeekly = data.data;
+          } else {
+            // Try detect direct date keys at root
+            const possibleDates = Object.keys(data || {}).filter(k => /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/.test(k));
+            if (possibleDates.length > 0) {
+              srcWeekly = {};
+              possibleDates.forEach(k => { srcWeekly[k] = data[k]; });
+            } else {
+              srcWeekly = {};
+            }
+          }
+          const transformed = {};
+
+          // Transform date keys from ", 2025" to ", 2026" if they look like date strings
+          Object.keys(srcWeekly).forEach((dateKey) => {
+            let newKey = dateKey;
+            if (typeof dateKey === 'string' && /,\s*2025$/.test(dateKey)) {
+              newKey = dateKey.replace(/,\s*2025$/, ', 2026');
+            }
+            transformed[newKey] = srcWeekly[dateKey];
+          });
+
+          const payload = {
+            ...data,
+            selectedMonth: 'January',
+            selectedYear: '2026',
+            activeMunicipalityTab: municipality,
+            weeklyReportData: transformed,
+            savedAt: new Date().toISOString(),
+            duplicatedFrom: 'January_2025'
+          };
+
+          // Overwrite if needed (merge: false), even when target existed without data
+          await setDoc(targetRef, payload, { merge: false });
+          duplicated++;
+        } catch (err) {
+          console.error('❌ Duplicate error for municipality', municipality, err);
+          // continue to next municipality
+        }
+      }
+
+      if (duplicated > 0) {
+        toast.success(`Duplicated: ${duplicated}, Skipped (exists): ${skipped}, Missing source: ${missing}`);
+      } else {
+        toast.info(`No documents duplicated. Skipped: ${skipped}, Missing: ${missing}`);
+      }
+    } catch (error) {
+      console.error('❌ Error duplicating January 2025 to 2026:', error);
+      toast.error('Error duplicating data');
+    } finally {
+      setIsDuplicatingJan(false);
+    }
+  };
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -3782,6 +3894,24 @@ const handleSaveAllMonths = async () => {
                         )}
                           <span className="text-sm font-medium">
                             {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
+                          </span>
+                        </button>
+                      )}
+
+                      {isAdmin && (
+                        <button
+                          onClick={duplicateJan2025To2026}
+                          disabled={isDuplicatingJan}
+                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                          title="Duplicate January 2025 → January 2026"
+                        >
+                          {isDuplicatingJan ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                          <span className="text-sm font-medium">
+                            {isDuplicatingJan ? 'Duplicating…' : 'Duplicate Jan 2025 → Jan 2026'}
                           </span>
                         </button>
                       )}
