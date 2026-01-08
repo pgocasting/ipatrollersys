@@ -203,7 +203,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [isLoadingCollection, setIsLoadingCollection] = useState(false);
   const [showCollectionView, setShowCollectionView] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleDateString("en-US", { month: "long" }));
-  const [selectedYear, setSelectedYear] = useState("2025");
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedReportMunicipality, setSelectedReportMunicipality] = useState("");
   const [importedConcernTypes, setImportedConcernTypes] = useState([]);
   const [concernTypeData, setConcernTypeData] = useState("");
