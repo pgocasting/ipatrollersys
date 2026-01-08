@@ -511,30 +511,89 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         const municipalityData = ipatrollerPatrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
         
-        // Get the actual barangay count for this municipality
-        const totalBarangays = barangayCounts[municipality] || 0;
-        const isActive = totalBarangays > 0 ? dailyCount >= totalBarangays : dailyCount >= 5;
+        // Use fixed daily target instead of barangay counts
+        const totalTarget = 14;
+        const isActive = dailyCount >= totalTarget; // kept for backward compatibility
+        // Determine tri-state status
+        const status = dailyCount >= 14 ? 'Active' : (dailyCount === 13 ? 'Warning' : 'Inactive');
         
-        // Calculate percentage based on actual barangay count
+        // Calculate percentage based on requested bands
+        // - 12 and below: 0–74%
+        // - exactly 13: 75–85% (use midpoint 80%)
+        // - 14 and above: 86–100% (linear, capped at 100)
         let percentage = 0;
-        if (totalBarangays > 0) {
-          percentage = Math.min(100, Math.round((dailyCount / totalBarangays) * 100));
+        if (dailyCount <= 12) {
+          percentage = Math.max(0, Math.min(74, Math.round((dailyCount / 12) * 74)));
+        } else if (dailyCount === 13) {
+          percentage = 80;
         } else {
-          // Fallback to old logic if barangay count is not available
-          percentage = dailyCount >= 5 ? 100 : Math.round((dailyCount / 5) * 100);
+          // 14 and above
+          percentage = Math.min(100, 86 + (dailyCount - 14));
         }
         
         return {
           municipality,
           dailyCount,
-          totalBarangays,
+          totalTarget,
           isActive,
+          status,
           percentage
         };
       });
     });
 
     return summaryData;
+  };
+
+  const generateDailySummaryPdf = () => {
+    try {
+      const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+      const dateObj = generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex];
+      const title = 'Daily Summary';
+      const subtitle = new Date(selectedYear, selectedMonth).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const dateLine = dateObj ? dateObj.fullDate : '';
+      doc.setFontSize(16);
+      doc.text(title, 40, 40);
+      doc.setFontSize(10);
+      doc.text(subtitle, 40, 58);
+      if (dateLine) doc.text(`Selected Date: ${dateLine}`, 40, 74);
+
+      const dailyData = getDailySummaryData(ipatrollerSelectedDayIndex);
+      let startY = 100;
+      Object.entries(dailyData).forEach(([district, rows], idx) => {
+        if (idx > 0) startY += 16;
+        doc.setFontSize(12);
+        doc.text(String(district), 40, startY);
+        const body = rows.map(r => [
+          r.municipality,
+          String(r.dailyCount),
+          r.status,
+          `${r.percentage}% (${r.dailyCount} / ${r.totalTarget})`
+        ]);
+        autoTable(doc, {
+          startY: startY + 8,
+          head: [[
+            'Municipality',
+            'Daily Count',
+            'Status',
+            'Progress'
+          ]],
+          body,
+          margin: { left: 40, right: 40 },
+          styles: { fontSize: 9, cellPadding: 6 },
+          headStyles: { fillColor: [59, 130, 246] },
+          willDrawCell: (data) => {
+            if (data.section === 'head') return;
+          }
+        });
+        startY = doc.lastAutoTable.finalY || startY + 40;
+      });
+
+      const fileNameDate = dateObj ? dateObj.fullDate.replace(/[, ]/g, '_') : `${selectedYear}_${selectedMonth + 1}`;
+      doc.save(`Daily_Summary_${fileNameDate}.pdf`);
+    } catch (e) {
+      console.error('Failed to generate Daily Summary PDF', e);
+    }
   };
 
   // Helper function to get all months between from and to dates
@@ -5079,6 +5138,15 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
+                    onClick={generateDailySummaryPdf}
+                    variant="default"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    PDF
+                  </Button>
+                  <Button
                     onClick={() => setShowIPatrollerDailySummary(false)}
                     variant="outline"
                     size="sm"
@@ -5142,7 +5210,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                               <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
                               <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
                               <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
-                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Barangays)</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Daily Target)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
@@ -5152,8 +5220,8 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                 <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
                                 <td className="px-4 py-2 text-center">
                                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    ${data.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                    {data.isActive ? 'Active' : 'Inactive'}
+                                    ${data.status === 'Active' ? 'bg-green-100 text-green-800' : data.status === 'Warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                    {data.status}
                                   </span>
                                 </td>
                                 <td className="px-4 py-2">
@@ -5162,8 +5230,8 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                       <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                                         <div
                                           className={`h-full rounded-full ${
-                                            data.isActive ? 'bg-green-500' :
-                                            data.percentage >= 50 ? 'bg-yellow-500' :
+                                            data.status === 'Active' ? 'bg-green-500' :
+                                            data.status === 'Warning' ? 'bg-yellow-500' :
                                             'bg-red-500'
                                           }`}
                                           style={{ width: `${data.percentage}%` }}
@@ -5172,7 +5240,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                       <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
                                     </div>
                                     <div className="text-xs text-gray-500 text-center">
-                                      {data.dailyCount} / {data.totalBarangays} barangays
+                                      {data.dailyCount} / {data.totalTarget} total
                                     </div>
                                   </div>
                                 </td>
