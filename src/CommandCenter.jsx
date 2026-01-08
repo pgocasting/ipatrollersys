@@ -270,8 +270,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     "July", "August", "September", "October", "November", "December"
   ];
 
-  const currentYear = new Date().getFullYear();
-  const years = [currentYear.toString(), (currentYear + 1).toString()];
+  // Fixed list to ensure 2025 is always available in the dropdown
+  const years = ["2024", "2025", "2026", "2027"];
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
