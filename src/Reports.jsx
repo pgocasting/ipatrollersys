@@ -88,7 +88,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   
   // IPatroller Daily Summary modal state
   const [showIPatrollerDailySummary, setShowIPatrollerDailySummary] = useState(false);
-  const [ipatrollerSelectedDayIndex, setIpatrollerSelectedDayIndex] = useState(0);
+  const [ipatrollerSelectedDayIndex, setIpatrollerSelectedDayIndex] = useState(() => {
+    const today = new Date();
+    return Math.max(0, today.getDate() - 1);
+  });
   const [ipatrollerPatrolData, setIpatrollerPatrolData] = useState([]);
   const [ipatrollerSelectedMonth, setIpatrollerSelectedMonth] = useState(new Date().getMonth());
   const [ipatrollerSelectedYear, setIpatrollerSelectedYear] = useState(new Date().getFullYear());
@@ -673,6 +676,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       loadIPatrollerData();
     }
   }, [showIPatrollerDailySummary, loadIPatrollerData]);
+
+  // When opening Daily Summary, default the selected date to the current day (bounded to the month length)
+  useEffect(() => {
+    if (showIPatrollerDailySummary) {
+      const today = new Date();
+      const daysInMonth = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const day = Math.min(Math.max(1, today.getDate()), daysInMonth);
+      setIpatrollerSelectedDayIndex(day - 1);
+    }
+  }, [showIPatrollerDailySummary, selectedMonth, selectedYear]);
 
   useEffect(() => {
     if (showIPatrollerPreview) {
