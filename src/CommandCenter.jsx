@@ -160,6 +160,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [showCommandCenterHelp, setShowCommandCenterHelp] = useState(false);
   const [dontShowAgain, setDontShowAgain] = useState(true);
   const [isDuplicatingJan, setIsDuplicatingJan] = useState(false);
+  const [showDuplicateJanModal, setShowDuplicateJanModal] = useState(false);
+  const [duplicateFromYear, setDuplicateFromYear] = useState('2025');
+  const [duplicateToYear, setDuplicateToYear] = useState('2026');
+  const [duplicateFromMonth, setDuplicateFromMonth] = useState('January');
+  const [duplicateToMonth, setDuplicateToMonth] = useState('January');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -172,6 +177,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         }
       }
     };
+
+  
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -379,6 +386,203 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       }
     } catch (error) {
       console.error('❌ Error duplicating January 2025 to 2026:', error);
+      toast.error('Error duplicating data');
+    } finally {
+      setIsDuplicatingJan(false);
+    }
+  };
+
+  // Generalized: Duplicate January data from a selected year to another selected year for all municipalities
+  const duplicateJanuaryFromTo = async (fromYear, toYear) => {
+    if (!isAdmin) return;
+    if (isDuplicatingJan) return;
+    if (!fromYear || !toYear) return;
+    try {
+      setIsDuplicatingJan(true);
+      const configured = Object.values(municipalitiesByDistrict).flat();
+      const muniSet = new Set(configured);
+      try {
+        const weeklyReportsRef = collection(db, 'commandCenter', 'weeklyReports');
+        const muniSnap = await getDocs(weeklyReportsRef);
+        muniSnap.forEach(docRef => muniSet.add(docRef.id));
+      } catch (e) {
+        console.warn('⚠️ Unable to enumerate municipalities from Firestore, proceeding with configured list only');
+      }
+      const municipalities = Array.from(muniSet);
+      let duplicated = 0;
+      let skipped = 0;
+      let missing = 0;
+
+      for (const municipality of municipalities) {
+        try {
+          const sourceId = `January_${fromYear}`;
+          const targetId = `January_${toYear}`;
+          const sourceRef = doc(db, 'commandCenter', 'weeklyReports', municipality, sourceId);
+          const targetRef = doc(db, 'commandCenter', 'weeklyReports', municipality, targetId);
+
+          const [sourceSnap, targetSnap] = await Promise.all([getDoc(sourceRef), getDoc(targetRef)]);
+
+          if (!sourceSnap.exists()) {
+            missing++;
+            continue;
+          }
+          let targetHasData = false;
+          if (targetSnap.exists()) {
+            const tData = targetSnap.data() || {};
+            const tWeekly = tData.weeklyReportData || (tData.data && tData.data.weeklyReportData) || {};
+            targetHasData = tWeekly && Object.keys(tWeekly).length > 0;
+          }
+          if (targetSnap.exists() && targetHasData) {
+            skipped++;
+            continue;
+          }
+
+          const data = sourceSnap.data() || {};
+          let srcWeekly = null;
+          if (data.weeklyReportData) {
+            srcWeekly = data.weeklyReportData;
+          } else if (data.data && data.data.weeklyReportData) {
+            srcWeekly = data.data.weeklyReportData;
+          } else if (data.data && typeof data.data === 'object') {
+            srcWeekly = data.data;
+          } else {
+            const possibleDates = Object.keys(data || {}).filter(k => /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/.test(k));
+            if (possibleDates.length > 0) {
+              srcWeekly = {};
+              possibleDates.forEach(k => { srcWeekly[k] = data[k]; });
+            } else {
+              srcWeekly = {};
+            }
+          }
+          const transformed = {};
+
+          // Replace trailing year in date-like keys
+          const yearRegex = new RegExp(`,\\s*${fromYear}$`);
+          Object.keys(srcWeekly).forEach((dateKey) => {
+            let newKey = dateKey;
+            if (typeof dateKey === 'string' && yearRegex.test(dateKey)) {
+              newKey = dateKey.replace(yearRegex, `, ${toYear}`);
+            }
+            transformed[newKey] = srcWeekly[dateKey];
+          });
+
+          const payload = {
+            ...data,
+            selectedMonth: 'January',
+            selectedYear: String(toYear),
+            activeMunicipalityTab: municipality,
+            weeklyReportData: transformed,
+            savedAt: new Date().toISOString(),
+            duplicatedFrom: `January_${fromYear}`
+          };
+
+          await setDoc(targetRef, payload, { merge: false });
+          duplicated++;
+        } catch (err) {
+          console.error('❌ Duplicate error for municipality', municipality, err);
+        }
+      }
+
+      if (duplicated > 0) {
+        toast.success(`Duplicated: ${duplicated}, Skipped (exists): ${skipped}, Missing source: ${missing}`);
+      } else {
+        toast.info(`No documents duplicated. Skipped: ${skipped}, Missing: ${missing}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error duplicating January ${fromYear} to ${toYear}:`, error);
+      toast.error('Error duplicating data');
+    } finally {
+      setIsDuplicatingJan(false);
+    }
+  };
+
+  // Generalized: Duplicate data from any selected month/year to another month/year for all municipalities
+  const duplicateMonthFromTo = async (fromMonth, fromYear, toMonth, toYear) => {
+    if (!isAdmin) return;
+    if (isDuplicatingJan) return;
+    if (!fromMonth || !fromYear || !toMonth || !toYear) return;
+    try {
+      setIsDuplicatingJan(true);
+      const configured = Object.values(municipalitiesByDistrict).flat();
+      const muniSet = new Set(configured);
+      try {
+        const weeklyReportsRef = collection(db, 'commandCenter', 'weeklyReports');
+        const muniSnap = await getDocs(weeklyReportsRef);
+        muniSnap.forEach(docRef => muniSet.add(docRef.id));
+      } catch (e) {
+        console.warn('⚠️ Unable to enumerate municipalities from Firestore, proceeding with configured list only');
+      }
+      const municipalities = Array.from(muniSet);
+      let duplicated = 0;
+      let skipped = 0;
+      let missing = 0;
+
+      for (const municipality of municipalities) {
+        try {
+          const sourceId = `${fromMonth}_${fromYear}`;
+          const targetId = `${toMonth}_${toYear}`;
+          const sourceRef = doc(db, 'commandCenter', 'weeklyReports', municipality, sourceId);
+          const targetRef = doc(db, 'commandCenter', 'weeklyReports', municipality, targetId);
+
+          const [sourceSnap, targetSnap] = await Promise.all([getDoc(sourceRef), getDoc(targetRef)]);
+
+          if (!sourceSnap.exists()) { missing++; continue; }
+
+          let targetHasData = false;
+          if (targetSnap.exists()) {
+            const tData = targetSnap.data() || {};
+            const tWeekly = tData.weeklyReportData || (tData.data && tData.data.weeklyReportData) || {};
+            targetHasData = tWeekly && Object.keys(tWeekly).length > 0;
+          }
+          if (targetSnap.exists() && targetHasData) { skipped++; continue; }
+
+          const data = sourceSnap.data() || {};
+          let srcWeekly = null;
+          if (data.weeklyReportData) srcWeekly = data.weeklyReportData;
+          else if (data.data && data.data.weeklyReportData) srcWeekly = data.data.weeklyReportData;
+          else if (data.data && typeof data.data === 'object') srcWeekly = data.data;
+          else {
+            const possibleDates = Object.keys(data || {}).filter(k => /^(January|February|March|April|May|June|July|August|September|October|November|December) \d{1,2}, \d{4}$/.test(k));
+            srcWeekly = possibleDates.length > 0 ? Object.fromEntries(possibleDates.map(k => [k, data[k]])) : {};
+          }
+
+          const transformed = {};
+          const monthYearRegex = new RegExp(`^${fromMonth} (\\d{1,2}),\\s*${fromYear}$`);
+          const yearOnlyRegex = new RegExp(`,\\s*${fromYear}$`);
+          Object.keys(srcWeekly).forEach((dateKey) => {
+            let newKey = dateKey;
+            if (typeof dateKey === 'string' && monthYearRegex.test(dateKey)) {
+              newKey = dateKey.replace(monthYearRegex, `${toMonth} $1, ${toYear}`);
+            } else if (typeof dateKey === 'string' && yearOnlyRegex.test(dateKey)) {
+              newKey = dateKey.replace(yearOnlyRegex, `, ${toYear}`);
+            }
+            transformed[newKey] = srcWeekly[dateKey];
+          });
+
+          const payload = {
+            ...data,
+            selectedMonth: toMonth,
+            selectedYear: String(toYear),
+            activeMunicipalityTab: municipality,
+            weeklyReportData: transformed,
+            savedAt: new Date().toISOString(),
+            duplicatedFrom: `${fromMonth}_${fromYear}`
+          };
+
+          await setDoc(targetRef, payload, { merge: false });
+          duplicated++;
+        } catch (err) {
+          console.error('❌ Duplicate error for municipality', municipality, err);
+        }
+      }
+
+      if (duplicated > 0) {
+        toast.success(`Duplicated: ${duplicated}, Skipped (exists): ${skipped}, Missing source: ${missing}`);
+      } else {
+        toast.info(`No documents duplicated. Skipped: ${skipped}, Missing: ${missing}`);
+      }
+    } catch (error) {
+      console.error(`❌ Error duplicating ${fromMonth} ${fromYear} to ${toMonth} ${toYear}:`, error);
       toast.error('Error duplicating data');
     } finally {
       setIsDuplicatingJan(false);
@@ -3900,10 +4104,10 @@ const handleSaveAllMonths = async () => {
 
                       {isAdmin && (
                         <button
-                          onClick={duplicateJan2025To2026}
+                          onClick={() => setShowDuplicateJanModal(true)}
                           disabled={isDuplicatingJan}
                           className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                          title="Duplicate January 2025 → January 2026"
+                          title={`Duplicate ${duplicateFromMonth} ${duplicateFromYear} → ${duplicateToMonth} ${duplicateToYear}`}
                         >
                           {isDuplicatingJan ? (
                             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -3911,9 +4115,98 @@ const handleSaveAllMonths = async () => {
                             <Copy className="h-4 w-4" />
                           )}
                           <span className="text-sm font-medium">
-                            {isDuplicatingJan ? 'Duplicating…' : 'Duplicate Jan 2025 → Jan 2026'}
+                            {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
                           </span>
                         </button>
+                      )}
+
+                      {isAdmin && (
+                        <Dialog open={showDuplicateJanModal} onOpenChange={setShowDuplicateJanModal}>
+                          <DialogContent className="max-w-md">
+                            <DialogHeader>
+                              <DialogTitle>Duplicate Monthly Data</DialogTitle>
+                              <DialogDescription>
+                                Select the year range to duplicate. This will copy all municipalities' January data.
+                              </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">From month</label>
+                                  <select
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={duplicateFromMonth}
+                                    onChange={(e) => setDuplicateFromMonth(e.target.value)}
+                                  >
+                                    {months.map(m => (
+                                      <option key={`from-m-${m}`} value={m}>{m}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">From year</label>
+                                  <select
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={duplicateFromYear}
+                                    onChange={(e) => setDuplicateFromYear(e.target.value)}
+                                  >
+                                    {years.map(y => (
+                                      <option key={`from-${y}`} value={y}>{y}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">To month</label>
+                                  <select
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={duplicateToMonth}
+                                    onChange={(e) => setDuplicateToMonth(e.target.value)}
+                                  >
+                                    {months.map(m => (
+                                      <option key={`to-m-${m}`} value={m}>{m}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-1">To year</label>
+                                  <select
+                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    value={duplicateToYear}
+                                    onChange={(e) => setDuplicateToYear(e.target.value)}
+                                  >
+                                    {years.map(y => (
+                                      <option key={`to-${y}`} value={y}>{y}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                              {(duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear) && (
+                                <p className="text-sm text-red-600">From and To must not be the same month and year.</p>
+                              )}
+                            </div>
+                            <DialogFooter>
+                              <button
+                                className="px-4 py-2 rounded-md border text-gray-700 hover:bg-gray-50"
+                                onClick={() => setShowDuplicateJanModal(false)}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400"
+                                disabled={isDuplicatingJan || (duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear)}
+                                onClick={async () => {
+                                  await duplicateMonthFromTo(duplicateFromMonth, duplicateFromYear, duplicateToMonth, duplicateToYear);
+                                  setShowDuplicateJanModal(false);
+                                }}
+                                title={`Duplicate ${duplicateFromMonth} ${duplicateFromYear} → ${duplicateToMonth} ${duplicateToYear}`}
+                              >
+                                {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
+                              </button>
+                            </DialogFooter>
+                          </DialogContent>
+                        </Dialog>
                       )}
                       
                       {isAdmin && (
@@ -4114,7 +4407,7 @@ const handleSaveAllMonths = async () => {
                 {isAdmin && (
                   <div className="mb-6">
                     <div className="block text-sm font-medium text-gray-700 mb-3">Municipality</div>
-                    <div className="flex flex-wrap gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
                       {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
                         const isActive = activeMunicipalityTab === municipality;
                         const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
@@ -4129,7 +4422,7 @@ const handleSaveAllMonths = async () => {
                           <Badge
                             key={municipality}
                             variant={isActive ? "default" : "secondary"}
-                            className={`px-4 py-2 h-auto cursor-pointer transition-all duration-200 flex items-center gap-2 hover:scale-105 ${
+                            className={`w-full px-4 py-2 h-auto cursor-pointer transition-all duration-200 flex items-center gap-2 hover:scale-105 ${
                               isActive
                                 ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg border-green-600'
                                 : 'bg-white hover:bg-green-50 text-gray-700 border border-gray-300 hover:border-green-300'
