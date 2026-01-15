@@ -4056,8 +4056,48 @@ const handleSaveAllMonths = async () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-2 sm:gap-3 w-full lg:w-auto">
-                    {/* Import Options - Admin Only */}
+                </div>
+              </div>
+              <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
+                {/* Month/Year Selection */}
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-2 sm:gap-3 mb-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full lg:max-w-[620px]">
+                    <div>
+                      <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
+                      <select 
+                        id="month-select"
+                        name="month-select"
+                        value={selectedMonth}
+                        onChange={(e) => {
+                          const newMonth = e.target.value;
+                          console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
+                          setSelectedMonth(newMonth);
+                          // Data will be loaded from Firestore via useEffect for month changes
+                        }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        {months.map((month) => (
+                          <option key={month} value={month}>{month}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
+                      <select 
+                        id="year-select"
+                        name="year-select"
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      >
+                        {years.map((year) => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-start lg:items-end gap-2 w-full lg:w-auto">
                     {isAdmin && (
                       <div className="flex items-center gap-3">
                         <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
@@ -4073,10 +4113,8 @@ const handleSaveAllMonths = async () => {
                         </label>
                       </div>
                     )}
-                    
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2 sm:gap-3">
 
+                    <div className="flex flex-wrap gap-2 sm:gap-3 w-full lg:w-auto lg:justify-end">
                       {(isAdmin || userAccessLevel === 'command-center') && (
                         <button
                           onClick={handleSaveWeeklyReport}
@@ -4358,89 +4396,6 @@ const handleSaveAllMonths = async () => {
                     />
                   </div>
                 </div>
-              </div>
-              <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
-                {/* Month/Year Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
-                  <div>
-                    <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
-                    <select 
-                      id="month-select"
-                      name="month-select"
-                      value={selectedMonth}
-                      onChange={(e) => {
-                        const newMonth = e.target.value;
-                        console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
-                        setSelectedMonth(newMonth);
-                        // Data will be loaded from Firestore via useEffect for month changes
-                      }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      {months.map((month) => (
-                        <option key={month} value={month}>{month}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
-                    <select 
-                      id="year-select"
-                      name="year-select"
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                    >
-                      {years.map((year) => (
-                        <option key={year} value={year}>{year}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Municipality Selection - Admin only */}
-                {isAdmin && (
-                  <div className="mb-2">
-                    <div className="block text-sm font-medium text-gray-700 mb-1">Municipality</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
-                      {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                        const isActive = activeMunicipalityTab === municipality;
-                        const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
-                        const barangaysCount = importedBarangays.filter(b => {
-                          // Normalize municipality names for comparison
-                          const normalizedMunicipality = municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                          const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                          return normalizedBarangay === normalizedMunicipality;
-                        }).length;
-                        
-                        return (
-                          <Badge
-                            key={municipality}
-                            variant={isActive ? "default" : "secondary"}
-                            className={`w-full px-4 py-2 h-auto cursor-pointer transition-all duration-200 flex items-center gap-2 hover:scale-105 ${
-                              isActive
-                                ? 'bg-green-600 hover:bg-green-700 text-white shadow-lg border-green-600'
-                                : 'bg-white hover:bg-green-50 text-gray-700 border border-gray-300 hover:border-green-300'
-                            }`}
-                            onClick={() => handleMunicipalityTabChange(municipality)}
-                          >
-                            <Building2 className="h-4 w-4" />
-                            <span className="font-medium">{municipality}</span>
-                            <Badge 
-                              variant="outline" 
-                              className={`text-xs ml-1 ${
-                                isActive 
-                                  ? 'bg-green-500 border-green-400 text-white hover:bg-green-400' 
-                                  : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
-                              }`}
-                            >
-                              {barangaysCount} brgy • {concernTypesCount} types
-                            </Badge>
-                          </Badge>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
               </div>
               
               
