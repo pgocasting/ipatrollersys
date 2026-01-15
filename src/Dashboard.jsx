@@ -55,7 +55,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     refreshIPatrollerData,
     createSampleData
   } = useData();
-  const { userAccessLevel, userMunicipality } = useAuth();
+  const { userAccessLevel, userMunicipality, isAdmin } = useAuth();
 
   // Instruction Modal State
   const [showInstructions, setShowInstructions] = useState(false);
@@ -1930,9 +1930,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
       )}
 
-      <div className="container mx-auto p-2 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 min-h-screen">
+      <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 ${isAdmin ? 'sticky top-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200' : ''} w-full px-4 sm:px-6 lg:px-8`}>
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Dashboard</h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
@@ -1943,10 +1943,10 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 : `Overview of IPatroller system performance based on ${summaryStats.yesterdayDate ? `patrol data from ${summaryStats.yesterdayDate}` : 'yesterday\'s patrol data'}`
               }
             </p>
-            {lastDataUpdate && (
+            {false && (
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">
                 <RefreshCw className="w-3 h-3" />
-                Last updated: {lastDataUpdate.toLocaleTimeString()} - Showing data for October 2025
+                Last updated: {lastDataUpdate?.toLocaleTimeString?.()} - Showing data for October 2025
               </p>
             )}
           </div>
@@ -2080,7 +2080,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         ) : userAccessLevel === 'command-center' ? (
           /* Command Center Stats - Modern shadcn Design */
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+          <div>
+          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-5 lg:mt-6 mb-4 sm:mb-6 lg:mb-8">
             {/* 1. Total Reports - FIRST */}
             <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-violet-500 via-violet-600 to-violet-700 overflow-hidden relative group">
               <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
@@ -2153,35 +2154,39 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
           </div>
+          </div>
         ) : (
           /* Regular Dashboard Stats */
-          <div className={`grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
+          <div>
+          <div className="w-full px-4 sm:px-6 lg:px-8">
+          <div>
+          <div className={`grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-5 lg:mt-6 mb-4 sm:mb-6 lg:mb-8 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
+          <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
+            <CardContent className="p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Municipalities</p>
-                  <p className="text-xl sm:text-2xl font-bold text-green-600">
+                  <p className="text-xs font-medium text-slate-500 mb-1 truncate">Active Municipalities</p>
+                  <p className="text-xl sm:text-2xl font-bold text-emerald-600">
                     {activeCount.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                <div className="p-2 sm:p-2.5 bg-emerald-100 rounded-lg flex-shrink-0">
+                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4 lg:p-6">
+          <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
+            <CardContent className="p-5 sm:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Inactive Municipalities</p>
+                  <p className="text-xs font-medium text-slate-500 mb-1 truncate">Inactive Municipalities</p>
                   <p className="text-xl sm:text-2xl font-bold text-red-600">
                     {inactiveCount.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
+                <div className="p-2 sm:p-2.5 bg-red-100 rounded-lg flex-shrink-0">
                   <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
                 </div>
               </div>
@@ -2190,32 +2195,32 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
           {userAccessLevel !== 'ipatroller' && (
             <>
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4 lg:p-6">
+              <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
+                <CardContent className="p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Actions (October 2025)</p>
+                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Actions (October 2025)</p>
                       <p className="text-xl sm:text-2xl font-bold text-blue-600">
                         {getCurrentMonthActionsCount().toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
+                    <div className="p-2 sm:p-2.5 bg-blue-100 rounded-lg flex-shrink-0">
                       <Target className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4 lg:p-6">
+              <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
+                <CardContent className="p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Incidents (October 2025)</p>
+                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Incidents (October 2025)</p>
                       <p className="text-xl sm:text-2xl font-bold text-orange-600">
                         {getCurrentMonthIncidentsCount().toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
+                    <div className="p-2 sm:p-2.5 bg-orange-100 rounded-lg flex-shrink-0">
                       <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
                     </div>
                   </div>
@@ -2224,9 +2229,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </>
           )}
           </div>
+          </div>
+          </div>
+          </div>
         )}
 
+        <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Analytics Section */}
+        <div className="w-full px-4 sm:px-6 lg:px-8">
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Analytics */
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -2551,15 +2561,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           <div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Municipality Lists */}
-          <Card className="lg:col-span-2 bg-white shadow-sm border border-gray-200 rounded-xl">
+          <Card className="lg:col-span-2 bg-white shadow-sm border border-slate-200 rounded-xl">
             <CardHeader className="p-6 pb-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <List className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <CardTitle className="text-lg font-semibold text-gray-900">Municipality List</CardTitle>
-                  <p className="text-sm text-gray-600">
+                  <CardTitle className="text-lg font-semibold text-slate-900">Municipality List</CardTitle>
+                  <p className="text-sm text-slate-600">
                     {`Active, warning, and inactive municipalities for ${getDashboardReferenceDate().date.toDateString()}`}
                   </p>
                 </div>
@@ -2600,8 +2610,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           <div className="flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
                             <div className="min-w-0">
-                              <p className="text-xs font-medium text-gray-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-gray-500">{municipality.district}</p>
+                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
+                              <p className="text-xs text-slate-500">{municipality.district}</p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
@@ -2631,8 +2641,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           <div className="flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
                             <div className="min-w-0">
-                              <p className="text-xs font-medium text-gray-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-gray-500">{municipality.district}</p>
+                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
+                              <p className="text-xs text-slate-500">{municipality.district}</p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
@@ -2662,8 +2672,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                           <div className="flex items-center gap-2">
                             <Building2 className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
                             <div className="min-w-0">
-                              <p className="text-xs font-medium text-gray-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-gray-500">{municipality.district}</p>
+                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
+                              <p className="text-xs text-slate-500">{municipality.district}</p>
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
@@ -2685,15 +2695,15 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </Card>
 
         {/* District Distribution Cards */}
-        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
+        <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
           <CardHeader className="p-6 pb-4">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-emerald-100 rounded-lg">
                 <MapPin className="w-4 h-4 text-emerald-600" />
               </div>
               <div>
-                <CardTitle className="text-sm font-semibold text-gray-900">District Distribution</CardTitle>
-                <p className="text-xs text-gray-600">
+                <CardTitle className="text-sm font-semibold text-slate-900">District Distribution</CardTitle>
+                <p className="text-xs text-slate-600">
                   {`Municipality status by district (${getDashboardReferenceDate().date.toDateString()})`}
                 </p>
               </div>
@@ -2739,8 +2749,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                         }`} />
                       </div>
                       <div>
-                        <h3 className="text-xs font-semibold text-gray-900">{district.name}</h3>
-                        <p className="text-xs text-gray-600">{district.total} municipalities</p>
+                        <h3 className="text-xs font-semibold text-slate-900">{district.name}</h3>
+                        <p className="text-xs text-slate-600">{district.total} municipalities</p>
                       </div>
                     </div>
                     <div className="text-right">
@@ -2751,7 +2761,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                       }`}>
                         {district.active}
                       </p>
-                      <p className="text-xs text-gray-500">Active</p>
+                      <p className="text-xs text-slate-500">Active</p>
                     </div>
                   </div>
                   
@@ -2969,6 +2979,8 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
           </div>
         )}
+        </div>
+        </div>
 
       </div>
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />

@@ -2165,9 +2165,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 md:space-y-8 bg-gray-50 min-h-screen">
+      <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">I-Patroller Management</h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
@@ -2176,278 +2176,297 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 { month: "long", year: "numeric" },
               )} • Patrol Activity Dashboard
             </p>
-            <div className="flex items-center gap-2 mt-2">
-              <div className={`w-2 h-2 rounded-full ${
-                firestoreStatus === 'connected' ? 'bg-green-500' : 
-                firestoreStatus === 'connecting' ? 'bg-yellow-500' : 
-                firestoreStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
-              }`}></div>
-              <span className="text-xs md:text-sm font-medium text-gray-600">
-                {firestoreStatus === 'connected' ? 'Firestore Connected' :
-                 firestoreStatus === 'connecting' ? 'Connecting to Firestore...' :
-                 firestoreStatus === 'error' ? 'Firestore Error - Using Local' :
-                 'Offline Mode - Local Storage'}
-              </span>
-              {firestoreStatus === 'error' && (
-                <Button
-                  onClick={loadPatrolDataFromFirestore}
-                  size="sm"
-                  variant="outline"
-                  className="ml-2 h-6 px-2 text-xs"
-                >
-                  <Wifi className="w-3 h-3 mr-1" />
-                  Retry
-                </Button>
-              )}
+            {false && (
+              <div className="flex items-center gap-2 mt-2">
+                <div className={`w-2 h-2 rounded-full ${
+                  firestoreStatus === 'connected' ? 'bg-green-500' : 
+                  firestoreStatus === 'connecting' ? 'bg-yellow-500' : 
+                  firestoreStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
+                }`}></div>
+                <span className="text-xs font-medium text-gray-600">
+                  {firestoreStatus === 'connected' ? 'Firestore Connected' :
+                   firestoreStatus === 'connecting' ? 'Connecting to Firestore...' :
+                   firestoreStatus === 'error' ? 'Firestore Error - Using Local' :
+                   'Offline Mode - Local Storage'}
+                </span>
+                {firestoreStatus === 'error' && (
+                  <Button
+                    onClick={loadPatrolDataFromFirestore}
+                    size="sm"
+                    variant="outline"
+                    className="ml-2 h-6 px-2 text-xs"
+                  >
+                    <Wifi className="w-3 h-3 mr-1" />
+                    Retry
+                  </Button>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="w-full sm:w-auto sm:ml-auto">
+            <button
+              onClick={() => syncToFirestore()}
+              disabled={loading}
+              className="flex items-center justify-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none w-full sm:w-auto"
+            >
+              <Save className="w-4 h-4" />
+              Save Data
+            </button>
+          </div>
+        </div>
+
+        <div className="w-full px-4 sm:px-6 lg:px-8 mt-3 sm:mt-4">
+          <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
+            <div className="w-full lg:max-w-3xl">
+              {/* Quick Stats */}
+              <div className="grid grid-cols-2 gap-1 sm:gap-2 mr-auto">
+                <Card className="bg-white shadow-sm border border-gray-200">
+                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Total Patrols</p>
+                        <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                          {overallSummary.totalPatrols.toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="p-1 sm:p-1.5 bg-blue-100 rounded-lg flex-shrink-0">
+                        <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-sm border border-gray-200">
+                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Active Card Counts</p>
+                        <p className="text-xl sm:text-2xl font-bold text-green-600">
+                          {overallSummary.totalActive.toLocaleString()}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0">Monthly Total</p>
+                      </div>
+                      <div className="p-1 sm:p-1.5 bg-green-100 rounded-lg flex-shrink-0">
+                        <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-sm border border-gray-200">
+                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Inactive Card Counts</p>
+                        <p className="text-xl sm:text-2xl font-bold text-red-600">
+                          {overallSummary.totalInactive.toLocaleString()}
+                        </p>
+                        <p className="text-[10px] text-gray-400 mt-0">Monthly Total</p>
+                      </div>
+                      <div className="p-1 sm:p-1.5 bg-red-100 rounded-lg flex-shrink-0">
+                        <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-white shadow-sm border border-gray-200">
+                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Avg Active %</p>
+                        <p className="text-xl sm:text-2xl font-bold text-orange-600">
+                          {overallSummary.avgActivePercentage}%
+                        </p>
+                      </div>
+                      <div className="p-1 sm:p-1.5 bg-orange-100 rounded-lg flex-shrink-0">
+                        <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            <div className="w-full lg:flex-1">
+              {/* Filters and Search */}
+              <Card className="bg-white shadow-sm border border-gray-200 rounded-xl h-full">
+                <CardContent className="p-2 sm:p-2.5 h-full">
+                  <div className="flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between w-full">
+                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 whitespace-nowrap">Filters & Search</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      <div className="flex flex-col justify-end">
+                        <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
+                          Search
+                        </Label>
+                        <Input
+                          id="search"
+                          name="search"
+                          placeholder="Search municipalities..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          autoComplete="off"
+                        />
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <Label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
+                          Month
+                        </Label>
+                        <select
+                          id="month-filter"
+                          name="month-filter"
+                          value={selectedMonth}
+                          onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          <option value={0}>January</option>
+                          <option value={1}>February</option>
+                          <option value={2}>March</option>
+                          <option value={3}>April</option>
+                          <option value={4}>May</option>
+                          <option value={5}>June</option>
+                          <option value={6}>July</option>
+                          <option value={7}>August</option>
+                          <option value={8}>September</option>
+                          <option value={9}>October</option>
+                          <option value={10}>November</option>
+                          <option value={11}>December</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <Label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
+                          Year
+                        </Label>
+                        <select
+                          id="year-filter"
+                          name="year-filter"
+                          value={selectedYear}
+                          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
+                            <option key={year} value={year}>
+                              {year}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col justify-end">
+                        <Label htmlFor="district-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
+                          District
+                        </Label>
+                        <select
+                          id="district-filter"
+                          name="district-filter"
+                          value={selectedDistrict}
+                          onChange={(e) => setSelectedDistrict(e.target.value)}
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          <option value="ALL">All Districts</option>
+                          <option value="1ST DISTRICT">1ST DISTRICT</option>
+                          <option value="2ND DISTRICT">2ND DISTRICT</option>
+                          <option value="3RD DISTRICT">3RD DISTRICT</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-end">
+                        <Button
+                          onClick={() => {
+                            setSelectedMonth(new Date().getMonth());
+                            setSelectedYear(new Date().getFullYear());
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2 h-8 w-full"
+                        >
+                          <Calendar className="w-4 h-4" />
+                          Current Month
+                        </Button>
+                      </div>
+
+                      <div className="flex items-end">
+                        <Button
+                          onClick={() => {
+                            setSearchTerm("");
+                            setSelectedDistrict("ALL");
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="flex items-center gap-2 h-8 w-full"
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </div>
-          
         </div>
 
-
-
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Patrols</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                    {overallSummary.totalPatrols.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                  <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Card Counts</p>
-                  <p className="text-xl sm:text-2xl font-bold text-green-600">
-                    {overallSummary.totalActive.toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
-                </div>
-                <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Inactive Card Counts</p>
-                  <p className="text-xl sm:text-2xl font-bold text-red-600">
-                    {overallSummary.totalInactive.toLocaleString()}
-                  </p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">Monthly Total</p>
-                </div>
-                <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
-                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Avg Active %</p>
-                  <p className="text-xl sm:text-2xl font-bold text-orange-600">
-                    {overallSummary.avgActivePercentage}%
-                  </p>
-                </div>
-                <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
-                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters and Search */}
-        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardContent className="p-4 sm:p-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mb-4 sm:mb-6">
-              <h3 className="text-base sm:text-lg font-semibold text-gray-900">Filters & Search</h3>
-              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                <Button
-                  onClick={() => {
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear());
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  Current Month
-                </Button>
-                <Button
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedDistrict("ALL");
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2"
-                >
-                  Clear Filters
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-              <div>
-                <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-2">
-                  Search
-                </Label>
-                <Input
-                  id="search"
-                  name="search"
-                  placeholder="Search municipalities..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  autoComplete="off"
-                />
-              </div>
-              <div>
-                <Label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                  Month
-                </Label>
-                <select
-                  id="month-filter"
-                  name="month-filter"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value={0}>January</option>
-                  <option value={1}>February</option>
-                  <option value={2}>March</option>
-                  <option value={3}>April</option>
-                  <option value={4}>May</option>
-                  <option value={5}>June</option>
-                  <option value={6}>July</option>
-                  <option value={7}>August</option>
-                  <option value={8}>September</option>
-                  <option value={9}>October</option>
-                  <option value={10}>November</option>
-                  <option value={11}>December</option>
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                  Year
-                </Label>
-                <select
-                  id="year-filter"
-                  name="year-filter"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
-                    <option key={year} value={year}>
-                      {year}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <Label htmlFor="district-filter" className="block text-sm font-medium text-gray-700 mb-2">
-                  District
-                </Label>
-                <select
-                  id="district-filter"
-                  name="district-filter"
-                  value={selectedDistrict}
-                  onChange={(e) => setSelectedDistrict(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                >
-                  <option value="ALL">All Districts</option>
-                  <option value="1ST DISTRICT">1ST DISTRICT</option>
-                  <option value="2ND DISTRICT">2ND DISTRICT</option>
-                  <option value="3RD DISTRICT">3RD DISTRICT</option>
-                </select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="w-full px-4 sm:px-6 lg:px-8 flex-1 overflow-y-auto min-h-0 pb-6 mt-4">
 
         {/* Patrol Data Table */}
-        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-          <CardHeader className="p-4 sm:p-6">
-            <CardTitle className="text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
-              {new Date(selectedYear, selectedMonth).toLocaleDateString(
-                "en-US",
-                { month: "long", year: "numeric" },
-              )} Patrol Data ({filteredData.length} municipalities)
-            </CardTitle>
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-0 w-full">
-              <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                <button
-                  onClick={() => setActiveTab("daily")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
-                    activeTab === "daily"
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <Calendar className="w-4 h-4" />
-                  Daily Counts
-                </button>
-                <button
-                  onClick={() => setActiveTab("criteria")}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 ${
-                    activeTab === "criteria"
-                      ? 'bg-white text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  <CheckCircle className="w-4 h-4" />
-                  Criteria
-                </button>
-                <button
-                  onClick={() => setShowTopPerformersModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
-                >
-                  <Target className="w-4 h-4" />
-                  Top Performers
-                </button>
-              </div>
-              <div className="w-full lg:w-auto lg:ml-auto">
-                <button
-                  onClick={() => syncToFirestore()}
-                  disabled={loading}
-                  className="flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-300 bg-green-600 text-white hover:bg-green-700 shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none w-full lg:w-auto"
-                >
-                  <Save className="w-4 h-4" />
-                  Save Data
-                </button>
-              </div>
-            </div>
-            
-            {/* Required Counts Information */}
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="flex items-center gap-2 text-sm text-blue-800">
-                <BarChart3 className="w-4 h-4" />
-                <span className="font-medium">Required Counts per Daily:</span>
-                <span className="px-2 py-1 bg-green-600 text-white rounded-md font-medium">14 = Active</span>
-                <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-yellow-500 text-white rounded-md font-medium">13 = Warning</span>
-                <span className="text-gray-500">•</span>
-                <span className="px-2 py-1 bg-red-600 text-white rounded-md font-medium">12 = Inactive</span>
+        <Card className="bg-white shadow-sm border border-gray-200 rounded-xl mt-4">
+          <CardHeader className="p-3 sm:p-4">
+            <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 w-full">
+              <div className="flex flex-col gap-1">
+                <CardTitle className="text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
+                  {new Date(selectedYear, selectedMonth).toLocaleDateString(
+                    "en-US",
+                    { month: "long", year: "numeric" },
+                  )} Patrol Data ({filteredData.length} municipalities)
+                </CardTitle>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                    <button
+                      onClick={() => setActiveTab("daily")}
+                      className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 ${
+                        activeTab === "daily"
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <Calendar className="w-4 h-4" />
+                      Daily Counts
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("criteria")}
+                      className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 ${
+                        activeTab === "criteria"
+                          ? 'bg-white text-blue-600 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
+                      }`}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      Criteria
+                    </button>
+                    <button
+                      onClick={() => setShowTopPerformersModal(true)}
+                      className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
+                    >
+                      <Target className="w-4 h-4" />
+                      Top Performers
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+                    <BarChart3 className="w-4 h-4 text-blue-700" />
+                    <span className="text-xs font-medium text-blue-800 whitespace-nowrap">Required Counts per Daily:</span>
+                    <span className="px-2 py-1 bg-green-600 text-white rounded-md text-xs font-medium whitespace-nowrap">14 = Active</span>
+                    <span className="px-2 py-1 bg-yellow-500 text-white rounded-md text-xs font-medium whitespace-nowrap">13 = Warning</span>
+                    <span className="px-2 py-1 bg-red-600 text-white rounded-md text-xs font-medium whitespace-nowrap">12 = Inactive</span>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2462,60 +2481,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   </span>
                   <span className="text-gray-500">•</span>
                   <span className="text-xs text-gray-600">
-                    "No. of Report Attended / Week" now shows Action Taken counts from Command Center
+                    "No. of Report Attended / Week" now shows Action Taken counts from Command Center for entries that have both before and after photos. Multiple after photos per entry are counted individually.
                   </span>
                 </div>
               </div>
             )} */}
 
-            {/* Daily Counts Tab Description */}
-            {activeTab === "daily" && (
-              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-gray-600 mt-0.5" />
-                  <div className="w-full">
-                    <h4 className="font-semibold text-gray-900 mb-3">How Daily Counts Work</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                      <div className="space-y-2">
-                        <p><strong>Daily Entry:</strong> Enter the number of patrols conducted each day</p>
-                        <p><strong>Color Coding:</strong> Green for 14+ patrols (Active), Red for below 14 (Inactive)</p>
-                      </div>
-                      <div className="space-y-2">
-                        <p><strong>Minimum Requirement:</strong> At least 14 patrols per day to be considered active</p>
-                        <p><strong>Data Entry:</strong> Click on any date cell to input or edit patrol counts</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Criteria Tab Description */}
-            {activeTab === "criteria" && (
-              <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <Shield className="w-5 h-5 text-gray-600 mt-0.5" />
-                  <div className="w-full">
-                    <h4 className="font-semibold text-gray-900 mb-3">How Criteria Table Works</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-700">
-                      <div className="space-y-1.5">
-                        <p><strong>Number of Barangay:</strong> Fixed per municipality reference.</p>
-                        <p><strong>Minimum Reports/Day:</strong> Constant 14.</p>
-                        <p><strong>Days to Complete C/M:</strong> Fixed value per municipality based on operational requirements.</p>
-                        <p><strong>Frequency/Week:</strong> Fixed weekly visit frequency for every barangay per municipality.</p>
-                      </div>
-                      <div className="space-y-1.5">
-                        <p><strong>Minimum Reports/Week:</strong> 98 (14 × 7).</p>
-                        <p><strong>Actual Reports/Week:</strong> Displays Week 1-4 breakdown of patrol reports for the month.</p>
-                        <p><strong>Reports Attended/Week:</strong> Shows Week 1-4 attended reports. Counts the total number of after photos uploaded from Command Center for entries that have both before and after photos. Multiple after photos per entry are counted individually.</p>
-                        <p><strong>% Efficiency:</strong> (Minimum Number of Reports (constant) / Week) ÷ (No. of Report Attended / Week) × 100.</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
           </CardHeader>
+
           <CardContent>
             <div className="overflow-x-auto">
               <table className="min-w-full">
@@ -3278,217 +3251,216 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                 </div>
-              </div>
 
-              {loadingTopPerformers ? (
-                <div className="text-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
-                  <p className="text-lg font-medium text-gray-700">Loading performance data...</p>
-                  <p className="text-sm text-gray-500">Fetching data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-                </div>
-              ) : (!filteredTopPerformersData || filteredTopPerformersData.length === 0) ? (
-                <div className="text-center py-12">
-                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
-                    <p className="text-gray-600 text-center">
-                      There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
-                    </p>
+                {loadingTopPerformers ? (
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto mb-4"></div>
+                    <p className="text-lg font-medium text-gray-700">Loading performance data...</p>
+                    <p className="text-sm text-gray-500">Fetching data for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
                   </div>
-                </div>
-              ) : getTopPerformers().length > 0 ? (
-                <div className="space-y-6">
-                  {/* Summary Stats Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Most Active</p>
-                            <p className="text-3xl font-bold text-emerald-600">
-                              {getTopPerformers()[0]?.activeDays || 0}
-                            </p>
-                          </div>
-                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-emerald-100">
-                            <Trophy className="h-6 w-6 text-emerald-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols</p>
-                            <p className="text-3xl font-bold text-blue-600">
-                              {getTopPerformers().reduce((sum, p) => sum + p.totalPatrols, 0)}
-                            </p>
-                          </div>
-                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                            <Activity className="h-6 w-6 text-blue-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Avg Performance</p>
-                            <p className="text-3xl font-bold text-purple-600">
-                              {Math.round(getTopPerformers().reduce((sum, p) => sum + p.activePercentage, 0) / Math.max(getTopPerformers().length, 1))}%
-                            </p>
-                          </div>
-                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                            <TrendingUp className="h-6 w-6 text-purple-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
-                      <CardContent className="p-6">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Top Municipality</p>
-                            <p className="text-lg font-bold text-orange-600">
-                              {getTopPerformers()[0]?.municipality || 'N/A'}
-                            </p>
-                          </div>
-                          <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                            <Building2 className="h-6 w-6 text-orange-600" />
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
+                ) : (!filteredTopPerformersData || filteredTopPerformersData.length === 0) ? (
+                  <div className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Data Available</h3>
+                      <p className="text-gray-600 text-center">
+                        There is no performance data available for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}.
+                      </p>
+                    </div>
                   </div>
+                ) : getTopPerformers().length > 0 ? (
+                  <div className="space-y-6">
+                    {/* Summary Stats Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                      <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Most Active</p>
+                              <p className="text-3xl font-bold text-emerald-600">
+                                {getTopPerformers()[0]?.activeDays || 0}
+                              </p>
+                            </div>
+                            <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-emerald-100">
+                              <Trophy className="h-6 w-6 text-emerald-600" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Total Patrols</p>
+                              <p className="text-3xl font-bold text-blue-600">
+                                {getTopPerformers().reduce((sum, p) => sum + p.totalPatrols, 0)}
+                              </p>
+                            </div>
+                            <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                              <Activity className="h-6 w-6 text-blue-600" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Avg Performance</p>
+                              <p className="text-3xl font-bold text-purple-600">
+                                {Math.round(getTopPerformers().reduce((sum, p) => sum + p.activePercentage, 0) / Math.max(getTopPerformers().length, 1))}%
+                              </p>
+                            </div>
+                            <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
+                              <TrendingUp className="h-6 w-6 text-purple-600" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                      <Card className="backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80">
+                        <CardContent className="p-6">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm font-medium transition-colors duration-300 text-gray-500">Top Municipality</p>
+                              <p className="text-lg font-bold text-orange-600">
+                                {getTopPerformers()[0]?.municipality || 'N/A'}
+                              </p>
+                            </div>
+                            <div className="h-12 w-12 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
+                              <Building2 className="h-6 w-6 text-orange-600" />
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
 
-                  {/* Top Performers Table */}
-                  <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
-                    <CardHeader>
-                      <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
-                        <Trophy className="w-5 h-5 text-yellow-500" />
-                        Top 12 Performers Ranking for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="overflow-x-auto">
-                        <table className="min-w-full">
-                          <thead>
-                            <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
-                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Rank
-                              </th>
-                              <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Municipality
-                              </th>
-                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                District
-                              </th>
-                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Active Days
-                              </th>
-                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Total Patrols
-                              </th>
-                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Performance
-                              </th>
-                              <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                Status
-                              </th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {getTopPerformers().map((performer, index) => {
-                              // Use the pre-calculated activePercentage from Criteria tab logic
-                              const activePercentage = performer.activePercentage;
-                              
-                              const getStatusStyle = () => {
-                                if (activePercentage >= 96) return 'bg-blue-100 text-blue-800 border-blue-200'; // Very Satisfactory (96-100)
-                                if (activePercentage >= 86) return 'bg-green-100 text-green-800 border-green-200'; // Very Good (86-95)
-                                if (activePercentage >= 75) return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Good (75-85)
-                                return 'bg-red-100 text-red-800 border-red-200'; // Needs Improvement (<75)
-                              };
-                              
-                              const getStatusText = () => {
-                                if (activePercentage >= 96) return 'Very Satisfactory';
-                                if (activePercentage >= 86) return 'Very Good';
-                                if (activePercentage >= 75) return 'Good';
-                                return 'Needs Improvement';
-                              };
+                    {/* Top Performers Table */}
+                    <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                      <CardHeader>
+                        <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
+                          <Trophy className="w-5 h-5 text-yellow-500" />
+                          Top 12 Performers Ranking for {new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full">
+                            <thead>
+                              <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
+                                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Rank
+                                </th>
+                                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Municipality
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  District
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Active Days
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Total Patrols
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Performance
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  Status
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200">
+                              {getTopPerformers().map((performer, index) => {
+                                // Use the pre-calculated activePercentage from Criteria tab logic
+                                const activePercentage = performer.activePercentage;
+                                
+                                const getStatusStyle = () => {
+                                  if (activePercentage >= 96) return 'bg-blue-100 text-blue-800 border-blue-200'; // Very Satisfactory (96-100)
+                                  if (activePercentage >= 86) return 'bg-green-100 text-green-800 border-green-200'; // Very Good (86-95)
+                                  if (activePercentage >= 75) return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Good (75-85)
+                                  return 'bg-red-100 text-red-800 border-red-200'; // Needs Improvement (<75)
+                                };
+                                
+                                const getStatusText = () => {
+                                  if (activePercentage >= 96) return 'Very Satisfactory';
+                                  if (activePercentage >= 86) return 'Very Good';
+                                  if (activePercentage >= 75) return 'Good';
+                                  return 'Needs Improvement';
+                                };
 
-                              return (
-                                <tr key={performer.id} className="transition-colors duration-200 hover:bg-gray-50">
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center">
-                                      {index < 3 ? (
-                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                                          index === 0 ? 'bg-yellow-500' : 
-                                          index === 1 ? 'bg-gray-400' : 
-                                          'bg-orange-500'
-                                        }`}>
-                                          {index + 1}
-                                        </div>
-                                      ) : (
-                                        <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-700 font-bold">
-                                          {index + 1}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
-                                      <MapPin className="w-4 h-4 text-gray-600" />
-                                      <span className="font-medium transition-colors duration-300 text-gray-900">
-                                        {performer.municipality}
+                                return (
+                                  <tr key={performer.id} className="transition-colors duration-200 hover:bg-gray-50">
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center">
+                                        {index < 3 ? (
+                                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
+                                            index === 0 ? 'bg-yellow-500' : 
+                                            index === 1 ? 'bg-gray-400' : 
+                                            'bg-orange-500'
+                                          }`}>
+                                            {index + 1}
+                                          </div>
+                                        ) : (
+                                          <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-100 text-gray-700 font-bold">
+                                            {index + 1}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                      <div className="flex items-center gap-3">
+                                        <MapPin className="w-4 h-4 text-gray-600" />
+                                        <span className="font-medium transition-colors duration-300 text-gray-900">
+                                          {performer.municipality}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <Badge className="transition-all duration-300 bg-gray-100 text-gray-800 border-gray-200">
+                                        {performer.district}
+                                      </Badge>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
+                                        {performer.activeDays}
                                       </span>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <Badge className="transition-all duration-300 bg-gray-100 text-gray-800 border-gray-200">
-                                      {performer.district}
-                                    </Badge>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
-                                      {performer.activeDays}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <span className="text-lg font-semibold transition-colors duration-300 text-blue-600">
-                                      {performer.totalPatrols}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <span className="text-lg font-semibold transition-colors duration-300 text-purple-600">
-                                      {activePercentage}%
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <Badge className={`transition-all duration-300 ${getStatusStyle()}`}>
-                                      {getStatusText()}
-                                    </Badge>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-              ) : (
-                <div className="text-center py-12">
-                  <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-                    <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">No Performance Data</h3>
-                    <p className="text-gray-600 text-center">
-                      No performance data found for the selected period.
-                    </p>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className="text-lg font-semibold transition-colors duration-300 text-blue-600">
+                                        {performer.totalPatrols}
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <span className="text-lg font-semibold transition-colors duration-300 text-purple-600">
+                                        {activePercentage}%
+                                      </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-center">
+                                      <Badge className={`transition-all duration-300 ${getStatusStyle()}`}>
+                                        {getStatusText()}
+                                      </Badge>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="flex flex-col items-center justify-center p-8 mb-6 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+                      <AlertTriangle className="w-12 h-12 text-amber-500 mb-4" />
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">No Performance Data</h3>
+                      <p className="text-gray-600 text-center">
+                        No performance data found for the selected period.
+                      </p>
+                    </div>
+                  </div>
+                )}
             </div>
 
             {/* Date Range PDF Modal - Inside Top Performers Modal */}
@@ -3645,10 +3617,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             )}
           </div>
         </div>
+      </div>
       )}
-
-
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
-    </Layout>
-  );
+    </div>
+  </Layout>
+);
 }

@@ -3544,7 +3544,125 @@ const handleSaveAllMonths = async () => {
 
   return (
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout} onShowHelp={() => setShowCommandCenterHelp(true)}>
-      <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
+          <div>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+              {selectedMonth} {selectedYear} • Command Center Dashboard
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto sm:ml-auto">
+            {(activeMunicipalityTab || userMunicipality) && (
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
+                <Building2 className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
+                <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
+                  {(() => {
+                    const currentMunicipality = activeMunicipalityTab || userMunicipality;
+                    console.log('🔍 Debug barangay count:', {
+                      currentMunicipality,
+                      totalBarangays: importedBarangays.length,
+                      barangayMunicipalities: importedBarangays.map(b => b.municipality)
+                    });
+
+                    const filtered = importedBarangays.filter(b => {
+                      if (!currentMunicipality) return true;
+                      const normalizedCurrent = currentMunicipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                      const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                      console.log('   Comparing:', {
+                        currentMunicipality,
+                        barangayMunicipality: b.municipality,
+                        normalizedCurrent,
+                        normalizedBarangay,
+                        match: normalizedBarangay === normalizedCurrent
+                      });
+                      return normalizedBarangay === normalizedCurrent;
+                    });
+
+                    console.log('✅ Filtered count:', filtered.length);
+                    return filtered.length;
+                  })()} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
+                </span>
+              </div>
+            )}
+
+            <div className="relative w-full sm:w-auto">
+              <button
+                id="commandcenter-menu-button"
+                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
+              >
+                <Menu className="w-5 h-5" />
+                <span className="text-sm font-medium">View Options</span>
+              </button>
+
+              {showMenuDropdown && (
+                <div
+                  id="commandcenter-menu-dropdown"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                >
+                <div className="py-1">
+                <div className="px-3 py-2">
+                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setActiveTab("weekly-report");
+                    setShowMenuDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                    activeTab === "weekly-report"
+                      ? "bg-green-50 text-green-700"
+                      : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                  }`}
+                >
+                  <FileText className="w-4 h-4 text-green-600" />
+                  <span>Weekly Report</span>
+                </button>
+
+                {isAdmin && (
+                  <button
+                    onClick={() => {
+                      setActiveTab("barangays");
+                      setShowMenuDropdown(false);
+                    }}
+                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                      activeTab === "barangays"
+                        ? "bg-purple-50 text-purple-700"
+                        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+                    }`}
+                  >
+                    <Building2 className="w-4 h-4 text-purple-600" />
+                    <span>Barangay Management</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setActiveTab("concern-types");
+                    setShowMenuDropdown(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                    activeTab === "concern-types"
+                      ? "bg-orange-50 text-orange-700"
+                      : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                  }`}
+                >
+                  <AlertTriangle className="w-4 h-4 text-orange-600" />
+                  <span>Concern Types</span>
+                </button>
+
+                </div>
+              </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
         {/* Firestore Quota Warning Banner */}
         {isBlocked && blockedUntil && (
           <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-4 shadow-md">
@@ -3900,131 +4018,6 @@ const handleSaveAllMonths = async () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 mb-4 sm:mb-6">
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage barangays, concern types, and weekly reports</p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
-            {/* Municipality Badge - for non-admin users */}
-            {(activeMunicipalityTab || userMunicipality) && (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
-                <Building2 className="h-4 w-4 text-green-600" />
-                <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
-                <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
-                  {(() => {
-                    const currentMunicipality = activeMunicipalityTab || userMunicipality;
-                    console.log('🔍 Debug barangay count:', {
-                      currentMunicipality,
-                      totalBarangays: importedBarangays.length,
-                      barangayMunicipalities: importedBarangays.map(b => b.municipality)
-                    });
-                    
-                    const filtered = importedBarangays.filter(b => {
-                      if (!currentMunicipality) return true;
-                      // Normalize municipality names for comparison
-                      const normalizedCurrent = currentMunicipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                      const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                      console.log('   Comparing:', { 
-                        currentMunicipality, 
-                        barangayMunicipality: b.municipality,
-                        normalizedCurrent, 
-                        normalizedBarangay,
-                        match: normalizedBarangay === normalizedCurrent
-                      });
-                      return normalizedBarangay === normalizedCurrent;
-                    });
-                    
-                    console.log('✅ Filtered count:', filtered.length);
-                    return filtered.length;
-                  })()} brgy • {getConcernTypesForMunicipality(activeMunicipalityTab || userMunicipality).length} types
-                </span>
-              </div>
-            )}
-            
-            {/* View Options Dropdown */}
-            <div className="relative w-full sm:w-auto">
-              <button
-                id="commandcenter-menu-button"
-                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
-              >
-                <Menu className="w-5 h-5" />
-                <span className="text-sm font-medium">View Options</span>
-              </button>
-              
-              {/* Dropdown Menu */}
-              {showMenuDropdown && (
-                <div 
-                  id="commandcenter-menu-dropdown"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
-                >
-                <div className="py-1">
-                {/* Navigation Options */}
-                <div className="px-3 py-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
-                </div>
-
-
-                {/* Weekly Report - available for all users */}
-                <button
-                  onClick={() => {
-                    setActiveTab("weekly-report");
-                    setShowMenuDropdown(false);
-                  }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                    activeTab === "weekly-report"
-                      ? "bg-green-50 text-green-700"
-                      : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                  }`}
-                >
-                  <FileText className="w-4 h-4 text-green-600" />
-                  <span>Weekly Report</span>
-                </button>
-
-                {/* Show Barangay Management only for admin */}
-                {isAdmin && (
-                  <button
-                    onClick={() => {
-                      setActiveTab("barangays");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "barangays"
-                        ? "bg-purple-50 text-purple-700"
-                        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
-                    }`}
-                  >
-                    <Building2 className="w-4 h-4 text-purple-600" />
-                    <span>Barangay Management</span>
-                  </button>
-                )}
-
-                {/* Show Concern Types for all users */}
-                <button
-                  onClick={() => {
-                    setActiveTab("concern-types");
-                    setShowMenuDropdown(false);
-                  }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                    activeTab === "concern-types"
-                      ? "bg-orange-50 text-orange-700"
-                      : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
-                  }`}
-                >
-                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                  <span>Concern Types</span>
-                </button>
-
-
-                </div>
-              </div>
-              )}
-            </div>
-          </div>
-        </div>
 
       {/* Main Dashboard */}
       <div className="space-y-3 sm:space-y-4">
@@ -4033,11 +4026,11 @@ const handleSaveAllMonths = async () => {
 
         {/* Weekly Report Section */}
         {activeTab === "weekly-report" && (
-          <div className="space-y-6">
+          <div className="space-y-3 sm:space-y-4">
             {/* Weekly Report Header */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-4 sm:p-6'} pb-0`}>
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+              <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-3 sm:p-4'} pb-0`}>
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 sm:gap-3">
                   <div className="flex items-start gap-3 w-full lg:w-auto">
                     <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
                       <FileText className="w-5 h-5 text-green-600" />
@@ -4045,7 +4038,7 @@ const handleSaveAllMonths = async () => {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
                       {activeMunicipalityTab && (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-1">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-green-600" />
                             <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
@@ -4063,7 +4056,7 @@ const handleSaveAllMonths = async () => {
                       )}
                     </div>
                   </div>
-                  <div className="flex flex-col gap-3 sm:gap-4 w-full lg:w-auto">
+                  <div className="flex flex-col gap-2 sm:gap-3 w-full lg:w-auto">
                     {/* Import Options - Admin Only */}
                     {isAdmin && (
                       <div className="flex items-center gap-3">
@@ -4083,6 +4076,22 @@ const handleSaveAllMonths = async () => {
                     
                     {/* Action Buttons */}
                     <div className="flex flex-wrap gap-2 sm:gap-3">
+
+                      {(isAdmin || userAccessLevel === 'command-center') && (
+                        <button
+                          onClick={handleSaveWeeklyReport}
+                          disabled={isLoadingWeeklyReports}
+                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                          title="Save Data"
+                        >
+                          {isLoadingWeeklyReports ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <CheckCircle className="h-4 w-4" />
+                          )}
+                          <span className="text-sm font-medium">Save Data</span>
+                        </button>
+                      )}
                       
                       {isAdmin && (
                         <button 
@@ -4336,21 +4345,6 @@ const handleSaveAllMonths = async () => {
                         </Dialog>
                       )}
                       
-                      {(isAdmin || userAccessLevel === 'command-center') && (
-                        <button 
-                          onClick={handleSaveWeeklyReport}
-                          disabled={isLoadingWeeklyReports}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                          title="Save Data"
-                        >
-                          {isLoadingWeeklyReports ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                          <span className="text-sm font-medium">Save Data</span>
-                        </button>
-                      )}
                       
                     </div>
                     
@@ -4365,11 +4359,11 @@ const handleSaveAllMonths = async () => {
                   </div>
                 </div>
               </div>
-              <div className={`${isCommandUser ? 'p-4' : 'p-4 md:p-6'} pt-0`}>
+              <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
                 {/* Month/Year Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-2">
                   <div>
-                    <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-2">Select Month</label>
+                    <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
                     <select 
                       id="month-select"
                       name="month-select"
@@ -4388,7 +4382,7 @@ const handleSaveAllMonths = async () => {
                     </select>
                   </div>
                   <div>
-                    <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-2">Select Year</label>
+                    <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
                     <select 
                       id="year-select"
                       name="year-select"
@@ -4405,9 +4399,9 @@ const handleSaveAllMonths = async () => {
 
                 {/* Municipality Selection - Admin only */}
                 {isAdmin && (
-                  <div className="mb-6">
-                    <div className="block text-sm font-medium text-gray-700 mb-3">Municipality</div>
-                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-3">
+                  <div className="mb-2">
+                    <div className="block text-sm font-medium text-gray-700 mb-1">Municipality</div>
+                    <div className="grid grid-cols-1 sm:grid-cols-6 gap-2">
                       {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
                         const isActive = activeMunicipalityTab === municipality;
                         const concernTypesCount = getConcernTypesForMunicipality(municipality).length;
@@ -6701,6 +6695,7 @@ const handleSaveAllMonths = async () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      </div>
     </Layout>
   );
 }

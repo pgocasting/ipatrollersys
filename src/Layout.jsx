@@ -156,7 +156,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-auto bg-white">
-        <div className="h-full p-3 sm:p-4 md:p-6">
+        <div className="h-full">
           {children}
         </div>
       </main>
