@@ -801,11 +801,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Set default active municipality tab when component loads
   useEffect(() => {
-    if (importedBarangays.length > 0 && !activeMunicipalityTab) {
+    if (!activeMunicipalityTab) {
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
       const firstMunicipality = allMunicipalities[0];
-      setActiveMunicipalityTab(firstMunicipality);
-      setSelectedReportMunicipality(firstMunicipality);
+      if (firstMunicipality) {
+        setActiveMunicipalityTab(firstMunicipality);
+        setSelectedReportMunicipality(firstMunicipality);
+      }
     }
   }, [importedBarangays, activeMunicipalityTab]);
 
@@ -4030,7 +4032,7 @@ const handleSaveAllMonths = async () => {
             {/* Weekly Report Header */}
             <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
               <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-3 sm:p-4'} pb-0`}>
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-2 sm:gap-3">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
                   <div className="flex items-start gap-3 w-full lg:w-auto">
                     <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
                       <FileText className="w-5 h-5 text-green-600" />
@@ -4038,7 +4040,7 @@ const handleSaveAllMonths = async () => {
                     <div className="flex-1 min-w-0">
                       <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
                       {activeMunicipalityTab && (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-0.5">
                           <div className="flex items-center gap-2">
                             <Building2 className="w-4 h-4 text-green-600" />
                             <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
@@ -4056,6 +4058,38 @@ const handleSaveAllMonths = async () => {
                       )}
                     </div>
                   </div>
+
+                  {isAdmin && (
+                    <div className="w-full lg:w-auto lg:ml-auto">
+                      <div className="flex items-center gap-2">
+                        <div className="text-sm font-medium text-gray-700">Municipality</div>
+                        {!Object.values(municipalitiesByDistrict).flat().length && (
+                          <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
+                        )}
+                      </div>
+
+                      <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
+                        {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                          const isActive = activeMunicipalityTab === municipality;
+                          return (
+                            <button
+                              key={municipality}
+                              type="button"
+                              onClick={() => handleMunicipalityTabChange(municipality)}
+                              className={`${
+                                isActive
+                                  ? 'bg-green-600 text-white border-green-600'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
+                              } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
+                              title={municipality}
+                            >
+                              <span className="block truncate">{municipality}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
