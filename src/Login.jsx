@@ -2,8 +2,8 @@ import React, { useState } from "react";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
-import { Alert, AlertDescription } from "./components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
 import { Loader2, Lock, Eye, EyeOff, Mail, Shield, Brain } from "lucide-react";
 import { useFirebase } from "./hooks/useFirebase";
 
@@ -18,6 +18,7 @@ export default function Login({ onLogin }) {
     keepLoggedIn: false,
   });
   const [error, setError] = useState("");
+  const [showErrorModal, setShowErrorModal] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useFirebase();
@@ -25,6 +26,7 @@ export default function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
+    setShowErrorModal(false);
     setIsLoading(true);
 
     try {
@@ -34,19 +36,25 @@ export default function Login({ onLogin }) {
         onLogin();
       } else {
         setError(result.error || "Invalid email or password");
+        setShowErrorModal(true);
       }
     } catch (error) {
       console.error('❌ Login error:', error);
       if (error.code === 'auth/user-not-found') {
         setError("User not found. Please check your email or contact administrator.");
+        setShowErrorModal(true);
       } else if (error.code === 'auth/wrong-password') {
         setError("Incorrect password. Please try again.");
+        setShowErrorModal(true);
       } else if (error.code === 'auth/too-many-requests') {
         setError("Too many failed attempts. Please try again later.");
+        setShowErrorModal(true);
       } else if (error.code === 'auth/network-request-failed') {
         setError("Network error. Please check your connection and try again.");
+        setShowErrorModal(true);
       } else {
         setError(`Login error: ${error.message}`);
+        setShowErrorModal(true);
       }
     } finally {
       setIsLoading(false);
@@ -63,8 +71,24 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="min-h-screen flex items-start justify-center bg-white p-2 sm:p-4 pt-8 sm:pt-30">
+      <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
+        <DialogContent className="sm:max-w-md" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>Login failed</DialogTitle>
+            <DialogDescription>
+              {error || "Login failed. Please try again."}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button type="button" onClick={() => setShowErrorModal(false)}>
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {/* Login Card Container */}
       <div className="relative z-10 w-full max-w-md">
+
         {/* Login Form Card with Shadow */}
         <Card className="shadow-xl border-gray-200 bg-white">
           {/* Logo Section - Inside Card */}
@@ -147,15 +171,6 @@ export default function Login({ onLogin }) {
                   Keep me logged in
                 </Label>
               </div>
-
-              {/* Error Message */}
-              {error && (
-                <Alert variant="destructive" className="border-red-300 bg-red-50">
-                  <AlertDescription className="text-sm sm:text-base text-red-800">
-                    {error}
-                  </AlertDescription>
-                </Alert>
-              )}
 
               {/* Login Button */}
               <Button
