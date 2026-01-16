@@ -79,6 +79,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     if (userMunicipality) {
       setActiveMunicipalityTab(userMunicipality);
+      setSelectedReportMunicipality(userMunicipality);
     }
   }, [userMunicipality]);
 
@@ -802,14 +803,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Set default active municipality tab when component loads
   useEffect(() => {
     if (!activeMunicipalityTab) {
-      const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
-      const firstMunicipality = allMunicipalities[0];
-      if (firstMunicipality) {
-        setActiveMunicipalityTab(firstMunicipality);
-        setSelectedReportMunicipality(firstMunicipality);
+      const defaultMunicipality = userMunicipality || Object.values(municipalitiesByDistrict).flat()[0];
+      if (defaultMunicipality) {
+        setActiveMunicipalityTab(defaultMunicipality);
+        setSelectedReportMunicipality(defaultMunicipality);
       }
     }
-  }, [importedBarangays, activeMunicipalityTab]);
+  }, [importedBarangays, activeMunicipalityTab, userMunicipality]);
 
   // Load weekly report data when year/municipality/month changes with debouncing
   useEffect(() => {
@@ -884,6 +884,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           // Check each municipality
           for (const municipalityDoc of municipalitySnapshot.docs) {
             const municipalityName = municipalityDoc.id;
+
+            if (!isAdmin && userMunicipality && municipalityName.toLowerCase() !== userMunicipality.toLowerCase()) {
+              continue;
+            }
             console.log(`🔍 Checking municipality: ${municipalityName}`);
             
             // Get all month/year documents for this municipality
