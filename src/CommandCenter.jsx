@@ -64,10 +64,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { notifications, showSuccess, showError, showInfo, showWarning, removeNotification } = useNotification();
   const { isBlocked, blockedUntil, timeLeft, executeWithQuotaCheck, resetQuotaBlock } = useFirestoreQuota();
   const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
+  const isReadOnly = userAccessLevel === 'ipatroller' && !isAdmin;
   
   // Access level check - only command-center users should access this page
   useEffect(() => {
-    if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'admin') {
+    if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'ipatroller' && userAccessLevel !== 'admin') {
       console.warn('⚠️ Unauthorized access attempt to Command Center. Access level:', userAccessLevel);
       // Optionally redirect to dashboard or show error
     }
@@ -639,6 +640,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Wrapper function for Firestore save operations with quota checking
   const saveWithQuotaCheck = useCallback(async (saveOperation, operationName = "Save") => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to modify Command Center data.';
+      toast.error(message);
+      showError(message);
+      return { success: false, error: message };
+    }
     if (isBlocked) {
       const message = `⚠️ Firestore quota exceeded! You can save data again at ${blockedUntil?.toLocaleString("en-PH", {
         dateStyle: "medium",
@@ -1670,6 +1677,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Clear all weekly report data for active municipality
   const handleClearActiveMunicipalityData = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to clear data.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
     if (window.confirm(`Are you sure you want to clear all weekly report data for ${activeMunicipalityTab}? This action cannot be undone.`)) {
       try {
         // Clear local state
@@ -1734,6 +1747,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Clear weekly report data for selected municipality
   const handleClearSelectedMunicipalityData = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to clear data.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
     if (!selectedClearMunicipality) {
       toast.error("Please select a municipality to clear data for");
       showError('Please select a municipality to clear data for');
@@ -1802,6 +1821,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Clear all entries (weekly report data for ALL municipalities across ALL months, keep barangays and concern types)
   const handleClearAllData = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to clear data.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
     const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
 
 This will permanently DELETE ALL weekly reports from the database:
@@ -2980,6 +3005,12 @@ Are you absolutely sure you want to proceed?`;
 
   // Save edited concern type(s)
   const handleSaveEditedConcernType = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to modify concern types.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
     if (!editingConcernType.name.trim() || !editingConcernType.district || !editingConcernType.municipality) {
       toast.error("Please fill in all required fields");
       showError('Please fill in all required fields');
@@ -3111,9 +3142,17 @@ Are you absolutely sure you want to proceed?`;
   };
 
   const handleClearBarangays = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to modify barangays.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
     if (importedBarangays.length === 0) {
       toast.error("No barangays to clear");
       showError('No barangays to clear');
+      return;
+    }
     try {
       const result = await deleteWeeklyReportFromCollection(docId);
       if (result.success) {
@@ -3127,11 +3166,16 @@ Are you absolutely sure you want to proceed?`;
       console.error('❌ Error deleting weekly report:', error);
       toast.error('Error deleting weekly report');
     }
-  }
-};
+  };
 
 // Bulk delete ALL weekly reports from ALL locations in Firestore
 const handleDeleteAllWeeklyReports = async () => {
+  if (isReadOnly) {
+    const message = 'View-only access: you do not have permission to delete weekly reports.';
+    toast.error(message);
+    showError(message);
+    return;
+  }
   const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
 
 This will permanently delete ALL weekly reports from:
@@ -3202,6 +3246,12 @@ Are you absolutely sure you want to proceed?`;
 
 // Save weekly report data to Firestore
 const handleSaveWeeklyReport = async () => {
+  if (isReadOnly) {
+    const message = 'View-only access: you do not have permission to save weekly reports.';
+    toast.error(message);
+    showError(message);
+    return;
+  }
   const monthYear = `${selectedMonth}_${selectedYear}`;
   const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
   const reportKey = `${monthYear}${municipalityKey}`;
@@ -3285,6 +3335,12 @@ const handleSaveWeeklyReport = async () => {
 
 // Handle Excel file selection and import
 const handleExcelFileSelect = async (event) => {
+  if (isReadOnly) {
+    const message = 'View-only access: you do not have permission to import Excel files.';
+    toast.error(message);
+    showError(message);
+    return;
+  }
   const file = event.target.files?.[0];
   if (!file) return;
 
@@ -3447,10 +3503,17 @@ const handleExcelFileSelect = async (event) => {
 
 // Save all imported months (from local storage import) to Firestore
 const handleSaveAllMonths = async () => {
+  if (isReadOnly) {
+    const message = 'View-only access: you do not have permission to save imported months.';
+    toast.error(message);
+    showError(message);
+    return;
+  }
   try {
     const monthKeys = Object.keys(allMonthsData || {});
     if (!monthKeys.length) {
-      toast.error('No imported months found to save');
+      toast.error("No months data to save");
+      showError('No months data to save');
       return;
     }
 
@@ -4063,7 +4126,7 @@ const handleSaveAllMonths = async () => {
                     </div>
                   </div>
 
-                  {isAdmin && (
+                  {(isAdmin || isReadOnly) && (
                     <div className="w-full lg:w-auto lg:ml-auto">
                       <div className="flex items-center gap-2">
                         <div className="text-sm font-medium text-gray-700">Municipality</div>
@@ -4153,7 +4216,7 @@ const handleSaveAllMonths = async () => {
                     )}
 
                     <div className="flex flex-wrap gap-2 sm:gap-3 w-full lg:w-auto lg:justify-end">
-                      {(isAdmin || userAccessLevel === 'command-center') && (
+                      {(isAdmin || userAccessLevel === 'command-center') && !isReadOnly && (
                         <button
                           onClick={handleSaveWeeklyReport}
                           disabled={isLoadingWeeklyReports}
@@ -6286,7 +6349,7 @@ const handleSaveAllMonths = async () => {
                         )}
                         <label
                           htmlFor={`before-photo-input-${row.id}`}
-                          className="block aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all"
+                          className="aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all"
                         >
                           <Plus className="w-5 h-5 text-blue-400 mb-1" />
                           <span className="text-xs font-medium text-blue-600">+ Add 1 or more photos</span>
@@ -6365,7 +6428,7 @@ const handleSaveAllMonths = async () => {
                         )}
                         <label
                           htmlFor={`after-photo-input-${row.id}`}
-                          className={`block aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
+                          className={`aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
                             row.beforePreviews.length > 0
                               ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-100'
                               : 'cursor-not-allowed border-gray-300 bg-gray-100 opacity-50'

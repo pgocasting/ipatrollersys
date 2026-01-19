@@ -1,6 +1,6 @@
 // Route utility functions for better page persistence
 
-export const VALID_PAGES = ['dashboard', 'ipatroller', 'reports', 'incidents', 'actioncenter', 'settings', 'firebase-test', 'cloudinary-demo', 'firebase-cloudinary-demo', 'photo-migration'];
+export const VALID_PAGES = ['dashboard', 'ipatroller', 'commandcenter', 'reports', 'incidents', 'actioncenter', 'settings', 'firebase-test', 'cloudinary-demo', 'firebase-cloudinary-demo', 'photo-migration'];
 
 export const getCurrentPageFromURL = () => {
   const path = window.location.pathname;

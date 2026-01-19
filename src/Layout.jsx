@@ -68,7 +68,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
   const allNavigationItems = React.useMemo(() => [
     { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: 'admin' },
     { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
-    { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: 'command-center' },
+    { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: ['command-center', 'ipatroller'] },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
     { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: ['admin', 'incidents'] },
     { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
