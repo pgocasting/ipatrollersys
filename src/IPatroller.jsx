@@ -888,16 +888,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             
             if (weekStart < totalDays) {
               const attended = municipalityActionCounts[week] || 0;
-              const efficiency = Math.floor((attended / WEEKLY_MIN) * 100);
+              const efficiency = Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100);
               weeklyEfficiency.push(efficiency);
             } else {
               weeklyEfficiency.push(0);
             }
           }
-          
-          // Overall Percentage is the sum of all weekly efficiency percentages
-          activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
+
+          const shouldUseCombinedMetric = selectedTopPerformersYear >= 2026;
+
+          if (shouldUseCombinedMetric) {
+            const weeklyScore = Math.round(weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0) / 4);
+            const activeDaysScore = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
+            activePercentage = Math.round((weeklyScore * 0.75) + (activeDaysScore * 0.25));
+          } else {
+            // Backward-compatible behavior for older months/years
+            activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
+          }
         }
+        
+        // Ensure Performance % stays within 0-100
+        activePercentage = Math.max(0, Math.min(Number(activePercentage) || 0, 100));
         
         return {
           ...item,
