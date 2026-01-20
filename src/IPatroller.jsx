@@ -900,7 +900,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           if (shouldUseCombinedMetric) {
             const weeklyScore = Math.round(weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0) / 4);
             const activeDaysScore = totalDays > 0 ? Math.round((activeDays / totalDays) * 100) : 0;
-            activePercentage = Math.round((weeklyScore * 0.75) + (activeDaysScore * 0.25));
+            activePercentage = Math.round((weeklyScore * 0.70) + (activeDaysScore * 0.30));
           } else {
             // Backward-compatible behavior for older months/years
             activePercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
