@@ -1909,12 +1909,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Header Bar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold text-gray-900">Action Center</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Action Center</h1>
               {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') && (
                 <Badge 
                   variant="secondary" 
@@ -1928,20 +1928,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </Badge>
               )}
             </div>
-            <p className="text-gray-500 mt-2">
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
               {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') 
                 ? `Manage and track ${userDepartment === 'agriculture' ? 'agriculture' : 'environmental'} action reports`
                 : 'Manage and track action reports with comprehensive analytics'
               }
             </p>
           </div>
-          
-          <div className="flex items-center gap-4">
+
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto sm:ml-auto">
             {/* View Options Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                  className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <Menu className="w-5 h-5" />
                   <span className="text-sm font-medium">View Options</span>
@@ -2000,24 +2000,24 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
+        <div className="px-4 sm:px-6 lg:px-8 py-3 space-y-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
+            <div className="h-full">
+
         {/* Quick Stats */}
-        <div className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-          isAdmin || (!userDepartment || (userDepartment !== 'agriculture' && userDepartment !== 'pg-enro'))
-            ? 'lg:grid-cols-5' 
-            : 'lg:grid-cols-2'
-        }`}>
+        <div className="grid grid-cols-2 gap-2 h-full">
           {/* Total Actions Card - Always shown */}
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardContent className="p-3 sm:p-4">
+          <Card className="bg-white shadow-sm border border-gray-200 col-span-2">
+            <CardContent className="p-1.5 sm:p-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Actions</p>
-                  <p className="text-xl sm:text-2xl font-bold text-blue-600">
+                  <p className="text-lg sm:text-xl font-bold text-blue-600">
                     {totalActions.toLocaleString()}
                   </p>
                 </div>
-                <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg flex-shrink-0">
-                  <Target className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                <div className="p-1.5 bg-blue-100 rounded-lg flex-shrink-0">
+                  <Target className="w-5 h-5 text-blue-600" />
                 </div>
               </div>
             </CardContent>
@@ -2025,26 +2025,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
           {/* Department-specific card for Agriculture and PG-ENRO users */}
           {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') ? (
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-3 sm:p-4">
+            <Card className="bg-white shadow-sm border border-gray-200 col-span-2">
+              <CardContent className="p-1.5 sm:p-1.5">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-gray-500 mb-1 truncate">
                       {userDepartment === 'agriculture' ? 'Agriculture (Bantay Dagat)' : 'PG-Enro (Environment)'}
                     </p>
-                    <p className={`text-xl sm:text-2xl font-bold ${
+                    <p className={`text-lg sm:text-xl font-bold ${
                       userDepartment === 'agriculture' ? 'text-green-600' : 'text-emerald-600'
                     }`}>
                       {(userDepartment === 'agriculture' ? agricultureActions : pgEnroActions).toLocaleString()}
                     </p>
                   </div>
-                  <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${
+                  <div className={`p-1.5 rounded-lg flex-shrink-0 ${
                     userDepartment === 'agriculture' ? 'bg-green-100' : 'bg-emerald-100'
                   }`}>
                     {userDepartment === 'agriculture' ? (
-                      <Fish className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                      <Fish className="w-5 h-5 text-green-600" />
                     ) : (
-                      <Trees className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
+                      <Trees className="w-5 h-5 text-emerald-600" />
                     )}
                   </div>
                 </div>
@@ -2054,64 +2054,64 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             /* Show all cards for admin and other users */
             <>
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-500 mb-1 truncate">PNP (Monthly)</p>
-                      <p className="text-xl sm:text-2xl font-bold text-red-600">
+                      <p className="text-lg sm:text-xl font-bold text-red-600">
                         {pnpActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg flex-shrink-0">
-                      <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
+                    <div className="p-1.5 bg-red-100 rounded-lg flex-shrink-0">
+                      <Shield className="w-5 h-5 text-red-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-500 mb-1 truncate">Agriculture (Bantay Dagat)</p>
-                      <p className="text-xl sm:text-2xl font-bold text-green-600">
+                      <p className="text-lg sm:text-xl font-bold text-green-600">
                         {agricultureActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg flex-shrink-0">
-                      <Fish className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
+                    <div className="p-1.5 bg-green-100 rounded-lg flex-shrink-0">
+                      <Fish className="w-5 h-5 text-green-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-500 mb-1 truncate">PG-Enro (Environment)</p>
-                      <p className="text-xl sm:text-2xl font-bold text-emerald-600">
+                      <p className="text-lg sm:text-xl font-bold text-emerald-600">
                         {pgEnroActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-emerald-100 rounded-lg flex-shrink-0">
-                      <Trees className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
+                    <div className="p-1.5 bg-emerald-100 rounded-lg flex-shrink-0">
+                      <Trees className="w-5 h-5 text-emerald-600" />
                     </div>
                   </div>
                 </CardContent>
               </Card>
 
               <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-3 sm:p-4">
+                <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-gray-500 mb-1 truncate">Pending</p>
-                      <p className="text-xl sm:text-2xl font-bold text-orange-600">
+                      <p className="text-lg sm:text-xl font-bold text-orange-600">
                         {pendingActions.toLocaleString()}
                       </p>
                     </div>
-                    <div className="p-1.5 sm:p-2 bg-orange-100 rounded-lg flex-shrink-0">
-                      <Clock className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
+                    <div className="p-1.5 bg-orange-100 rounded-lg flex-shrink-0">
+                      <Clock className="w-5 h-5 text-orange-600" />
                     </div>
                   </div>
                 </CardContent>
@@ -2120,6 +2120,130 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           )}
 
         </div>
+
+            </div>
+
+            <div className="h-full">
+              {/* Report Filters */}
+              <Card className="bg-white shadow-sm border border-gray-200 h-full">
+                <CardContent className="p-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-base font-semibold text-gray-900">Filters &amp; Search</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const now = new Date();
+                          setSelectedMonth(now.getMonth());
+                          setSelectedYear(String(now.getFullYear()));
+                        }}
+                        className="px-2 py-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
+                      >
+                        Current Month
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm("");
+                          setSelectedDistrict("all");
+                          setSelectedMonth(new Date().getMonth());
+                          setSelectedYear(new Date().getFullYear().toString());
+                          setActiveMunicipality("all");
+                          setActiveTab(userDepartment === 'agriculture' || userDepartment === 'pg-enro' ? userDepartment : "all");
+                        }}
+                        className="px-2 py-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
+                      >
+                        Clear Filters
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="search" className="text-xs font-medium text-gray-700">Search</Label>
+                      <Input
+                        id="search"
+                        name="search"
+                        placeholder="Search municipalities..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        autoComplete="off"
+                      />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="month-filter" className="text-xs font-medium text-gray-700">Month</Label>
+                      <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                        <SelectTrigger id="month-filter" name="month-filter">
+                          <SelectValue placeholder="Month" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[
+                            'January', 'February', 'March', 'April', 'May', 'June',
+                            'July', 'August', 'September', 'October', 'November', 'December'
+                          ].map((month, index) => (
+                            <SelectItem key={month} value={index.toString()}>
+                              {month}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="year-filter" className="text-xs font-medium text-gray-700">Year</Label>
+                      <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger id="year-filter" name="year-filter">
+                          <SelectValue placeholder="Year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {yearOptions.map((year) => (
+                            <SelectItem key={year} value={year}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="district-filter" className="text-xs font-medium text-gray-700">District</Label>
+                      <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
+                        <SelectTrigger id="district-filter" name="district-filter">
+                          <SelectValue placeholder="All Districts" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Districts</SelectItem>
+                          <SelectItem value="1ST DISTRICT">1st District</SelectItem>
+                          <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
+                          <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                      <Label htmlFor="department-filter" className="text-xs font-medium text-gray-700">Department</Label>
+                      <Select
+                        value={activeTab}
+                        onValueChange={setActiveTab}
+                        disabled={userDepartment === 'agriculture' || userDepartment === 'pg-enro'}
+                      >
+                        <SelectTrigger id="department-filter" name="department-filter">
+                          <SelectValue placeholder="All Departments" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Departments</SelectItem>
+                          <SelectItem value="pnp">PNP</SelectItem>
+                          <SelectItem value="agriculture">Agriculture</SelectItem>
+                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
 
         {/* Monthly Department Breakdown Modal */}
         <Dialog open={showMonthlyBreakdownModal} onOpenChange={setShowMonthlyBreakdownModal}>
@@ -2217,131 +2341,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </DialogContent>
         </Dialog>
 
-        {/* Report Filters */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold text-gray-900">Filters &amp; Search</h3>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const now = new Date();
-                    setSelectedMonth(now.getMonth());
-                    setSelectedYear(String(now.getFullYear()));
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
-                >
-                  Current Month
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setSelectedDistrict("all");
-                    setSelectedMonth(new Date().getMonth());
-                    setSelectedYear(new Date().getFullYear().toString());
-                    setActiveMunicipality("all");
-                    setActiveTab(userDepartment === 'agriculture' || userDepartment === 'pg-enro' ? userDepartment : "all");
-                  }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
-                >
-                  Clear Filters
-                </button>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="search" className="text-sm font-medium text-gray-700">Search</Label>
-                <Input
-                  id="search"
-                  name="search"
-                  placeholder="Search municipalities..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  autoComplete="off"
-                />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="department-filter" className="text-sm font-medium text-gray-700">Department</Label>
-                <Select
-                  value={activeTab}
-                  onValueChange={setActiveTab}
-                  disabled={userDepartment === 'agriculture' || userDepartment === 'pg-enro'}
-                >
-                  <SelectTrigger id="department-filter" name="department-filter">
-                    <SelectValue placeholder="All Departments" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Departments</SelectItem>
-                    <SelectItem value="pnp">PNP</SelectItem>
-                    <SelectItem value="agriculture">Agriculture</SelectItem>
-                    <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="month-filter" className="text-sm font-medium text-gray-700">Month</Label>
-                <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                  <SelectTrigger id="month-filter" name="month-filter">
-                    <SelectValue placeholder="Month" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[
-                      'January', 'February', 'March', 'April', 'May', 'June',
-                      'July', 'August', 'September', 'October', 'November', 'December'
-                    ].map((month, index) => (
-                      <SelectItem key={month} value={index.toString()}>
-                        {month}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="year-filter" className="text-sm font-medium text-gray-700">Year</Label>
-                <Select value={selectedYear} onValueChange={setSelectedYear}>
-                  <SelectTrigger id="year-filter" name="year-filter">
-                    <SelectValue placeholder="Year" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {yearOptions.map((year) => (
-                      <SelectItem key={year} value={year}>
-                        {year}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="district-filter" className="text-sm font-medium text-gray-700">District</Label>
-                <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                  <SelectTrigger id="district-filter" name="district-filter">
-                    <SelectValue placeholder="All Districts" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Districts</SelectItem>
-                    <SelectItem value="1ST DISTRICT">1st District</SelectItem>
-                    <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
-                    <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Actions Table */}
         <div className="border rounded-md border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
+          <div className="overflow-x-auto overflow-y-auto max-h-[60vh] relative" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
             <Table className="border-gray-200 w-full">
               <TableCaption className="text-slate-500">Action reports and their current status.</TableCaption>
-              <TableHeader>
+              <TableHeader className="sticky top-0 z-10 bg-white">
                 <TableRow className="border-b border-gray-200 table-header-spacing">
                   <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Department</TableHead>
                   <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Municipality</TableHead>
@@ -2476,7 +2481,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         
         {/* Pagination Controls */}
         {filteredItems.length > 0 && (
-          <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-white border-t border-gray-200">
+          <div className="mt-6 sticky bottom-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-white border-t border-gray-200">
             {/* Items per page selector */}
             <div className="flex items-center gap-2">
               <label htmlFor="itemsPerPage" className="text-sm font-medium text-gray-700">
@@ -3715,6 +3720,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         accept=".csv,.xlsx,.xls"
         style={{ display: 'none' }}
       />
+      </div>
     </Layout>
   );
 }
