@@ -9,6 +9,7 @@ import { Input } from "./components/ui/input";
 import { Label } from "./components/ui/label";
 import { Textarea } from "./components/ui/textarea";
 import { Badge } from "./components/ui/badge";
+import { toast } from "sonner";
 import { 
   collection, 
   getDocs, 
@@ -30,7 +31,6 @@ import { db } from './firebase';
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
-import { toast } from "sonner";
 import { 
   Upload, 
   Plus, 
@@ -388,6 +388,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [showClearIncidentsModal, setShowClearIncidentsModal] = useState(false);
+  const [clearScope, setClearScope] = useState("month_year");
+  const [clearTargetMonth, setClearTargetMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
+  const [clearTargetYear, setClearTargetYear] = useState(new Date().getFullYear().toString());
   
   // Pagination state
   const [paginationPage, setPaginationPage] = useState(1);
@@ -396,11 +400,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [showClearDataModal, setShowClearDataModal] = useState(false);
-  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
-  const [clearDataMode, setClearDataMode] = useState('month');
-  const [clearDataMonth, setClearDataMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
-  const [clearDataYear, setClearDataYear] = useState(new Date().getFullYear().toString());
   const [pdfReportData, setPdfReportData] = useState({
     memorandum: {
       for: 'The Provincial Director, Bataan Police Provincial Office',
@@ -677,91 +676,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       if (removedCount > 0) {
         await batch.commit();
         await loadIncidents();
-        toast.success(`Successfully removed ${removedCount} incidents from current month`);
+        alert(`✅ Successfully removed ${removedCount} incidents from current month`);
       } else {
-        toast.message('No incidents found for current month');
+        alert('✅ No incidents found for current month');
       }
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing current month incidents:', error);
       setFirestoreStatus('error');
-      toast.error('Error clearing current month incidents');
-    } finally {
-      setCleanupLoading(false);
-    }
-  };
-
-  const clearIncidentsByScope = async ({ mode, monthName, yearString }) => {
-    try {
-      setCleanupLoading(true);
-      setFirestoreStatus('saving');
-      const incidentsRef = collection(db, 'incidents');
-      const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      let removedCount = 0;
-
-      const targetYear = parseInt(yearString, 10);
-      const targetMonth = new Date(`${monthName} 1, ${yearString}`).getMonth();
-
-      const getMonthIndex = (value, fallbackYear) => {
-        if (value === undefined || value === null) return null;
-        if (typeof value === 'number' && Number.isFinite(value)) return value;
-        const str = String(value).trim();
-        if (!str) return null;
-
-        const asNumber = parseInt(str, 10);
-        if (!Number.isNaN(asNumber) && asNumber >= 0 && asNumber <= 11) return asNumber;
-        if (!Number.isNaN(asNumber) && asNumber >= 1 && asNumber <= 12) return asNumber - 1;
-
-        const d = new Date(`${str} 1, ${fallbackYear || new Date().getFullYear()}`);
-        return Number.isNaN(d.getTime()) ? null : d.getMonth();
-      };
-
-      querySnapshot.forEach((doc) => {
-        const incidentData = doc.data();
-
-        const yearFromField = incidentData?.year !== undefined && incidentData?.year !== null
-          ? parseInt(String(incidentData.year).trim(), 10)
-          : NaN;
-        const monthFromField = getMonthIndex(incidentData?.month, yearFromField);
-
-        let incidentYear = Number.isNaN(yearFromField) ? null : yearFromField;
-        let incidentMonth = monthFromField;
-
-        if (incidentYear === null || incidentMonth === null) {
-          const incidentDate = new Date(incidentData?.date);
-          if (!Number.isNaN(incidentDate.getTime())) {
-            if (incidentYear === null) incidentYear = incidentDate.getFullYear();
-            if (incidentMonth === null) incidentMonth = incidentDate.getMonth();
-          }
-        }
-
-        if (incidentYear === null) {
-          return;
-        }
-
-        const shouldDelete = mode === 'year'
-          ? incidentYear === targetYear
-          : incidentYear === targetYear && incidentMonth === targetMonth;
-
-        if (shouldDelete) {
-          batch.delete(doc.ref);
-          removedCount++;
-        }
-      });
-
-      if (removedCount > 0) {
-        await batch.commit();
-        await loadIncidents();
-        toast.success(`Successfully removed ${removedCount} incidents`);
-      } else {
-        toast.message('No incidents found to remove for the selected period');
-      }
-      setFirestoreStatus('connected');
-    } catch (error) {
-      console.error('❌ Error clearing incidents by scope:', error);
-      setFirestoreStatus('error');
-      toast.error('Error clearing incidents');
+      alert('❌ Error clearing current month incidents');
     } finally {
       setCleanupLoading(false);
     }
@@ -783,13 +706,95 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
         setIncidents([]);
         toast.success(`Successfully removed all ${removedCount} incidents`);
       } else {
-        toast.message('No incidents found to remove');
+        toast.info('No incidents found to remove');
       }
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing all incidents:', error);
       setFirestoreStatus('error');
       toast.error('Error clearing all incidents');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const clearIncidentsForMonthYear = async (monthIndex, yearNumber) => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      let removedCount = 0;
+
+      querySnapshot.forEach((docSnap) => {
+        const incidentData = docSnap.data();
+        const incidentDate = new Date(incidentData?.date);
+        if (!Number.isNaN(incidentDate.getTime())) {
+          if (incidentDate.getMonth() === monthIndex && incidentDate.getFullYear() === yearNumber) {
+            batch.delete(docSnap.ref);
+            removedCount++;
+          }
+        }
+      });
+
+      if (removedCount > 0) {
+        await batch.commit();
+        await loadIncidents();
+        toast.success(`Successfully removed ${removedCount} incidents for the selected month`);
+      } else {
+        toast.info('No incidents found for the selected month');
+      }
+
+      setFirestoreStatus('connected');
+      return { removedCount };
+    } catch (error) {
+      console.error('❌ Error clearing incidents for month/year:', error);
+      setFirestoreStatus('error');
+      toast.error('Error clearing incidents for the selected month');
+      throw error;
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const clearIncidentsForYear = async (yearNumber) => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      let removedCount = 0;
+
+      querySnapshot.forEach((docSnap) => {
+        const incidentData = docSnap.data();
+        const incidentDate = new Date(incidentData?.date);
+        if (!Number.isNaN(incidentDate.getTime())) {
+          if (incidentDate.getFullYear() === yearNumber) {
+            batch.delete(docSnap.ref);
+            removedCount++;
+          }
+        }
+      });
+
+      if (removedCount > 0) {
+        await batch.commit();
+        await loadIncidents();
+        toast.success(`Successfully removed ${removedCount} incidents for year ${yearNumber}`);
+      } else {
+        toast.info(`No incidents found for year ${yearNumber}`);
+      }
+
+      setFirestoreStatus('connected');
+      return { removedCount };
+    } catch (error) {
+      console.error('❌ Error clearing incidents for year:', error);
+      setFirestoreStatus('error');
+      toast.error('Error clearing incidents for the selected year');
+      throw error;
     } finally {
       setCleanupLoading(false);
     }
@@ -1136,7 +1141,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     const isCSV = file.name.endsWith('.csv');
     if (!isExcel && !isCSV) {
-      toast.error('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
+      alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
       return;
     }
     const reader = new FileReader();
@@ -1207,19 +1212,19 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
-              toast.success(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
             } catch (error) {
               console.error('Error saving imported incidents:', error);
               setFirestoreStatus('error');
-              toast.error('Error saving imported incidents to database. Please try again.');
+              alert('Error saving imported incidents to database. Please try again.');
             } finally {
               setLoading(false);
             }
           } else {
-            toast.message('No valid data found in the CSV file.');
+            alert('No valid data found in the CSV file.');
           }
         } catch (error) {
-          toast.error('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
+          alert('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
         }
       };
       reader.readAsText(file);
@@ -1287,7 +1292,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               // Only add incidents that have at least some basic data
               if (incident.incidentType || incident.description || incident.location || incident.officer) {
                 // Debug: Log the processed incident data
-                console.log(' Processed incident from Excel:', {
+                console.log('📊 Processed incident from Excel:', {
                   headers: headers,
                   values: values,
                   incident: incident
@@ -1314,20 +1319,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
-              toast.success(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
             } catch (error) {
               console.error('Error saving imported incidents:', error);
               setFirestoreStatus('error');
-              toast.error('Error saving imported incidents to database. Please try again.');
+              alert('Error saving imported incidents to database. Please try again.');
             } finally {
               setLoading(false);
             }
           } else {
-            toast.message('No valid data found in the Excel file.');
+            alert('No valid data found in the Excel file.');
           }
         } catch (error) {
           console.error('Error reading Excel file:', error);
-          toast.error('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
+          alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
         }
       };
       reader.readAsArrayBuffer(file);
@@ -3421,11 +3426,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
-                    setClearDataMode('month');
-                    setClearDataMonth(new Date().toLocaleString('en-US', { month: 'long' }));
-                    setClearDataYear(new Date().getFullYear().toString());
-                    setShowClearDataConfirm(false);
-                    setShowClearDataModal(true);
+                    setClearScope("month_year");
+                    setClearTargetMonth(new Date().toLocaleString('en-US', { month: 'long' }));
+                    setClearTargetYear(new Date().getFullYear().toString());
+                    setShowClearIncidentsModal(true);
                   }}
                   disabled={cleanupLoading}
                   className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-gray-100 hover:text-red-700 focus:bg-gray-100 focus:text-red-700"
@@ -3998,6 +4002,153 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           )}
         </div>
       </div>
+
+      {/* Clear Incidents Data Modal */}
+      {showClearIncidentsModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-red-100">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Clear Incidents Data</h3>
+                </div>
+                <button
+                  onClick={() => setShowClearIncidentsModal(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                Choose what scope you want to clear. This action cannot be undone.
+              </p>
+
+              <div className="space-y-3">
+                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="clear-scope"
+                    value="month_year"
+                    checked={clearScope === "month_year"}
+                    onChange={() => setClearScope("month_year")}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-gray-900">Clear by Month and Year</div>
+                    <div className="text-xs text-gray-500">Delete incidents that fall within the selected month.</div>
+                  </div>
+                </label>
+
+                <label className="flex items-start gap-3 p-3 border border-gray-200 rounded-xl cursor-pointer hover:bg-gray-50">
+                  <input
+                    type="radio"
+                    name="clear-scope"
+                    value="year"
+                    checked={clearScope === "year"}
+                    onChange={() => setClearScope("year")}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-gray-900">Clear Whole Year</div>
+                    <div className="text-xs text-gray-500">Delete incidents that fall within the selected year.</div>
+                  </div>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className={clearScope !== "month_year" ? "opacity-50 pointer-events-none" : ""}>
+                  <Label className="text-xs text-gray-600">Month</Label>
+                  <select
+                    id="clear-target-month"
+                    name="clear-target-month"
+                    value={clearTargetMonth}
+                    onChange={(e) => setClearTargetMonth(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  >
+                    {Array.from({ length: 12 }).map((_, idx) => {
+                      const monthName = new Date(2020, idx, 1).toLocaleString('en-US', { month: 'long' });
+                      return (
+                        <option key={monthName} value={monthName}>
+                          {monthName}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-600">Year</Label>
+                  <select
+                    id="clear-target-year"
+                    name="clear-target-year"
+                    value={clearTargetYear}
+                    onChange={(e) => setClearTargetYear(e.target.value)}
+                    className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                  >
+                    {Array.from({ length: 7 }).map((_, i) => {
+                      const year = new Date().getFullYear() - 3 + i;
+                      return (
+                        <option key={year} value={String(year)}>
+                          {year}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowClearIncidentsModal(false)}
+                className="px-5 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors duration-200"
+                disabled={cleanupLoading}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    const yearNumber = parseInt(clearTargetYear, 10);
+                    if (Number.isNaN(yearNumber)) {
+                      toast.error('Please select a valid year');
+                      return;
+                    }
+
+                    toast.loading('Clearing incidents...', { id: 'clear-incidents' });
+
+                    if (clearScope === "month_year") {
+                      const monthIndex = new Date(`${clearTargetMonth} 1, ${yearNumber}`).getMonth();
+                      await clearIncidentsForMonthYear(monthIndex, yearNumber);
+                    } else {
+                      await clearIncidentsForYear(yearNumber);
+                    }
+
+                    toast.dismiss('clear-incidents');
+                    setShowClearIncidentsModal(false);
+                  } catch (error) {
+                    toast.dismiss('clear-incidents');
+                  }
+                }}
+                className="px-5 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl transition-colors duration-200"
+                disabled={cleanupLoading}
+              >
+                Clear Data
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Add Incident Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
@@ -4270,160 +4421,6 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 Save Report
               </button>
             </div>
-          </div>
-        </div>
-      )}
-
-      {showClearDataModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Clear Incidents Data</h3>
-                <p className="text-gray-600 mt-1 text-sm">Select what period you want to clear</p>
-              </div>
-              <button
-                onClick={() => {
-                  setShowClearDataModal(false);
-                  setShowClearDataConfirm(false);
-                }}
-                className="p-2 rounded-xl transition-all duration-300 hover:scale-110 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {!showClearDataConfirm ? (
-              <>
-                <div className="p-6 space-y-5">
-                  <div className="space-y-2">
-                    <Label>Clear Mode</Label>
-                    <Select value={clearDataMode} onValueChange={setClearDataMode}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select clear mode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="month">Month + Year</SelectItem>
-                        <SelectItem value="year">Whole Year</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {clearDataMode === 'month' && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Month</Label>
-                        <Select value={clearDataMonth} onValueChange={setClearDataMonth}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select month" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[
-                              'January','February','March','April','May','June','July','August','September','October','November','December'
-                            ].map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Year</Label>
-                        <Select value={clearDataYear} onValueChange={setClearDataYear}>
-                          <SelectTrigger className="w-full">
-                            <SelectValue placeholder="Select year" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {Array.from({ length: 7 }, (_, i) => (new Date().getFullYear() - 3 + i).toString()).map((y) => (
-                              <SelectItem key={y} value={y}>{y}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                  )}
-
-                  {clearDataMode === 'year' && (
-                    <div className="space-y-2">
-                      <Label>Year</Label>
-                      <Select value={clearDataYear} onValueChange={setClearDataYear}>
-                        <SelectTrigger className="w-full">
-                          <SelectValue placeholder="Select year" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 7 }, (_, i) => (new Date().getFullYear() - 3 + i).toString()).map((y) => (
-                            <SelectItem key={y} value={y}>{y}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    This action will permanently delete incidents for the selected period and cannot be undone.
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-                  <button
-                    onClick={() => {
-                      setShowClearDataModal(false);
-                      setShowClearDataConfirm(false);
-                    }}
-                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    disabled={cleanupLoading}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => setShowClearDataConfirm(true)}
-                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-red-600 text-white hover:bg-red-700"
-                    disabled={cleanupLoading}
-                  >
-                    Continue
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="p-6 space-y-4">
-                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-                    You are about to permanently delete
-                    <span className="font-semibold">
-                      {clearDataMode === 'year'
-                        ? ` all incidents in ${clearDataYear}`
-                        : ` all incidents in ${clearDataMonth} ${clearDataYear}`}
-                    </span>
-                    . This action cannot be undone.
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-                  <button
-                    onClick={() => setShowClearDataConfirm(false)}
-                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
-                    disabled={cleanupLoading}
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={async () => {
-                      setShowClearDataModal(false);
-                      setShowClearDataConfirm(false);
-                      await clearIncidentsByScope({
-                        mode: clearDataMode,
-                        monthName: clearDataMonth,
-                        yearString: clearDataYear
-                      });
-                    }}
-                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-red-600 text-white hover:bg-red-700"
-                    disabled={cleanupLoading}
-                  >
-                    {cleanupLoading ? 'Clearing...' : 'Confirm Clear'}
-                  </button>
-                </div>
-              </>
-            )}
           </div>
         </div>
       )}

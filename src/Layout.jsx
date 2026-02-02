@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Separator } from "./components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "./components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle, VisuallyHidden } from "./components/ui/sheet";
 import { Card, CardContent } from "./components/ui/card";
 
 import { useFirebase } from "./hooks/useFirebase";
@@ -121,7 +121,9 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
           className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}
           data-sheet-content="true"
         >
-          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <VisuallyHidden>
+            <SheetTitle>Navigation Menu</SheetTitle>
+          </VisuallyHidden>
           <Sidebar 
             sidebarOpen={true}
             navigationItems={navigationItems}
