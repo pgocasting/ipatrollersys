@@ -1,24 +1,47 @@
-import React, { useEffect } from "react";
-import { SidebarProvider, Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader, SidebarInset, SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarRail, SidebarTrigger } from "./components/ui/sidebar";
-import { Avatar, AvatarFallback, AvatarImage } from "./components/ui/avatar";
+import React, { useState, useEffect } from "react";
+import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
+import { Separator } from "./components/ui/separator";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "./components/ui/sheet";
+import { Card, CardContent } from "./components/ui/card";
+
 import { useFirebase } from "./hooks/useFirebase";
 import { useAuth } from "./contexts/AuthContext";
+import { useSidebar } from "./hooks/useSidebar";
+import Sidebar from "./components/Sidebar";
+import SidebarToggle from "./components/SidebarToggle";
 import { 
   Home, 
   Car, 
   AlertTriangle, 
   BarChart3, 
   Settings,
+  Menu,
+  X,
+  Bell,
   Activity,
   Command,
   User,
-  LogOut
+  Mountain
 } from "lucide-react";
 
+const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
+
 export default function Layout({ children, onNavigate, currentPage, onLogout, onShowHelp }) {
+  const {
+    sidebarOpen,
+    isCollapsed,
+    isMobile,
+    openSidebar,
+    closeSidebar,
+    toggleCollapsed,
+    handleNavigation
+  } = useSidebar();
   const { user } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
+  
+  // Enhanced navigation handler with auto-close functionality
+  const enhancedNavigate = handleNavigation(onNavigate);
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
@@ -34,7 +57,8 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
   };
   
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
-  const [mounted, setMounted] = React.useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -70,9 +94,8 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
   );
 
   const handlePageNavigation = (pageId) => {
-    if (onNavigate) {
-      onNavigate(pageId);
-    }
+    // Use enhanced navigation handler
+    enhancedNavigate(pageId);
     
     // Update browser history without adding to back stack
     window.history.replaceState({ page: pageId }, '', `/${pageId}`);
@@ -87,107 +110,66 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
   }
 
   return (
-    <SidebarProvider
-      defaultOpen={true}
-      style={{
-        "--sidebar": "hsl(240 5.9% 10%)",
-        "--sidebar-foreground": "hsl(240 4.8% 95.9%)",
-        "--sidebar-primary": "hsl(224.3 76.3% 48%)",
-        "--sidebar-primary-foreground": "hsl(0 0% 100%)",
-        "--sidebar-accent": "hsl(240 3.7% 15.9%)",
-        "--sidebar-accent-foreground": "hsl(240 4.8% 95.9%)",
-        "--sidebar-border": "hsl(240 3.7% 15.9%)",
-        "--sidebar-ring": "hsl(217.2 91.2% 59.8%)",
-      }}
-    >
-      <Sidebar collapsible="icon" variant="sidebar">
-        <SidebarHeader>
-          <div className="flex items-center gap-3 px-2 py-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
-              IP
-            </div>
-            <div className="flex min-w-0 flex-col leading-none">
-              <span className="font-semibold truncate">IPatroller</span>
-              <span className="text-xs text-muted-foreground truncate">System Dashboard</span>
-            </div>
-          </div>
-        </SidebarHeader>
+    <div className="flex h-screen w-full bg-white">
+      {/* Mobile Sidebar using Sheet */}
+      <Sheet open={sidebarOpen} onOpenChange={closeSidebar}>
+        <SheetTrigger asChild>
+          <div style={{ display: 'none' }}></div>
+        </SheetTrigger>
+        <SheetContent 
+          side="left" 
+          className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}
+          data-sheet-content="true"
+        >
+          <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          <Sidebar 
+            sidebarOpen={true}
+            navigationItems={navigationItems}
+            currentPage={currentPage}
+            handleNavigation={handlePageNavigation}
+            isCollapsed={isCollapsed}
+            onToggleCollapsed={toggleCollapsed}
+            isMobile={true}
+            onLogout={onLogout}
+            onCloseSidebar={closeSidebar}
+            onShowHelp={onShowHelp}
+          />
+        </SheetContent>
+      </Sheet>
 
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Platform</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {navigationItems.map((item) => {
-                  const Icon = item.icon;
-                  const isActive = currentPage === item.id;
-                  return (
-                    <SidebarMenuItem key={item.id}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        tooltip={item.label}
-                        onClick={() => handlePageNavigation(item.id)}
-                      >
-                        <Icon />
-                        <span>{item.label}</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  );
-                })}
+      {/* Desktop Sidebar */}
+      <div className="hidden md:block">
+        <Sidebar 
+          sidebarOpen={false}
+          navigationItems={navigationItems}
+          currentPage={currentPage}
+          handleNavigation={handlePageNavigation}
+          isCollapsed={isCollapsed}
+          onToggleCollapsed={toggleCollapsed}
+          isMobile={false}
+          onLogout={onLogout}
+          onShowHelp={onShowHelp}
+        />
+      </div>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    isActive={currentPage === 'settings'}
-                    tooltip="Settings"
-                    onClick={() => handlePageNavigation('settings')}
-                  >
-                    <Settings />
-                    <span>Settings</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-
-        <SidebarFooter>
-          <div className="flex items-center gap-3 rounded-lg px-2 py-2">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src={userInfo.avatar || undefined} alt={userInfo.name} />
-              <AvatarFallback className="text-xs font-bold">{initials}</AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="text-sm font-medium truncate">{userInfo.name}</div>
-              <div className="text-xs text-muted-foreground truncate">@{userInfo.username}</div>
-            </div>
-          </div>
-          <div className="px-2 pb-2">
-            <Badge variant="secondary" className="w-fit text-xs">
-              {isAdmin ? 'Administrator' : userAccessLevel}
-            </Badge>
-          </div>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <SidebarMenuButton tooltip="Logout" onClick={onLogout}>
-                <LogOut />
-                <span>Logout</span>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarFooter>
-        <SidebarRail />
-      </Sidebar>
-
-      <SidebarInset>
-        <div className="flex h-screen flex-col">
-          <div className="flex h-12 items-center gap-2 border-b px-3">
-            <SidebarTrigger />
-          </div>
-          <div className="flex-1 overflow-auto">
-            {children}
-          </div>
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-auto bg-white">
+        <div className="h-full">
+          {children}
         </div>
-      </SidebarInset>
-    </SidebarProvider>
+      </main>
+
+      {/* Mobile Menu Button - Fixed Position */}
+      <div className="fixed top-4 left-4 z-50 md:hidden">
+        <SidebarToggle
+          type="mobile-trigger"
+          variant="outline"
+          size="icon"
+          className="bg-white shadow-md border-gray-200 text-black hover:bg-gray-50"
+          onToggle={openSidebar}
+          showTooltip={false}
+        />
+      </div>
+    </div>
   );
-}
+} 
