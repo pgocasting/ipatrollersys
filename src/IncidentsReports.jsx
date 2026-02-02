@@ -158,6 +158,65 @@ const enhancedClasses = {
 };
 export default function IncidentsReports({ onLogout, onNavigate, currentPage }) {
   const fileInputRef = useRef(null);
+  const parseIncidentDate = (rawDate) => {
+    if (!rawDate) return null;
+
+    if (rawDate instanceof Date) {
+      return Number.isNaN(rawDate.getTime()) ? null : rawDate;
+    }
+
+    if (typeof rawDate === 'object') {
+      if (typeof rawDate.toDate === 'function') {
+        const d = rawDate.toDate();
+        return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+      }
+
+      if (typeof rawDate.seconds === 'number') {
+        const d = new Date(rawDate.seconds * 1000);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+
+    if (typeof rawDate === 'string') {
+      const s = rawDate.trim();
+      if (!s) return null;
+
+      const direct = new Date(s);
+      if (!Number.isNaN(direct.getTime())) return direct;
+
+      const isoLike = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (isoLike) {
+        const d = new Date(`${isoLike[1]}-${isoLike[2]}-${isoLike[3]}T00:00:00`);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\b.*)?$/);
+      if (mdy) {
+        const month = parseInt(mdy[1], 10) - 1;
+        const day = parseInt(mdy[2], 10);
+        const year = parseInt(mdy[3], 10);
+        const d = new Date(year, month, day);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\b.*)?$/);
+      if (dmy) {
+        const day = parseInt(dmy[1], 10);
+        const month = parseInt(dmy[2], 10) - 1;
+        const year = parseInt(dmy[3], 10);
+        const d = new Date(year, month, day);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+
+      const monthYear = s.match(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i);
+      if (monthYear) {
+        const d = new Date(`${monthYear[1]} 1, ${monthYear[2]}`);
+        return Number.isNaN(d.getTime()) ? null : d;
+      }
+    }
+
+    return null;
+  };
   // Function to automatically identify incident type from description
   const identifyIncidentType = (description) => {
     if (!description) return "Other";
@@ -659,60 +718,37 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     try {
       setCleanupLoading(true);
       setFirestoreStatus('saving');
+
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
+
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
       const batch = writeBatch(db);
       let removedCount = 0;
-      querySnapshot.forEach((doc) => {
-        const incidentData = doc.data();
-        const incidentDate = new Date(incidentData.date);
-        if (incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
-          batch.delete(doc.ref);
+
+      querySnapshot.forEach((docSnap) => {
+        const incidentData = docSnap.data();
+        const incidentDate = parseIncidentDate(incidentData?.date);
+        if (incidentDate && incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
+          batch.delete(docSnap.ref);
           removedCount++;
         }
       });
+
       if (removedCount > 0) {
         await batch.commit();
         await loadIncidents();
-        alert(`✅ Successfully removed ${removedCount} incidents from current month`);
+        toast.success(`Successfully removed ${removedCount} incidents from current month`);
       } else {
-        alert('✅ No incidents found for current month');
+        toast.info('No incidents found for current month');
       }
+
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing current month incidents:', error);
       setFirestoreStatus('error');
-      alert('❌ Error clearing current month incidents');
-    } finally {
-      setCleanupLoading(false);
-    }
-  };
-  const clearAllIncidentsData = async () => {
-    try {
-      setCleanupLoading(true);
-      setFirestoreStatus('saving');
-      const incidentsRef = collection(db, 'incidents');
-      const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      let removedCount = 0;
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-        removedCount++;
-      });
-      if (removedCount > 0) {
-        await batch.commit();
-        setIncidents([]);
-        toast.success(`Successfully removed all ${removedCount} incidents`);
-      } else {
-        toast.info('No incidents found to remove');
-      }
-      setFirestoreStatus('connected');
-    } catch (error) {
-      console.error('❌ Error clearing all incidents:', error);
-      setFirestoreStatus('error');
-      toast.error('Error clearing all incidents');
+      toast.error('Error clearing current month incidents');
     } finally {
       setCleanupLoading(false);
     }
@@ -730,12 +766,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       querySnapshot.forEach((docSnap) => {
         const incidentData = docSnap.data();
-        const incidentDate = new Date(incidentData?.date);
-        if (!Number.isNaN(incidentDate.getTime())) {
-          if (incidentDate.getMonth() === monthIndex && incidentDate.getFullYear() === yearNumber) {
-            batch.delete(docSnap.ref);
-            removedCount++;
-          }
+        const incidentDate = parseIncidentDate(incidentData?.date);
+        if (incidentDate && incidentDate.getMonth() === monthIndex && incidentDate.getFullYear() === yearNumber) {
+          batch.delete(docSnap.ref);
+          removedCount++;
         }
       });
 
@@ -771,12 +805,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       querySnapshot.forEach((docSnap) => {
         const incidentData = docSnap.data();
-        const incidentDate = new Date(incidentData?.date);
-        if (!Number.isNaN(incidentDate.getTime())) {
-          if (incidentDate.getFullYear() === yearNumber) {
-            batch.delete(docSnap.ref);
-            removedCount++;
-          }
+        const incidentDate = parseIncidentDate(incidentData?.date);
+        if (incidentDate && incidentDate.getFullYear() === yearNumber) {
+          batch.delete(docSnap.ref);
+          removedCount++;
         }
       });
 
