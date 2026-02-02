@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 import { Separator } from "./components/ui/separator";
-import { Sheet, SheetContent, SheetTrigger, SheetTitle, VisuallyHidden } from "./components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "./components/ui/sheet";
 import { Card, CardContent } from "./components/ui/card";
 
 import { useFirebase } from "./hooks/useFirebase";
@@ -69,7 +69,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
     { id: 'dashboard', label: 'Dashboard', icon: Home, showFor: 'admin' },
     { id: 'ipatroller', label: 'I-Patroller', icon: Car, showFor: ['admin', 'ipatroller'] },
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: ['command-center', 'ipatroller'] },
-    { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: 'action-center' },
+    { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: ['action-center', 'ipatroller'] },
     { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: ['admin', 'incidents'] },
     { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
     { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
@@ -121,9 +121,9 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
           className={`${isCollapsed ? 'w-16' : 'w-72'} p-0 transition-all duration-300`}
           data-sheet-content="true"
         >
-          <VisuallyHidden>
+          <span className="sr-only">
             <SheetTitle>Navigation Menu</SheetTitle>
-          </VisuallyHidden>
+          </span>
           <Sidebar 
             sidebarOpen={true}
             navigationItems={navigationItems}
