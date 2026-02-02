@@ -30,6 +30,7 @@ import { db } from './firebase';
 import * as XLSX from 'xlsx';
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
+import { toast } from "sonner";
 import { 
   Upload, 
   Plus, 
@@ -395,6 +396,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [showPdfEditModal, setShowPdfEditModal] = useState(false);
   const [showPdfPreviewModal, setShowPdfPreviewModal] = useState(false);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [showClearDataModal, setShowClearDataModal] = useState(false);
+  const [showClearDataConfirm, setShowClearDataConfirm] = useState(false);
+  const [clearDataMode, setClearDataMode] = useState('month');
+  const [clearDataMonth, setClearDataMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
+  const [clearDataYear, setClearDataYear] = useState(new Date().getFullYear().toString());
   const [pdfReportData, setPdfReportData] = useState({
     memorandum: {
       for: 'The Provincial Director, Bataan Police Provincial Office',
@@ -671,15 +677,91 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       if (removedCount > 0) {
         await batch.commit();
         await loadIncidents();
-        alert(`✅ Successfully removed ${removedCount} incidents from current month`);
+        toast.success(`Successfully removed ${removedCount} incidents from current month`);
       } else {
-        alert('✅ No incidents found for current month');
+        toast.message('No incidents found for current month');
       }
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing current month incidents:', error);
       setFirestoreStatus('error');
-      alert('❌ Error clearing current month incidents');
+      toast.error('Error clearing current month incidents');
+    } finally {
+      setCleanupLoading(false);
+    }
+  };
+
+  const clearIncidentsByScope = async ({ mode, monthName, yearString }) => {
+    try {
+      setCleanupLoading(true);
+      setFirestoreStatus('saving');
+      const incidentsRef = collection(db, 'incidents');
+      const querySnapshot = await getDocs(incidentsRef);
+      const batch = writeBatch(db);
+      let removedCount = 0;
+
+      const targetYear = parseInt(yearString, 10);
+      const targetMonth = new Date(`${monthName} 1, ${yearString}`).getMonth();
+
+      const getMonthIndex = (value, fallbackYear) => {
+        if (value === undefined || value === null) return null;
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        const str = String(value).trim();
+        if (!str) return null;
+
+        const asNumber = parseInt(str, 10);
+        if (!Number.isNaN(asNumber) && asNumber >= 0 && asNumber <= 11) return asNumber;
+        if (!Number.isNaN(asNumber) && asNumber >= 1 && asNumber <= 12) return asNumber - 1;
+
+        const d = new Date(`${str} 1, ${fallbackYear || new Date().getFullYear()}`);
+        return Number.isNaN(d.getTime()) ? null : d.getMonth();
+      };
+
+      querySnapshot.forEach((doc) => {
+        const incidentData = doc.data();
+
+        const yearFromField = incidentData?.year !== undefined && incidentData?.year !== null
+          ? parseInt(String(incidentData.year).trim(), 10)
+          : NaN;
+        const monthFromField = getMonthIndex(incidentData?.month, yearFromField);
+
+        let incidentYear = Number.isNaN(yearFromField) ? null : yearFromField;
+        let incidentMonth = monthFromField;
+
+        if (incidentYear === null || incidentMonth === null) {
+          const incidentDate = new Date(incidentData?.date);
+          if (!Number.isNaN(incidentDate.getTime())) {
+            if (incidentYear === null) incidentYear = incidentDate.getFullYear();
+            if (incidentMonth === null) incidentMonth = incidentDate.getMonth();
+          }
+        }
+
+        if (incidentYear === null) {
+          return;
+        }
+
+        const shouldDelete = mode === 'year'
+          ? incidentYear === targetYear
+          : incidentYear === targetYear && incidentMonth === targetMonth;
+
+        if (shouldDelete) {
+          batch.delete(doc.ref);
+          removedCount++;
+        }
+      });
+
+      if (removedCount > 0) {
+        await batch.commit();
+        await loadIncidents();
+        toast.success(`Successfully removed ${removedCount} incidents`);
+      } else {
+        toast.message('No incidents found to remove for the selected period');
+      }
+      setFirestoreStatus('connected');
+    } catch (error) {
+      console.error('❌ Error clearing incidents by scope:', error);
+      setFirestoreStatus('error');
+      toast.error('Error clearing incidents');
     } finally {
       setCleanupLoading(false);
     }
@@ -699,15 +781,15 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       if (removedCount > 0) {
         await batch.commit();
         setIncidents([]);
-        alert(`✅ Successfully removed all ${removedCount} incidents`);
+        toast.success(`Successfully removed all ${removedCount} incidents`);
       } else {
-        alert('✅ No incidents found to remove');
+        toast.message('No incidents found to remove');
       }
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing all incidents:', error);
       setFirestoreStatus('error');
-      alert('❌ Error clearing all incidents');
+      toast.error('Error clearing all incidents');
     } finally {
       setCleanupLoading(false);
     }
@@ -1054,7 +1136,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
     const isCSV = file.name.endsWith('.csv');
     if (!isExcel && !isCSV) {
-      alert('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
+      toast.error('Please select a valid Excel file (.xlsx, .xls) or CSV file (.csv)');
       return;
     }
     const reader = new FileReader();
@@ -1125,19 +1207,19 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
-              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+              toast.success(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
             } catch (error) {
               console.error('Error saving imported incidents:', error);
               setFirestoreStatus('error');
-              alert('Error saving imported incidents to database. Please try again.');
+              toast.error('Error saving imported incidents to database. Please try again.');
             } finally {
               setLoading(false);
             }
           } else {
-            alert('No valid data found in the CSV file.');
+            toast.message('No valid data found in the CSV file.');
           }
         } catch (error) {
-          alert('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
+          toast.error('Error reading CSV file. Please make sure it\'s a valid CSV file with the correct format.');
         }
       };
       reader.readAsText(file);
@@ -1205,7 +1287,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               // Only add incidents that have at least some basic data
               if (incident.incidentType || incident.description || incident.location || incident.officer) {
                 // Debug: Log the processed incident data
-                console.log('📊 Processed incident from Excel:', {
+                console.log(' Processed incident from Excel:', {
                   headers: headers,
                   values: values,
                   incident: incident
@@ -1232,20 +1314,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               await batch.commit();
               await loadIncidents(); // Reload from Firestore
               setFirestoreStatus('connected');
-              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
+              toast.success(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
             } catch (error) {
               console.error('Error saving imported incidents:', error);
               setFirestoreStatus('error');
-              alert('Error saving imported incidents to database. Please try again.');
+              toast.error('Error saving imported incidents to database. Please try again.');
             } finally {
               setLoading(false);
             }
           } else {
-            alert('No valid data found in the Excel file.');
+            toast.message('No valid data found in the Excel file.');
           }
         } catch (error) {
           console.error('Error reading Excel file:', error);
-          alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
+          toast.error('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
         }
       };
       reader.readAsArrayBuffer(file);
@@ -3339,9 +3421,11 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
-                    if (confirm('⚠️ Are you sure you want to delete ALL incidents? This action cannot be undone!')) {
-                      clearAllIncidentsData();
-                    }
+                    setClearDataMode('month');
+                    setClearDataMonth(new Date().toLocaleString('en-US', { month: 'long' }));
+                    setClearDataYear(new Date().getFullYear().toString());
+                    setShowClearDataConfirm(false);
+                    setShowClearDataModal(true);
                   }}
                   disabled={cleanupLoading}
                   className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-gray-100 hover:text-red-700 focus:bg-gray-100 focus:text-red-700"
@@ -4186,6 +4270,160 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 Save Report
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showClearDataModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gray-50">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Clear Incidents Data</h3>
+                <p className="text-gray-600 mt-1 text-sm">Select what period you want to clear</p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowClearDataModal(false);
+                  setShowClearDataConfirm(false);
+                }}
+                className="p-2 rounded-xl transition-all duration-300 hover:scale-110 text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            {!showClearDataConfirm ? (
+              <>
+                <div className="p-6 space-y-5">
+                  <div className="space-y-2">
+                    <Label>Clear Mode</Label>
+                    <Select value={clearDataMode} onValueChange={setClearDataMode}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select clear mode" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="month">Month + Year</SelectItem>
+                        <SelectItem value="year">Whole Year</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {clearDataMode === 'month' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Month</Label>
+                        <Select value={clearDataMonth} onValueChange={setClearDataMonth}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[
+                              'January','February','March','April','May','June','July','August','September','October','November','December'
+                            ].map((m) => (
+                              <SelectItem key={m} value={m}>{m}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Year</Label>
+                        <Select value={clearDataYear} onValueChange={setClearDataYear}>
+                          <SelectTrigger className="w-full">
+                            <SelectValue placeholder="Select year" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Array.from({ length: 7 }, (_, i) => (new Date().getFullYear() - 3 + i).toString()).map((y) => (
+                              <SelectItem key={y} value={y}>{y}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  )}
+
+                  {clearDataMode === 'year' && (
+                    <div className="space-y-2">
+                      <Label>Year</Label>
+                      <Select value={clearDataYear} onValueChange={setClearDataYear}>
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select year" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 7 }, (_, i) => (new Date().getFullYear() - 3 + i).toString()).map((y) => (
+                            <SelectItem key={y} value={y}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    This action will permanently delete incidents for the selected period and cannot be undone.
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                  <button
+                    onClick={() => {
+                      setShowClearDataModal(false);
+                      setShowClearDataConfirm(false);
+                    }}
+                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    disabled={cleanupLoading}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => setShowClearDataConfirm(true)}
+                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-red-600 text-white hover:bg-red-700"
+                    disabled={cleanupLoading}
+                  >
+                    Continue
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="p-6 space-y-4">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    You are about to permanently delete
+                    <span className="font-semibold">
+                      {clearDataMode === 'year'
+                        ? ` all incidents in ${clearDataYear}`
+                        : ` all incidents in ${clearDataMonth} ${clearDataYear}`}
+                    </span>
+                    . This action cannot be undone.
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
+                  <button
+                    onClick={() => setShowClearDataConfirm(false)}
+                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    disabled={cleanupLoading}
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={async () => {
+                      setShowClearDataModal(false);
+                      setShowClearDataConfirm(false);
+                      await clearIncidentsByScope({
+                        mode: clearDataMode,
+                        monthName: clearDataMonth,
+                        yearString: clearDataYear
+                      });
+                    }}
+                    className="px-6 py-3 rounded-xl font-semibold transition-all duration-300 hover:scale-105 bg-red-600 text-white hover:bg-red-700"
+                    disabled={cleanupLoading}
+                  >
+                    {cleanupLoading ? 'Clearing...' : 'Confirm Clear'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
