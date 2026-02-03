@@ -2319,7 +2319,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           placeholder="Search municipalities..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 !text-black caret-black placeholder:text-gray-400"
                           autoComplete="off"
                         />
                       </div>
@@ -2333,7 +2333,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           name="month-filter"
                           value={selectedMonth}
                           onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
+                          style={{ color: '#000' }}
                         >
                           <option value={0}>January</option>
                           <option value={1}>February</option>
@@ -2359,7 +2360,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           name="year-filter"
                           value={selectedYear}
                           onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
+                          style={{ color: '#000' }}
                         >
                           {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
                             <option key={year} value={year}>
@@ -2378,7 +2380,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           name="district-filter"
                           value={selectedDistrict}
                           onChange={(e) => setSelectedDistrict(e.target.value)}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
+                          style={{ color: '#000' }}
                         >
                           <option value="ALL">All Districts</option>
                           <option value="1ST DISTRICT">1ST DISTRICT</option>
@@ -2507,17 +2510,17 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
                     {activeTab === "daily" ? (
                       <>
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-black">
                           Municipality
                         </th>
-                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                        <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-black">
                           District
                         </th>
                         {selectedDates.map((date, index) => (
                           <th
                             key={index}
                             className={`px-2 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-all duration-300 ${
-                              date.isCurrentDay ? 'bg-blue-100 text-blue-800' : ''
+                              date.isCurrentDay ? 'bg-blue-100 text-blue-800' : 'text-black'
                             }`}
                           >
                             {date.dayName} {date.dayNumber}

@@ -187,92 +187,17 @@ const Sidebar = React.memo(({
 
         {/* Footer Section */}
         <div className="border-t border-gray-200 bg-white px-3 py-3">
-          {/* User Profile */}
-          {isCollapsed && !isMobile ? (
-            <div className="flex justify-center">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all duration-300">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                          <AvatarFallback className="text-xs font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 bg-white border-gray-300" align="end" side="right">
-                      <DropdownMenuLabel className="font-normal p-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12">
-                            <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                            <AvatarFallback className="text-sm font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-semibold leading-none text-gray-800">{userInfo.name}</p>
-                            <p className="text-xs text-gray-500">@{userInfo.username}</p>
-                            <Badge variant="secondary" className="w-fit text-xs mt-2 bg-gray-200 text-gray-800">
-                              {isAdmin ? 'Administrator' : userAccessLevel}
-                            </Badge>
-                          </div>
-                        </div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => handleNavigation('settings')} className="text-gray-700 hover:bg-gray-100">
-                        <Settings className="mr-2 h-4 w-4 text-gray-600" />
-                        <span>Settings</span>
-                      </DropdownMenuItem>
-                      {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
-                        <DropdownMenuItem onClick={onShowHelp} className="text-gray-700 hover:bg-blue-50 hover:text-blue-600">
-                          <HelpCircle className="mr-2 h-4 w-4 text-blue-600" />
-                          <span>View Instructions</span>
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onLogout} className="text-gray-600 hover:bg-gray-100 focus:text-gray-800">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TooltipTrigger>
-                <TooltipContent side="right" className="bg-black text-white">
-                  <p className="font-medium">{userInfo.name}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {/* User Profile Card */}
-              <div className="relative overflow-hidden rounded-xl bg-gray-100 p-3 text-gray-800">
-                <div className="absolute inset-0 bg-gray-50/50"></div>
-                <div className="relative flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border-2 border-gray-300">
-                    <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                    <AvatarFallback className="text-xs font-bold bg-blue-600 text-white">{initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <p className="text-sm font-bold leading-none truncate">{userInfo.name}</p>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs mt-1 w-fit">
-                      {isAdmin ? 'Administrator' : userAccessLevel}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
           {/* Settings and Logout Section */}
           {!isCollapsed && (
             <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
               {/* Settings Button */}
-              {(() => {
+              {isAdmin && (() => {
                 const isActive = currentPage === 'settings';
                 return (
                   <Button
                     variant="ghost"
                     size="default"
-                    className={`w-full h-9 font-medium transition-all duration-300 group ${
+                    className={`w-full h-11 font-medium transition-all duration-300 group ${
                       isActive 
                         ? 'bg-blue-600 text-white shadow-lg' 
                         : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
@@ -331,6 +256,83 @@ const Sidebar = React.memo(({
               showTooltip={true}
             />
           </div>
+
+          {/* User Profile (Bottom) */}
+          {isCollapsed && !isMobile ? (
+            <div className="mt-3 pt-3 border-t border-gray-200 flex justify-center">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all duration-300">
+                        <Avatar className="h-7 w-7">
+                          <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                          <AvatarFallback className="text-xs font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent className="w-64 bg-white border-gray-300" align="end" side="right">
+                      <DropdownMenuLabel className="font-normal p-4">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-12 w-12">
+                            <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                            <AvatarFallback className="text-sm font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col space-y-1">
+                            <p className="text-sm font-semibold leading-none text-gray-800">{userInfo.name}</p>
+                            <p className="text-xs text-gray-500">@{userInfo.username}</p>
+                            <Badge variant="secondary" className="w-fit text-xs mt-2 bg-gray-200 text-gray-800">
+                              {isAdmin ? 'Administrator' : userAccessLevel}
+                            </Badge>
+                          </div>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      {isAdmin && (
+                        <DropdownMenuItem onClick={() => handleNavigation('settings')} className="text-gray-700 hover:bg-gray-100">
+                          <Settings className="mr-2 h-4 w-4 text-gray-600" />
+                          <span>Settings</span>
+                        </DropdownMenuItem>
+                      )}
+                      {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
+                        <DropdownMenuItem onClick={onShowHelp} className="text-gray-700 hover:bg-blue-50 hover:text-blue-600">
+                          <HelpCircle className="mr-2 h-4 w-4" />
+                          <span>Help & Commands</span>
+                        </DropdownMenuItem>
+                      )}
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={onLogout} className="text-gray-600 hover:bg-gray-100 focus:text-gray-800">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Log out</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TooltipTrigger>
+                <TooltipContent side="right" className="bg-black text-white">
+                  <p className="font-medium">{userInfo.name}</p>
+                </TooltipContent>
+              </Tooltip>
+            </div>
+          ) : (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              {/* User Profile Card */}
+              <div className="relative overflow-hidden rounded-xl bg-gray-100 p-3 text-gray-800">
+                <div className="absolute inset-0 bg-gray-50/50"></div>
+                <div className="relative flex items-center gap-3">
+                  <Avatar className="h-10 w-10 border-2 border-gray-300">
+                    <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                    <AvatarFallback className="text-xs font-bold bg-blue-600 text-white">{initials}</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <p className="text-sm font-bold leading-none truncate">{userInfo.name}</p>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs mt-1 w-fit">
+                      {isAdmin ? 'Administrator' : userAccessLevel}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </aside>
     </TooltipProvider>
