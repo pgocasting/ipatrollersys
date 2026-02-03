@@ -4175,7 +4175,8 @@ const handleSaveAllMonths = async () => {
                           setSelectedMonth(newMonth);
                           // Data will be loaded from Firestore via useEffect for month changes
                         }}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                        style={{ color: '#000' }}
                       >
                         {months.map((month) => (
                           <option key={month} value={month}>{month}</option>
@@ -4189,7 +4190,8 @@ const handleSaveAllMonths = async () => {
                         name="year-select"
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                        style={{ color: '#000' }}
                       >
                         {years.map((year) => (
                           <option key={year} value={year}>{year}</option>
@@ -4589,7 +4591,8 @@ const handleSaveAllMonths = async () => {
                                   <select 
                                     id={`barangay-select-${date}`}
                                     name={`barangay-select-${date}`}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                    style={{ color: '#000' }}
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -4618,7 +4621,8 @@ const handleSaveAllMonths = async () => {
                                   <select 
                                     id={`concern-type-select-${date}`}
                                     name={`concern-type-select-${date}`}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                    style={{ color: '#000' }}
                                     value=""
                                     onChange={(e) => {
                                       if (e.target.value) {
@@ -4651,7 +4655,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4669,7 +4673,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4687,7 +4691,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4705,7 +4709,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4721,7 +4725,7 @@ const handleSaveAllMonths = async () => {
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
                                     type="text" 
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
+                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                     placeholder=""
                                     value=""
                                     onChange={(e) => {
@@ -4734,7 +4738,7 @@ const handleSaveAllMonths = async () => {
                                 </td>
                                 <td className="px-3 py-2 table-cell-spacing">
                                   <div className="flex items-center justify-center">
-                                    <span className="text-xs text-gray-400 italic">Add entry to upload</span>
+                                    <span className="text-xs text-black italic">Add entry to upload</span>
                                   </div>
                                 </td>
                               </tr>
@@ -4755,7 +4759,8 @@ const handleSaveAllMonths = async () => {
                                       <select 
                                         id={`existing-barangay-${date}-${entryIndex}`}
                                         name={`existing-barangay-${date}-${entryIndex}`}
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200"
+                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                        style={{ color: '#000' }}
                                         value={entry.barangay}
                                         onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
                                       >
@@ -4787,7 +4792,8 @@ const handleSaveAllMonths = async () => {
                                     <select 
                                       id={`existing-concern-type-${date}-${entryIndex}`}
                                       name={`existing-concern-type-${date}-${entryIndex}`}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                      style={{ color: '#000' }}
                                       value={entry.concernType}
                                       onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
                                     >
@@ -4815,7 +4821,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week1}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week1', e.target.value)}
@@ -4828,7 +4834,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week2}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
@@ -4841,7 +4847,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week3}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
@@ -4854,7 +4860,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week4}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
@@ -4865,7 +4871,7 @@ const handleSaveAllMonths = async () => {
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200"
+                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                       placeholder=""
                                       value={entry.actionTaken}
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
@@ -5098,8 +5104,7 @@ const handleSaveAllMonths = async () => {
                     placeholder="Enter barangay names separated by commas or new lines&#10;Example:&#10;Barangay 1&#10;Barangay 2&#10;Barangay 3"
                     value={barangayData}
                     onChange={(e) => setBarangayData(e.target.value)}
-                    rows={6}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical text-sm !text-black caret-black"
                   />
                 </div>
 
@@ -5152,7 +5157,7 @@ const handleSaveAllMonths = async () => {
                         <select
                           value={barangayFilterMunicipality}
                           onChange={(e) => setBarangayFilterMunicipality(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
                         >
                           <option value="">All Municipalities</option>
                           {getUniqueMunicipalities().map(municipality => (
@@ -5165,7 +5170,7 @@ const handleSaveAllMonths = async () => {
                         <select
                           value={barangaySortBy}
                           onChange={(e) => handleBarangaySort(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
                         >
                           <option value="name">Name</option>
                           <option value="municipality">Municipality</option>
@@ -5319,7 +5324,7 @@ const handleSaveAllMonths = async () => {
                                         handleBarangaySelection(barangay.id, e.target.checked);
                                       });
                                     }}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
                                   />
                                   <Building2 className="h-5 w-5 text-purple-600" />
                                   <div>
@@ -5363,7 +5368,7 @@ const handleSaveAllMonths = async () => {
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={(e) => handleBarangaySelection(barangay.id, e.target.checked)}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
                               />
                               <MapPinIcon className="h-4 w-4 text-blue-500" />
                               <div>
@@ -5420,7 +5425,7 @@ const handleSaveAllMonths = async () => {
                           value={editingBarangay.name}
                           onChange={(e) => setEditingBarangay({...editingBarangay, name: e.target.value})}
                           placeholder={editingBarangay.isBulkEdit ? "Enter barangay names separated by commas" : "Enter barangay name"}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
                         />
                         {editingBarangay.isBulkEdit && (
                           <p className="text-xs text-gray-500 mt-1">
@@ -5436,7 +5441,7 @@ const handleSaveAllMonths = async () => {
                           name="edit-barangay-district"
                           value={editingBarangay.district}
                           onChange={(e) => setEditingBarangay({...editingBarangay, district: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
                         >
                           {Object.keys(municipalitiesByDistrict).map((district) => (
                             <option key={district} value={district}>
@@ -5453,7 +5458,7 @@ const handleSaveAllMonths = async () => {
                           name="edit-barangay-municipality"
                           value={editingBarangay.municipality}
                           onChange={(e) => setEditingBarangay({...editingBarangay, municipality: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
                         >
                           {editingBarangay.district && municipalitiesByDistrict[editingBarangay.district]?.map((municipality) => (
                             <option key={municipality} value={municipality}>
@@ -5553,8 +5558,8 @@ const handleSaveAllMonths = async () => {
                       type="text"
                       value={editingConcernType.name}
                       onChange={(e) => setEditingConcernType({...editingConcernType, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
                       placeholder={editingConcernType.isBulkEdit ? "Enter concern type names separated by commas" : "Enter concern type name"}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     />
                     {editingConcernType.isBulkEdit && (
                       <p className="text-xs text-gray-500 mt-1">
@@ -5570,7 +5575,7 @@ const handleSaveAllMonths = async () => {
                       name="edit-concern-type-district"
                       value={editingConcernType.district}
                       onChange={(e) => setEditingConcernType({...editingConcernType, district: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     >
                       {Object.keys(municipalitiesByDistrict).map((district) => (
                         <option key={district} value={district}>
@@ -5587,7 +5592,7 @@ const handleSaveAllMonths = async () => {
                       name="edit-concern-type-municipality"
                       value={editingConcernType.municipality}
                       onChange={(e) => setEditingConcernType({...editingConcernType, municipality: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     >
                       {editingConcernType.district && municipalitiesByDistrict[editingConcernType.district]?.map((municipality) => (
                         <option key={municipality} value={municipality}>
@@ -5741,7 +5746,7 @@ const handleSaveAllMonths = async () => {
                       value={selectedDistrict} 
                       onChange={(e) => setSelectedDistrict(e.target.value)}
                       disabled={!!userMunicipality}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     >
                       <option value="">Choose district</option>
                       {Object.keys(municipalitiesByDistrict).map((district) => (
@@ -5759,7 +5764,7 @@ const handleSaveAllMonths = async () => {
                       value={selectedMunicipality} 
                       onChange={(e) => setSelectedMunicipality(e.target.value)}
                       disabled={!selectedDistrict || !!userMunicipality}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     >
                       <option value="">Choose municipality</option>
                       {selectedDistrict && municipalitiesByDistrict[selectedDistrict]?.map((municipality) => (
@@ -5778,8 +5783,7 @@ const handleSaveAllMonths = async () => {
                       placeholder={`Enter concern types separated by commas or new lines\nExample:\nSecurity Issue\nTraffic Violation\nPublic Disturbance\nEmergency Response\nCommunity Service`}
                       value={concernTypeData}
                       onChange={(e) => setConcernTypeData(e.target.value)}
-                      rows={6}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-vertical"
+                      className="w-full h-48 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                     />
                   </div>
 
@@ -5834,7 +5838,7 @@ const handleSaveAllMonths = async () => {
                               <select 
                                 value={concernTypeFilterMunicipality}
                                 onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
-                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                               >
                                 <option value="">All Municipalities</option>
                                 {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
@@ -5855,7 +5859,7 @@ const handleSaveAllMonths = async () => {
                             <select
                               value={concernTypeSortBy}
                               onChange={(e) => handleConcernTypeSort(e.target.value)}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                             >
                               <option value="name">Name</option>
                               <option value="municipality">Municipality</option>
@@ -6034,7 +6038,7 @@ const handleSaveAllMonths = async () => {
                                           type="checkbox"
                                           checked={isSelected}
                                           onChange={(e) => handleConcernTypeSelection(type.id, e.target.checked)}
-                                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
                                         />
                               <AlertTriangle className={`h-4 w-4 ${
                                           isForCurrentMunicipality 
@@ -6101,7 +6105,7 @@ const handleSaveAllMonths = async () => {
                     <select
                       value={selectedMonth}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
                     >
                       <option value="">All Months</option>
                       <option value="January">January</option>
@@ -6123,7 +6127,7 @@ const handleSaveAllMonths = async () => {
                     <select
                       value={selectedYear}
                       onChange={(e) => setSelectedYear(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
                     >
                       <option value="">All Years</option>
                       <option value="2024">2024</option>
@@ -6517,7 +6521,7 @@ const handleSaveAllMonths = async () => {
                 }}
                 placeholder="Add any additional notes or action taken about this concern..."
                 rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm !text-black caret-black placeholder:text-gray-400"
                 required
               />
               <p className="text-xs text-gray-500 mt-1">Required: Please add action taken after uploading after photos</p>
