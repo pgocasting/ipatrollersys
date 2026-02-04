@@ -604,13 +604,42 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     return null;
   };
 
+  const normalizeText = (value) => {
+    if (value === null || value === undefined) return '';
+    if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
+    if (Array.isArray(value)) return value.map(v => normalizeText(v)).filter(Boolean).join(' ');
+    if (typeof value === 'object') return '';
+    return String(value).trim().toLowerCase();
+  };
+
+  const getSearchBlobForItem = (item) => {
+    const parts = [
+      item?.department,
+      item?.municipality,
+      item?.district,
+      item?.what,
+      item?.where,
+      item?.actionTaken,
+      item?.who,
+      item?.why,
+      item?.how,
+      item?.source,
+      item?.otherInformation,
+      item?.when instanceof Date ? item.when.toLocaleString() : item?.when,
+    ];
+
+    return parts
+      .map(normalizeText)
+      .filter(Boolean)
+      .join(' ');
+  };
+
   // Filter and sort data
   const filteredItems = actionItems.filter(item => {
-    const matchesSearch = searchTerm === "" || 
-      Object.values(item).some(value => 
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    const matchesDistrict = selectedDistrict === 'all' || item.district === selectedDistrict;
+    const normalizedSearch = normalizeText(searchTerm);
+    const matchesSearch = normalizedSearch === "" || getSearchBlobForItem(item).includes(normalizedSearch);
+
+    const matchesDistrict = selectedDistrict === 'all' || normalizeText(item.district) === normalizeText(selectedDistrict);
     const matchesYear = (() => {
       // If we cannot reliably determine a year for this row, do not exclude it.
       const detectedYear = detectYearFromItem(item);
@@ -631,7 +660,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
     }
     
-    const matchesMunicipality = activeMunicipality === "all" || item.municipality === activeMunicipality;
+    const matchesMunicipality = activeMunicipality === "all" || normalizeText(item.municipality) === normalizeText(activeMunicipality);
     const matchesMonth = (() => {
       if (item.when instanceof Date) {
         return item.when.getMonth() === selectedMonth;
@@ -668,6 +697,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     
     return matchesSearch && matchesDistrict && matchesYear && matchesDepartment && matchesMunicipality && matchesMonth && hasValidData;
   });
+
+  useEffect(() => {
+    setTablePage(1);
+  }, [searchTerm, selectedDistrict, selectedYear, activeTab, activeMunicipality, selectedMonth, itemsPerPage]);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
@@ -1914,7 +1947,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Action Center</h1>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-black">Action Center</h1>
               {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') && (
                 <Badge 
                   variant="secondary" 
@@ -1928,7 +1961,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </Badge>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+            <p className="text-xs sm:text-sm text-black mt-1 sm:mt-2">
               {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') 
                 ? `Manage and track ${userDepartment === 'agriculture' ? 'agriculture' : 'environmental'} action reports`
                 : 'Manage and track action reports with comprehensive analytics'
@@ -2011,7 +2044,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
             <CardContent className="p-1.5 sm:p-1.5">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Actions</p>
+                  <p className="text-xs font-medium text-black mb-1 truncate">Total Actions</p>
                   <p className="text-lg sm:text-xl font-bold text-blue-600">
                     {totalActions.toLocaleString()}
                   </p>
@@ -2029,7 +2062,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-1.5 sm:p-1.5">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">
+                    <p className="text-xs font-medium text-black mb-1 truncate">
                       {userDepartment === 'agriculture' ? 'Agriculture (Bantay Dagat)' : 'PG-Enro (Environment)'}
                     </p>
                     <p className={`text-lg sm:text-xl font-bold ${
@@ -2057,7 +2090,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">PNP (Monthly)</p>
+                      <p className="text-xs font-medium text-black mb-1 truncate">PNP (Monthly)</p>
                       <p className="text-lg sm:text-xl font-bold text-red-600">
                         {pnpActions.toLocaleString()}
                       </p>
@@ -2073,7 +2106,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Agriculture (Bantay Dagat)</p>
+                      <p className="text-xs font-medium text-black mb-1 truncate">Agriculture (Bantay Dagat)</p>
                       <p className="text-lg sm:text-xl font-bold text-green-600">
                         {agricultureActions.toLocaleString()}
                       </p>
@@ -2089,7 +2122,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">PG-Enro (Environment)</p>
+                      <p className="text-xs font-medium text-black mb-1 truncate">PG-Enro (Environment)</p>
                       <p className="text-lg sm:text-xl font-bold text-emerald-600">
                         {pgEnroActions.toLocaleString()}
                       </p>
@@ -2105,7 +2138,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-1.5 sm:p-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-gray-500 mb-1 truncate">Pending</p>
+                      <p className="text-xs font-medium text-black mb-1 truncate">Pending</p>
                       <p className="text-lg sm:text-xl font-bold text-orange-600">
                         {pendingActions.toLocaleString()}
                       </p>
@@ -2128,7 +2161,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <Card className="bg-white shadow-sm border border-gray-200 h-full">
                 <CardContent className="p-2">
                   <div className="flex items-center justify-between gap-2">
-                    <h3 className="text-base font-semibold text-gray-900">Filters &amp; Search</h3>
+                    <h3 className="text-base font-semibold text-black">Filters &amp; Search</h3>
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -2137,7 +2170,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           setSelectedMonth(now.getMonth());
                           setSelectedYear(String(now.getFullYear()));
                         }}
-                        className="px-2 py-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
+                        className="px-2 py-1 border border-gray-300 text-black bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
                       >
                         Current Month
                       </button>
@@ -2151,7 +2184,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           setActiveMunicipality("all");
                           setActiveTab(userDepartment === 'agriculture' || userDepartment === 'pg-enro' ? userDepartment : "all");
                         }}
-                        className="px-2 py-1 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
+                        className="px-2 py-1 border border-gray-300 text-black bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
                       >
                         Clear Filters
                       </button>
@@ -2160,12 +2193,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
                   <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="search" className="text-xs font-medium text-gray-700">Search</Label>
+                      <Label htmlFor="search" className="text-xs font-medium text-black">Search</Label>
                       <Input
                         id="search"
                         name="search"
                         placeholder="Search municipalities..."
-                        className="!text-black !placeholder:text-gray-400"
+                        className="text-black placeholder:text-gray-400"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoComplete="off"
@@ -2173,21 +2206,21 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="month-filter" className="text-xs font-medium text-gray-700">Month</Label>
+                      <Label htmlFor="month-filter" className="text-xs font-medium text-black">Month</Label>
                       <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
                         <SelectTrigger
                           id="month-filter"
                           name="month-filter"
-                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                          className="[&>span:not([data-placeholder])]:text-black [&>span[data-placeholder]]:text-gray-400"
                         >
-                          <SelectValue placeholder="Month" className="text-gray-900" />
+                          <SelectValue placeholder="Month" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                           {[
                             'January', 'February', 'March', 'April', 'May', 'June',
                             'July', 'August', 'September', 'October', 'November', 'December'
                           ].map((month, index) => (
-                            <SelectItem key={month} value={index.toString()}>
+                            <SelectItem key={month} value={index.toString()} className="text-black">
                               {month}
                             </SelectItem>
                           ))}
@@ -2196,18 +2229,18 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="year-filter" className="text-xs font-medium text-gray-700">Year</Label>
+                      <Label htmlFor="year-filter" className="text-xs font-medium text-black">Year</Label>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
                         <SelectTrigger
                           id="year-filter"
                           name="year-filter"
-                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                          className="[&>span:not([data-placeholder])]:text-black [&>span[data-placeholder]]:text-gray-400"
                         >
-                          <SelectValue placeholder="Year" className="text-gray-900" />
+                          <SelectValue placeholder="Year" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                           {yearOptions.map((year) => (
-                            <SelectItem key={year} value={year}>
+                            <SelectItem key={year} value={year} className="text-black">
                               {year}
                             </SelectItem>
                           ))}
@@ -2216,26 +2249,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <Label htmlFor="district-filter" className="text-xs font-medium text-gray-700">District</Label>
+                      <Label htmlFor="district-filter" className="text-xs font-medium text-black">District</Label>
                       <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
                         <SelectTrigger
                           id="district-filter"
                           name="district-filter"
-                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                          className="[&>span:not([data-placeholder])]:text-black [&>span[data-placeholder]]:text-gray-400"
                         >
-                          <SelectValue placeholder="All Districts" className="text-gray-900" />
+                          <SelectValue placeholder="All Districts" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Districts</SelectItem>
-                          <SelectItem value="1ST DISTRICT">1st District</SelectItem>
-                          <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
-                          <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
+                          <SelectItem value="all" className="text-black">All Districts</SelectItem>
+                          <SelectItem value="1ST DISTRICT" className="text-black">1st District</SelectItem>
+                          <SelectItem value="2ND DISTRICT" className="text-black">2nd District</SelectItem>
+                          <SelectItem value="3RD DISTRICT" className="text-black">3rd District</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
 
                     <div className="flex flex-col gap-1.5 sm:col-span-2">
-                      <Label htmlFor="department-filter" className="text-xs font-medium text-gray-700">Department</Label>
+                      <Label htmlFor="department-filter" className="text-xs font-medium text-black">Department</Label>
                       <Select
                         value={activeTab}
                         onValueChange={setActiveTab}
@@ -2244,15 +2277,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         <SelectTrigger
                           id="department-filter"
                           name="department-filter"
-                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                          className="[&>span:not([data-placeholder])]:text-black [&>span[data-placeholder]]:text-gray-400"
                         >
-                          <SelectValue placeholder="All Departments" className="text-gray-900" />
+                          <SelectValue placeholder="All Departments" />
                         </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Departments</SelectItem>
-                          <SelectItem value="pnp">PNP</SelectItem>
-                          <SelectItem value="agriculture">Agriculture</SelectItem>
-                          <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
+                          <SelectItem value="all" className="text-black">All Departments</SelectItem>
+                          <SelectItem value="pnp" className="text-black">PNP</SelectItem>
+                          <SelectItem value="agriculture" className="text-black">Agriculture</SelectItem>
+                          <SelectItem value="pg-enro" className="text-black">PG-ENRO</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -2362,7 +2395,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
         <div className="border rounded-md border-gray-200 shadow-sm overflow-hidden">
           <div className="overflow-x-auto overflow-y-auto max-h-[60vh] relative" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
             <Table className="border-gray-200 w-full">
-              <TableCaption className="text-slate-500">Action reports and their current status.</TableCaption>
+              <TableCaption className="text-black">Action reports and their current status.</TableCaption>
               <TableHeader className="sticky top-0 z-10 bg-white">
                 <TableRow className="border-b border-gray-200 table-header-spacing">
                   <TableHead className="min-w-[120px] border-gray-200 align-top py-3 px-2 break-words whitespace-normal font-semibold text-center text-xs">Department</TableHead>
@@ -2379,7 +2412,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={8} className="p-8 text-center align-middle">
-                      <div className="text-lg text-gray-500">
+                      <div className="text-lg text-black">
                         <div className="flex items-center justify-center gap-2">
                           <RotateCcw className="w-5 h-5 animate-spin" />
                           <span>Loading action reports...</span>
@@ -2390,7 +2423,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 ) : filteredItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={8} className="p-8 text-center align-middle">
-                      <div className="text-lg text-gray-500">
+                      <div className="text-lg text-black">
                         {actionItems.length === 0 ? (
                           <div>
                             <p className="mb-2">No action reports found in database.</p>
@@ -2410,42 +2443,42 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <TableRow key={item.id || index} className="border-gray-200 hover:bg-gray-50/50">
                       <TableCell className="font-medium break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs leading-tight break-words hyphens-auto word-wrap text-center">
                             {item.department?.toUpperCase() || 'N/A'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs leading-relaxed break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs leading-relaxed break-words hyphens-auto word-wrap text-center">
                             {item.municipality || 'N/A'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs break-words hyphens-auto word-wrap text-center">
                             {item.district || 'N/A'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs leading-tight break-words hyphens-auto word-wrap text-center">
                             {item.what || 'N/A'}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs break-words hyphens-auto word-wrap text-center">
                             {typeof item.when === 'string' ? item.when : formatDate(item.when)}
                           </p>
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <p className="text-gray-900 text-xs leading-tight break-words hyphens-auto word-wrap text-center">
+                          <p className="text-black text-xs leading-tight break-words hyphens-auto word-wrap text-center">
                             {item.where || 'N/A'}
                           </p>
                         </div>
@@ -2501,7 +2534,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           <div className="mt-6 sticky bottom-0 z-20 flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 bg-white border-t border-gray-200">
             {/* Items per page selector */}
             <div className="flex items-center gap-2">
-              <label htmlFor="itemsPerPage" className="text-sm font-medium text-gray-700">
+              <label htmlFor="itemsPerPage" className="text-sm font-medium text-black">
                 Show:
               </label>
               <Select value={itemsPerPage.toString()} onValueChange={(value) => {
@@ -2519,11 +2552,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <SelectItem value="100">100</SelectItem>
                 </SelectContent>
               </Select>
-              <span className="text-sm text-gray-700">entries</span>
+              <span className="text-sm text-black">entries</span>
             </div>
             
             {/* Pagination info */}
-            <div className="text-sm text-gray-700">
+            <div className="text-sm text-black">
               Showing {startIndex + 1} to {Math.min(startIndex + itemsPerPage, filteredItems.length)} of {filteredItems.length} entries
             </div>
             
@@ -2532,7 +2565,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <button
                 onClick={prevPage}
                 disabled={tablePage === 1}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className="p-2 text-black hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 title="Previous page"
               >
                 <ChevronLeft className="w-4 h-4" />
@@ -2596,7 +2629,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     if (typeof page === 'string') {
                       // Render ellipsis
                       return (
-                        <span key={page} className="px-2 text-gray-400">
+                        <span key={page} className="px-2 text-black">
                           ...
                         </span>
                       );
@@ -2610,7 +2643,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         className={`px-3 py-2 text-sm rounded-lg transition-colors duration-200 ${
                           tablePage === page
                             ? 'bg-blue-600 text-white'
-                            : 'text-gray-600 hover:bg-gray-100'
+                            : 'text-black hover:bg-gray-100'
                         }`}
                       >
                         {page}
@@ -2623,7 +2656,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <button
                 onClick={nextPage}
                 disabled={tablePage === totalPages}
-                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+                className="p-2 text-black hover:bg-gray-100 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                 title="Next page"
               >
                 <ChevronRight className="w-4 h-4" />
@@ -2644,8 +2677,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <Plus className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Add New Action Report</h3>
-                  <p className="text-sm text-gray-500">Create a new action report with department-specific details</p>
+                  <h3 className="text-lg font-semibold text-black">Add New Action Report</h3>
+                  <p className="text-sm text-black">Create a new action report with department-specific details</p>
                 </div>
               </div>
               <button
@@ -2666,16 +2699,20 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="department" className="text-sm font-medium text-gray-700">Department *</Label>
+                    <Label htmlFor="department" className="text-sm font-medium text-black">Department *</Label>
                     <Select 
                       value={formData.department} 
                       onValueChange={(value) => setFormData({...formData, department: value})}
                       disabled={!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro')}
                     >
-                      <SelectTrigger id="department" name="department" className="w-full">
+                      <SelectTrigger
+                        id="department"
+                        name="department"
+                        className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                      >
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                         {isAdmin ? (
                           <>
                             <SelectItem value="pnp">PNP</SelectItem>
@@ -2698,25 +2735,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="municipality" className="text-sm font-medium text-gray-700">Municipality *</Label>
+                    <Label htmlFor="municipality" className="text-sm font-medium text-black">Municipality *</Label>
                     <Input
                       id="municipality"
                       name="municipality"
                       value={formData.municipality}
                       onChange={(e) => handleMunicipalityChange(e.target.value)}
                       placeholder="Enter municipality (district will auto-detect)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       autoComplete="address-level2"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="district" className="text-sm font-medium text-gray-700">District *</Label>
+                    <Label htmlFor="district" className="text-sm font-medium text-black">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger id="district" name="district" className="w-full">
+                      <SelectTrigger
+                        id="district"
+                        name="district"
+                        className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                      >
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                         <SelectItem value="1ST DISTRICT">1st District</SelectItem>
                         <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
                         <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
@@ -2725,7 +2766,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
+                    <Label htmlFor="when" className="text-sm font-medium text-black">When (Date/Time) *</Label>
                     <Input
                       id="when"
                       name="when"
@@ -2733,7 +2774,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
                       placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       autoComplete="off"
                     />
                   </div>
@@ -2748,27 +2789,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="what" className="text-sm font-medium text-gray-700">What (Action Description) *</Label>
+                    <Label htmlFor="what" className="text-sm font-medium text-black">What (Action Description) *</Label>
                     <Textarea
                       id="what"
                       name="what"
                       value={formData.what}
                       onChange={(e) => setFormData({...formData, what: e.target.value})}
                       placeholder="Describe the action taken in detail"
-                      className="w-full min-h-[80px]"
+                      className="w-full min-h-[80px] text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       rows={3}
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="where" className="text-sm font-medium text-gray-700">Where (Location) *</Label>
+                    <Label htmlFor="where" className="text-sm font-medium text-black">Where (Location) *</Label>
                     <Input
                       id="where"
                       name="where"
                       value={formData.where}
                       onChange={(e) => setFormData({...formData, where: e.target.value})}
                       placeholder="Enter specific location"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       autoComplete="street-address"
                     />
                   </div>
@@ -2784,25 +2825,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="who" className="text-sm font-medium text-gray-700">Who (Person/s Involved)</Label>
+                      <Label htmlFor="who" className="text-sm font-medium text-black">Who (Person/s Involved)</Label>
                       <Input
                         id="who"
                         name="who"
                         value={formData.who}
                         onChange={(e) => setFormData({...formData, who: e.target.value})}
                         placeholder="Names of persons involved"
-                        className="w-full"
+                        className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                         autoComplete="name"
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="gender" className="text-sm font-medium text-gray-700">Gender</Label>
+                      <Label htmlFor="gender" className="text-sm font-medium text-black">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger id="gender" name="gender" className="w-full">
+                        <SelectTrigger
+                          id="gender"
+                          name="gender"
+                          className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                        >
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                           <SelectItem value="Male">Male</SelectItem>
                           <SelectItem value="Female">Female</SelectItem>
                           <SelectItem value="Multiple">Multiple</SelectItem>
@@ -2812,40 +2857,40 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="why" className="text-sm font-medium text-gray-700">Why (Reason/Motive)</Label>
+                      <Label htmlFor="why" className="text-sm font-medium text-black">Why (Reason/Motive)</Label>
                       <Textarea
                         id="why"
                         name="why"
                         value={formData.why}
                         onChange={(e) => setFormData({...formData, why: e.target.value})}
                         placeholder="Reason or motive for the incident"
-                        className="w-full min-h-[60px]"
+                        className="w-full min-h-[60px] text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                         rows={2}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="how" className="text-sm font-medium text-gray-700">How (Method/Manner)</Label>
+                      <Label htmlFor="how" className="text-sm font-medium text-black">How (Method/Manner)</Label>
                       <Textarea
                         id="how"
                         name="how"
                         value={formData.how}
                         onChange={(e) => setFormData({...formData, how: e.target.value})}
                         placeholder="How the incident occurred or was handled"
-                        className="w-full min-h-[60px]"
+                        className="w-full min-h-[60px] text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                         rows={2}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="source" className="text-sm font-medium text-gray-700">Source</Label>
+                      <Label htmlFor="source" className="text-sm font-medium text-black">Source</Label>
                       <Input
                         id="source"
                         name="source"
                         value={formData.source}
                         onChange={(e) => setFormData({...formData, source: e.target.value})}
                         placeholder="Information source (e.g., witness, report, etc.)"
-                        className="w-full"
+                        className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                         autoComplete="off"
                       />
                     </div>
@@ -2883,7 +2928,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
+                    <Label htmlFor="actionTaken" className="text-sm font-medium text-black">Action Taken/Status *</Label>
                     <Input
                       id="actionTaken"
                       name="actionTaken"
@@ -2891,26 +2936,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       value={formData.actionTaken}
                       onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
                       placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       autoComplete="off"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="otherInformation" className="text-sm font-medium text-gray-700">Other Information</Label>
+                    <Label htmlFor="otherInformation" className="text-sm font-medium text-black">Other Information</Label>
                     <Textarea
                       id="otherInformation"
                       name="otherInformation"
                       value={formData.otherInformation}
                       onChange={(e) => setFormData({...formData, otherInformation: e.target.value})}
                       placeholder="Any additional relevant information, notes, or observations"
-                      className="w-full min-h-[80px]"
+                      className="w-full min-h-[80px] text-black placeholder:text-gray-400 !opacity-100 disabled:!opacity-100"
                       rows={3}
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="photos" className="text-sm font-medium text-gray-700">Photos/Evidence</Label>
+                    <Label htmlFor="photos" className="text-sm font-medium text-black">Photos/Evidence</Label>
                     <Input
                       id="photos"
                       name="photos"
@@ -2921,10 +2966,10 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         const files = Array.from(e.target.files || []);
                         setFormData({...formData, photos: files});
                       }}
-                      className="w-full"
+                      className="w-full text-black file:text-black"
                       autoComplete="off"
                     />
-                    <p className="text-xs text-gray-500">Upload photos or evidence related to this action report</p>
+                    <p className="text-xs text-black">Upload photos or evidence related to this action report</p>
                   </div>
                 </div>
               </div>
@@ -2935,7 +2980,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <Button 
                 variant="outline" 
                 onClick={() => setShowAddModal(false)} 
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="flex-1 border-gray-300 text-black hover:bg-gray-50"
               >
                 Cancel
               </Button>
@@ -2972,8 +3017,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <Eye className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">View Action Report</h3>
-                  <p className="text-sm text-gray-500">Detailed information about the selected action report</p>
+                  <h3 className="text-lg font-semibold text-black">View Action Report</h3>
+                  <p className="text-sm text-black">Detailed information about the selected action report</p>
                 </div>
               </div>
               <button
@@ -2994,29 +3039,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">Department</div>
-                    <p className="text-base font-semibold text-gray-900 mt-1">
+                    <div className="text-sm font-medium text-black">Department</div>
+                    <p className="text-base font-semibold text-black mt-1">
                       {selectedAction.department?.toUpperCase() || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">Municipality</div>
-                    <p className="text-base font-semibold text-gray-900 mt-1">
+                    <div className="text-sm font-medium text-black">Municipality</div>
+                    <p className="text-base font-semibold text-black mt-1">
                       {selectedAction.municipality || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">District</div>
-                    <p className="text-base font-semibold text-gray-900 mt-1">
+                    <div className="text-sm font-medium text-black">District</div>
+                    <p className="text-base font-semibold text-black mt-1">
                       {selectedAction.district || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">When</div>
-                    <p className="text-base font-semibold text-gray-900 mt-1">
+                    <div className="text-sm font-medium text-black">When</div>
+                    <p className="text-base font-semibold text-black mt-1">
                       {typeof selectedAction.when === 'string' ? selectedAction.when : formatDate(selectedAction.when)}
                     </p>
                   </div>
@@ -3031,15 +3076,15 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">What (Action Description)</div>
-                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                    <div className="text-sm font-medium text-black">What (Action Description)</div>
+                    <p className="text-sm text-black mt-2 leading-relaxed">
                       {selectedAction.what || 'N/A'}
                     </p>
                   </div>
                   
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">Where (Location)</div>
-                    <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                    <div className="text-sm font-medium text-black">Where (Location)</div>
+                    <p className="text-sm text-black mt-2 leading-relaxed">
                       {selectedAction.where || 'N/A'}
                     </p>
                   </div>
@@ -3056,8 +3101,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedAction.who && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <div className="text-sm font-medium text-gray-600">Who (Person/s Involved)</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Who (Person/s Involved)</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.who}
                         </p>
                       </div>
@@ -3065,8 +3110,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.gender && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <div className="text-sm font-medium text-gray-600">Gender</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Gender</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.gender}
                         </p>
                       </div>
@@ -3074,8 +3119,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.why && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <div className="text-sm font-medium text-gray-600">Why (Reason/Motive)</div>
-                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                        <div className="text-sm font-medium text-black">Why (Reason/Motive)</div>
+                        <p className="text-sm text-black mt-2 leading-relaxed">
                           {selectedAction.why}
                         </p>
                       </div>
@@ -3083,8 +3128,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.how && (
                       <div className="p-3 bg-white rounded-lg border border-red-100">
-                        <div className="text-sm font-medium text-gray-600">How (Method/Manner)</div>
-                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                        <div className="text-sm font-medium text-black">How (Method/Manner)</div>
+                        <p className="text-sm text-black mt-2 leading-relaxed">
                           {selectedAction.how}
                         </p>
                       </div>
@@ -3092,8 +3137,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.source && (
                       <div className="p-3 bg-white rounded-lg border border-red-100 md:col-span-2">
-                        <div className="text-sm font-medium text-gray-600">Source</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Source</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.source}
                         </p>
                       </div>
@@ -3112,8 +3157,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {selectedAction.who && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <div className="text-sm font-medium text-gray-600">Who (Person/s Involved)</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Who (Person/s Involved)</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.who}
                         </p>
                       </div>
@@ -3121,8 +3166,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.why && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <div className="text-sm font-medium text-gray-600">Why (Reason/Motive)</div>
-                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                        <div className="text-sm font-medium text-black">Why (Reason/Motive)</div>
+                        <p className="text-sm text-black mt-2 leading-relaxed">
                           {selectedAction.why}
                         </p>
                       </div>
@@ -3130,8 +3175,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.how && (
                       <div className="p-3 bg-white rounded-lg border border-green-100 md:col-span-2">
-                        <div className="text-sm font-medium text-gray-600">How (Observation/Findings)</div>
-                        <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                        <div className="text-sm font-medium text-black">How (Observation/Findings)</div>
+                        <p className="text-sm text-black mt-2 leading-relaxed">
                           {selectedAction.how}
                         </p>
                       </div>
@@ -3139,8 +3184,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.gender && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <div className="text-sm font-medium text-gray-600">Gender</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Gender</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.gender}
                         </p>
                       </div>
@@ -3148,8 +3193,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     
                     {selectedAction.source && (
                       <div className="p-3 bg-white rounded-lg border border-green-100">
-                        <div className="text-sm font-medium text-gray-600">Source</div>
-                        <p className="text-sm text-gray-900 mt-2">
+                        <div className="text-sm font-medium text-black">Source</div>
+                        <p className="text-sm text-black mt-2">
                           {selectedAction.source}
                         </p>
                       </div>
@@ -3177,7 +3222,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="p-3 bg-white rounded-lg border border-gray-100">
-                    <div className="text-sm font-medium text-gray-600">Action Taken/Status</div>
+                    <div className="text-sm font-medium text-black">Action Taken/Status</div>
                     <div className="mt-2">
                       <span className={`inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-full ${
                         selectedAction.actionTaken && selectedAction.actionTaken.trim() && selectedAction.actionTaken.toLowerCase().includes('arrested') 
@@ -3195,8 +3240,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   
                   {selectedAction.otherInformation && (
                     <div className="p-3 bg-white rounded-lg border border-gray-100">
-                      <div className="text-sm font-medium text-gray-600">Other Information</div>
-                      <p className="text-sm text-gray-900 mt-2 leading-relaxed">
+                      <div className="text-sm font-medium text-black">Other Information</div>
+                      <p className="text-sm text-black mt-2 leading-relaxed">
                         {selectedAction.otherInformation}
                       </p>
                     </div>
@@ -3204,9 +3249,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   
                   {selectedAction.photos && selectedAction.photos.length > 0 && (
                     <div className="p-3 bg-white rounded-lg border border-gray-100">
-                      <div className="text-sm font-medium text-gray-600">Documents/Evidence</div>
+                      <div className="text-sm font-medium text-black">Documents/Evidence</div>
                       <div className="mt-3 space-y-2">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-black">
                           {selectedAction.photos.length} document(s) attached:
                         </p>
                         <div className="space-y-2">
@@ -3266,8 +3311,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   <Edit className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Edit Action Report</h3>
-                  <p className="text-sm text-gray-500">Update the details of the selected action report</p>
+                  <h3 className="text-lg font-semibold text-black">Edit Action Report</h3>
+                  <p className="text-sm text-black">Update the details of the selected action report</p>
                 </div>
               </div>
               <button
@@ -3288,12 +3333,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-department" className="text-sm font-medium text-gray-700">Department *</Label>
+                    <Label htmlFor="edit-department" className="text-sm font-medium text-black">Department *</Label>
                     <Select value={formData.department} onValueChange={(value) => setFormData({...formData, department: value})}>
-                      <SelectTrigger id="edit-department" name="department" className="w-full">
+                      <SelectTrigger
+                        id="edit-department"
+                        name="department"
+                        className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                      >
                         <SelectValue placeholder="Select Department" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                         <SelectItem value="pnp">PNP</SelectItem>
                         <SelectItem value="agriculture">Agriculture</SelectItem>
                         <SelectItem value="pg-enro">PG-ENRO</SelectItem>
@@ -3302,25 +3351,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-municipality" className="text-sm font-medium text-gray-700">Municipality *</Label>
+                    <Label htmlFor="edit-municipality" className="text-sm font-medium text-black">Municipality *</Label>
                     <Input
                       id="edit-municipality"
                       name="municipality"
                       value={formData.municipality}
                       onChange={(e) => handleMunicipalityChange(e.target.value)}
                       placeholder="Enter municipality (district will auto-detect)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400"
                       autoComplete="address-level2"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-district" className="text-sm font-medium text-gray-700">District *</Label>
+                    <Label htmlFor="edit-district" className="text-sm font-medium text-black">District *</Label>
                     <Select value={formData.district} onValueChange={(value) => setFormData({...formData, district: value})}>
-                      <SelectTrigger id="edit-district" name="district" className="w-full">
+                      <SelectTrigger
+                        id="edit-district"
+                        name="district"
+                        className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                      >
                         <SelectValue placeholder="Select District" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                         <SelectItem value="1ST DISTRICT">1st District</SelectItem>
                         <SelectItem value="2ND DISTRICT">2nd District</SelectItem>
                         <SelectItem value="3RD DISTRICT">3rd District</SelectItem>
@@ -3329,7 +3382,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-when" className="text-sm font-medium text-gray-700">When (Date/Time) *</Label>
+                    <Label htmlFor="edit-when" className="text-sm font-medium text-black">When (Date/Time) *</Label>
                     <Input
                       id="edit-when"
                       name="when"
@@ -3337,7 +3390,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       value={formData.when}
                       onChange={(e) => setFormData({...formData, when: e.target.value})}
                       placeholder="Enter date/time (e.g., 2025-10-22, Yesterday, This morning)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400"
                       autoComplete="off"
                     />
                   </div>
@@ -3352,27 +3405,27 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-what" className="text-sm font-medium text-gray-700">What (Action Description) *</Label>
+                    <Label htmlFor="edit-what" className="text-sm font-medium text-black">What (Action Description) *</Label>
                     <Textarea
                       id="edit-what"
                       name="what"
                       value={formData.what}
                       onChange={(e) => setFormData({...formData, what: e.target.value})}
                       placeholder="Describe the action taken in detail"
-                      className="w-full min-h-[80px]"
+                      className="w-full min-h-[80px] text-black placeholder:text-gray-400"
                       rows={3}
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-where" className="text-sm font-medium text-gray-700">Where (Location) *</Label>
+                    <Label htmlFor="edit-where" className="text-sm font-medium text-black">Where (Location) *</Label>
                     <Input
                       id="edit-where"
                       name="where"
                       value={formData.where}
                       onChange={(e) => setFormData({...formData, where: e.target.value})}
                       placeholder="Enter specific location"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400"
                       autoComplete="street-address"
                     />
                   </div>
@@ -3388,25 +3441,29 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="edit-who" className="text-sm font-medium text-gray-700">Who (Person/s Involved)</Label>
+                      <Label htmlFor="edit-who" className="text-sm font-medium text-black">Who (Person/s Involved)</Label>
                       <Input
                         id="edit-who"
                         name="who"
                         value={formData.who}
                         onChange={(e) => setFormData({...formData, who: e.target.value})}
                         placeholder="Names of persons involved"
-                        className="w-full"
+                        className="w-full text-black placeholder:text-gray-400"
                         autoComplete="name"
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="edit-gender" className="text-sm font-medium text-gray-700">Gender</Label>
+                      <Label htmlFor="edit-gender" className="text-sm font-medium text-black">Gender</Label>
                       <Select value={formData.gender} onValueChange={(value) => setFormData({...formData, gender: value})}>
-                        <SelectTrigger id="edit-gender" name="gender" className="w-full">
+                        <SelectTrigger
+                          id="edit-gender"
+                          name="gender"
+                          className="w-full !opacity-100 disabled:!opacity-100 [&>span:not([data-placeholder])]:text-black [&>span:not([data-placeholder])]:opacity-100 [&>span[data-placeholder]]:text-gray-400 [&>span[data-placeholder]]:opacity-100"
+                        >
                           <SelectValue placeholder="Select Gender" />
                         </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
                           <SelectItem value="Male">Male</SelectItem>
                           <SelectItem value="Female">Female</SelectItem>
                           <SelectItem value="Multiple">Multiple</SelectItem>
@@ -3416,40 +3473,40 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="edit-why" className="text-sm font-medium text-gray-700">Why (Reason/Motive)</Label>
+                      <Label htmlFor="edit-why" className="text-sm font-medium text-black">Why (Reason/Motive)</Label>
                       <Textarea
                         id="edit-why"
                         name="why"
                         value={formData.why}
                         onChange={(e) => setFormData({...formData, why: e.target.value})}
                         placeholder="Reason or motive for the incident"
-                        className="w-full min-h-[60px]"
+                        className="w-full min-h-[60px] text-black placeholder:text-gray-400"
                         rows={2}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="edit-how" className="text-sm font-medium text-gray-700">How (Method/Manner)</Label>
+                      <Label htmlFor="edit-how" className="text-sm font-medium text-black">How (Method/Manner)</Label>
                       <Textarea
                         id="edit-how"
                         name="how"
                         value={formData.how}
                         onChange={(e) => setFormData({...formData, how: e.target.value})}
                         placeholder="How the incident occurred or was handled"
-                        className="w-full min-h-[60px]"
+                        className="w-full min-h-[60px] text-black placeholder:text-gray-400"
                         rows={2}
                       />
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="edit-source" className="text-sm font-medium text-gray-700">Source</Label>
+                      <Label htmlFor="edit-source" className="text-sm font-medium text-black">Source</Label>
                       <Input
                         id="edit-source"
                         name="source"
                         value={formData.source}
                         onChange={(e) => setFormData({...formData, source: e.target.value})}
                         placeholder="Information source (e.g., witness, report, etc.)"
-                        className="w-full"
+                        className="w-full text-black placeholder:text-gray-400"
                         autoComplete="off"
                       />
                     </div>
@@ -3487,7 +3544,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </h4>
                 <div className="grid grid-cols-1 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="edit-actionTaken" className="text-sm font-medium text-gray-700">Action Taken/Status *</Label>
+                    <Label htmlFor="edit-actionTaken" className="text-sm font-medium text-black">Action Taken/Status *</Label>
                     <Input
                       id="edit-actionTaken"
                       name="actionTaken"
@@ -3495,26 +3552,26 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       value={formData.actionTaken}
                       onChange={(e) => setFormData({...formData, actionTaken: e.target.value})}
                       placeholder="Enter action taken/status (e.g., Pending, Arrested, Resolved, In Progress)"
-                      className="w-full"
+                      className="w-full text-black placeholder:text-gray-400"
                       autoComplete="off"
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-otherInformation" className="text-sm font-medium text-gray-700">Other Information</Label>
+                    <Label htmlFor="edit-otherInformation" className="text-sm font-medium text-black">Other Information</Label>
                     <Textarea
                       id="edit-otherInformation"
                       name="otherInformation"
                       value={formData.otherInformation}
                       onChange={(e) => setFormData({...formData, otherInformation: e.target.value})}
                       placeholder="Any additional relevant information, notes, or observations"
-                      className="w-full min-h-[80px]"
+                      className="w-full min-h-[80px] text-black placeholder:text-gray-400"
                       rows={3}
                     />
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="edit-photos" className="text-sm font-medium text-gray-700">Photos/Evidence</Label>
+                    <Label htmlFor="edit-photos" className="text-sm font-medium text-black">Photos/Evidence</Label>
                     <Input
                       id="edit-photos"
                       name="photos"
@@ -3528,7 +3585,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       className="w-full"
                       autoComplete="off"
                     />
-                    <p className="text-xs text-gray-500">Upload new photos or evidence (will replace existing files)</p>
+                    <p className="text-xs text-black">Upload new photos or evidence (will replace existing files)</p>
                   </div>
                 </div>
               </div>
@@ -3539,7 +3596,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <Button 
                 variant="outline" 
                 onClick={() => setShowEditModal(false)} 
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="flex-1 border-gray-300 text-black hover:bg-gray-50"
               >
                 Cancel
               </Button>
@@ -3572,16 +3629,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4">
             <div className="p-6">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold text-gray-900">Select Department</h3>
+                <h3 className="text-xl font-bold text-black">Select Department</h3>
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-black hover:text-black transition-colors"
                 >
                   <X className="w-6 h-6" />
                 </button>
               </div>
               
-              <p className="text-gray-600 mb-6">Choose which department the Excel/CSV file is for:</p>
+              <p className="text-black mb-6">Choose which department the Excel/CSV file is for:</p>
               
               <div className="space-y-3">
                 <button
@@ -3593,8 +3650,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Shield className="w-5 h-5 text-red-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">PNP (Philippine National Police)</h4>
-                      <p className="text-sm text-gray-600">Law enforcement and security actions</p>
+                      <h4 className="font-semibold text-black">PNP (Philippine National Police)</h4>
+                      <p className="text-sm text-black">Law enforcement and security actions</p>
                     </div>
                   </div>
                 </button>
@@ -3608,8 +3665,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Fish className="w-5 h-5 text-green-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">Agriculture (Bantay Dagat)</h4>
-                      <p className="text-sm text-gray-600">Fisheries and agricultural monitoring</p>
+                      <h4 className="font-semibold text-black">Agriculture (Bantay Dagat)</h4>
+                      <p className="text-sm text-black">Fisheries and agricultural monitoring</p>
                     </div>
                   </div>
                 </button>
@@ -3623,8 +3680,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       <Trees className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
-                      <h4 className="font-semibold text-gray-900">PG-ENRO</h4>
-                      <p className="text-sm text-gray-600">Environmental protection and natural resources</p>
+                      <h4 className="font-semibold text-black">PG-ENRO</h4>
+                      <p className="text-sm text-black">Environmental protection and natural resources</p>
                     </div>
                   </div>
                 </button>
@@ -3633,7 +3690,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <div className="mt-6 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowImportDialog(false)}
-                  className="w-full px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full px-4 py-2 text-black border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -3654,7 +3711,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-red-600">Delete Action Report</h3>
-                  <p className="text-sm text-gray-500">This action cannot be undone</p>
+                  <p className="text-sm text-black">This action cannot be undone</p>
                 </div>
               </div>
               <button
@@ -3698,7 +3755,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
               <Button 
                 variant="outline" 
                 onClick={() => setShowDeleteModal(false)} 
-                className="flex-1 border-gray-300 text-gray-700 hover:bg-gray-50"
+                className="flex-1 border-gray-300 text-black hover:bg-gray-50"
               >
                 Cancel
               </Button>
