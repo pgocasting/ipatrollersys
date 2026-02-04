@@ -2165,6 +2165,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         id="search"
                         name="search"
                         placeholder="Search municipalities..."
+                        className="!text-black !placeholder:text-gray-400"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         autoComplete="off"
@@ -2174,8 +2175,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="month-filter" className="text-xs font-medium text-gray-700">Month</Label>
                       <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
-                        <SelectTrigger id="month-filter" name="month-filter">
-                          <SelectValue placeholder="Month" />
+                        <SelectTrigger
+                          id="month-filter"
+                          name="month-filter"
+                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                        >
+                          <SelectValue placeholder="Month" className="text-gray-900" />
                         </SelectTrigger>
                         <SelectContent>
                           {[
@@ -2193,8 +2198,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="year-filter" className="text-xs font-medium text-gray-700">Year</Label>
                       <Select value={selectedYear} onValueChange={setSelectedYear}>
-                        <SelectTrigger id="year-filter" name="year-filter">
-                          <SelectValue placeholder="Year" />
+                        <SelectTrigger
+                          id="year-filter"
+                          name="year-filter"
+                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                        >
+                          <SelectValue placeholder="Year" className="text-gray-900" />
                         </SelectTrigger>
                         <SelectContent>
                           {yearOptions.map((year) => (
@@ -2209,8 +2218,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="district-filter" className="text-xs font-medium text-gray-700">District</Label>
                       <Select value={selectedDistrict} onValueChange={setSelectedDistrict}>
-                        <SelectTrigger id="district-filter" name="district-filter">
-                          <SelectValue placeholder="All Districts" />
+                        <SelectTrigger
+                          id="district-filter"
+                          name="district-filter"
+                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                        >
+                          <SelectValue placeholder="All Districts" className="text-gray-900" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Districts</SelectItem>
@@ -2228,8 +2241,12 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         onValueChange={setActiveTab}
                         disabled={userDepartment === 'agriculture' || userDepartment === 'pg-enro'}
                       >
-                        <SelectTrigger id="department-filter" name="department-filter">
-                          <SelectValue placeholder="All Departments" />
+                        <SelectTrigger
+                          id="department-filter"
+                          name="department-filter"
+                          className="[&>span:not([data-placeholder])]:text-gray-900 [&>span[data-placeholder]]:text-gray-400"
+                        >
+                          <SelectValue placeholder="All Departments" className="text-gray-900" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">All Departments</SelectItem>

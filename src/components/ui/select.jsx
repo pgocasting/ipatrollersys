@@ -103,8 +103,8 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none text-black dark:text-gray-100",
-        "focus:bg-gray-100 focus:text-gray-900 hover:bg-gray-100 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none !text-black !opacity-100 dark:!text-gray-100",
+        "focus:bg-gray-100 focus:!text-black hover:bg-gray-100 data-[highlighted]:!text-black data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
         className
       )}
       {...props}>
@@ -113,7 +113,7 @@ function SelectItem({
           <CheckIcon className="h-4 w-4" />
         </SelectPrimitive.ItemIndicator>
       </span>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText className="!text-black dark:!text-gray-100">{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );
 }
