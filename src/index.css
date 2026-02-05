@@ -1,4 +1,22 @@
-
 @import "tailwindcss";
 
+input[data-slot="input"],
+textarea[data-slot="input"],
+select[data-slot="input"] {
+  color: #000 !important;
+  caret-color: #000 !important;
+  -webkit-text-fill-color: #000 !important;
+}
 
+input[data-slot="input"]:-webkit-autofill,
+input[data-slot="input"]:-webkit-autofill:hover,
+input[data-slot="input"]:-webkit-autofill:focus,
+textarea[data-slot="input"]:-webkit-autofill,
+textarea[data-slot="input"]:-webkit-autofill:hover,
+textarea[data-slot="input"]:-webkit-autofill:focus,
+select[data-slot="input"]:-webkit-autofill,
+select[data-slot="input"]:-webkit-autofill:hover,
+select[data-slot="input"]:-webkit-autofill:focus {
+  -webkit-text-fill-color: #000 !important;
+  caret-color: #000 !important;
+}

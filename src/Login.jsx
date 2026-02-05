@@ -124,6 +124,7 @@ export default function Login({ onLogin }) {
                   value={formData.username}
                   onChange={handleChange}
                   required
+                  style={{ color: "#000", WebkitTextFillColor: "#000", caretColor: "#000" }}
                   className="h-10 sm:h-12 text-sm sm:text-base bg-white border-gray-300 text-gray-900 caret-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
                   placeholder="Enter your username"
                   autoComplete="username"
@@ -143,6 +144,7 @@ export default function Login({ onLogin }) {
                     value={formData.password}
                     onChange={handleChange}
                     required
+                    style={{ color: "#000", WebkitTextFillColor: "#000", caretColor: "#000" }}
                     className="h-10 sm:h-12 text-sm sm:text-base pr-12 bg-white border-gray-300 text-gray-900 caret-gray-900 placeholder:text-gray-400 focus:border-blue-500 focus:ring-blue-500"
                     placeholder="Enter your password"
                     autoComplete="current-password"
