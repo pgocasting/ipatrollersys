@@ -3700,17 +3700,17 @@ const handleSaveAllMonths = async () => {
   return (
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout} onShowHelp={() => setShowCommandCenterHelp(true)}>
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-1.5 border-b border-slate-200">
           <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0">
               {selectedMonth} {selectedYear} • Command Center Dashboard
             </p>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto sm:ml-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto sm:ml-auto">
             {(activeMunicipalityTab || userMunicipality) && (
-              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg border border-green-200 bg-green-50 text-green-800 shadow-sm flex-shrink-0 w-full sm:w-auto justify-between sm:justify-start">
                 <Building2 className="h-4 w-4 text-green-600" />
                 <span className="text-sm font-medium">{activeMunicipalityTab || userMunicipality}</span>
                 <span className="text-xs px-2 py-0.5 rounded-md bg-green-600 text-white">
@@ -4179,16 +4179,16 @@ const handleSaveAllMonths = async () => {
         </Dialog>
 
       {/* Main Dashboard */}
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-1 sm:space-y-2">
 
 
 
         {/* Weekly Report Section */}
         {activeTab === "weekly-report" && (
-          <div className="space-y-3 sm:space-y-4">
+          <div className="space-y-1 sm:space-y-2">
             {/* Weekly Report Header */}
-            <div className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <div className={`${isCommandUser ? 'p-3 sm:p-4' : 'p-3 sm:p-4'} pb-0`}>
+            <div>
+              <div className={`${isCommandUser ? 'p-1 sm:p-2' : 'p-1 sm:p-2'} pb-0`}>
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
                   <div className="flex items-start gap-3 w-full lg:w-auto">
                     <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
@@ -4249,10 +4249,10 @@ const handleSaveAllMonths = async () => {
                   )}
                 </div>
               </div>
-              <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
+              <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-0`}>
                 {/* Month/Year Selection */}
-                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-2 sm:gap-3 mb-2">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto lg:max-w-none">
+                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-1 mb-0">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
                     <div className="lg:w-[220px]">
                       <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
                       <select 
@@ -4621,38 +4621,39 @@ const handleSaveAllMonths = async () => {
               
               
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
-                <div className={`overflow-x-auto h-[60vh] md:h-[70vh] overflow-y-auto relative rounded-lg border border-gray-200 bg-white shadow-sm ${isCommandUser ? 'cc-compact' : ''}`} style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
-                  <table className="w-full min-w-[1200px]">
-                    <thead className="sticky top-0 z-20">
+                <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
+                  <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 260px)', paddingBottom: '72px', paddingRight: '8px' }}>
+                    <table className="w-full min-w-[1200px]">
+                      <thead className="sticky top-0 z-20">
                       <tr className="bg-white border-b-2 border-gray-300">
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32">
                           <div className="flex items-center gap-2">
                             <MapPinIcon className="h-4 w-4 text-blue-500" />
                             BARANGAY
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
                             CONCERN TYPE
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-4 py-4 text-center text-sm font-bold text-gray-800 border-r border-gray-200" colSpan="4">
+                        <th className="px-3 py-2 text-center text-sm font-bold text-gray-800 border-r border-gray-200" colSpan="4">
                           <div className="flex items-center justify-center gap-2">
                             <BarChart3 className="h-4 w-4 text-purple-500" />
                             WEEKLY REPORT
                           </div>
                         </th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
                           <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4 text-gray-500" />
                             REMARKS
                           </div>
                         </th>
-                        <th className="px-4 py-4 text-left text-sm font-bold text-gray-800 table-cell-spacing">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 table-cell-spacing">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             ACTION TAKEN
@@ -4660,27 +4661,27 @@ const handleSaveAllMonths = async () => {
                         </th>
                       </tr>
                       <tr className="bg-gray-100 border-b border-gray-300">
-                        <th className="px-4 py-3 border-r border-gray-200"></th>
-                        <th className="px-4 py-3 border-r border-gray-200"></th>
-                        <th className="px-4 py-3 border-r border-gray-200"></th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
+                        <th className="px-3 py-2 border-r border-gray-200"></th>
+                        <th className="px-3 py-2 border-r border-gray-200"></th>
+                        <th className="px-3 py-2 border-r border-gray-200"></th>
+                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 1</div>
                           <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200 whitespace-nowrap">
+                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 2</div>
                           <div className="text-xs opacity-90">{selectedMonth} 8-14</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200 whitespace-nowrap">
+                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 3</div>
                           <div className="text-xs opacity-90">{selectedMonth} 15-21</div>
                         </th>
-                        <th className="px-4 py-3 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200 whitespace-nowrap">
+                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 4</div>
                           <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
                         </th>
-                        <th className="px-4 py-3 border-r border-gray-200"></th>
-                        <th className="px-4 py-3"></th>
+                        <th className="px-3 py-2 border-r border-gray-200"></th>
+                        <th className="px-3 py-2"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
@@ -4699,18 +4700,18 @@ const handleSaveAllMonths = async () => {
                             {dateEntries.length === 0 ? (
                               // Empty row when no entries
                               <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
-                                <td className="px-3 py-2 text-sm font-medium text-gray-700 bg-white/30">
+                                <td className="px-3 py-0.5 text-sm font-medium text-gray-700 bg-white/30">
                                   <div className="flex items-center gap-2">
                                     <Clock className="h-3 w-3 text-gray-400" />
                                     {date}
                                   </div>
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <select 
                                     id={`barangay-select-${date}`}
                                     name={`barangay-select-${date}`}
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
                                     style={{ color: '#000' }}
                                     value={selectedBarangayFilter || ""}
                                     onChange={(e) => {
@@ -4736,12 +4737,12 @@ const handleSaveAllMonths = async () => {
                                       ))}
                                   </select>
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <select 
                                     id={`concern-type-select-${date}`}
                                     name={`concern-type-select-${date}`}
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
                                     style={{ color: '#000' }}
                                     value=""
                                     onChange={(e) => {
@@ -4768,7 +4769,7 @@ const handleSaveAllMonths = async () => {
                                     )}
                                   </select>
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <input 
                                     id={`week1-${date}`}
                                     name={`week1-${date}`}
@@ -4776,7 +4777,7 @@ const handleSaveAllMonths = async () => {
                                     min="0"
                                     step="1"
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4787,7 +4788,7 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <input 
                                     id={`week2-${date}`}
                                     name={`week2-${date}`}
@@ -4795,7 +4796,7 @@ const handleSaveAllMonths = async () => {
                                     min="0"
                                     step="1"
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4806,7 +4807,7 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <input 
                                     id={`week3-${date}`}
                                     name={`week3-${date}`}
@@ -4814,7 +4815,7 @@ const handleSaveAllMonths = async () => {
                                     min="0"
                                     step="1"
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4825,7 +4826,7 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2">
+                                <td className="px-3 py-0.5">
                                   <input 
                                     id={`week4-${date}`}
                                     name={`week4-${date}`}
@@ -4833,7 +4834,7 @@ const handleSaveAllMonths = async () => {
                                     min="0"
                                     step="1"
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
                                     onChange={(e) => {
@@ -4844,13 +4845,13 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip="">
+                                <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip="">
                                   <input 
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
                                     type="text" 
                                     disabled={isReadOnly}
-                                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
+                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                     placeholder=""
                                     value=""
                                     onChange={(e) => {
@@ -4861,7 +4862,7 @@ const handleSaveAllMonths = async () => {
                                     }}
                                   />
                                 </td>
-                                <td className="px-3 py-2 table-cell-spacing">
+                                <td className="px-3 py-0.5 table-cell-spacing">
                                   <div className="flex items-center justify-center">
                                     <span className="text-xs text-black italic">Add entry to upload</span>
                                   </div>
@@ -4872,20 +4873,20 @@ const handleSaveAllMonths = async () => {
                               dateEntries.map(({ entry, entryIndex }, filteredIndex) => (
                                 <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
                                   {filteredIndex === 0 && (
-                                    <td className="px-3 py-2 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
+                                    <td className="px-3 py-0.5 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
                                       <div className="flex items-center gap-2">
                                         <Clock className="h-3 w-3 text-gray-400" />
                                         {date}
                                       </div>
                                     </td>
                                   )}
-                                  <td className="px-3 py-2 table-cell-hover" data-tooltip={entry.barangay || "Select barangay"}>
+                                  <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.barangay || "Select barangay"}>
                                     <div className="flex items-center gap-2">
                                       <select 
                                         id={`existing-barangay-${date}-${entryIndex}`}
                                         name={`existing-barangay-${date}-${entryIndex}`}
                                         disabled={isReadOnly}
-                                        className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                        className="flex-1 px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
                                         style={{ color: '#000' }}
                                         value={entry.barangay}
                                         onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
@@ -4916,12 +4917,12 @@ const handleSaveAllMonths = async () => {
                                       )}
                                     </div>
                                   </td>
-                                  <td className="px-3 py-2 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
+                                  <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
                                     <select 
                                       id={`existing-concern-type-${date}-${entryIndex}`}
                                       name={`existing-concern-type-${date}-${entryIndex}`}
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
                                       style={{ color: '#000' }}
                                       value={entry.concernType}
                                       onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
@@ -4943,7 +4944,7 @@ const handleSaveAllMonths = async () => {
                                       )}
                                     </select>
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-0.5">
                                     <input 
                                       id={`existing-week1-${date}-${entryIndex}`}
                                       name={`existing-week1-${date}-${entryIndex}`}
@@ -4951,13 +4952,13 @@ const handleSaveAllMonths = async () => {
                                       min="0"
                                       step="1"
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week1}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week1', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-0.5">
                                     <input 
                                       id={`existing-week2-${date}-${entryIndex}`}
                                       name={`existing-week2-${date}-${entryIndex}`}
@@ -4965,13 +4966,13 @@ const handleSaveAllMonths = async () => {
                                       min="0"
                                       step="1"
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week2}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-0.5">
                                     <input 
                                       id={`existing-week3-${date}-${entryIndex}`}
                                       name={`existing-week3-${date}-${entryIndex}`}
@@ -4979,13 +4980,13 @@ const handleSaveAllMonths = async () => {
                                       min="0"
                                       step="1"
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week3}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2">
+                                  <td className="px-3 py-0.5">
                                     <input 
                                       id={`existing-week4-${date}-${entryIndex}`}
                                       name={`existing-week4-${date}-${entryIndex}`}
@@ -4993,25 +4994,25 @@ const handleSaveAllMonths = async () => {
                                       min="0"
                                       step="1"
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week4}
                                       onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
+                                  <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
                                     <input 
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
                                       disabled={isReadOnly}
-                                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
+                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                       placeholder=""
                                       value={entry.actionTaken}
                                       onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
                                     />
                                   </td>
-                                  <td className="px-3 py-2 table-cell-spacing">
+                                  <td className="px-3 py-0.5 table-cell-spacing">
                                     <div className="flex items-center justify-center gap-2 h-full">
                                       {entry.photos && (
                                         (entry.photos.before || entry.photos.after) ||
@@ -5021,7 +5022,7 @@ const handleSaveAllMonths = async () => {
                                           {/* View button when photos exist */}
                                           <button
                                             onClick={() => handleViewPhotos(date, entryIndex)}
-                                            className="flex items-center gap-2 px-4 py-1.5 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
+                                            className="flex items-center gap-2 px-4 py-1 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
                                             title="View Photos"
                                           >
                                             <Eye className="w-4 h-4" />
@@ -5031,7 +5032,7 @@ const handleSaveAllMonths = async () => {
                                           {!isReadOnly && (isAdmin || (!entry.remarks && ((!entry.photos.before || !entry.photos.after) || (entry.photos.rows && entry.photos.rows.some(row => !row.after || !row.after.length))))) && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
-                                              className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
+                                              className="flex items-center gap-2 px-4 py-1 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
                                               title="Upload / Edit Photos"
                                             >
                                               <Upload className="w-4 h-4" />
@@ -5097,11 +5098,11 @@ const handleSaveAllMonths = async () => {
                             )}
                             {/* Add new entry button */}
                             <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
-                              <td colSpan="9" className="px-4 py-3 text-center">
+                              <td colSpan="9" className="px-4 py-2 text-center">
                                 {!isReadOnly && (
                                   <button
                                     onClick={() => addDateEntry(date)}
-                                    className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
+                                    className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
                                   >
                                     <Plus className="h-4 w-4" />
                                     + Add Entry for {date}
@@ -5112,8 +5113,12 @@ const handleSaveAllMonths = async () => {
                           </React.Fragment>
                         );
                       })}
-                    </tbody>
-                  </table>
+                      <tr>
+                        <td colSpan="9" className="h-16"></td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>
@@ -6214,8 +6219,8 @@ const handleSaveAllMonths = async () => {
       {showCollectionView && (
         <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-3">
                   <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
                     <Database className="h-5 w-5 text-purple-600" />
@@ -6234,8 +6239,8 @@ const handleSaveAllMonths = async () => {
               </div>
 
               {/* Filters */}
-              <div className="bg-white shadow-sm border border-gray-200 rounded-xl p-6 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-3 mb-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Month</label>
                     <select
