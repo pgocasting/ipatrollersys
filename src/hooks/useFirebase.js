@@ -50,7 +50,8 @@ export const useFirebase = () => {
 
       const data = docSnap.data();
       const users = data.users || [];
-      const userRecord = users.find(u => u.username === username);
+      const normalizedUsername = (username ?? "").trim().toLowerCase();
+      const userRecord = users.find((u) => (u.username ?? "").trim().toLowerCase() === normalizedUsername);
 
       if (!userRecord) {
         throw new Error('User not found');
