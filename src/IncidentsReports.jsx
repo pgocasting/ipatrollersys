@@ -1166,6 +1166,76 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const handleImportExcel = () => {
     fileInputRef.current?.click();
   };
+  const normalizeIncidentField = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+  };
+  const buildIncidentDedupeKey = (incident) => {
+    const incidentType = normalizeIncidentField(incident?.incidentType);
+    const date = normalizeIncidentField(incident?.date);
+    const time = normalizeIncidentField(incident?.time);
+    const location = normalizeIncidentField(incident?.location);
+    const municipality = normalizeIncidentField(incident?.municipality);
+    const district = normalizeIncidentField(incident?.district);
+    const officer = normalizeIncidentField(incident?.officer);
+    const description = normalizeIncidentField(incident?.description);
+    return [incidentType, date, time, location, municipality, district, officer, description].join('|');
+  };
+  const saveImportedIncidents = async (rawIncidents) => {
+    const existingKeys = new Set((incidents || []).map(buildIncidentDedupeKey));
+    const fileKeys = new Set();
+
+    const uniqueForImport = [];
+    let skippedDuplicatesInFile = 0;
+    let skippedExisting = 0;
+
+    for (const incident of rawIncidents) {
+      const key = buildIncidentDedupeKey(incident);
+      if (!key || key === '|||||||') {
+        continue;
+      }
+      if (fileKeys.has(key)) {
+        skippedDuplicatesInFile++;
+        continue;
+      }
+      fileKeys.add(key);
+      if (existingKeys.has(key)) {
+        skippedExisting++;
+        continue;
+      }
+      uniqueForImport.push(incident);
+    }
+
+    if (uniqueForImport.length === 0) {
+      alert(`No new incidents imported. Skipped ${skippedDuplicatesInFile} duplicates in file and ${skippedExisting} already existing incidents.`);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setFirestoreStatus('saving');
+      const batch = writeBatch(db);
+      const incidentsRef = collection(db, 'incidents');
+      uniqueForImport.forEach((incident) => {
+        const docRef = doc(incidentsRef);
+        batch.set(docRef, {
+          ...incident,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        });
+      });
+      await batch.commit();
+      await loadIncidents();
+      setFirestoreStatus('connected');
+      alert(`Successfully imported ${uniqueForImport.length} incidents. Skipped ${skippedDuplicatesInFile} duplicates in file and ${skippedExisting} already existing incidents.`);
+    } catch (error) {
+      console.error('Error saving imported incidents:', error);
+      setFirestoreStatus('error');
+      alert('Error saving imported incidents to database. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1227,31 +1297,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             }
           }
           if (importedIncidents.length > 0) {
-            // Save imported incidents to Firestore
-            try {
-              setLoading(true);
-              setFirestoreStatus('saving');
-              const batch = writeBatch(db);
-              const incidentsRef = collection(db, 'incidents');
-              importedIncidents.forEach(incident => {
-                const docRef = doc(incidentsRef);
-                batch.set(docRef, {
-                  ...incident,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                });
-              });
-              await batch.commit();
-              await loadIncidents(); // Reload from Firestore
-              setFirestoreStatus('connected');
-              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
-            } catch (error) {
-              console.error('Error saving imported incidents:', error);
-              setFirestoreStatus('error');
-              alert('Error saving imported incidents to database. Please try again.');
-            } finally {
-              setLoading(false);
-            }
+            await saveImportedIncidents(importedIncidents);
           } else {
             alert('No valid data found in the CSV file.');
           }
@@ -1334,31 +1380,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             }
           });
           if (importedIncidents.length > 0) {
-            // Save imported incidents to Firestore
-            try {
-              setLoading(true);
-              setFirestoreStatus('saving');
-              const batch = writeBatch(db);
-              const incidentsRef = collection(db, 'incidents');
-              importedIncidents.forEach(incident => {
-                const docRef = doc(incidentsRef);
-                batch.set(docRef, {
-                  ...incident,
-                  createdAt: new Date().toISOString(),
-                  updatedAt: new Date().toISOString()
-                });
-              });
-              await batch.commit();
-              await loadIncidents(); // Reload from Firestore
-              setFirestoreStatus('connected');
-              alert(`Successfully imported ${importedIncidents.length} incidents to Firestore!`);
-            } catch (error) {
-              console.error('Error saving imported incidents:', error);
-              setFirestoreStatus('error');
-              alert('Error saving imported incidents to database. Please try again.');
-            } finally {
-              setLoading(false);
-            }
+            await saveImportedIncidents(importedIncidents);
           } else {
             alert('No valid data found in the Excel file.');
           }
