@@ -215,6 +215,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [showCollectionView, setShowCollectionView] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleDateString("en-US", { month: "long" }));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
+  const [selectedBarangayFilter, setSelectedBarangayFilter] = useState("");
   const [selectedReportMunicipality, setSelectedReportMunicipality] = useState("");
   const [importedConcernTypes, setImportedConcernTypes] = useState([]);
   const [concernTypeData, setConcernTypeData] = useState("");
@@ -1219,6 +1220,90 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
     return data;
   };
+
+  const parseBarangaySelectionValue = (value) => {
+    if (!value) return { name: '', municipality: '' };
+    const raw = String(value).trim();
+
+    const parenMatch = raw.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+    if (parenMatch) {
+      return {
+        name: parenMatch[1].trim(),
+        municipality: parenMatch[2].trim()
+      };
+    }
+
+    const commaParts = raw.split(',').map(p => p.trim()).filter(Boolean);
+    if (commaParts.length >= 2) {
+      return {
+        name: commaParts[0],
+        municipality: commaParts.slice(1).join(', ')
+      };
+    }
+
+    return { name: raw, municipality: '' };
+  };
+
+  const normalizeBarangayKey = ({ name, municipality }) => {
+    const normalize = (s) => String(s || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    return {
+      name: normalize(name),
+      municipality: normalize(municipality)
+    };
+  };
+
+  const getFilteredDateData = (date) => {
+    const data = getDateData(date);
+    if (!selectedBarangayFilter) return data;
+
+    const selectedParsed = normalizeBarangayKey(parseBarangaySelectionValue(selectedBarangayFilter));
+
+    return data.filter(entry => {
+      const entryParsed = normalizeBarangayKey(parseBarangaySelectionValue(entry?.barangay));
+      if (!selectedParsed.name) return true;
+      if (selectedParsed.municipality) {
+        return entryParsed.name === selectedParsed.name && entryParsed.municipality === selectedParsed.municipality;
+      }
+      return entryParsed.name === selectedParsed.name;
+    });
+  };
+
+  const getFilteredDateEntriesWithIndex = (date) => {
+    const allEntries = getDateData(date);
+    const filteredEntries = getFilteredDateData(date);
+
+    if (filteredEntries === allEntries) {
+      return allEntries.map((entry, entryIndex) => ({ entry, entryIndex }));
+    }
+
+    return allEntries
+      .map((entry, entryIndex) => ({ entry, entryIndex }))
+      .filter(({ entry }) => filteredEntries.includes(entry));
+  };
+
+  useEffect(() => {
+    if (!selectedBarangayFilter) return;
+
+    const normalizedTab = activeMunicipalityTab
+      ? activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim()
+      : null;
+
+    const availableValues = importedBarangays
+      .filter(barangay => {
+        if (!normalizedTab) return true;
+        const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+        return normalizedBarangay === normalizedTab;
+      })
+      .map(barangay => `${barangay.name}, ${barangay.municipality}`);
+
+    if (!availableValues.includes(selectedBarangayFilter)) {
+      setSelectedBarangayFilter("");
+    }
+  }, [activeMunicipalityTab, importedBarangays, selectedBarangayFilter]);
 
   // Validate if entry has all required data (required before photo upload)
   const isEntryIncomplete = (entry) => {
@@ -4162,8 +4247,8 @@ const handleSaveAllMonths = async () => {
               <div className={`${isCommandUser ? 'p-3' : 'p-3 md:p-4'} pt-0 pb-2`}>
                 {/* Month/Year Selection */}
                 <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-2 sm:gap-3 mb-2">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full lg:max-w-[620px]">
-                    <div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full lg:w-auto lg:max-w-none">
+                    <div className="lg:w-[220px]">
                       <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
                       <select 
                         id="month-select"
@@ -4183,7 +4268,7 @@ const handleSaveAllMonths = async () => {
                         ))}
                       </select>
                     </div>
-                    <div>
+                    <div className="lg:w-[220px]">
                       <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
                       <select 
                         id="year-select"
@@ -4196,6 +4281,31 @@ const handleSaveAllMonths = async () => {
                         {years.map((year) => (
                           <option key={year} value={year}>{year}</option>
                         ))}
+                      </select>
+                    </div>
+                    <div className="lg:w-[260px]">
+                      <label htmlFor="barangay-filter" className="block text-sm font-medium text-gray-700 mb-1">Select Barangay</label>
+                      <select
+                        id="barangay-filter"
+                        name="barangay-filter"
+                        value={selectedBarangayFilter}
+                        onChange={(e) => setSelectedBarangayFilter(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                        style={{ color: '#000' }}
+                      >
+                        <option value="">All Barangays</option>
+                        {importedBarangays
+                          .filter(barangay => {
+                            if (!activeMunicipalityTab) return true;
+                            const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                            const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                            return normalizedBarangay === normalizedTab;
+                          })
+                          .map((barangay) => (
+                            <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
+                              {barangay.name} ({barangay.municipality})
+                            </option>
+                          ))}
                       </select>
                     </div>
                   </div>
@@ -4569,7 +4679,7 @@ const handleSaveAllMonths = async () => {
                       {currentDates.map((date, index) => {
                         const weekNumber = getWeekNumber(date);
                         const isWeekend = index % 7 >= 5; // Saturday and Sunday
-                        const dateEntries = getDateData(date);
+                        const dateEntries = getFilteredDateEntriesWithIndex(date);
                         
                         // Debug logging for first few dates
                         if (index < 3) {
@@ -4593,7 +4703,7 @@ const handleSaveAllMonths = async () => {
                                     name={`barangay-select-${date}`}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
                                     style={{ color: '#000' }}
-                                    value=""
+                                    value={selectedBarangayFilter || ""}
                                     onChange={(e) => {
                                       if (e.target.value) {
                                         addDateEntry(date);
@@ -4744,9 +4854,9 @@ const handleSaveAllMonths = async () => {
                               </tr>
                             ) : (
                               // Render existing entries
-                              dateEntries.map((entry, entryIndex) => (
+                              dateEntries.map(({ entry, entryIndex }, filteredIndex) => (
                                 <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
-                                  {entryIndex === 0 && (
+                                  {filteredIndex === 0 && (
                                     <td className="px-3 py-2 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
                                       <div className="flex items-center gap-2">
                                         <Clock className="h-3 w-3 text-gray-400" />
@@ -4898,7 +5008,7 @@ const handleSaveAllMonths = async () => {
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                              title={isAdmin ? "Edit Photos & Remarks (Admin)" : "Edit Photos & Remarks"}
+                                              title="Upload / Edit Photos"
                                             >
                                               <Upload className="w-4 h-4" />
                                               <span className="text-sm font-medium">Edit</span>

@@ -38,7 +38,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
     handleNavigation
   } = useSidebar();
   const { user } = useFirebase();
-  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
+  const { isAdmin, userAccessLevel, userViewingPage, userFirstName, userLastName, userUsername } = useAuth();
   
   // Enhanced navigation handler with auto-close functionality
   const enhancedNavigate = handleNavigation(onNavigate);
@@ -80,6 +80,11 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
     allNavigationItems.filter(item => {
       // Admin users can see everything
       if (isAdmin) return true;
+
+      // Viewing users can only see their allowed page
+      if (userAccessLevel === 'viewing') {
+        return Boolean(userViewingPage) && item.id === userViewingPage;
+      }
       
       // Show for all users
       if (item.showFor === 'all') return true;
@@ -90,7 +95,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
       } else {
         return item.showFor === userAccessLevel;
       }
-    }), [allNavigationItems, isAdmin, userAccessLevel]
+    }), [allNavigationItems, isAdmin, userAccessLevel, userViewingPage]
   );
 
   const handlePageNavigation = (pageId) => {

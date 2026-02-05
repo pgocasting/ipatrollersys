@@ -49,6 +49,14 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     "Not Municipality",
   ];
 
+  const viewingPageOptions = [
+    { value: "dashboard", label: "Dashboard" },
+    { value: "ipatroller", label: "I-Patroller" },
+    { value: "commandcenter", label: "Command Center" },
+    { value: "actioncenter", label: "Action Center" },
+    { value: "incidents", label: "Incidents" },
+  ];
+
   const [newUser, setNewUser] = useState({
     email: "",
     username: "",
@@ -57,6 +65,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     firstName: "",
     lastName: "",
     municipality: "",
+    viewingPage: "",
     phoneNumber: "",
     role: "User",
     accessLevel: "action-center",
@@ -68,11 +77,11 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     lastName: "",
     username: "",
     municipality: "",
+    viewingPage: "",
     phoneNumber: "",
     accessLevel: "action-center",
     department: "",
   });
-
 
   useEffect(() => {
     let isMounted = true;
@@ -108,8 +117,12 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin) return;
     
     // Validate form
-    if (!newUser.municipality && newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents") {
+    if (!newUser.municipality && newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && newUser.accessLevel !== "viewing") {
       toast.error("Please select a municipality or 'Not Municipality'");
+      return;
+    }
+    if (newUser.accessLevel === "viewing" && !newUser.viewingPage) {
+      toast.error("Please select a page for Viewing access");
       return;
     }
     if (!newUser.firstName || !newUser.lastName) {
@@ -135,7 +148,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         username: newUser.username || newUser.email.split('@')[0],
         firstName: newUser.firstName,
         lastName: newUser.lastName,
-        municipality: newUser.municipality,
+        municipality: newUser.accessLevel === "viewing" ? "" : newUser.municipality,
+        viewingPage: newUser.accessLevel === "viewing" ? newUser.viewingPage : "",
         phoneNumber: newUser.phoneNumber,
         role: "User",
         accessLevel: newUser.accessLevel,
@@ -181,6 +195,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         firstName: "",
         lastName: "",
         municipality: "",
+        viewingPage: "",
         phoneNumber: "",
         role: "User",
         accessLevel: "action-center",
@@ -206,6 +221,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
       lastName: user.lastName || "",
       username: user.username || "",
       municipality: user.municipality || "",
+      viewingPage: user.viewingPage || "",
       phoneNumber: user.phoneNumber || "",
       accessLevel: user.accessLevel || "action-center",
       department: user.department || "",
@@ -226,8 +242,12 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     if (!isAdmin || !selectedUser) return;
     
     // Validate form
-    if (!editUser.municipality && editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents") {
+    if (!editUser.municipality && editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents" && editUser.accessLevel !== "viewing") {
       toast.error("Please select a municipality or 'Not Municipality'");
+      return;
+    }
+    if (editUser.accessLevel === "viewing" && !editUser.viewingPage) {
+      toast.error("Please select a page for Viewing access");
       return;
     }
     if (!editUser.firstName || !editUser.lastName) {
@@ -245,7 +265,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         firstName: editUser.firstName,
         lastName: editUser.lastName,
         username: editUser.username,
-        municipality: editUser.municipality,
+        municipality: editUser.accessLevel === "viewing" ? "" : editUser.municipality,
+        viewingPage: editUser.accessLevel === "viewing" ? editUser.viewingPage : "",
         phoneNumber: editUser.phoneNumber,
         accessLevel: editUser.accessLevel,
         department: editUser.department,
@@ -288,6 +309,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         lastName: "",
         username: "",
         municipality: "",
+        viewingPage: "",
         phoneNumber: "",
         accessLevel: "action-center",
         department: "",
@@ -395,23 +417,23 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="given-name" required />
+                      <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="given-name" required />
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="family-name" required />
+                      <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="family-name" required />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
-                      <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="email" required />
+                      <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="email" required />
                     </div>
-                    {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && (
+                    {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && newUser.accessLevel !== "viewing" && (
                       <div className="space-y-2">
                         <Label htmlFor="municipality">Municipality</Label>
                         <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
-                          <SelectTrigger id="municipality" name="municipality" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="municipality" name="municipality" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                             <SelectValue placeholder="Select municipality" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -426,8 +448,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="accessLevel">Access Level</Label>
-                      <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger id="accessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200">
+                      <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "", viewingPage: value === "viewing" ? prev.viewingPage : "" }))}>
+                        <SelectTrigger id="accessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -436,14 +458,32 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
                           <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
                           <SelectItem value="incidents">Incidents</SelectItem>
+                          <SelectItem value="viewing">Viewing</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    {newUser.accessLevel === "viewing" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="viewingPage">Allowed Page</Label>
+                        <Select value={newUser.viewingPage} onValueChange={(value) => setNewUser((prev) => ({ ...prev, viewingPage: value }))}>
+                          <SelectTrigger id="viewingPage" name="viewingPage" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
+                            <SelectValue placeholder="Select page" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            {viewingPageOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {newUser.accessLevel === "action-center" && (
                       <div className="space-y-2">
                         <Label htmlFor="department">Department</Label>
                         <Select value={newUser.department} onValueChange={(value) => setNewUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="department" name="department" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="department" name="department" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -456,15 +496,15 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="username">Username</Label>
-                    <Input id="username" name="username" placeholder="johndoe" value={newUser.username} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="username" required />
+                    <Input id="username" name="username" placeholder="johndoe" value={newUser.username} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="username" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="password">Password</Label>
-                    <Input id="password" name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="new-password" required />
+                    <Input id="password" name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="new-password" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200" autoComplete="new-password" required />
+                    <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="new-password" required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="phoneNumber">Contact Number (Optional)</Label>
@@ -490,7 +530,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         }
                         setNewUser((prev) => ({ ...prev, phoneNumber: value }));
                       }}
-                      className="col-span-3 bg-white border-slate-200"
+                      className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400"
                     />
                     <p className="text-xs text-gray-500">Format: +63 XXX XXX XXXX</p>
                   </div>
@@ -526,7 +566,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         placeholder="John" 
                         value={editUser.firstName} 
                         onChange={handleEditInputChange} 
-                        className="col-span-3 bg-white border-slate-200" 
+                        className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" 
                         autoComplete="given-name"
                         required 
                       />
@@ -539,7 +579,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         placeholder="Doe" 
                         value={editUser.lastName} 
                         onChange={handleEditInputChange} 
-                        className="col-span-3 bg-white border-slate-200" 
+                        className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" 
                         autoComplete="family-name"
                         required 
                       />
@@ -555,15 +595,15 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                         placeholder="johndoe" 
                         value={editUser.username} 
                         onChange={handleEditInputChange} 
-                        className="col-span-3 bg-white border-slate-200" 
+                        className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" 
                         required 
                       />
                     </div>
-                    {editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents" && (
+                    {editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents" && editUser.accessLevel !== "viewing" && (
                       <div className="space-y-2">
                         <Label htmlFor="editMunicipality">Municipality</Label>
                         <Select value={editUser.municipality} onValueChange={(value) => setEditUser((prev) => ({ ...prev, municipality: value }))}>
-                          <SelectTrigger id="editMunicipality" name="municipality" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="editMunicipality" name="municipality" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                             <SelectValue placeholder="Select municipality" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -578,8 +618,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="editAccessLevel">Access Level</Label>
-                      <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "" }))}>
-                        <SelectTrigger id="editAccessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200">
+                      <Select value={editUser.accessLevel} onValueChange={(value) => setEditUser((prev) => ({ ...prev, accessLevel: value, department: "", viewingPage: value === "viewing" ? prev.viewingPage : "" }))}>
+                        <SelectTrigger id="editAccessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
@@ -588,14 +628,32 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
                           <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
                           <SelectItem value="incidents">Incidents</SelectItem>
+                          <SelectItem value="viewing">Viewing</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
+                    {editUser.accessLevel === "viewing" && (
+                      <div className="space-y-2">
+                        <Label htmlFor="editViewingPage">Allowed Page</Label>
+                        <Select value={editUser.viewingPage} onValueChange={(value) => setEditUser((prev) => ({ ...prev, viewingPage: value }))}>
+                          <SelectTrigger id="editViewingPage" name="viewingPage" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
+                            <SelectValue placeholder="Select page" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-white border border-slate-200">
+                            {viewingPageOptions.map((opt) => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
                     {editUser.accessLevel === "action-center" && (
                       <div className="space-y-2">
                         <Label htmlFor="editDepartment">Department</Label>
                         <Select value={editUser.department} onValueChange={(value) => setEditUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="editDepartment" name="department" className="col-span-3 bg-white border border-slate-200">
+                          <SelectTrigger id="editDepartment" name="department" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
                             <SelectValue placeholder="Select department" />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-slate-200">
@@ -776,7 +834,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       placeholder="Search by name, email, or username..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 bg-white border-gray-300"
+                      className="pl-10 bg-white border-gray-300 !text-black placeholder:text-gray-400"
                     />
                   </div>
                 </div>
@@ -795,6 +853,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <SelectItem value="ipatroller">IPatroller</SelectItem>
                       <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
                       <SelectItem value="incidents">Incidents</SelectItem>
+                      <SelectItem value="viewing">Viewing</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -895,7 +954,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                 <TableHead className="font-bold text-gray-700 py-4 min-w-[200px]">Contact Details</TableHead>
                                 <TableHead className="font-bold text-gray-700 py-4 text-center">Role</TableHead>
                                 <TableHead className="font-bold text-gray-700 py-4 text-center">Department</TableHead>
-                                <TableHead className="text-right font-bold text-gray-700 py-4 pr-6">Actions</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 py-4">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -959,8 +1018,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                       {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
                                     </Badge>
                                   </TableCell>
-                                  <TableCell className="text-right py-4 pr-6">
-                                    <div className="flex gap-2 justify-end">
+                                  <TableCell className="text-center py-4">
+                                    <div className="flex gap-2 justify-center">
                                       <Button 
                                         variant="outline" 
                                         size="sm"
@@ -1028,7 +1087,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                 <TableHead className="font-bold text-gray-700 py-4 min-w-[200px]">Contact Details</TableHead>
                                 <TableHead className="font-bold text-gray-700 py-4 text-center">Role</TableHead>
                                 <TableHead className="font-bold text-gray-700 py-4 text-center">Department</TableHead>
-                                <TableHead className="text-right font-bold text-gray-700 py-4 pr-6">Actions</TableHead>
+                                <TableHead className="text-center font-bold text-gray-700 py-4">Actions</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1092,8 +1151,8 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                       {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
                                     </Badge>
                                   </TableCell>
-                                  <TableCell className="text-right py-4 pr-6">
-                                    <div className="flex gap-2 justify-end">
+                                  <TableCell className="text-center py-4">
+                                    <div className="flex gap-2 justify-center">
                                       <Button 
                                         variant="outline" 
                                         size="sm"

@@ -16,11 +16,29 @@ export function AuthProvider({ children }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [userMunicipality, setUserMunicipality] = useState("");
   const [userAccessLevel, setUserAccessLevel] = useState("");
+  const [userViewingPage, setUserViewingPage] = useState("");
   const [userDepartment, setUserDepartment] = useState("");
   const [userFirstName, setUserFirstName] = useState("");
   const [userLastName, setUserLastName] = useState("");
   const [userUsername, setUserUsername] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const normalizeViewingPage = (page) => {
+    if (!page) return "";
+    const raw = String(page).trim();
+    if (!raw) return "";
+    const key = raw.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+    const labelMap = {
+      dashboard: "dashboard",
+      ipatroller: "ipatroller",
+      commandcenter: "commandcenter",
+      actioncenter: "actioncenter",
+      incidents: "incidents",
+    };
+
+    return labelMap[key] || raw;
+  };
 
   useEffect(() => {
     const checkRole = async () => {
@@ -38,6 +56,15 @@ export function AuthProvider({ children }) {
           setIsAdmin(isAdminUser);
           setUserMunicipality(currentUser?.municipality || "");
           setUserAccessLevel(userAccessLevelValue);
+          setUserViewingPage(
+            normalizeViewingPage(
+              currentUser?.viewingPage ||
+                currentUser?.allowedPage ||
+                currentUser?.viewPage ||
+                currentUser?.page ||
+                ""
+            )
+          );
           setUserDepartment(currentUser?.department || "");
           setUserFirstName(currentUser?.firstName || "");
           setUserLastName(currentUser?.lastName || "");
@@ -75,6 +102,7 @@ export function AuthProvider({ children }) {
     isAdmin,
     userMunicipality,
     userAccessLevel,
+    userViewingPage,
     userDepartment,
     userFirstName,
     userLastName,

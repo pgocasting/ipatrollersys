@@ -19,9 +19,19 @@ function SelectGroup({
 }
 
 function SelectValue({
+  className,
   ...props
 }) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />;
+  return (
+    <SelectPrimitive.Value
+      data-slot="select-value"
+      className={cn(
+        "!opacity-100 !text-black data-[placeholder]:!text-gray-400 dark:!text-gray-100",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 function SelectTrigger({
@@ -35,10 +45,11 @@ function SelectTrigger({
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm cursor-pointer text-black dark:text-gray-100",
+        "flex h-9 w-full items-center justify-between whitespace-nowrap rounded-md border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm cursor-pointer !opacity-100 !text-black dark:!text-gray-100",
         "placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400",
         "disabled:cursor-not-allowed disabled:opacity-50",
         "[&>span]:line-clamp-1",
+        "[&_[data-slot=select-value]]:!opacity-100 [&_[data-slot=select-value]]:!text-black [&_[data-slot=select-value][data-placeholder]]:!text-gray-400",
         className
       )}
       {...props}>
@@ -61,7 +72,9 @@ function SelectContent({
       <SelectPrimitive.Content
         data-slot="select-content"
         className={cn(
-          "relative z-[100] max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-white text-gray-900 shadow-md",
+          "relative z-[100] max-h-96 min-w-[8rem] overflow-hidden rounded-md border bg-white !opacity-100 !text-black shadow-md dark:!text-gray-100",
+          "[&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]_span]:!text-black",
+          "[&_[data-disabled]]:!text-gray-400 dark:[&_[data-disabled]]:!text-gray-500",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           "data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
           position === "popper" &&
@@ -104,7 +117,9 @@ function SelectItem({
       data-slot="select-item"
       className={cn(
         "relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-2 pr-8 text-sm outline-none !text-black !opacity-100 dark:!text-gray-100",
-        "focus:bg-gray-100 focus:!text-black hover:bg-gray-100 data-[highlighted]:!text-black data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+        "focus:bg-gray-100 hover:bg-gray-100 data-[highlighted]:bg-gray-100 data-[highlighted]:!text-black",
+        "data-[state=checked]:font-medium data-[state=checked]:!text-black",
+        "data-[disabled]:pointer-events-none data-[disabled]:!opacity-50 data-[disabled]:!text-gray-400 dark:data-[disabled]:!text-gray-500",
         className
       )}
       {...props}>

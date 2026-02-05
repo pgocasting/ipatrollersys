@@ -28,7 +28,7 @@ import { logPageNavigation, logAdminLogout } from './utils/adminLogger';
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('loading');
   const { user, loading, logout } = useFirebase();
-  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
+  const { isAdmin, userAccessLevel, userViewingPage, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
   // Set initial page after auth is determined; force all non-admin users to their respective pages
   useEffect(() => {
@@ -48,6 +48,10 @@ function AppContent() {
         } else if (userAccessLevel === 'incidents') {
           setCurrentPage('incidents');
           window.history.replaceState({}, '', '/incidents');
+        } else if (userAccessLevel === 'viewing') {
+          const page = userViewingPage || 'dashboard';
+          setCurrentPage(page);
+          window.history.replaceState({}, '', `/${page}`);
         } else {
           // Fallback to dashboard if no specific access level (shouldn't happen)
           setCurrentPage('dashboard');
@@ -65,7 +69,7 @@ function AppContent() {
       }
       setCurrentPage('loading');
     }
-  }, [user, loading, userAccessLevel, isAdmin]);
+  }, [user, loading, userAccessLevel, userViewingPage, isAdmin]);
 
   // Initialize users collection when app starts
   useEffect(() => {
@@ -98,9 +102,13 @@ function AppContent() {
       } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         window.history.replaceState({}, '', '/incidents');
+      } else if (userAccessLevel === 'viewing') {
+        const page = userViewingPage || 'dashboard';
+        setCurrentPage(page);
+        window.history.replaceState({}, '', `/${page}`);
       }
     }
-  }, [user, loading, userAccessLevel, isAdmin, currentPage]);
+  }, [user, loading, userAccessLevel, userViewingPage, isAdmin, currentPage]);
 
   const handleLogout = async () => {
     try {
@@ -199,6 +207,27 @@ function AppContent() {
           </div>
         </div>
       );
+    }
+
+    // Access control for viewing users: force them onto the allowed page
+    if (!isAdmin && userAccessLevel === 'viewing') {
+      const allowed = userViewingPage || 'dashboard';
+      if (currentPage !== allowed) {
+        setCurrentPage(allowed);
+      }
+      switch (allowed) {
+        case 'ipatroller':
+          return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        case 'commandcenter':
+          return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        case 'actioncenter':
+          return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        case 'incidents':
+          return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+        case 'dashboard':
+        default:
+          return <Dashboard onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      }
     }
 
     // Access control for dashboard - all non-admin users cannot access dashboard
