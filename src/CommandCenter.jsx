@@ -65,6 +65,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { isBlocked, blockedUntil, timeLeft, executeWithQuotaCheck, resetQuotaBlock } = useFirestoreQuota();
   const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
   const isReadOnly = (userAccessLevel === 'ipatroller' || userAccessLevel === 'viewing') && !isAdmin;
+  const isViewingUser = userAccessLevel === 'viewing' && !isAdmin;
   const isFilterReadOnly = userAccessLevel === 'ipatroller' && !isAdmin;
   
   // Access level check - only command-center users should access this page
@@ -1324,6 +1325,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     // Entry is incomplete if ANY required field is missing
     // All fields must be filled: barangay, concern type, at least one week, and action taken
     return !hasBarangay || !hasConcernType || !hasWeekData || !hasActionTaken;
+  };
+
+  const isEntryCompleteForViewingHighlight = (entry) => {
+    if (isEntryIncomplete(entry)) return false;
+    const hasRemarks = entry.remarks && String(entry.remarks).trim() !== '';
+    return hasRemarks;
   };
 
   // Photo upload handlers
@@ -3884,6 +3891,25 @@ const handleSaveAllMonths = async () => {
             position: relative;
           }
           
+          .command-center-table thead th {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+          }
+
+          .command-center-table tbody td {
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+            vertical-align: middle;
+          }
+
+          .command-center-table input,
+          .command-center-table select {
+            height: 1.9rem;
+            padding-top: 0.125rem;
+            padding-bottom: 0.125rem;
+            line-height: 1.25rem;
+          }
+          
           .table-cell-hover input,
           .table-cell-hover select {
             overflow: hidden;
@@ -4456,7 +4482,7 @@ const handleSaveAllMonths = async () => {
                             </div>
                             <DialogFooter>
                               <button
-                                className="px-4 py-2 rounded-md border text-gray-700 hover:bg-gray-50"
+                                className="px-4 py-2 rounded-md border text-gray-700 hover:text-gray-800 transition-colors duration-200"
                                 onClick={() => setShowDuplicateJanModal(false)}
                               >
                                 Cancel
@@ -4623,7 +4649,7 @@ const handleSaveAllMonths = async () => {
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
                   <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 260px)', paddingBottom: '72px', paddingRight: '8px' }}>
-                    <table className="w-full min-w-[1200px]">
+                    <table className="command-center-table w-full min-w-[1200px]">
                       <thead className="sticky top-0 z-20">
                       <tr className="bg-white border-b-2 border-gray-300">
                         <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
@@ -4700,8 +4726,8 @@ const handleSaveAllMonths = async () => {
                             {dateEntries.length === 0 ? (
                               // Empty row when no entries
                               <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
-                                <td className="px-3 py-0.5 text-sm font-medium text-gray-700 bg-white/30">
-                                  <div className="flex items-center gap-2">
+                                <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight">
+                                  <div className="flex items-center gap-2 leading-tight">
                                     <Clock className="h-3 w-3 text-gray-400" />
                                     {date}
                                   </div>
@@ -4870,11 +4896,27 @@ const handleSaveAllMonths = async () => {
                               </tr>
                             ) : (
                               // Render existing entries
-                              dateEntries.map(({ entry, entryIndex }, filteredIndex) => (
-                                <tr key={`${date}-${entryIndex}`} className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
+                              dateEntries.map(({ entry, entryIndex }, filteredIndex) => {
+                                const shouldHighlight =
+                                  isViewingUser &&
+                                  !!selectedBarangayFilter &&
+                                  entry?.barangay === selectedBarangayFilter &&
+                                  isEntryCompleteForViewingHighlight(entry);
+
+                                return (
+                                  <tr
+                                    key={`${date}-${entryIndex}`}
+                                    className={`transition-colors duration-200 border-b border-gray-200 ${
+                                      shouldHighlight
+                                        ? 'bg-yellow-50 hover:bg-yellow-100'
+                                        : isWeekend
+                                          ? 'bg-blue-50 hover:bg-blue-100'
+                                          : 'bg-white hover:bg-gray-50'
+                                    }`}
+                                  >
                                   {filteredIndex === 0 && (
-                                    <td className="px-3 py-0.5 text-sm font-medium text-gray-700 bg-white/30" rowSpan={dateEntries.length}>
-                                      <div className="flex items-center gap-2">
+                                    <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight" rowSpan={dateEntries.length}>
+                                      <div className="flex items-center gap-2 leading-tight">
                                         <Clock className="h-3 w-3 text-gray-400" />
                                         {date}
                                       </div>
@@ -5093,8 +5135,9 @@ const handleSaveAllMonths = async () => {
                                       )}
                                     </div>
                                   </td>
-                                </tr>
-                              ))
+                                  </tr>
+                                );
+                              })
                             )}
                             {/* Add new entry button */}
                             <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
