@@ -64,11 +64,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { notifications, showSuccess, showError, showInfo, showWarning, removeNotification } = useNotification();
   const { isBlocked, blockedUntil, timeLeft, executeWithQuotaCheck, resetQuotaBlock } = useFirestoreQuota();
   const isCommandUser = userAccessLevel === 'command-center' && !isAdmin;
-  const isReadOnly = userAccessLevel === 'ipatroller' && !isAdmin;
+  const isReadOnly = (userAccessLevel === 'ipatroller' || userAccessLevel === 'viewing') && !isAdmin;
+  const isFilterReadOnly = userAccessLevel === 'ipatroller' && !isAdmin;
   
   // Access level check - only command-center users should access this page
   useEffect(() => {
-    if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'ipatroller' && userAccessLevel !== 'admin') {
+    if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'ipatroller' && userAccessLevel !== 'viewing' && userAccessLevel !== 'admin') {
       console.warn('⚠️ Unauthorized access attempt to Command Center. Access level:', userAccessLevel);
       // Optionally redirect to dashboard or show error
     }
@@ -4260,6 +4261,7 @@ const handleSaveAllMonths = async () => {
                           setSelectedMonth(newMonth);
                           // Data will be loaded from Firestore via useEffect for month changes
                         }}
+                        disabled={isFilterReadOnly}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
                         style={{ color: '#000' }}
                       >
@@ -4275,6 +4277,7 @@ const handleSaveAllMonths = async () => {
                         name="year-select"
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(e.target.value)}
+                        disabled={isFilterReadOnly}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
                         style={{ color: '#000' }}
                       >
@@ -4290,6 +4293,7 @@ const handleSaveAllMonths = async () => {
                         name="barangay-filter"
                         value={selectedBarangayFilter}
                         onChange={(e) => setSelectedBarangayFilter(e.target.value)}
+                        disabled={isFilterReadOnly}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
                         style={{ color: '#000' }}
                       >
@@ -4701,6 +4705,7 @@ const handleSaveAllMonths = async () => {
                                   <select 
                                     id={`barangay-select-${date}`}
                                     name={`barangay-select-${date}`}
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
                                     style={{ color: '#000' }}
                                     value={selectedBarangayFilter || ""}
@@ -4731,6 +4736,7 @@ const handleSaveAllMonths = async () => {
                                   <select 
                                     id={`concern-type-select-${date}`}
                                     name={`concern-type-select-${date}`}
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
                                     style={{ color: '#000' }}
                                     value=""
@@ -4765,6 +4771,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
@@ -4783,6 +4790,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
@@ -4801,6 +4809,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
@@ -4819,6 +4828,7 @@ const handleSaveAllMonths = async () => {
                                     type="number" 
                                     min="0"
                                     step="1"
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                     placeholder="0"
                                     value=""
@@ -4835,6 +4845,7 @@ const handleSaveAllMonths = async () => {
                                     id={`action-taken-${date}`}
                                     name={`action-taken-${date}`}
                                     type="text" 
+                                    disabled={isReadOnly}
                                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                     placeholder=""
                                     value=""
@@ -4869,6 +4880,7 @@ const handleSaveAllMonths = async () => {
                                       <select 
                                         id={`existing-barangay-${date}-${entryIndex}`}
                                         name={`existing-barangay-${date}-${entryIndex}`}
+                                        disabled={isReadOnly}
                                         className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
                                         style={{ color: '#000' }}
                                         value={entry.barangay}
@@ -4889,19 +4901,22 @@ const handleSaveAllMonths = async () => {
                                             </option>
                                           ))}
                                       </select>
-                                      <button
-                                        onClick={() => removeDateEntry(date, entryIndex)}
-                                        className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                        title="Remove entry"
-                                      >
-                                        <X className="w-4 h-4" />
-                                      </button>
+                                      {!isReadOnly && (
+                                        <button
+                                          onClick={() => removeDateEntry(date, entryIndex)}
+                                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                          title="Remove entry"
+                                        >
+                                          <X className="w-4 h-4" />
+                                        </button>
+                                      )}
                                     </div>
                                   </td>
                                   <td className="px-3 py-2 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
                                     <select 
                                       id={`existing-concern-type-${date}-${entryIndex}`}
                                       name={`existing-concern-type-${date}-${entryIndex}`}
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
                                       style={{ color: '#000' }}
                                       value={entry.concernType}
@@ -4931,6 +4946,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week1}
@@ -4944,6 +4960,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week2}
@@ -4957,6 +4974,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week3}
@@ -4970,6 +4988,7 @@ const handleSaveAllMonths = async () => {
                                       type="number" 
                                       min="0"
                                       step="1"
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
                                       placeholder="0"
                                       value={entry.week4}
@@ -4981,6 +5000,7 @@ const handleSaveAllMonths = async () => {
                                       id={`existing-action-taken-${date}-${entryIndex}`}
                                       name={`existing-action-taken-${date}-${entryIndex}`}
                                       type="text" 
+                                      disabled={isReadOnly}
                                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
                                       placeholder=""
                                       value={entry.actionTaken}
@@ -5004,7 +5024,7 @@ const handleSaveAllMonths = async () => {
                                             <span className="text-sm font-medium">View</span>
                                           </button>
                                           {/* Edit button - show if before OR after photo is missing, OR if user is admin */}
-                                          {(isAdmin || (!entry.remarks && ((!entry.photos.before || !entry.photos.after) || (entry.photos.rows && entry.photos.rows.some(row => !row.after || !row.after.length))))) && (
+                                          {!isReadOnly && (isAdmin || (!entry.remarks && ((!entry.photos.before || !entry.photos.after) || (entry.photos.rows && entry.photos.rows.some(row => !row.after || !row.after.length))))) && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1.5 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
@@ -5074,13 +5094,15 @@ const handleSaveAllMonths = async () => {
                             {/* Add new entry button */}
                             <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
                               <td colSpan="9" className="px-4 py-3 text-center">
-                                <button
-                                  onClick={() => addDateEntry(date)}
-                                  className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
-                                >
-                                  <Plus className="h-4 w-4" />
-                                  + Add Entry for {date}
-                                </button>
+                                {!isReadOnly && (
+                                  <button
+                                    onClick={() => addDateEntry(date)}
+                                    className="px-4 py-2 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
+                                  >
+                                    <Plus className="h-4 w-4" />
+                                    + Add Entry for {date}
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           </React.Fragment>
