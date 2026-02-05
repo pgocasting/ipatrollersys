@@ -3744,74 +3744,78 @@ const handleSaveAllMonths = async () => {
             )}
 
             <div className="relative w-full sm:w-auto">
-              <button
-                id="commandcenter-menu-button"
-                onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
-              >
-                <Menu className="w-5 h-5" />
-                <span className="text-sm font-medium">View Options</span>
-              </button>
-
-              {showMenuDropdown && (
-                <div
-                  id="commandcenter-menu-dropdown"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
-                >
-                <div className="py-1">
-                <div className="px-3 py-2">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setActiveTab("weekly-report");
-                    setShowMenuDropdown(false);
-                  }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                    activeTab === "weekly-report"
-                      ? "bg-green-50 text-green-700"
-                      : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                  }`}
-                >
-                  <FileText className="w-4 h-4 text-green-600" />
-                  <span>Weekly Report</span>
-                </button>
-
-                {isAdmin && (
+              {userAccessLevel !== 'viewing' && (
+                <>
                   <button
-                    onClick={() => {
-                      setActiveTab("barangays");
-                      setShowMenuDropdown(false);
-                    }}
-                    className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                      activeTab === "barangays"
-                        ? "bg-purple-50 text-purple-700"
-                        : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
-                    }`}
+                    id="commandcenter-menu-button"
+                    onClick={() => setShowMenuDropdown(!showMenuDropdown)}
+                    className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
                   >
-                    <Building2 className="w-4 h-4 text-purple-600" />
-                    <span>Barangay Management</span>
+                    <Menu className="w-5 h-5" />
+                    <span className="text-sm font-medium">View Options</span>
                   </button>
-                )}
 
-                <button
-                  onClick={() => {
-                    setActiveTab("concern-types");
-                    setShowMenuDropdown(false);
-                  }}
-                  className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                    activeTab === "concern-types"
-                      ? "bg-orange-50 text-orange-700"
-                      : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
-                  }`}
-                >
-                  <AlertTriangle className="w-4 h-4 text-orange-600" />
-                  <span>Concern Types</span>
-                </button>
+                  {showMenuDropdown && (
+                    <div
+                      id="commandcenter-menu-dropdown"
+                      className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
+                    >
+                    <div className="py-1">
+                    <div className="px-3 py-2">
+                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                    </div>
 
-                </div>
-              </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab("weekly-report");
+                        setShowMenuDropdown(false);
+                      }}
+                      className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                        activeTab === "weekly-report"
+                          ? "bg-green-50 text-green-700"
+                          : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                      }`}
+                    >
+                      <FileText className="w-4 h-4 text-green-600" />
+                      <span>Weekly Report</span>
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => {
+                          setActiveTab("barangays");
+                          setShowMenuDropdown(false);
+                        }}
+                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                          activeTab === "barangays"
+                            ? "bg-purple-50 text-purple-700"
+                            : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+                        }`}
+                      >
+                        <Building2 className="w-4 h-4 text-purple-600" />
+                        <span>Barangay Management</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setActiveTab("concern-types");
+                        setShowMenuDropdown(false);
+                      }}
+                      className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
+                        activeTab === "concern-types"
+                          ? "bg-orange-50 text-orange-700"
+                          : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                      }`}
+                    >
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                      <span>Concern Types</span>
+                    </button>
+
+                    </div>
+                  </div>
+                  )}
+                </>
               )}
             </div>
           </div>
