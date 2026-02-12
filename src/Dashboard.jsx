@@ -57,6 +57,50 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   } = useData();
   const { userAccessLevel, userMunicipality, isAdmin } = useAuth();
 
+  const currentMonthYearLabel = new Date().toLocaleString('en-US', {
+    month: 'long',
+    year: 'numeric'
+  });
+
+  const normalizeMunicipalityName = (value) => {
+    if (value === null || value === undefined) return '';
+    return String(value).trim().toLowerCase();
+  };
+
+  const getReportDate = (report) => {
+    if (!report) return null;
+
+    const candidate =
+      report.when ??
+      report.date ??
+      report.createdAt ??
+      report.updatedAt ??
+      report.timestamp ??
+      report.time;
+
+    if (!candidate) return null;
+
+    if (candidate instanceof Date) return candidate;
+
+    if (typeof candidate?.toDate === 'function') {
+      const d = candidate.toDate();
+      return d instanceof Date && !Number.isNaN(d.getTime()) ? d : null;
+    }
+
+    if (typeof candidate === 'object') {
+      const seconds = candidate.seconds ?? candidate._seconds;
+      const nanos = candidate.nanoseconds ?? candidate._nanoseconds;
+      if (typeof seconds === 'number') {
+        const ms = seconds * 1000 + (typeof nanos === 'number' ? Math.floor(nanos / 1e6) : 0);
+        const d = new Date(ms);
+        return !Number.isNaN(d.getTime()) ? d : null;
+      }
+    }
+
+    const d = new Date(candidate);
+    return !Number.isNaN(d.getTime()) ? d : null;
+  };
+
   // Instruction Modal State
   const [showInstructions, setShowInstructions] = useState(false);
 
@@ -1197,13 +1241,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     
     const filteredActions = dataToUse.filter(report => {
       // Filter by user's municipality if user is not admin
-      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
+      if (
+        userAccessLevel !== 'admin' &&
+        userMunicipality &&
+        report.municipality &&
+        normalizeMunicipalityName(report.municipality) !== normalizeMunicipalityName(userMunicipality)
+      ) {
         return false;
       }
       
       // Filter by current month
-      if (report.when) {
-        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+      const actionDate = getReportDate(report);
+      if (actionDate) {
         return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
       }
       
@@ -1251,13 +1300,13 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     
     const municipalityReports = dataToUse.filter(report => {
       // Filter by municipality
-      if (report.municipality !== municipalityName) {
+      if (normalizeMunicipalityName(report.municipality) !== normalizeMunicipalityName(municipalityName)) {
         return false;
       }
       
       // Filter by current month
-      if (report.when) {
-        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+      const actionDate = getReportDate(report);
+      if (actionDate) {
         return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
       }
       
@@ -1296,13 +1345,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     
     const filteredActions = dataToUse.filter(report => {
       // Filter by user's municipality if user is not admin
-      if (userAccessLevel !== 'admin' && userMunicipality && report.municipality && report.municipality !== userMunicipality) {
+      if (
+        userAccessLevel !== 'admin' &&
+        userMunicipality &&
+        report.municipality &&
+        normalizeMunicipalityName(report.municipality) !== normalizeMunicipalityName(userMunicipality)
+      ) {
         return false;
       }
       
       // Filter by current month
-      if (report.when) {
-        const actionDate = report.when.toDate ? report.when.toDate() : new Date(report.when);
+      const actionDate = getReportDate(report);
+      if (actionDate) {
         return actionDate.getMonth() === currentMonth && actionDate.getFullYear() === currentYear;
       }
       
@@ -1946,7 +2000,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             {false && (
               <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">
                 <RefreshCw className="w-3 h-3" />
-                Last updated: {lastDataUpdate?.toLocaleTimeString?.()} - Showing data for October 2025
+                Last updated: {lastDataUpdate?.toLocaleTimeString?.()} - Showing data for {currentMonthYearLabel}
               </p>
             )}
           </div>
@@ -1965,7 +2019,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   if (userAccessLevel === 'command-center') {
                     fetchCommandCenterData(); // Refresh Command Center data
                   }
-                  showSuccess('All dashboard data refreshed for current month (October 2025)');
+                  showSuccess(`All dashboard data refreshed for current month (${currentMonthYearLabel})`);
                 }}
                 className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base px-3 py-2"
               >
@@ -1998,7 +2052,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   fetchCommandCenterData();
                   fetchActionCenterData(); // Also refresh action data
                   fetchIncidentsData(); // Also refresh incidents data
-                  showSuccess('Command Center data refreshed for current month (October 2025)');
+                  showSuccess(`Command Center data refreshed for current month (${currentMonthYearLabel})`);
                 }}
                 disabled={isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents}
                 className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 text-sm sm:text-base px-3 py-2 w-full sm:w-auto"
@@ -2199,7 +2253,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Actions (October 2025)</p>
+                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Actions ({currentMonthYearLabel})</p>
                       <p className="text-xl sm:text-2xl font-bold text-blue-600">
                         {getCurrentMonthActionsCount().toLocaleString()}
                       </p>
@@ -2215,7 +2269,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                 <CardContent className="p-5 sm:p-6">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Incidents (October 2025)</p>
+                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Incidents ({currentMonthYearLabel})</p>
                       <p className="text-xl sm:text-2xl font-bold text-orange-600">
                         {getCurrentMonthIncidentsCount().toLocaleString()}
                       </p>
@@ -2908,7 +2962,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {/* Total Actions */}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Total Actions (October 2025)</span>
+                      <span className="text-sm font-semibold text-gray-700">Total Actions ({currentMonthYearLabel})</span>
                       <span className="text-lg font-bold text-blue-600">{getCurrentMonthActionsCount()}</span>
                     </div>
                   </div>
@@ -2969,7 +3023,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
                   {/* Total Incidents */}
                   <div className="pt-3 border-t border-gray-200">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Total Incidents (October 2025)</span>
+                      <span className="text-sm font-semibold text-gray-700">Total Incidents ({currentMonthYearLabel})</span>
                       <span className="text-lg font-bold text-red-600">{getCurrentMonthIncidentsCount()}</span>
                     </div>
                   </div>
