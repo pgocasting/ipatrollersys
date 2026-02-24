@@ -24,6 +24,7 @@ import {
 import { db } from './firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from "xlsx";
 import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
 import {
   Plus,
@@ -116,6 +117,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [pdfToYear, setPdfToYear] = useState(new Date().getFullYear());
   const [isGeneratingRangePdf, setIsGeneratingRangePdf] = useState(false);
 
+  // Daily Counts Export Modal state variables
+  const [showDailyCountsExportModal, setShowDailyCountsExportModal] = useState(false);
+  const [dailyCountsExportMonth, setDailyCountsExportMonth] = useState(new Date().getMonth());
+  const [dailyCountsExportYear, setDailyCountsExportYear] = useState(new Date().getFullYear());
+  const [isExportingDailyCounts, setIsExportingDailyCounts] = useState(false);
+
   // Calculate daily summary data for a specific day
   const getDailySummaryData = (dayIndex) => {
     const summaryData = {};
@@ -137,6 +144,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
     return summaryData;
   };
+
   // Remove unused state
   const moreOptionsRef = useRef(null);
 
@@ -152,7 +160,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       document.removeEventListener("mousedown", handleClickOutside);
     };
   }, []);
-
 
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
@@ -2174,6 +2181,124 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     }
   };
 
+  const loadPatrolDataDirectly = async (month, year) => {
+    try {
+      const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+      const lockedNoEntryMonths = [0, 1];
+      const isLockedNoEntry = lockedNoEntryMonths.includes(month) && year === 2025;
+
+      const datesForMonth = generateDates(month, year);
+
+      if (isLockedNoEntry) {
+        const lockedData = [];
+        Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+          municipalities.forEach((municipality) => {
+            lockedData.push({
+              id: `${district}-${municipality}`,
+              municipality,
+              district,
+              data: datesForMonth.map(() => null),
+            });
+          });
+        });
+        return lockedData;
+      }
+
+      const monthDocRef = doc(db, 'patrolData', monthYearId);
+      const municipalitiesRef = collection(monthDocRef, 'municipalities');
+      const snapshot = await getDocs(municipalitiesRef);
+      const firestoreData = [];
+
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data) {
+          firestoreData.push({
+            id: docSnap.id,
+            ...data,
+          });
+        }
+      });
+
+      const allMunicipalitiesData = [];
+      Object.entries(municipalitiesByDistrict).forEach(([district, municipalities]) => {
+        municipalities.forEach((municipality) => {
+          const existingData = firestoreData.find(item => item.municipality === municipality && item.district === district);
+          const rawData = existingData?.data;
+          const normalizedData = Array.isArray(rawData) ? rawData.slice(0, datesForMonth.length) : [];
+          while (normalizedData.length < datesForMonth.length) normalizedData.push(null);
+
+          allMunicipalitiesData.push({
+            id: existingData?.id || `${district}-${municipality}`,
+            municipality,
+            district,
+            data: normalizedData,
+          });
+        });
+      });
+
+      return allMunicipalitiesData;
+    } catch (error) {
+      console.error('Error loading patrol data directly:', month, year, error);
+      return [];
+    }
+  };
+
+  const exportDailyCountsToExcel = async (month, year) => {
+    setIsExportingDailyCounts(true);
+    try {
+      const exportData = await loadPatrolDataDirectly(month, year);
+      if (!exportData || exportData.length === 0) {
+        toast.error('No daily count data available to export');
+        showError('No daily count data available to export');
+        return;
+      }
+
+      const dates = generateDates(month, year);
+      const headerRow = [
+        'Municipality',
+        'District',
+        ...dates.map(d => `${d.dayName} ${d.dayNumber}`),
+      ];
+
+      const rows = exportData.map(item => {
+        const row = [item.municipality, item.district];
+        dates.forEach((_, idx) => {
+          const v = item.data?.[idx];
+          row.push(v === undefined || v === null ? '' : v);
+        });
+        return row;
+      });
+
+      const aoa = [headerRow, ...rows];
+      const sheet = XLSX.utils.aoa_to_sheet(aoa);
+      const wb = XLSX.utils.book_new();
+      const monthLabel = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      XLSX.utils.book_append_sheet(wb, sheet, 'Daily Counts');
+      const fileName = `Daily_Counts_${monthLabel.replace(/\s+/g, '_')}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+
+      toast.success('Excel exported successfully', {
+        description: `Saved as ${fileName}`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showSuccess('Excel exported successfully!');
+      setShowDailyCountsExportModal(false);
+    } catch (error) {
+      console.error('Failed to export daily counts to Excel', error);
+      toast.error('Failed to export Excel', {
+        description: error?.message || 'Please try again',
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showError('Failed to export Excel');
+    } finally {
+      setIsExportingDailyCounts(false);
+    }
+  };
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="h-full flex flex-col overflow-hidden">
@@ -2226,206 +2351,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
-        <div className="w-full px-4 sm:px-6 lg:px-8 mt-3 sm:mt-4">
-          <div className="flex flex-col lg:flex-row lg:items-stretch gap-3">
-            <div className="w-full lg:max-w-3xl">
-              {/* Quick Stats */}
-              <div className="grid grid-cols-2 gap-1 sm:gap-2 mr-auto">
-                <Card className="bg-white shadow-sm border border-gray-200">
-                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Total Patrols</p>
-                        <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                          {overallSummary.totalPatrols.toLocaleString()}
-                        </p>
-                      </div>
-                      <div className="p-1 sm:p-1.5 bg-blue-100 rounded-lg flex-shrink-0">
-                        <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white shadow-sm border border-gray-200">
-                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Active Card Counts</p>
-                        <p className="text-xl sm:text-2xl font-bold text-green-600">
-                          {overallSummary.totalActive.toLocaleString()}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-0">Monthly Total</p>
-                      </div>
-                      <div className="p-1 sm:p-1.5 bg-green-100 rounded-lg flex-shrink-0">
-                        <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white shadow-sm border border-gray-200">
-                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Inactive Card Counts</p>
-                        <p className="text-xl sm:text-2xl font-bold text-red-600">
-                          {overallSummary.totalInactive.toLocaleString()}
-                        </p>
-                        <p className="text-[10px] text-gray-400 mt-0">Monthly Total</p>
-                      </div>
-                      <div className="p-1 sm:p-1.5 bg-red-100 rounded-lg flex-shrink-0">
-                        <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="bg-white shadow-sm border border-gray-200">
-                  <CardContent className="py-1.5 px-2.5 sm:py-2 sm:px-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs font-medium text-gray-500 mb-0.5 truncate">Avg Active %</p>
-                        <p className="text-xl sm:text-2xl font-bold text-orange-600">
-                          {overallSummary.avgActivePercentage}%
-                        </p>
-                      </div>
-                      <div className="p-1 sm:p-1.5 bg-orange-100 rounded-lg flex-shrink-0">
-                        <Target className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-
-            <div className="w-full lg:flex-1">
-              {/* Filters and Search */}
-              <Card className="bg-white shadow-sm border border-gray-200 rounded-xl h-full">
-                <CardContent className="p-2 sm:p-2.5 h-full">
-                  <div className="flex flex-col gap-1.5">
-                    <div className="flex items-center justify-between w-full">
-                      <h3 className="text-base sm:text-lg font-semibold text-gray-900 whitespace-nowrap">Filters & Search</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                      <div className="flex flex-col justify-end">
-                        <Label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
-                          Search
-                        </Label>
-                        <Input
-                          id="search"
-                          name="search"
-                          placeholder="Search municipalities..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 !text-black caret-black placeholder:text-gray-400"
-                          autoComplete="off"
-                        />
-                      </div>
-
-                      <div className="flex flex-col justify-end">
-                        <Label htmlFor="month-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
-                          Month
-                        </Label>
-                        <select
-                          id="month-filter"
-                          name="month-filter"
-                          value={selectedMonth}
-                          onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
-                          style={{ color: '#000' }}
-                        >
-                          <option value={0}>January</option>
-                          <option value={1}>February</option>
-                          <option value={2}>March</option>
-                          <option value={3}>April</option>
-                          <option value={4}>May</option>
-                          <option value={5}>June</option>
-                          <option value={6}>July</option>
-                          <option value={7}>August</option>
-                          <option value={8}>September</option>
-                          <option value={9}>October</option>
-                          <option value={10}>November</option>
-                          <option value={11}>December</option>
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col justify-end">
-                        <Label htmlFor="year-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
-                          Year
-                        </Label>
-                        <select
-                          id="year-filter"
-                          name="year-filter"
-                          value={selectedYear}
-                          onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
-                          style={{ color: '#000' }}
-                        >
-                          {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
-                            <option key={year} value={year}>
-                              {year}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col justify-end">
-                        <Label htmlFor="district-filter" className="block text-sm font-medium text-gray-700 mb-0.5 leading-none">
-                          District
-                        </Label>
-                        <select
-                          id="district-filter"
-                          name="district-filter"
-                          value={selectedDistrict}
-                          onChange={(e) => setSelectedDistrict(e.target.value)}
-                          className="w-full h-8 px-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white !text-black"
-                          style={{ color: '#000' }}
-                        >
-                          <option value="ALL">All Districts</option>
-                          <option value="1ST DISTRICT">1ST DISTRICT</option>
-                          <option value="2ND DISTRICT">2ND DISTRICT</option>
-                          <option value="3RD DISTRICT">3RD DISTRICT</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-end">
-                        <Button
-                          onClick={() => {
-                            setSelectedMonth(new Date().getMonth());
-                            setSelectedYear(new Date().getFullYear());
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2 h-8 w-full"
-                        >
-                          <Calendar className="w-4 h-4" />
-                          Current Month
-                        </Button>
-                      </div>
-
-                      <div className="flex items-end">
-                        <Button
-                          onClick={() => {
-                            setSearchTerm("");
-                            setSelectedDistrict("ALL");
-                          }}
-                          variant="outline"
-                          size="sm"
-                          className="flex items-center gap-2 h-8 w-full"
-                        >
-                          Clear Filters
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </div>
-
         <div className="w-full px-4 sm:px-6 lg:px-8 flex-1 overflow-y-auto min-h-0 pb-6 mt-4">
 
         {/* Patrol Data Table */}
@@ -2464,6 +2389,21 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       <CheckCircle className="w-4 h-4" />
                       Criteria
                     </button>
+                    {activeTab === "daily" && (
+                      <Button
+                        onClick={() => {
+                          setDailyCountsExportMonth(selectedMonth);
+                          setDailyCountsExportYear(selectedYear);
+                          setShowDailyCountsExportModal(true);
+                        }}
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                      >
+                        <FileSpreadsheet className="w-4 h-4 mr-2" />
+                        Export Excel
+                      </Button>
+                    )}
                     <button
                       onClick={() => setShowTopPerformersModal(true)}
                       className="flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 text-gray-600 hover:text-gray-900 hover:bg-emerald-50"
@@ -2794,6 +2734,88 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           </CardContent>
         </Card>
       </div>
+
+      {showDailyCountsExportModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-emerald-100 rounded-lg">
+                  <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Export Daily Counts</h3>
+                  <p className="text-sm text-gray-600">Select month and year to export</p>
+                </div>
+              </div>
+              <Button
+                onClick={() => setShowDailyCountsExportModal(false)}
+                variant="outline"
+                size="sm"
+                className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                disabled={isExportingDailyCounts}
+              >
+                <XCircle className="w-4 h-4 mr-2" />
+                Close
+              </Button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-1">Month</Label>
+                  <select
+                    value={dailyCountsExportMonth}
+                    onChange={(e) => setDailyCountsExportMonth(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                    disabled={isExportingDailyCounts}
+                  >
+                    {[
+                      "January", "February", "March", "April", "May", "June",
+                      "July", "August", "September", "October", "November", "December"
+                    ].map((m, idx) => (
+                      <option key={idx} value={idx}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label className="block text-sm font-medium text-gray-700 mb-1">Year</Label>
+                  <select
+                    value={dailyCountsExportYear}
+                    onChange={(e) => setDailyCountsExportYear(parseInt(e.target.value))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white"
+                    disabled={isExportingDailyCounts}
+                  >
+                    {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
+                      <option key={year} value={year}>{year}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  onClick={() => exportDailyCountsToExcel(dailyCountsExportMonth, dailyCountsExportYear)}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={isExportingDailyCounts}
+                >
+                  {isExportingDailyCounts ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Exporting...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Print Preview Modal */}
       {showPrintPreview && previewData && (
