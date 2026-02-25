@@ -2831,6 +2831,99 @@ Are you absolutely sure you want to proceed?`;
     showSuccess('Barangays exported successfully!');
   };
 
+  const handleBarangaySelection = (barangayId, isChecked) => {
+    setSelectedBarangays((prev) => {
+      if (isChecked) {
+        if (prev.includes(barangayId)) return prev;
+        return [...prev, barangayId];
+      }
+      return prev.filter((id) => id !== barangayId);
+    });
+  };
+
+  const handleSelectAllBarangays = () => {
+    const targetBarangays = getSortedBarangays();
+    const targetIds = targetBarangays.map((b) => b.id);
+
+    setSelectedBarangays((prev) => {
+      const allSelected = targetIds.length > 0 && targetIds.every((id) => prev.includes(id));
+      if (allSelected) {
+        return prev.filter((id) => !targetIds.includes(id));
+      }
+      const merged = new Set([...prev, ...targetIds]);
+      return Array.from(merged);
+    });
+  };
+
+  const handleClearSelectedBarangays = () => {
+    setSelectedBarangays([]);
+  };
+
+  const handleRemoveSelectedBarangays = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to modify barangays.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+
+    if (selectedBarangays.length === 0) {
+      toast.error('No selected barangays to remove');
+      showError('No selected barangays to remove');
+      return;
+    }
+
+    const ok = window.confirm(`Remove ${selectedBarangays.length} selected barangay(s)?`);
+    if (!ok) return;
+
+    const remaining = importedBarangays.filter((b) => !selectedBarangays.includes(b.id));
+    const previous = importedBarangays;
+
+    setImportedBarangays(remaining);
+    setSelectedBarangays([]);
+
+    const saveResult = await saveWithQuotaCheck(
+      () => saveBarangays(remaining),
+      'Remove Selected Barangays'
+    );
+
+    if (saveResult.success) {
+      barangaysCache.current = remaining;
+      toast.success('Selected barangays removed');
+      showSuccess('Selected barangays removed');
+    } else {
+      setImportedBarangays(previous);
+      toast.error('Failed to remove selected barangays: ' + (saveResult.error || 'Unknown error'));
+      showError('Failed to remove selected barangays: ' + (saveResult.error || 'Unknown error'));
+    }
+  };
+
+  const handleEditSelectedBarangays = () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to edit barangays.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+
+    if (selectedBarangays.length === 0) {
+      toast.error('No selected barangays to edit');
+      showError('No selected barangays to edit');
+      return;
+    }
+
+    const first = importedBarangays.find((b) => selectedBarangays.includes(b.id));
+
+    setEditingBarangay({
+      isBulkEdit: true,
+      selectedIds: [...selectedBarangays],
+      name: '',
+      district: first?.district || '',
+      municipality: first?.municipality || '',
+    });
+    setIsEditingBarangays(true);
+  };
+
   // Barangay sorting functions
   const handleBarangaySort = (sortBy) => {
     if (barangaySortBy === sortBy) {
@@ -3224,14 +3317,52 @@ Are you absolutely sure you want to proceed?`;
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `concern_types_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `concern-types-${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+    URL.revokeObjectURL(url);
+
     toast.success(`Exported ${concernTypesToExport.length} concern types to CSV`);
     showSuccess(`Exported ${concernTypesToExport.length} concern types to CSV`);
+  };
+
+  const handleClearConcernTypes = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to modify concern types.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+
+    if (importedConcernTypes.length === 0) {
+      toast.error('No concern types to clear');
+      showError('No concern types to clear');
+      return;
+    }
+
+    const ok = window.confirm(`Clear ALL concern types (${importedConcernTypes.length})?`);
+    if (!ok) return;
+
+    const previous = importedConcernTypes;
+    setImportedConcernTypes([]);
+    setSelectedConcernTypes([]);
+
+    const saveResult = await saveWithQuotaCheck(
+      () => saveConcernTypes([]),
+      'Clear Concern Types'
+    );
+
+    if (saveResult.success) {
+      concernTypesCache.current = [];
+      toast.success('All concern types cleared');
+      showSuccess('All concern types cleared');
+    } else {
+      setImportedConcernTypes(previous);
+      toast.error('Failed to clear concern types: ' + (saveResult.error || 'Unknown error'));
+      showError('Failed to clear concern types: ' + (saveResult.error || 'Unknown error'));
+    }
   };
 
   const handleClearBarangays = async () => {
