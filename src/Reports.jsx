@@ -1152,71 +1152,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       }
 
-      // Municipality Performance Table - matching preview format
       if (aggregatedData.length > 0) {
-        // Add new page for Municipality Performance
-        doc.addPage();
-        const finalY = 30; // Minimal spacing from top
-
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Municipality Performance', 20, finalY);
-
-        const municipalityTableData = aggregatedData.map(item => [
-          item.municipality,
-          item.district,
-          (barangayCounts[item.municipality] || 0).toString(),
-          item.totalPatrols.toLocaleString(),
-          item.activeDays.toString(),
-          item.inactiveDays.toString(),
-          `${item.activePercentage}%`
-        ]);
-
-        autoTable(doc, {
-          head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
-          body: municipalityTableData,
-          startY: finalY + 10,
-          styles: {
-            fontSize: 8,
-            cellPadding: 2,
-            overflow: 'linebreak',
-            halign: 'left',
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1
-          },
-          headStyles: {
-            fillColor: [34, 197, 94], // Green background like preview
-            fontStyle: 'bold',
-            textColor: [255, 255, 255],
-            fontSize: 9,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1
-          },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252] // Light gray alternating rows like preview
-          },
-          columnStyles: {
-            0: { cellWidth: 'auto', halign: 'left' },
-            1: { cellWidth: 'auto', halign: 'left' },
-            2: { cellWidth: 'auto', halign: 'center' },
-            3: { cellWidth: 'auto', halign: 'center' },
-            4: { cellWidth: 'auto', halign: 'center' },
-            5: { cellWidth: 'auto', halign: 'center' },
-            6: { cellWidth: 'auto', halign: 'center' }
-          },
-          margin: { left: 20, right: 20 },
-          tableWidth: 'auto',
-          showHead: 'everyPage',
-          pageBreak: 'auto',
-          didDrawPage: function (data) {
-            // Add page numbers
-            const pageCount = doc.internal.getNumberOfPages();
-            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-            doc.setFontSize(8);
-            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
-          }
-        });
-
         // Overall Summary Statistics - auto-fit table layout
         const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
 
@@ -1569,85 +1505,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       margin: { left: 20, right: 20 }
     });
 
-    // Municipality Performance Section
-    const finalY = doc.lastAutoTable.finalY + 15;
-    doc.setFontSize(14);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Municipality Performance', 20, finalY);
-
-    // Calculate municipality performance data
-    const municipalityData = [];
-    Object.keys(municipalitiesByDistrict).forEach(district => {
-      municipalitiesByDistrict[district].forEach(municipality => {
-        const municipalityInfo = ipatrollerData?.find(item => item.municipality === municipality);
-        const requiredBarangays = barangayCounts[municipality] || 0;
-
-        if (municipalityInfo) {
-          const stats = calculatePatrolStats(municipalityInfo.data);
-          const totalDays = stats.activeDays + stats.inactiveDays;
-          const activePercentage = totalDays > 0 ? Math.round((stats.activeDays / totalDays) * 100) : 0;
-
-          municipalityData.push([
-            municipality,
-            district,
-            requiredBarangays.toString(),
-            stats.totalPatrols.toLocaleString(),
-            stats.activeDays.toString(),
-            stats.inactiveDays.toString(),
-            `${activePercentage}%`
-          ]);
-        } else {
-          // Add municipality with no data
-          municipalityData.push([
-            municipality,
-            district,
-            requiredBarangays.toString(),
-            '0',
-            '0',
-            '0',
-            '0%'
-          ]);
-        }
-      });
-    });
-
-    // Municipality Performance Table
-    autoTable(doc, {
-      head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
-      body: municipalityData,
-      startY: finalY + 5,
-      styles: {
-        fontSize: 8,
-        cellPadding: 2,
-        overflow: 'linebreak',
-        halign: 'center',
-        lineColor: [0, 0, 0],
-        lineWidth: 0.1
-      },
-      headStyles: {
-        fillColor: [34, 197, 94], // Green background
-        fontStyle: 'bold',
-        textColor: [255, 255, 255],
-        fontSize: 9,
-        halign: 'center'
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252] // Light gray alternating rows
-      },
-      columnStyles: {
-        0: { halign: 'left' },
-        1: { halign: 'left' },
-        2: { halign: 'center' },
-        3: { halign: 'center' },
-        4: { halign: 'center' },
-        5: { halign: 'center' },
-        6: { halign: 'center' }
-      },
-      margin: { left: 20, right: 20 }
-    });
-
     // Overall Summary Statistics Section
-    const overallFinalY = doc.lastAutoTable.finalY + 15;
+    const overallFinalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 15 : 200;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Overall Summary Statistics', 20, overallFinalY);

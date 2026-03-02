@@ -2041,69 +2041,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         });
       }
 
-      // Municipality Performance Table - matching preview format
       if (patrolData.length > 0) {
-        const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
-
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Municipality Performance', 20, finalY);
-
-        const municipalityTableData = patrolData.map(item => [
-          item.municipality,
-          item.district,
-          (barangayCounts[item.municipality] || 0).toString(),
-          item.totalPatrols.toLocaleString(),
-          item.activeDays.toString(),
-          item.inactiveDays.toString(),
-          `${item.activePercentage}%`
-        ]);
-
-        autoTable(doc, {
-          head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
-          body: municipalityTableData,
-          startY: finalY + 7,
-          styles: {
-            fontSize: 8,
-            cellPadding: 2,
-            overflow: 'linebreak',
-            halign: 'left',
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1
-          },
-          headStyles: {
-            fillColor: [34, 197, 94], // Green background like preview
-            fontStyle: 'bold',
-            textColor: [255, 255, 255],
-            fontSize: 9,
-            lineColor: [0, 0, 0],
-            lineWidth: 0.1
-          },
-          alternateRowStyles: {
-            fillColor: [248, 250, 252] // Light gray alternating rows like preview
-          },
-          columnStyles: {
-            0: { cellWidth: 'auto', halign: 'left' },
-            1: { cellWidth: 'auto', halign: 'left' },
-            2: { cellWidth: 'auto', halign: 'center' },
-            3: { cellWidth: 'auto', halign: 'center' },
-            4: { cellWidth: 'auto', halign: 'center' },
-            5: { cellWidth: 'auto', halign: 'center' },
-            6: { cellWidth: 'auto', halign: 'center' }
-          },
-          margin: { left: 20, right: 20 },
-          tableWidth: 'auto',
-          showHead: 'everyPage',
-          pageBreak: 'auto',
-          didDrawPage: function (data) {
-            // Add page numbers
-            const pageCount = doc.internal.getNumberOfPages();
-            const currentPage = doc.internal.getCurrentPageInfo().pageNumber;
-            doc.setFontSize(8);
-            doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
-          }
-        });
-
         // Overall Summary Statistics - auto-fit table layout
         const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
 
@@ -2952,40 +2890,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </div>
                   )}
 
-                  {/* Municipality Performance */}
-                  {previewData.municipalityPerformance.length > 0 && (
-                    <div className="mb-8">
-                      <h2 className="text-lg font-bold text-gray-900 mb-4">Municipality Performance</h2>
-                      <div className="overflow-x-auto">
-                        <table className="w-full border-collapse border border-gray-300">
-                          <thead>
-                            <tr className="bg-green-50">
-                              <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">Municipality</th>
-                              <th className="border border-gray-300 px-4 py-2 text-left font-semibold text-gray-900">District</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Required Barangays</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Total Patrols</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active Days</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Inactive Days</th>
-                              <th className="border border-gray-300 px-4 py-2 text-center font-semibold text-gray-900">Active %</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {previewData.municipalityPerformance.map((municipality, index) => (
-                              <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                                <td className="border border-gray-300 px-4 py-2 font-medium text-gray-900">{municipality.municipality}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-gray-700">{municipality.district}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center text-blue-600 font-semibold">{municipality.requiredBarangays}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center text-gray-700">{municipality.totalPatrols.toLocaleString()}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center text-green-600 font-semibold">{municipality.activeDays}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center text-red-600 font-semibold">{municipality.inactiveDays}</td>
-                                <td className="border border-gray-300 px-4 py-2 text-center text-purple-600 font-semibold">{municipality.activePercentage}%</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+
 
                   {/* Overall Summary Statistics */}
                   <div className="border-t border-gray-200 pt-6">
