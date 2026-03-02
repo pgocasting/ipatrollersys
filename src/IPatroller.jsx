@@ -2413,6 +2413,33 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </button>
                   </div>
 
+                  {/* Month/Year Filter for Daily Counts */}
+                  {activeTab === "daily" && (
+                    <div className="flex items-center gap-2">
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      >
+                        {[
+                          "January", "February", "March", "April", "May", "June",
+                          "July", "August", "September", "October", "November", "December"
+                        ].map((m, idx) => (
+                          <option key={idx} value={idx}>{m}</option>
+                        ))}
+                      </select>
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                        className="px-3 py-1.5 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                      >
+                        {Array.from({ length: YEAR_OPTIONS_END - YEAR_OPTIONS_START + 1 }, (_, i) => YEAR_OPTIONS_START + i).map((year) => (
+                          <option key={year} value={year}>{year}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                     <BarChart3 className="w-4 h-4 text-blue-700" />
                     <span className="text-xs font-medium text-blue-800 whitespace-nowrap">Required Counts per Daily:</span>

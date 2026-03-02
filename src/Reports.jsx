@@ -85,6 +85,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Action Center Summary modal state
   const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
   const [actionItems, setActionItems] = useState([]);
+  const [showActionCenterGenerateModal, setShowActionCenterGenerateModal] = useState(false);
+  const [isGeneratingActionCenterRangeReport, setIsGeneratingActionCenterRangeReport] = useState(false);
   
   // IPatroller Daily Summary modal state
   const [showIPatrollerDailySummary, setShowIPatrollerDailySummary] = useState(false);
@@ -1832,6 +1834,226 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
     
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+  };
+
+  const generateActionCenterReportJanFebByDepartment = async (department) => {
+    setIsGeneratingActionCenterRangeReport(true);
+    try {
+      const normalizedDept = department === 'PG-ENRO' ? 'pg-enro' : department.toLowerCase();
+
+      const paperConfig = getPaperConfig(paperSize);
+      const doc = new jsPDF('p', 'mm', paperConfig.format);
+
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const centerX = pageWidth / 2;
+
+      const usableWidth = pageWidth - (paperConfig.margin * 2);
+      const baseColumnWidths = [16, 18, 18, 36, 16, 36, 44];
+      const baseTotalWidth = baseColumnWidths.reduce((sum, w) => sum + w, 0);
+      const scale = baseTotalWidth > 0 ? Math.min(1, usableWidth / baseTotalWidth) : 1;
+      let scaledWidths = baseColumnWidths.map(w => Math.max(12, Math.floor(w * scale * 10) / 10));
+
+      // If mins still overflow (portrait is narrow), shrink flexible columns further.
+      const sumWidths = () => scaledWidths.reduce((sum, w) => sum + w, 0);
+      if (sumWidths() > usableWidth) {
+        const overflow = sumWidths() - usableWidth;
+        const flexibleIdx = [3, 5, 6];
+        const flexibleTotal = flexibleIdx.reduce((sum, i) => sum + scaledWidths[i], 0);
+        flexibleIdx.forEach(i => {
+          const share = flexibleTotal > 0 ? (scaledWidths[i] / flexibleTotal) : (1 / flexibleIdx.length);
+          const reduceBy = overflow * share;
+          scaledWidths[i] = Math.max(24, Math.floor((scaledWidths[i] - reduceBy) * 10) / 10);
+        });
+      }
+
+      const firstSixWidth = scaledWidths.slice(0, 6).reduce((sum, w) => sum + w, 0);
+      scaledWidths[6] = Math.max(30, Math.floor((usableWidth - firstSixWidth) * 10) / 10);
+
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('Action Center Report', centerX, 18, { align: 'center' });
+
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`${department} | January - February ${selectedYear}`, centerX, 26, { align: 'center' });
+
+      let filteredActions = actionItems.length > 0 ? actionItems : (actionReports || []);
+
+      const janActions = filteredActions.filter(action => {
+        const dept = (action.department || '').toLowerCase();
+        if (dept !== normalizedDept) return false;
+
+        if (selectedDistrict !== 'all') {
+          if ((action.district || '') !== selectedDistrict) return false;
+        }
+
+        const actionDate = action.when ? new Date(action.when) : null;
+        if (!actionDate || isNaN(actionDate.getTime())) return false;
+
+        const isSameYear = actionDate.getFullYear() === Number(selectedYear);
+        return isSameYear && actionDate.getMonth() === 0;
+      });
+
+      const febActions = filteredActions.filter(action => {
+        const dept = (action.department || '').toLowerCase();
+        if (dept !== normalizedDept) return false;
+
+        if (selectedDistrict !== 'all') {
+          if ((action.district || '') !== selectedDistrict) return false;
+        }
+
+        const actionDate = action.when ? new Date(action.when) : null;
+        if (!actionDate || isNaN(actionDate.getTime())) return false;
+
+        const isSameYear = actionDate.getFullYear() === Number(selectedYear);
+        return isSameYear && actionDate.getMonth() === 1;
+      });
+
+      const getComparableDate = (value) => {
+        const d = value ? new Date(value) : null;
+        return d && !isNaN(d.getTime()) ? d.getTime() : null;
+      };
+
+      const sortActions = (actions) => {
+        return [...actions].sort((a, b) => {
+          const aTime = getComparableDate(a?.when);
+          const bTime = getComparableDate(b?.when);
+          if (aTime !== null && bTime !== null && aTime !== bTime) return aTime - bTime;
+          if (aTime !== null && bTime === null) return -1;
+          if (aTime === null && bTime !== null) return 1;
+
+          const aMun = (a?.municipality || '').toString().toLowerCase();
+          const bMun = (b?.municipality || '').toString().toLowerCase();
+          if (aMun < bMun) return -1;
+          if (aMun > bMun) return 1;
+          return 0;
+        });
+      };
+
+      const sortedJanActions = sortActions(janActions);
+      const sortedFebActions = sortActions(febActions);
+
+      const infoY = 40;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, infoY);
+      doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, infoY + 6);
+
+      const startY = infoY + 16;
+
+      const drawMonthSection = (title, actions, y) => {
+        doc.setFontSize(11);
+        doc.setFont('helvetica', 'bold');
+        doc.text(title, paperConfig.margin, y);
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(`Total Records: ${actions.length}`, paperConfig.margin, y + 6);
+
+        autoTable(doc, {
+        head: [[
+          'Dept',
+          'Mun',
+          'Dist',
+          'What',
+          'Date',
+          'Where',
+          'Action'
+        ]],
+        body: actions.map(a => {
+          const whenValue = a.when ? new Date(a.when) : null;
+          const whenText = whenValue && !isNaN(whenValue.getTime())
+            ? whenValue.toLocaleDateString()
+            : '';
+          const deptText = (() => {
+            const d = (a.department || '').toLowerCase();
+            if (d === 'agriculture') return 'AGRI';
+            if (d === 'pg-enro') return 'PG-ENRO';
+            if (d === 'pnp') return 'PNP';
+            return (a.department || '').toUpperCase();
+          })();
+          return [
+            deptText,
+            a.municipality || '',
+            a.district || '',
+            a.what || '',
+            whenText,
+            a.where || '',
+            a.actionTaken || ''
+          ];
+        }),
+        startY: y + 10,
+        styles: {
+          fontSize: 8,
+          cellPadding: 1.5,
+          overflow: 'linebreak',
+          valign: 'top',
+          halign: 'left',
+          textColor: [0, 0, 0],
+          lineColor: [0, 0, 0],
+          lineWidth: 0.1
+        },
+        headStyles: {
+          fillColor: [230, 230, 230],
+          fontStyle: 'bold',
+          textColor: [0, 0, 0],
+          fontSize: 9,
+          halign: 'center',
+          valign: 'middle',
+          lineColor: [0, 0, 0],
+          lineWidth: 0.2,
+          overflow: 'visible',
+          cellPadding: 2,
+          minCellHeight: 8
+        },
+        theme: 'grid',
+        tableLineColor: [0, 0, 0],
+        tableLineWidth: 0.2,
+        columnStyles: {
+          0: { halign: 'center', cellWidth: scaledWidths[0] },
+          1: { cellWidth: scaledWidths[1] },
+          2: { halign: 'center', cellWidth: scaledWidths[2] },
+          3: { cellWidth: scaledWidths[3] },
+          4: { halign: 'center', cellWidth: scaledWidths[4] },
+          5: { cellWidth: scaledWidths[5] },
+          6: { cellWidth: scaledWidths[6] }
+        },
+        margin: { left: paperConfig.margin, right: paperConfig.margin },
+        showHead: 'everyPage',
+        tableWidth: 'wrap',
+        rowPageBreak: 'avoid',
+        didParseCell: (data) => {
+          if (data.section === 'head') return;
+          if (data.column.index === 4) {
+            data.cell.styles.halign = 'center';
+          }
+        },
+        pageBreak: 'auto'
+        });
+
+        return doc.lastAutoTable?.finalY || (y + 25);
+      };
+
+      let nextY = startY;
+      nextY = drawMonthSection(`January ${selectedYear}`, sortedJanActions, nextY);
+
+      if (sortedFebActions.length > 0) {
+        const pageHeight = doc.internal.pageSize.getHeight();
+        const remaining = pageHeight - nextY;
+        if (remaining < 60) {
+          doc.addPage();
+          nextY = paperConfig.margin;
+        } else {
+          nextY += 12;
+        }
+        drawMonthSection(`February ${selectedYear}`, sortedFebActions, nextY);
+      }
+
+      const filename = `action-center-${normalizedDept}-jan-feb-${selectedYear}-${paperSize}.pdf`;
+      doc.save(filename);
+    } finally {
+      setIsGeneratingActionCenterRangeReport(false);
+    }
   };
 
   // Incidents Report (matching Incidents Reports data structure) - Compact Single Page
@@ -3898,7 +4120,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           actions: [
             {
               name: "Generate Report",
-              action: generateActionCenterReport,
+              action: () => setShowActionCenterGenerateModal(true),
               format: "PDF",
               priority: "high"
             },
@@ -4606,6 +4828,70 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 >
                   Close
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showActionCenterGenerateModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
+                  <p className="text-sm text-gray-500">Choose a department (January - February)</p>
+                </div>
+                <button
+                  onClick={() => setShowActionCenterGenerateModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  disabled={isGeneratingActionCenterRangeReport}
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-3">
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'AGRICULTURE'}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('PG-ENRO');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PG-ENRO'}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('PNP');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PNP'}
+                </Button>
+
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowActionCenterGenerateModal(false)}
+                    disabled={isGeneratingActionCenterRangeReport}
+                    className="w-full"
+                  >
+                    Cancel
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
