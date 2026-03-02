@@ -1941,15 +1941,26 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const periodText = `Report Period: ${new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}`;
       const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
       
+      // Calculate data completeness
+      const totalDaysInMonth = selectedDates.length;
+      const totalPossibleDays = patrolData.length * totalDaysInMonth;
+      const daysWithData = patrolData.reduce((acc, municipality) => {
+        return acc + municipality.data.filter(day => day !== null && day !== undefined && day !== '').length;
+      }, 0);
+      const dataCompleteness = totalPossibleDays > 0 ? Math.round((daysWithData / totalPossibleDays) * 100) : 0;
+      const completenessText = `Data Completeness: ${dataCompleteness}% (${daysWithData} of ${totalPossibleDays} possible days)`;
+      
       const generatedWidth = doc.getTextWidth(generatedText);
       const monthWidth = doc.getTextWidth(monthText);
       const periodWidth = doc.getTextWidth(periodText);
       const dataSourceWidth = doc.getTextWidth(dataSourceText);
+      const completenessWidth = doc.getTextWidth(completenessText);
       
       doc.text(generatedText, (pageWidth - generatedWidth) / 2, 30);
       doc.text(monthText, (pageWidth - monthWidth) / 2, 36);
       doc.text(periodText, (pageWidth - periodWidth) / 2, 42);
       doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 48);
+      doc.text(completenessText, (pageWidth - completenessWidth) / 2, 54);
       
       // District Summary Table - matching preview format
       if (Object.keys(groupedData).length > 0) {
