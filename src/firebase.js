@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, setPersistence, browserSessionPersistence } from 'firebase/auth';
-import { getFirestore, initializeFirestore } from 'firebase/firestore';
+import { getFirestore, initializeFirestore, memoryLocalCache } from 'firebase/firestore';
 
 // Your Firebase configuration
 const firebaseConfig = {
@@ -24,10 +24,10 @@ setPersistence(auth, browserSessionPersistence).catch((error) => {
   console.warn('Failed to set default session persistence:', error);
 });
 
-// Initialize Cloud Firestore with settings to prevent connection issues
+// Initialize Cloud Firestore using WebSocket (fastest) transport + in-memory cache
+// NOTE: experimentalForceLongPolling was removed — long-polling is ~3-5x slower than WebSockets
 export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-  useFetchStreams: false
+  localCache: memoryLocalCache()
 });
 
 export default app;

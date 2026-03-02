@@ -16,8 +16,8 @@ import { logReportAccess } from './utils/adminLogger';
 import { useAuth } from './contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { 
-  Shield, 
+import {
+  Shield,
   AlertTriangle,
   Filter,
   Target,
@@ -48,15 +48,20 @@ import {
   Eye
 } from "lucide-react";
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 export default function Reports({ onLogout, onNavigate, currentPage }) {
-  const { 
-    actionReports, 
-    incidents, 
-    ipatrollerData, 
-    summaryStats, 
-    loading: dataLoading 
+  const {
+    actionReports,
+    incidents,
+    ipatrollerData,
+    summaryStats,
+    loading: dataLoading
   } = useData();
-  
+
   const { user, getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
 
@@ -65,7 +70,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [toMonth, setToMonth] = useState(new Date().getMonth());
   const [toYear, setToYear] = useState(new Date().getFullYear());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
-  
+
   // Backward compatibility: use fromMonth/fromYear as selectedMonth/selectedYear for existing code
   const selectedMonth = fromMonth;
   const selectedYear = fromYear;
@@ -74,20 +79,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [showSummaryModal, setShowSummaryModal] = useState(false);
   const [filterStatus, setFilterStatus] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Command Center Summary modal state
   const [showCommandCenterSummary, setShowCommandCenterSummary] = useState(false);
   const [summaryViewType, setSummaryViewType] = useState("monthly"); // "monthly" or "quarterly"
   const [commandCenterData, setCommandCenterData] = useState({});
   const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
   const [isGeneratingCommandCenterReport, setIsGeneratingCommandCenterReport] = useState(false);
-  
+
   // Action Center Summary modal state
   const [showActionCenterSummary, setShowActionCenterSummary] = useState(false);
   const [actionItems, setActionItems] = useState([]);
   const [showActionCenterGenerateModal, setShowActionCenterGenerateModal] = useState(false);
   const [isGeneratingActionCenterRangeReport, setIsGeneratingActionCenterRangeReport] = useState(false);
-  
+
   // IPatroller Daily Summary modal state
   const [showIPatrollerDailySummary, setShowIPatrollerDailySummary] = useState(false);
   const [ipatrollerSelectedDayIndex, setIpatrollerSelectedDayIndex] = useState(() => {
@@ -97,7 +102,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [ipatrollerPatrolData, setIpatrollerPatrolData] = useState([]);
   const [ipatrollerSelectedMonth, setIpatrollerSelectedMonth] = useState(new Date().getMonth());
   const [ipatrollerSelectedYear, setIpatrollerSelectedYear] = useState(new Date().getFullYear());
-  
+
   // IPatroller Preview Report modal state
   const [showIPatrollerPreview, setShowIPatrollerPreview] = useState(false);
   const [ipatrollerPreviewData, setIpatrollerPreviewData] = useState(null);
@@ -126,48 +131,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const loadCommandCenterData = async () => {
     setIsLoadingCommandCenter(true);
     try {
-      // Convert month number to month name to match CommandCenter storage format
-      const monthName = months[selectedMonth]; // e.g., "September"
+      const monthName = months[selectedMonth];
       const monthYear = `${monthName}_${selectedYear}`;
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
-      const commandCenterReports = {};
-      
-      console.log('🔍 Loading Command Center data for:', monthYear);
-      console.log('📍 Municipalities to load:', allMunicipalities);
-      
-      // Load data for each municipality using the nested structure
-      for (const municipality of allMunicipalities) {
-        try {
-          // Use the nested structure: commandCenter/weeklyReports/<Municipality>/<Month_Year>
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
-            const municipalityData = docSnap.data();
-            console.log(`✅ Found data for ${municipality}:`, municipalityData);
-            commandCenterReports[municipality] = municipalityData;
-          } else {
-            console.log(`📝 No data found for ${municipality} in ${monthYear}`);
+
+      // OPTIMIZED: Load all municipalities in PARALLEL + barangays/concern types simultaneously
+      const [municipalityResults, barangaysResult, concernTypesResult] = await Promise.all([
+        Promise.all(allMunicipalities.map(async (municipality) => {
+          try {
+            const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+              return { municipality, data: docSnap.data() };
+            }
+            return null;
+          } catch (error) {
+            return null;
           }
-        } catch (error) {
-          console.error(`❌ Error loading data for ${municipality}:`, error);
-        }
-      }
-      
-      // Load barangays and concern types
-      const barangaysResult = await getBarangays();
-      const concernTypesResult = await getConcernTypes();
-      
-      console.log('📊 Command Center reports loaded:', Object.keys(commandCenterReports));
-      console.log('🏘️ Barangays loaded:', barangaysResult.success ? barangaysResult.data.length : 0);
-      console.log('🏷️ Concern types loaded:', concernTypesResult.success ? concernTypesResult.data.length : 0);
-      
+        })),
+        getBarangays(),
+        getConcernTypes()
+      ]);
+
+      const commandCenterReports = {};
+      municipalityResults.forEach(result => {
+        if (result) commandCenterReports[result.municipality] = result.data;
+      });
+
       setCommandCenterData({
         reports: commandCenterReports,
         barangays: barangaysResult.success ? barangaysResult.data : [],
         concernTypes: concernTypesResult.success ? concernTypesResult.data : []
       });
-      
+
     } catch (error) {
       console.error('Error loading Command Center data:', error);
     } finally {
@@ -197,31 +193,31 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Translation and grammar correction function (from Action Center)
   const translateAndCorrectGrammar = (text) => {
     if (!text || typeof text !== 'string') return text;
-    
+
     // Common Filipino to English translations for law enforcement actions
     const translations = {
       // Arrest related
       'nahuli': 'arrested',
-      'naaresto': 'arrested', 
+      'naaresto': 'arrested',
       'nakuha': 'arrested',
       'dinakip': 'arrested',
       'nasakote': 'arrested',
       'nakulong': 'arrested',
       'kinuha': 'arrested',
-      
+
       // Investigation related
       'iniimbestigahan': 'under investigation',
       'sinisiyasat': 'under investigation',
       'tinitingnan': 'under investigation',
       'pinag-aaralan': 'under investigation',
-      
+
       // Pending related
       'naghihintay': 'pending',
       'pending pa': 'pending',
       'hindi pa tapos': 'pending',
       'patuloy': 'ongoing',
       'tuloy-tuloy': 'ongoing',
-      
+
       // Resolved related
       'tapos na': 'resolved',
       'natapos': 'resolved',
@@ -229,7 +225,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       'naresolba': 'resolved',
       'nakasuhan': 'filed charges',
       'nasampa': 'filed charges',
-      
+
       // Common words
       'ang': 'the',
       'sa': 'in',
@@ -246,15 +242,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       'ngayon': 'today',
       'bukas': 'tomorrow'
     };
-    
+
     let result = text.toLowerCase().trim();
-    
+
     // Apply translations
     Object.entries(translations).forEach(([filipino, english]) => {
       const regex = new RegExp(`\\b${filipino}\\b`, 'gi');
       result = result.replace(regex, english);
     });
-    
+
     // Grammar corrections and improvements
     result = result
       .replace(/\s+/g, ' ') // Remove extra spaces
@@ -265,12 +261,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       .replace(/^./, (match) => match.toUpperCase()) // Capitalize first letter
       .replace(/\s+$/, '') // Remove trailing spaces
       .replace(/^\s+/, ''); // Remove leading spaces
-    
+
     // Handle common patterns
     if (result.includes('arrested')) {
       result = result.replace(/arrested.*/, 'Arrested');
     }
-    
+
     return result || text; // Return original if translation fails
   };
 
@@ -283,13 +279,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
     try {
       console.log('🚀 COMPREHENSIVE ACTION DATA FETCH STARTED');
-      
+
       const allActionData = [];
-      
+
       // List of possible collection names where action data might be stored
       const possibleCollections = [
         'actionReports',
-        'actionCenter', 
+        'actionCenter',
         'actions',
         'reports',
         'actionData',
@@ -298,23 +294,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         'agricultureActions',
         'pgEnroActions'
       ];
-      
+
       console.log('📋 Checking collections:', possibleCollections);
-      
+
       // Check each possible collection
       for (const collectionName of possibleCollections) {
         try {
           console.log(`\n🔍 Checking collection: ${collectionName}`);
           const collectionRef = collection(db, collectionName);
           const snapshot = await getDocs(collectionRef);
-          
+
           console.log(`📊 ${collectionName}: ${snapshot.size} documents found`);
-          
+
           if (snapshot.size > 0) {
             snapshot.forEach((doc) => {
               const data = doc.data();
               console.log(`📄 ${collectionName}/${doc.id}:`, Object.keys(data));
-              
+
               // Handle different data structures
               if (data.data && Array.isArray(data.data)) {
                 // Month-based structure with data array
@@ -369,12 +365,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           console.log(`⚠️ Collection ${collectionName} not accessible:`, collectionError.message);
         }
       }
-      
+
       console.log(`\n✅ TOTAL RAW DATA COLLECTED: ${allActionData.length} items`);
-      
+
       if (allActionData.length > 0) {
         console.log('📄 Sample raw data:', allActionData.slice(0, 3));
-        
+
         // Transform and standardize all collected data
         const transformedData = allActionData
           .map((item, index) => {
@@ -397,7 +393,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             } else if (item.createdAt) {
               dateValue = new Date(item.createdAt);
             }
-            
+
             return {
               id: item.id || `action_${index}_${Date.now()}`,
               department: item.department || item.dept || item.agency || null,
@@ -418,27 +414,27 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           })
           .filter(item => {
             // Filter out entries with missing critical information
-            const hasValidDepartment = item.department && 
-              item.department.toLowerCase() !== 'unknown' && 
+            const hasValidDepartment = item.department &&
+              item.department.toLowerCase() !== 'unknown' &&
               item.department.trim() !== '';
-            
-            const hasValidMunicipality = item.municipality && 
-              item.municipality.toLowerCase() !== 'unknown' && 
+
+            const hasValidMunicipality = item.municipality &&
+              item.municipality.toLowerCase() !== 'unknown' &&
               item.municipality.trim() !== '';
-            
-            const hasValidDistrict = item.district && 
-              item.district.toLowerCase() !== 'unknown' && 
+
+            const hasValidDistrict = item.district &&
+              item.district.toLowerCase() !== 'unknown' &&
               item.district.trim() !== '';
-            
-            const hasValidWhat = item.what && 
-              item.what.toLowerCase() !== 'no description' && 
+
+            const hasValidWhat = item.what &&
+              item.what.toLowerCase() !== 'no description' &&
               item.what.trim() !== '';
-            
-            const hasValidWhere = item.where && 
-              item.where.toLowerCase() !== 'unknown location' && 
-              item.where.toLowerCase() !== 'unknown' && 
+
+            const hasValidWhere = item.where &&
+              item.where.toLowerCase() !== 'unknown location' &&
+              item.where.toLowerCase() !== 'unknown' &&
               item.where.trim() !== '';
-            
+
             // Only include entries that have valid data for critical fields
             return hasValidDepartment && hasValidMunicipality && hasValidDistrict && hasValidWhat && hasValidWhere;
           })
@@ -453,20 +449,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               where: item.where || 'Location not specified'
             };
           });
-        
+
         // Sort by date (newest first)
         transformedData.sort((a, b) => new Date(b.when) - new Date(a.when));
-        
+
         console.log('✅ DATA TRANSFORMATION COMPLETED');
         console.log(`📊 Final dataset: ${transformedData.length} action reports (unknown entries filtered out)`);
         console.log('📄 Sample transformed data:', transformedData.slice(0, 2));
-        
+
         setActionItems(transformedData);
       } else {
         console.log('⚠️ NO ACTION DATA FOUND IN ANY COLLECTION');
         setActionItems([]);
       }
-      
+
     } catch (error) {
       console.error('❌ COMPREHENSIVE FETCH ERROR:', error);
       setActionItems([]);
@@ -481,7 +477,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   }, [fetchAllActionData]);
 
   // IPatroller Daily Summary functions (moved from IPatroller.jsx)
-  
+
   // Generate dates for selected month and year
   const generateDates = (month, year) => {
     const dates = [];
@@ -510,18 +506,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Calculate daily summary data for a specific day
   const getDailySummaryData = (dayIndex) => {
     const summaryData = {};
-    
+
     Object.keys(municipalitiesByDistrict).forEach(district => {
       summaryData[district] = municipalitiesByDistrict[district].map(municipality => {
         const municipalityData = ipatrollerPatrolData.find(item => item.municipality === municipality);
         const dailyCount = municipalityData ? municipalityData.data[dayIndex] || 0 : 0;
-        
+
         // Use fixed daily target instead of barangay counts
         const totalTarget = 14;
         const isActive = dailyCount >= totalTarget; // kept for backward compatibility
         // Determine tri-state status
         const status = dailyCount >= 14 ? 'Active' : (dailyCount === 13 ? 'Warning' : 'Inactive');
-        
+
         // Calculate percentage based on requested bands
         // - 12 and below: 0–74%
         // - exactly 13: 75–85% (use midpoint 80%)
@@ -535,7 +531,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           // 14 and above
           percentage = Math.min(100, 86 + (dailyCount - 14));
         }
-        
+
         return {
           municipality,
           dailyCount,
@@ -620,7 +616,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const months = [];
     let currentMonth = fromMonth;
     let currentYear = fromYear;
-    
+
     while (currentYear < toYear || (currentYear === toYear && currentMonth <= toMonth)) {
       months.push({ month: currentMonth, year: currentYear });
       currentMonth++;
@@ -629,7 +625,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         currentYear++;
       }
     }
-    
+
     return months;
   };
 
@@ -637,35 +633,30 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const loadIPatrollerData = useCallback(async () => {
     try {
       const monthsToLoad = getMonthsInRange(fromMonth, fromYear, toMonth, toYear);
-      const allFirestoreData = [];
-      
-      // Load data for each month in the range
-      for (const { month, year } of monthsToLoad) {
-        const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
-        
-        try {
-          const monthDocRef = doc(db, 'patrolData', monthYearId);
-          const municipalitiesRef = collection(monthDocRef, 'municipalities');
-          const querySnapshot = await getDocs(municipalitiesRef);
-          
-          querySnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data) {
-              allFirestoreData.push({
-                id: doc.id,
-                month: month,
-                year: year,
-                monthYearId: monthYearId,
-                ...data
-              });
-            }
-          });
-        } catch (monthError) {
-          console.warn(`No data found for ${monthYearId}:`, monthError);
-        }
-      }
 
-      setIpatrollerPatrolData(allFirestoreData);
+      // OPTIMIZED: Load all months in PARALLEL
+      const monthResults = await Promise.all(
+        monthsToLoad.map(async ({ month, year }) => {
+          const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+          try {
+            const monthDocRef = doc(db, 'patrolData', monthYearId);
+            const municipalitiesRef = collection(monthDocRef, 'municipalities');
+            const querySnapshot = await getDocs(municipalitiesRef);
+            const monthData = [];
+            querySnapshot.forEach((d) => {
+              const data = d.data();
+              if (data) {
+                monthData.push({ id: d.id, month, year, monthYearId, ...data });
+              }
+            });
+            return monthData;
+          } catch {
+            return [];
+          }
+        })
+      );
+
+      setIpatrollerPatrolData(monthResults.flat());
     } catch (error) {
       console.error('Error loading IPatroller data:', error);
       setIpatrollerPatrolData([]);
@@ -745,7 +736,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }, { activeDays: 0, inactiveDays: 0 });
 
     const totalPatrols = ipatrollerPatrolData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0);
-    const avgActivePercentage = (activeDays + inactiveDays) > 0 
+    const avgActivePercentage = (activeDays + inactiveDays) > 0
       ? Math.round((activeDays / (activeDays + inactiveDays)) * 100)
       : 0;
 
@@ -778,9 +769,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const avgActivePercentage =
       districtData.length > 0
         ? Math.round(
-            districtData.reduce((sum, item) => sum + (item.activePercentage || 0), 0) /
-              districtData.length,
-          )
+          districtData.reduce((sum, item) => sum + (item.activePercentage || 0), 0) /
+          districtData.length,
+        )
         : 0;
     return {
       totalPatrols,
@@ -794,7 +785,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Generate preview data for the report (supports multi-month)
   const generateIPatrollerPreviewData = () => {
     const overallSummary = calculateIPatrollerOverallSummary();
-    
+
     // Group data by municipality and aggregate across months
     const municipalityAggregates = {};
     ipatrollerPatrolData.forEach(item => {
@@ -818,7 +809,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     // Convert to array and calculate percentages
     const aggregatedData = Object.values(municipalityAggregates).map(item => ({
       ...item,
-      activePercentage: (item.activeDays + item.inactiveDays) > 0 
+      activePercentage: (item.activeDays + item.inactiveDays) > 0
         ? Math.round((item.activeDays / (item.activeDays + item.inactiveDays)) * 100)
         : 0
     }));
@@ -844,7 +835,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       : `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`;
 
     const previewData = {
-      title: fromMonth === toMonth && fromYear === toYear 
+      title: fromMonth === toMonth && fromYear === toYear
         ? "I-Patroller Monthly Summary Report"
         : "I-Patroller Multi-Month Summary Report",
       generatedDate: new Date().toLocaleDateString(),
@@ -863,7 +854,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         const avgActivePercentage = (totalActive + totalInactive) > 0
           ? Math.round((totalActive / (totalActive + totalInactive)) * 100)
           : 0;
-        
+
         return {
           district,
           municipalityCount: districtMunicipalities.length,
@@ -881,7 +872,34 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         activeDays: item.activeDays,
         inactiveDays: item.inactiveDays,
         activePercentage: item.activePercentage
-      }))
+      })),
+      monthlyBreakdown: monthsInRange.map(({ month, year }) => {
+        const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
+        const monthData = ipatrollerPatrolData.filter(item => item.monthYearId === monthYearId);
+        const monthTotalPatrols = monthData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0);
+        const monthActiveDays = monthData.reduce((sum, item) => sum + (item.activeDays || 0), 0);
+        const monthInactiveDays = monthData.reduce((sum, item) => sum + (item.inactiveDays || 0), 0);
+        const monthActivePercentage = (monthActiveDays + monthInactiveDays) > 0
+          ? Math.round((monthActiveDays / (monthActiveDays + monthInactiveDays)) * 100)
+          : 0;
+        return {
+          label: `${months[month]} ${year}`,
+          municipalities: monthData.map(item => ({
+            municipality: item.municipality,
+            district: item.district,
+            totalPatrols: item.totalPatrols || 0,
+            activeDays: item.activeDays || 0,
+            inactiveDays: item.inactiveDays || 0,
+            activePercentage: item.activePercentage || 0
+          })),
+          totals: {
+            totalPatrols: monthTotalPatrols,
+            activeDays: monthActiveDays,
+            inactiveDays: monthInactiveDays,
+            activePercentage: monthActivePercentage
+          }
+        };
+      })
     };
 
     setIpatrollerPreviewData(previewData);
@@ -891,11 +909,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Generate Monthly/Multi-Month Summary Report (supports date ranges)
   const generateIPatrollerMonthlySummaryReport = () => {
     setIsGeneratingIPatrollerReport(true);
-    
+
     try {
       const doc = new jsPDF('p', 'mm', 'a4');
       const overallSummary = calculateIPatrollerOverallSummary();
-      
+
       // Aggregate data by municipality across all months
       const municipalityAggregates = {};
       ipatrollerPatrolData.forEach(item => {
@@ -917,7 +935,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       // Convert to array and calculate percentages
       const aggregatedData = Object.values(municipalityAggregates).map(item => ({
         ...item,
-        activePercentage: (item.activeDays + item.inactiveDays) > 0 
+        activePercentage: (item.activeDays + item.inactiveDays) > 0
           ? Math.round((item.activeDays / (item.activeDays + item.inactiveDays)) * 100)
           : 0
       }));
@@ -930,44 +948,44 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         acc[item.district].push(item);
         return acc;
       }, {});
-      
+
       // Determine report title and period
       const isMultiMonth = fromMonth !== toMonth || fromYear !== toYear;
       const reportTitle = isMultiMonth ? 'I-Patroller Multi-Month Summary Report' : 'I-Patroller Monthly Summary Report';
       const reportPeriod = isMultiMonth
         ? `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`
         : `${months[fromMonth]} ${fromYear}`;
-      
+
       // Header - Centered with tighter top spacing
       doc.setFontSize(20);
       doc.setFont('helvetica', 'bold');
       const pageWidth = doc.internal.pageSize.width;
       const titleWidth = doc.getTextWidth(reportTitle);
       doc.text(reportTitle, (pageWidth - titleWidth) / 2, 20);
-      
+
       // Report details - tighter vertical spacing
       doc.setFontSize(12);
       doc.setFont('helvetica', 'normal');
       const generatedText = `Generated: ${new Date().toLocaleDateString()}`;
       const periodText = `Report Period: ${reportPeriod}`;
       const dataSourceText = `Data Source: Based on IPatroller Daily Counts`;
-      
+
       const generatedWidth = doc.getTextWidth(generatedText);
       const periodWidth = doc.getTextWidth(periodText);
       const dataSourceWidth = doc.getTextWidth(dataSourceText);
-      
+
       doc.text(generatedText, (pageWidth - generatedWidth) / 2, 30);
       doc.text(periodText, (pageWidth - periodWidth) / 2, 36);
       doc.text(dataSourceText, (pageWidth - dataSourceWidth) / 2, 42);
-      
+
       let currentY = 50;
-      
+
       // District Summary Table - Show first
       if (Object.keys(groupedData).length > 0) {
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text(isMultiMonth ? 'Overall District Summary' : 'District Summary', 20, currentY);
-        
+
         const districtTableData = Object.keys(groupedData).map(district => {
           const districtMunicipalities = groupedData[district];
           const totalPatrols = districtMunicipalities.reduce((sum, m) => sum + m.totalPatrols, 0);
@@ -976,7 +994,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           const avgActivePercentage = (totalActive + totalInactive) > 0
             ? Math.round((totalActive / (totalActive + totalInactive)) * 100)
             : 0;
-          
+
           return [
             district,
             districtMunicipalities.length.toString(),
@@ -986,7 +1004,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             `${avgActivePercentage}%`
           ];
         });
-        
+
         autoTable(doc, {
           head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
           body: districtTableData,
@@ -1030,37 +1048,37 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
           }
         });
-        
+
         currentY = doc.lastAutoTable.finalY + 15;
       }
-      
-      // Per-Month Breakdown (only for multi-month reports)
-      if (isMultiMonth) {
+
+      // Per-Month Breakdown (always included, even for single month)
+      {
         // Add separator before monthly breakdown
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         doc.line(20, currentY, pageWidth - 20, currentY);
         currentY += 10;
-        
+
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Monthly Breakdown', 20, currentY);
         currentY += 7;
-        
+
         // Group data by month
         const monthsInRange = getMonthsInRange(fromMonth, fromYear, toMonth, toYear);
-        
+
         monthsInRange.forEach(({ month, year }) => {
           const monthYearId = `${String(month + 1).padStart(2, "0")}-${year}`;
           const monthData = ipatrollerPatrolData.filter(item => item.monthYearId === monthYearId);
-          
+
           if (monthData.length > 0) {
             // Month header
             doc.setFontSize(12);
             doc.setFont('helvetica', 'bold');
             doc.text(`${months[month]} ${year}`, 20, currentY);
             currentY += 5;
-            
+
             // Calculate month summary
             const monthTotalPatrols = monthData.reduce((sum, item) => sum + (item.totalPatrols || 0), 0);
             const monthActiveDays = monthData.reduce((sum, item) => sum + (item.activeDays || 0), 0);
@@ -1068,7 +1086,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             const monthActivePercentage = (monthActiveDays + monthInactiveDays) > 0
               ? Math.round((monthActiveDays / (monthActiveDays + monthInactiveDays)) * 100)
               : 0;
-            
+
             // Month data table
             const monthTableData = monthData.map(item => [
               item.municipality,
@@ -1078,7 +1096,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               (item.inactiveDays || 0).toString(),
               `${item.activePercentage || 0}%`
             ]);
-            
+
             // Add summary row
             monthTableData.push([
               { content: 'Month Total', colSpan: 2, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
@@ -1087,7 +1105,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               { content: monthInactiveDays.toString(), styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } },
               { content: `${monthActivePercentage}%`, styles: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
             ]);
-            
+
             autoTable(doc, {
               head: [['Municipality', 'District', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
               body: monthTableData,
@@ -1128,22 +1146,22 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
               }
             });
-            
+
             currentY = doc.lastAutoTable.finalY + 10;
           }
         });
       }
-      
+
       // Municipality Performance Table - matching preview format
       if (aggregatedData.length > 0) {
         // Add new page for Municipality Performance
         doc.addPage();
         const finalY = 30; // Minimal spacing from top
-        
+
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Municipality Performance', 20, finalY);
-        
+
         const municipalityTableData = aggregatedData.map(item => [
           item.municipality,
           item.district,
@@ -1153,7 +1171,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           item.inactiveDays.toString(),
           `${item.activePercentage}%`
         ]);
-        
+
         autoTable(doc, {
           head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
           body: municipalityTableData,
@@ -1198,34 +1216,34 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             doc.text(`Page ${currentPage} of ${pageCount}`, 20, doc.internal.pageSize.height - 10);
           }
         });
-        
+
         // Overall Summary Statistics - auto-fit table layout
         const summaryY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
-        
+
         // Separator
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         doc.line(20, summaryY, pageWidth - 20, summaryY);
-        
+
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Overall Summary Statistics', 20, summaryY + 10);
-        
+
         // Two-column key/value table that auto-fits to page width
         const summaryRows = [
           ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
           ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
           ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
         ];
-        
+
         autoTable(doc, {
           head: [['Metric', 'Value', 'Metric', 'Value']],
           body: summaryRows,
           startY: summaryY + 16,
           margin: { left: 20, right: 20 },
           tableWidth: 'auto',
-          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
-          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' },
           columnStyles: {
             0: { cellWidth: 'auto', halign: 'left' },
             1: { cellWidth: 'auto', halign: 'center' },
@@ -1233,40 +1251,40 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             3: { cellWidth: 'auto', halign: 'center' }
           }
         });
-        
+
       } else {
         // No data message
         const finalY = doc.lastAutoTable ? doc.lastAutoTable.finalY + 10 : 200;
         doc.setFontSize(12);
         doc.setFont('helvetica', 'italic');
         doc.text('No patrol data available for the selected period.', 20, finalY);
-        
+
         // Overall Summary Statistics - even when no data, show as auto-fit table
         const summaryY = finalY + 10;
-        
+
         // Separator
         doc.setDrawColor(0, 0, 0);
         doc.setLineWidth(0.5);
         doc.line(20, summaryY, pageWidth - 20, summaryY);
-        
+
         doc.setFontSize(16);
         doc.setFont('helvetica', 'bold');
         doc.text('Overall Summary Statistics', 20, summaryY + 10);
-        
+
         const summaryRowsNoData = [
           ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
           ['Total Active Days', overallSummary.totalActive.toLocaleString(), 'Total Municipalities', `${overallSummary.municipalityCount}`],
           ['Total Inactive Days', overallSummary.totalInactive.toLocaleString(), '', '']
         ];
-        
+
         autoTable(doc, {
           head: [['Metric', 'Value', 'Metric', 'Value']],
           body: summaryRowsNoData,
           startY: summaryY + 16,
           margin: { left: 20, right: 20 },
           tableWidth: 'auto',
-          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0,0,0] },
-          headStyles: { fillColor: [243, 244, 246], textColor: [0,0,0], fontStyle: 'bold' },
+          styles: { fontSize: 9, cellPadding: 3, lineWidth: 0.1, lineColor: [0, 0, 0] },
+          headStyles: { fillColor: [243, 244, 246], textColor: [0, 0, 0], fontStyle: 'bold' },
           columnStyles: {
             0: { cellWidth: 'auto', halign: 'left' },
             1: { cellWidth: 'auto', halign: 'center' },
@@ -1275,13 +1293,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           }
         });
       }
-      
+
       // Save the PDF with appropriate filename
       const filename = isMultiMonth
         ? `ipatroller-summary-${months[fromMonth]}-${fromYear}-to-${months[toMonth]}-${toYear}.pdf`
         : `ipatroller-monthly-summary-${months[fromMonth]}-${fromYear}.pdf`;
       doc.save(filename);
-      
+
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -1289,10 +1307,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
+  const months = MONTH_NAMES;
 
   const districts = ["all", "1ST DISTRICT", "2ND DISTRICT", "3RD DISTRICT"];
 
@@ -1330,7 +1345,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const getColumnWidths = (paperType, tableType) => {
     const config = getPaperConfig(paperType);
     const availableWidth = config.width - (config.margin * 2);
-    
+
     switch (tableType) {
       case 'ipatroller':
         if (paperType === 'long') {
@@ -1396,12 +1411,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Helper function to calculate patrol statistics (matching I-Patroller logic exactly)
   const calculatePatrolStats = (data) => {
     if (!data || !Array.isArray(data)) return { activeDays: 0, inactiveDays: 0, totalPatrols: 0 };
-    
+
     // Match I-Patroller logic: active if >= 5 patrols, inactive if < 5 but > 0
     let activeDays = 0;
     let inactiveDays = 0;
     let totalPatrols = 0;
-    
+
     data.forEach((patrols) => {
       if (patrols !== null && patrols !== undefined && patrols !== '') {
         totalPatrols += patrols;
@@ -1412,7 +1427,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         }
       }
     });
-    
+
     return { activeDays, inactiveDays, totalPatrols };
   };
 
@@ -1443,7 +1458,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }, { activeDays: 0, inactiveDays: 0 });
 
     const totalPatrols = ipatrollerData.reduce((sum, item) => sum + item.totalPatrols, 0);
-    const avgActivePercentage = (activeDays + inactiveDays) > 0 
+    const avgActivePercentage = (activeDays + inactiveDays) > 0
       ? Math.round((activeDays / (activeDays + inactiveDays)) * 100)
       : 0;
 
@@ -1460,34 +1475,34 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const generateIPatrollerSummaryReport = () => {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
-    
+
     // Calculate center position
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
-    
+
     // Main title - centered and bold
     doc.setFontSize(18);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(0, 0, 0);
     doc.text('I-Patroller Monthly Summary Report', centerX, 25, { align: 'center' });
-    
+
     // Report details - centered
     const isMultiMonth = fromMonth !== toMonth || fromYear !== toYear;
     const reportPeriod = isMultiMonth
       ? `${months[fromMonth]} ${fromYear} - ${months[toMonth]} ${toYear}`
       : `${months[fromMonth]} ${fromYear}`;
-    
+
     doc.setFontSize(12);
     doc.setFont('helvetica', 'normal');
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, centerX, 35, { align: 'center' });
     doc.text(`Report Period: ${reportPeriod}`, centerX, 42, { align: 'center' });
     doc.text('Data Source: Based on IPatroller Daily Counts', centerX, 49, { align: 'center' });
-    
+
     // District Summary Section
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('District Summary', 20, 75);
-    
+
     // Calculate district summary data
     const districtSummaryData = [];
     Object.keys(municipalitiesByDistrict).forEach(district => {
@@ -1495,7 +1510,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       let totalPatrols = 0;
       let activeDays = 0;
       let inactiveDays = 0;
-      
+
       municipalities.forEach(municipality => {
         const municipalityData = ipatrollerData?.find(item => item.municipality === municipality);
         if (municipalityData) {
@@ -1505,11 +1520,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           inactiveDays += stats.inactiveDays;
         }
       });
-      
-      const avgActivePercentage = (activeDays + inactiveDays) > 0 
-        ? Math.round((activeDays / (activeDays + inactiveDays)) * 100) 
+
+      const avgActivePercentage = (activeDays + inactiveDays) > 0
+        ? Math.round((activeDays / (activeDays + inactiveDays)) * 100)
         : 0;
-      
+
       districtSummaryData.push([
         district,
         municipalities.length.toString(),
@@ -1519,7 +1534,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         `${avgActivePercentage}%`
       ]);
     });
-    
+
     // District Summary Table
     autoTable(doc, {
       head: [['District', 'Municipalities', 'Total Patrols', 'Active Days', 'Inactive Days', 'Avg Active %']],
@@ -1553,25 +1568,25 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       },
       margin: { left: 20, right: 20 }
     });
-    
+
     // Municipality Performance Section
     const finalY = doc.lastAutoTable.finalY + 15;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Municipality Performance', 20, finalY);
-    
+
     // Calculate municipality performance data
     const municipalityData = [];
     Object.keys(municipalitiesByDistrict).forEach(district => {
       municipalitiesByDistrict[district].forEach(municipality => {
         const municipalityInfo = ipatrollerData?.find(item => item.municipality === municipality);
         const requiredBarangays = barangayCounts[municipality] || 0;
-        
+
         if (municipalityInfo) {
           const stats = calculatePatrolStats(municipalityInfo.data);
           const totalDays = stats.activeDays + stats.inactiveDays;
           const activePercentage = totalDays > 0 ? Math.round((stats.activeDays / totalDays) * 100) : 0;
-          
+
           municipalityData.push([
             municipality,
             district,
@@ -1595,7 +1610,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         }
       });
     });
-    
+
     // Municipality Performance Table
     autoTable(doc, {
       head: [['Municipality', 'District', 'Required Barangays', 'Total Patrols', 'Active Days', 'Inactive Days', 'Active %']],
@@ -1630,23 +1645,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       },
       margin: { left: 20, right: 20 }
     });
-    
+
     // Overall Summary Statistics Section
     const overallFinalY = doc.lastAutoTable.finalY + 15;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Overall Summary Statistics', 20, overallFinalY);
-    
+
     // Calculate overall statistics
     const overallSummary = calculateOverallSummary();
     const totalMunicipalities = Object.values(municipalitiesByDistrict).flat().length;
-    
+
     const overallStatsData = [
       ['Total Patrols', overallSummary.totalPatrols.toLocaleString(), 'Average Active Percentage', `${overallSummary.avgActivePercentage}%`],
       ['Total Active Days', overallSummary.totalActive.toString(), 'Total Municipalities', totalMunicipalities.toString()],
       ['Total Inactive Days', overallSummary.totalInactive.toString(), '', '']
     ];
-    
+
     // Overall Summary Statistics Table
     autoTable(doc, {
       body: overallStatsData,
@@ -1668,7 +1683,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       margin: { left: 20, right: 20 },
       showHead: false
     });
-    
+
     // Page footer
     const pageCount = doc.internal.getNumberOfPages();
     for (let i = 1; i <= pageCount; i++) {
@@ -1677,7 +1692,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'normal');
       doc.text(`Page ${i} of ${pageCount}`, centerX, doc.internal.pageSize.height - 10, { align: 'center' });
     }
-    
+
     // Save with appropriate filename
     const filename = (fromMonth !== toMonth || fromYear !== toYear)
       ? `ipatroller-summary-${months[fromMonth]}-${fromYear}-to-${months[toMonth]}-${toYear}.pdf`
@@ -1689,36 +1704,36 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const generateActionCenterReport = () => {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
-    
+
     // Calculate center position
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
-    
+
     // Add logo/header section
     doc.setFillColor(147, 51, 234); // Purple background
     doc.rect(0, 0, pageWidth, 40, 'F');
-    
+
     // Main title - centered
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text('Action Center Report', centerX, 25, { align: 'center' });
-    
+
     // Reset text color
     doc.setTextColor(0, 0, 0);
-    
+
     // Report info section with better organization
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text('Report Information', centerX, 60, { align: 'center' });
-    
+
     // Info box
     const infoY = 70;
     doc.setFillColor(248, 250, 252);
     doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'F');
     doc.setDrawColor(147, 51, 234);
     doc.rect(paperConfig.margin, infoY - 5, pageWidth - (paperConfig.margin * 2), 40, 'S');
-    
+
     // Report details - organized in two columns
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
@@ -1726,18 +1741,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.text(`Month: ${months[selectedMonth]}`, paperConfig.margin + 10, infoY + 15);
     doc.text(`Year: ${selectedYear}`, paperConfig.margin + 10, infoY + 25);
     doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin + 10, infoY + 35);
-    
+
     // Paper size indicator - right aligned
     doc.setFontSize(8);
     doc.setFont('helvetica', 'italic');
     doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 10, infoY + 5, { align: 'right' });
-    
+
     // Filter action reports by date and district
     // Use actionItems (loaded from fetchAllActionData) instead of actionReports from DataContext
     let filteredActions = actionItems.length > 0 ? actionItems : (actionReports || []);
-    
+
     console.log('📊 Generating Action Center Report with', filteredActions.length, 'total actions');
-    
+
     if (selectedMonth !== 'all' && selectedYear !== 'all') {
       filteredActions = filteredActions.filter(action => {
         const actionDate = action.when ? new Date(action.when) : null;
@@ -1750,7 +1765,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       filteredActions = filteredActions.filter(action => action.district === selectedDistrict);
       console.log('🗺️ After district filter:', filteredActions.length, 'actions');
     }
-    
+
     // Department breakdown
     const departmentStats = {};
     filteredActions.forEach(action => {
@@ -1759,7 +1774,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         departmentStats[dept] = { count: 0, pending: 0, resolved: 0 };
       }
       departmentStats[dept].count++;
-      
+
       // Check both status and actionTaken fields (actionTaken is the actual field used)
       const status = (action.status || action.actionTaken || '').toLowerCase();
       if (status.includes('pending') || status.includes('ongoing') || status.includes('investigation')) {
@@ -1771,12 +1786,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         departmentStats[dept].pending++;
       }
     });
-    
+
     // Department Statistics section - cleaner design
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.text('Department Statistics', centerX, 120, { align: 'center' });
-    
+
     // Department breakdown table with autofit
     if (Object.keys(departmentStats).length > 0) {
       const tableData = Object.entries(departmentStats).map(([dept, stats]) => [
@@ -1786,12 +1801,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         stats.resolved.toString(),
         `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
       ]);
-      
+
       autoTable(doc, {
         head: [['Department', 'Total Reports', 'Pending', 'Resolved', 'Resolution Rate']],
         body: tableData,
         startY: 130,
-        styles: { 
+        styles: {
           fontSize: 10,
           cellPadding: 3,
           overflow: 'linebreak',
@@ -1799,7 +1814,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           lineColor: [200, 200, 200],
           lineWidth: 0.1
         },
-        headStyles: { 
+        headStyles: {
           fillColor: [147, 51, 234],
           fontStyle: 'bold',
           textColor: [255, 255, 255],
@@ -1832,7 +1847,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setTextColor(100, 100, 100);
       doc.text('No action reports available for the selected period.', centerX, 150, { align: 'center' });
     }
-    
+
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
@@ -1951,84 +1966,84 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.text(`Total Records: ${actions.length}`, paperConfig.margin, y + 6);
 
         autoTable(doc, {
-        head: [[
-          'Dept',
-          'Mun',
-          'Dist',
-          'What',
-          'Date',
-          'Where',
-          'Action'
-        ]],
-        body: actions.map(a => {
-          const whenValue = a.when ? new Date(a.when) : null;
-          const whenText = whenValue && !isNaN(whenValue.getTime())
-            ? whenValue.toLocaleDateString()
-            : '';
-          const deptText = (() => {
-            const d = (a.department || '').toLowerCase();
-            if (d === 'agriculture') return 'AGRI';
-            if (d === 'pg-enro') return 'PG-ENRO';
-            if (d === 'pnp') return 'PNP';
-            return (a.department || '').toUpperCase();
-          })();
-          return [
-            deptText,
-            a.municipality || '',
-            a.district || '',
-            a.what || '',
-            whenText,
-            a.where || '',
-            a.actionTaken || ''
-          ];
-        }),
-        startY: y + 10,
-        styles: {
-          fontSize: 8,
-          cellPadding: 1.5,
-          overflow: 'linebreak',
-          valign: 'top',
-          halign: 'left',
-          textColor: [0, 0, 0],
-          lineColor: [0, 0, 0],
-          lineWidth: 0.1
-        },
-        headStyles: {
-          fillColor: [230, 230, 230],
-          fontStyle: 'bold',
-          textColor: [0, 0, 0],
-          fontSize: 9,
-          halign: 'center',
-          valign: 'middle',
-          lineColor: [0, 0, 0],
-          lineWidth: 0.2,
-          overflow: 'visible',
-          cellPadding: 2,
-          minCellHeight: 8
-        },
-        theme: 'grid',
-        tableLineColor: [0, 0, 0],
-        tableLineWidth: 0.2,
-        columnStyles: {
-          0: { halign: 'center', cellWidth: scaledWidths[0] },
-          1: { cellWidth: scaledWidths[1] },
-          2: { halign: 'center', cellWidth: scaledWidths[2] },
-          3: { cellWidth: scaledWidths[3] },
-          4: { halign: 'center', cellWidth: scaledWidths[4] },
-          5: { cellWidth: scaledWidths[5] },
-          6: { cellWidth: scaledWidths[6] }
-        },
-        margin: { left: paperConfig.margin, right: paperConfig.margin },
-        showHead: 'everyPage',
-        tableWidth: 'wrap',
-        rowPageBreak: 'avoid',
-        didParseCell: (data) => {
-          if (data.section === 'head') return;
-          if (data.column.index === 4) {
-            data.cell.styles.halign = 'center';
-          }
-        },
-        pageBreak: 'auto'
+          head: [[
+            'Dept',
+            'Mun',
+            'Dist',
+            'What',
+            'Date',
+            'Where',
+            'Action'
+          ]],
+          body: actions.map(a => {
+            const whenValue = a.when ? new Date(a.when) : null;
+            const whenText = whenValue && !isNaN(whenValue.getTime())
+              ? whenValue.toLocaleDateString()
+              : '';
+            const deptText = (() => {
+              const d = (a.department || '').toLowerCase();
+              if (d === 'agriculture') return 'AGRI';
+              if (d === 'pg-enro') return 'PG-ENRO';
+              if (d === 'pnp') return 'PNP';
+              return (a.department || '').toUpperCase();
+            })();
+            return [
+              deptText,
+              a.municipality || '',
+              a.district || '',
+              a.what || '',
+              whenText,
+              a.where || '',
+              a.actionTaken || ''
+            ];
+          }),
+          startY: y + 10,
+          styles: {
+            fontSize: 8,
+            cellPadding: 1.5,
+            overflow: 'linebreak',
+            valign: 'top',
+            halign: 'left',
+            textColor: [0, 0, 0],
+            lineColor: [0, 0, 0],
+            lineWidth: 0.1
+          },
+          headStyles: {
+            fillColor: [230, 230, 230],
+            fontStyle: 'bold',
+            textColor: [0, 0, 0],
+            fontSize: 9,
+            halign: 'center',
+            valign: 'middle',
+            lineColor: [0, 0, 0],
+            lineWidth: 0.2,
+            overflow: 'visible',
+            cellPadding: 2,
+            minCellHeight: 8
+          },
+          theme: 'grid',
+          tableLineColor: [0, 0, 0],
+          tableLineWidth: 0.2,
+          columnStyles: {
+            0: { halign: 'center', cellWidth: scaledWidths[0] },
+            1: { cellWidth: scaledWidths[1] },
+            2: { halign: 'center', cellWidth: scaledWidths[2] },
+            3: { cellWidth: scaledWidths[3] },
+            4: { halign: 'center', cellWidth: scaledWidths[4] },
+            5: { cellWidth: scaledWidths[5] },
+            6: { cellWidth: scaledWidths[6] }
+          },
+          margin: { left: paperConfig.margin, right: paperConfig.margin },
+          showHead: 'everyPage',
+          tableWidth: 'wrap',
+          rowPageBreak: 'avoid',
+          didParseCell: (data) => {
+            if (data.section === 'head') return;
+            if (data.column.index === 4) {
+              data.cell.styles.halign = 'center';
+            }
+          },
+          pageBreak: 'auto'
         });
 
         return doc.lastAutoTable?.finalY || (y + 25);
@@ -2060,30 +2075,30 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const generateIncidentsReport = () => {
     const paperConfig = getPaperConfig(paperSize);
     const doc = new jsPDF('p', 'mm', paperConfig.format);
-    
+
     // Calculate center position
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
     const centerX = pageWidth / 2;
-    
+
     // Add compact header section
     doc.setFillColor(239, 68, 68); // Red background
     doc.rect(0, 0, pageWidth, 30, 'F'); // Reduced height
-    
+
     // Main title - centered and smaller
     doc.setFontSize(18); // Reduced from 24
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255);
     doc.text('Incidents Report', centerX, 20, { align: 'center' });
-    
+
     // Reset text color
     doc.setTextColor(0, 0, 0);
-    
+
     // Compact report info section
     doc.setFontSize(12); // Reduced from 14
     doc.setFont('helvetica', 'bold');
     doc.text('Report Information', centerX, 45, { align: 'center' });
-    
+
     // Compact info box
     const infoY = 50;
     const infoBoxHeight = 25; // Reduced from 35
@@ -2091,23 +2106,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.rect(paperConfig.margin, infoY - 3, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
     doc.rect(paperConfig.margin, infoY - 3, pageWidth - (paperConfig.margin * 2), infoBoxHeight, 'S');
-    
+
     // Compact report details in two columns
     doc.setFontSize(9); // Reduced from 10
     doc.setFont('helvetica', 'normal');
     const leftCol = paperConfig.margin + 5;
     const rightCol = centerX + 10;
-    
+
     doc.text(`Generated: ${new Date().toLocaleDateString()}`, leftCol, infoY + 5);
     doc.text(`Month: ${months[selectedMonth]}`, leftCol, infoY + 12);
     doc.text(`Year: ${selectedYear}`, rightCol, infoY + 5);
     doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, rightCol, infoY + 12);
-    
+
     // Paper size indicator
     doc.setFontSize(7);
     doc.setFont('helvetica', 'italic');
     doc.text(`Paper: ${paperConfig.name}`, pageWidth - paperConfig.margin - 5, infoY + 19, { align: 'right' });
-    
+
     // Filter incidents by date and district
     let filteredIncidents = incidents || [];
     if (selectedMonth !== 'all' && selectedYear !== 'all') {
@@ -2119,7 +2134,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     if (selectedDistrict !== 'all') {
       filteredIncidents = filteredIncidents.filter(incident => incident.district === selectedDistrict);
     }
-      
+
     // Incident type breakdown
     const incidentTypeStats = {};
     filteredIncidents.forEach(incident => {
@@ -2131,39 +2146,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       if (incident.status === 'Active') incidentTypeStats[type].active++;
       if (incident.status === 'Resolved') incidentTypeStats[type].resolved++;
     });
-    
+
     // Compact statistics section
     const statsStartY = infoY + infoBoxHeight + 10; // Reduced spacing
     doc.setFontSize(12); // Reduced from 16
     doc.setFont('helvetica', 'bold');
     doc.text('Incident Statistics', centerX, statsStartY, { align: 'center' });
-    
+
     // Compact statistics box
     const statsY = statsStartY + 8;
     const boxWidth = pageWidth - (paperConfig.margin * 2);
     const boxHeight = 20; // Reduced from 35
-    
+
     doc.setFillColor(254, 242, 242);
     doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'F');
     doc.setDrawColor(239, 68, 68);
     doc.rect(paperConfig.margin, statsY - 3, boxWidth, boxHeight, 'S');
-    
+
     // Statistics in horizontal layout
     doc.setFontSize(9); // Reduced from 11
     doc.setFont('helvetica', 'normal');
-    
+
     const stat1X = paperConfig.margin + 10;
     const stat2X = centerX - 30;
     const stat3X = centerX + 30;
-    
+
     doc.text(`Total Incidents: ${filteredIncidents.length}`, stat1X, statsY + 8);
     doc.text(`Active Cases: ${filteredIncidents.filter(i => i.status === 'Active').length}`, stat2X, statsY + 8);
     doc.text(`Resolved Cases: ${filteredIncidents.filter(i => i.status === 'Resolved').length}`, stat3X, statsY + 8);
-    
+
     // Compact incident type breakdown table
     if (Object.keys(incidentTypeStats).length > 0) {
       const tableData = Object.entries(incidentTypeStats)
-        .sort(([,a], [,b]) => b.count - a.count)
+        .sort(([, a], [, b]) => b.count - a.count)
         .map(([type, stats]) => [
           type,
           stats.count.toString(),
@@ -2171,28 +2186,28 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           stats.resolved.toString(),
           `${((stats.resolved / stats.count) * 100).toFixed(1)}%`
         ]);
-      
+
       // Compact table positioning
       const tableStartY = statsY + boxHeight + 8; // Reduced spacing
-      
+
       // Compact table title
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Incident Type Breakdown', centerX, tableStartY, { align: 'center' });
-      
+
       autoTable(doc, {
         head: [['Incident Type', 'Total', 'Active', 'Resolved', 'Resolution Rate']],
         body: tableData,
         startY: tableStartY + 6,
-        styles: { 
+        styles: {
           fontSize: 8, // Reduced font size
           cellPadding: 2, // Reduced padding
           overflow: 'linebreak',
           halign: 'left',
           valign: 'middle'
         },
-        headStyles: { 
-          fillColor: [239, 68, 68], 
+        headStyles: {
+          fillColor: [239, 68, 68],
           fontStyle: 'bold',
           textColor: [255, 255, 255],
           fontSize: 9, // Reduced header font
@@ -2219,7 +2234,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'italic');
       doc.text('No incidents available for the selected period.', paperConfig.margin, noDataY);
     }
-    
+
     doc.save(`incidents-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
@@ -2229,35 +2244,35 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.log('Report generation already in progress...');
       return;
     }
-    
+
     setIsGeneratingCommandCenterReport(true);
     try {
       console.log('Starting Command Center Report generation...');
       console.log('Command Center Data:', commandCenterData);
-      
+
       // Load fresh data for report generation
       let reportData = commandCenterData;
-      
+
       // Always reload data to ensure we have the latest
       console.log('⚡ Loading fresh Command Center data for report with parallel queries...');
       const startTime = performance.now();
       const monthName = months[selectedMonth];
       const monthYear = `${monthName}_${selectedYear}`;
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
-      
+
       // Create all Firebase queries in parallel
       const municipalityQueries = allMunicipalities.map(municipality => {
         const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
         return getDoc(docRef);
       });
-      
+
       // Load all data in parallel
       const [municipalityResults, barangaysResult, concernTypesResult] = await Promise.all([
         Promise.allSettled(municipalityQueries),
         getBarangays(),
         getConcernTypes()
       ]);
-      
+
       // Process results
       const commandCenterReports = {};
       municipalityResults.forEach((result, index) => {
@@ -2270,468 +2285,468 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           console.error(`❌ Error loading ${municipality}:`, result.reason);
         }
       });
-      
+
       const endTime = performance.now();
       console.log(`✅ Data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-      
+
       reportData = {
         reports: commandCenterReports,
         barangays: barangaysResult.success ? barangaysResult.data : [],
         concernTypes: concernTypesResult.success ? concernTypesResult.data : []
       };
-      
+
       console.log('📊 Report data loaded:', {
         municipalities: Object.keys(reportData.reports).length,
         barangays: reportData.barangays.length,
         concernTypes: reportData.concernTypes.length
       });
-      
+
       const paperConfig = getPaperConfig(paperSize);
       const pdfDoc = new jsPDF('p', 'mm', paperConfig.format);
-    
-    // Calculate center position
-    const pageWidth = pdfDoc.internal.pageSize.getWidth();
-    const centerX = pageWidth / 2;
-    
-    // ============ PAGE 1: COVER PAGE ============
-    
-    // Add logo/header section - Full width banner
-    pdfDoc.setFillColor(16, 185, 129); // Green background
-    pdfDoc.rect(0, 0, pageWidth, 50, 'F');
-    
-    // Main title - centered
-    pdfDoc.setFontSize(28);
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.setTextColor(255, 255, 255);
-    pdfDoc.text('Command Center Report', centerX, 32, { align: 'center' });
-    
-    // Reset text color
-    pdfDoc.setTextColor(0, 0, 0);
-    
-    // Report Information Section - Table Style
-    let currentY = 65;
-    pdfDoc.setFontSize(14);
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.text('Report Information', centerX, currentY, { align: 'center' });
-    currentY += 8;
-    
-    // Report Information Table - Compact
-    const reportInfoData = [
-      ['Generated Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
-      ['Report Month', months[selectedMonth]],
-      ['Report Year', selectedYear.toString()],
-      ['District Filter', selectedDistrict === 'all' ? 'All Districts' : selectedDistrict],
-      ['Paper Size', paperConfig.name]
-    ];
-    
-    autoTable(pdfDoc, {
-      body: reportInfoData,
-      startY: currentY,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.3
-      },
-      columnStyles: {
-        0: { 
-          cellWidth: 50, 
-          fontStyle: 'bold', 
-          fillColor: [240, 253, 244],
-          halign: 'left'
+
+      // Calculate center position
+      const pageWidth = pdfDoc.internal.pageSize.getWidth();
+      const centerX = pageWidth / 2;
+
+      // ============ PAGE 1: COVER PAGE ============
+
+      // Add logo/header section - Full width banner
+      pdfDoc.setFillColor(16, 185, 129); // Green background
+      pdfDoc.rect(0, 0, pageWidth, 50, 'F');
+
+      // Main title - centered
+      pdfDoc.setFontSize(28);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.setTextColor(255, 255, 255);
+      pdfDoc.text('Command Center Report', centerX, 32, { align: 'center' });
+
+      // Reset text color
+      pdfDoc.setTextColor(0, 0, 0);
+
+      // Report Information Section - Table Style
+      let currentY = 65;
+      pdfDoc.setFontSize(14);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.text('Report Information', centerX, currentY, { align: 'center' });
+      currentY += 8;
+
+      // Report Information Table - Compact
+      const reportInfoData = [
+        ['Generated Date', new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })],
+        ['Report Month', months[selectedMonth]],
+        ['Report Year', selectedYear.toString()],
+        ['District Filter', selectedDistrict === 'all' ? 'All Districts' : selectedDistrict],
+        ['Paper Size', paperConfig.name]
+      ];
+
+      autoTable(pdfDoc, {
+        body: reportInfoData,
+        startY: currentY,
+        theme: 'grid',
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.3
         },
-        1: { 
-          cellWidth: 'auto', 
-          halign: 'left'
-        }
-      },
-      margin: { left: paperConfig.margin, right: paperConfig.margin }
-    });
-    
-    currentY = pdfDoc.lastAutoTable.finalY + 12;
-    
-    // Command Center Overview Section - Table Style
-    pdfDoc.setFontSize(14);
-    pdfDoc.setFont('helvetica', 'bold');
-    pdfDoc.text('Command Center Overview', centerX, currentY, { align: 'center' });
-    currentY += 8;
-    
-    // Calculate real statistics from Command Center data
-    const reports = reportData.reports || {};
-    const totalMunicipalities = Object.keys(reports).length;
-    const totalReports = Object.values(reports).reduce((sum, report) => {
-      if (report.weeklyReportData) {
-        return sum + Object.values(report.weeklyReportData).reduce((dateSum, dateEntries) => {
-          return dateSum + (Array.isArray(dateEntries) ? dateEntries.length : 0);
-        }, 0);
-      }
-      return sum;
-    }, 0);
-    
-    const totalBarangays = reportData.barangays ? reportData.barangays.length : 0;
-    const totalConcernTypes = reportData.concernTypes ? reportData.concernTypes.length : 0;
-    
-    // Command Center Statistics Table - Compact
-    const statsData = [
-      ['Total Municipalities', totalMunicipalities.toString()],
-      ['Total Reports', totalReports.toString()],
-      ['Total Barangays', totalBarangays.toString()],
-      ['Total Concern Types', totalConcernTypes.toString()],
-      ['Reporting Period', `${months[selectedMonth]} ${selectedYear}`],
-      ['Data Status', isLoadingCommandCenter ? 'Loading...' : 'Current']
-    ];
-    
-    autoTable(pdfDoc, {
-      body: statsData,
-      startY: currentY,
-      theme: 'grid',
-      styles: {
-        fontSize: 9,
-        cellPadding: 3,
-        lineColor: [200, 200, 200],
-        lineWidth: 0.3
-      },
-      columnStyles: {
-        0: { 
-          cellWidth: 50, 
-          fontStyle: 'bold', 
-          fillColor: [240, 253, 244],
-          halign: 'left'
-        },
-        1: { 
-          cellWidth: 'auto', 
-          halign: 'left',
-          fontSize: 10,
-          fontStyle: 'bold',
-          textColor: [16, 185, 129]
-        }
-      },
-      margin: { left: paperConfig.margin, right: paperConfig.margin }
-    });
-    
-    // Add footer note on first page
-    currentY = pdfDoc.lastAutoTable.finalY + 20;
-    pdfDoc.setFontSize(9);
-    pdfDoc.setFont('helvetica', 'italic');
-    pdfDoc.setTextColor(100, 100, 100);
-    pdfDoc.text('Detailed breakdown by district, municipality, and barangay follows on the next pages.', centerX, currentY, { align: 'center' });
-    pdfDoc.setTextColor(0, 0, 0);
-    
-    // ============ START PAGE 2: DISTRICT DATA ============
-    pdfDoc.addPage();
-    
-    // Process real Command Center data to create district-based hierarchical structure
-    const processCommandCenterData = () => {
-      const districtData = {};
-      const reports = reportData.reports || {};
-      const barangays = reportData.barangays || [];
-      
-      console.log('🔍 Processing Command Center Data:');
-      console.log('📊 Reports:', reports);
-      console.log('📊 Reports keys:', Object.keys(reports));
-      console.log('🏘️ Barangays:', barangays.length);
-      console.log('📋 Command Center Data:', commandCenterData);
-      
-      // Get district mapping for municipalities
-      const getDistrictForMunicipality = (municipality) => {
-        for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
-          if (municipalities.includes(municipality)) {
-            return district;
+        columnStyles: {
+          0: {
+            cellWidth: 50,
+            fontStyle: 'bold',
+            fillColor: [240, 253, 244],
+            halign: 'left'
+          },
+          1: {
+            cellWidth: 'auto',
+            halign: 'left'
           }
+        },
+        margin: { left: paperConfig.margin, right: paperConfig.margin }
+      });
+
+      currentY = pdfDoc.lastAutoTable.finalY + 12;
+
+      // Command Center Overview Section - Table Style
+      pdfDoc.setFontSize(14);
+      pdfDoc.setFont('helvetica', 'bold');
+      pdfDoc.text('Command Center Overview', centerX, currentY, { align: 'center' });
+      currentY += 8;
+
+      // Calculate real statistics from Command Center data
+      const reports = reportData.reports || {};
+      const totalMunicipalities = Object.keys(reports).length;
+      const totalReports = Object.values(reports).reduce((sum, report) => {
+        if (report.weeklyReportData) {
+          return sum + Object.values(report.weeklyReportData).reduce((dateSum, dateEntries) => {
+            return dateSum + (Array.isArray(dateEntries) ? dateEntries.length : 0);
+          }, 0);
         }
-        return "Unknown District";
-      };
-      
-      // Process each municipality's data
-      Object.entries(reports).forEach(([municipality, reportData]) => {
-        console.log(`🏙️ Processing municipality: ${municipality}`, reportData);
-        const district = getDistrictForMunicipality(municipality);
-        const weeklyData = reportData.weeklyReportData || {};
-        
-        // Initialize district if not exists
-        if (!districtData[district]) {
-          districtData[district] = {};
-        }
-        
-        // Get barangays for this municipality
-        const municipalityBarangays = barangays.filter(b => b.municipality === municipality);
-        
-        const barangayData = {};
-        
-        // Process each barangay's data
-        municipalityBarangays.forEach(barangay => {
-          const barangayName = barangay.name;
-          const concernTypeData = {};
-          let totalReports = 0;
-          
-          // Count concern types for this barangay across all dates
-          Object.values(weeklyData).forEach(dateEntries => {
-            if (Array.isArray(dateEntries)) {
-              dateEntries.forEach(entry => {
-                // Check if this entry is for the current barangay
-                if (entry.barangay && entry.barangay.includes(barangayName)) {
-                  totalReports++;
-                  
-                  // Count concern type with action taken tracking
-                  if (entry.concernType) {
-                    if (!concernTypeData[entry.concernType]) {
-                      concernTypeData[entry.concernType] = {
-                        total: 0,
-                        actionTaken: 0
-                      };
-                    }
-                    concernTypeData[entry.concernType].total++;
-                    
-                    // Check if action was taken
-                    if (entry.actionTaken && entry.actionTaken.trim() !== '') {
-                      concernTypeData[entry.concernType].actionTaken++;
+        return sum;
+      }, 0);
+
+      const totalBarangays = reportData.barangays ? reportData.barangays.length : 0;
+      const totalConcernTypes = reportData.concernTypes ? reportData.concernTypes.length : 0;
+
+      // Command Center Statistics Table - Compact
+      const statsData = [
+        ['Total Municipalities', totalMunicipalities.toString()],
+        ['Total Reports', totalReports.toString()],
+        ['Total Barangays', totalBarangays.toString()],
+        ['Total Concern Types', totalConcernTypes.toString()],
+        ['Reporting Period', `${months[selectedMonth]} ${selectedYear}`],
+        ['Data Status', isLoadingCommandCenter ? 'Loading...' : 'Current']
+      ];
+
+      autoTable(pdfDoc, {
+        body: statsData,
+        startY: currentY,
+        theme: 'grid',
+        styles: {
+          fontSize: 9,
+          cellPadding: 3,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.3
+        },
+        columnStyles: {
+          0: {
+            cellWidth: 50,
+            fontStyle: 'bold',
+            fillColor: [240, 253, 244],
+            halign: 'left'
+          },
+          1: {
+            cellWidth: 'auto',
+            halign: 'left',
+            fontSize: 10,
+            fontStyle: 'bold',
+            textColor: [16, 185, 129]
+          }
+        },
+        margin: { left: paperConfig.margin, right: paperConfig.margin }
+      });
+
+      // Add footer note on first page
+      currentY = pdfDoc.lastAutoTable.finalY + 20;
+      pdfDoc.setFontSize(9);
+      pdfDoc.setFont('helvetica', 'italic');
+      pdfDoc.setTextColor(100, 100, 100);
+      pdfDoc.text('Detailed breakdown by district, municipality, and barangay follows on the next pages.', centerX, currentY, { align: 'center' });
+      pdfDoc.setTextColor(0, 0, 0);
+
+      // ============ START PAGE 2: DISTRICT DATA ============
+      pdfDoc.addPage();
+
+      // Process real Command Center data to create district-based hierarchical structure
+      const processCommandCenterData = () => {
+        const districtData = {};
+        const reports = reportData.reports || {};
+        const barangays = reportData.barangays || [];
+
+        console.log('🔍 Processing Command Center Data:');
+        console.log('📊 Reports:', reports);
+        console.log('📊 Reports keys:', Object.keys(reports));
+        console.log('🏘️ Barangays:', barangays.length);
+        console.log('📋 Command Center Data:', commandCenterData);
+
+        // Get district mapping for municipalities
+        const getDistrictForMunicipality = (municipality) => {
+          for (const [district, municipalities] of Object.entries(municipalitiesByDistrict)) {
+            if (municipalities.includes(municipality)) {
+              return district;
+            }
+          }
+          return "Unknown District";
+        };
+
+        // Process each municipality's data
+        Object.entries(reports).forEach(([municipality, reportData]) => {
+          console.log(`🏙️ Processing municipality: ${municipality}`, reportData);
+          const district = getDistrictForMunicipality(municipality);
+          const weeklyData = reportData.weeklyReportData || {};
+
+          // Initialize district if not exists
+          if (!districtData[district]) {
+            districtData[district] = {};
+          }
+
+          // Get barangays for this municipality
+          const municipalityBarangays = barangays.filter(b => b.municipality === municipality);
+
+          const barangayData = {};
+
+          // Process each barangay's data
+          municipalityBarangays.forEach(barangay => {
+            const barangayName = barangay.name;
+            const concernTypeData = {};
+            let totalReports = 0;
+
+            // Count concern types for this barangay across all dates
+            Object.values(weeklyData).forEach(dateEntries => {
+              if (Array.isArray(dateEntries)) {
+                dateEntries.forEach(entry => {
+                  // Check if this entry is for the current barangay
+                  if (entry.barangay && entry.barangay.includes(barangayName)) {
+                    totalReports++;
+
+                    // Count concern type with action taken tracking
+                    if (entry.concernType) {
+                      if (!concernTypeData[entry.concernType]) {
+                        concernTypeData[entry.concernType] = {
+                          total: 0,
+                          actionTaken: 0
+                        };
+                      }
+                      concernTypeData[entry.concernType].total++;
+
+                      // Check if action was taken
+                      if (entry.actionTaken && entry.actionTaken.trim() !== '') {
+                        concernTypeData[entry.concernType].actionTaken++;
+                      }
                     }
                   }
-                }
-              });
+                });
+              }
+            });
+
+            // Convert concern type data to array format
+            const concernTypes = Object.entries(concernTypeData).map(([type, data]) => ({
+              type,
+              total: data.total,
+              actionTaken: data.actionTaken
+            }));
+
+            // Only include barangays that have data
+            if (totalReports > 0) {
+              barangayData[barangayName] = {
+                concernTypes,
+                totalReports
+              };
             }
           });
-          
-          // Convert concern type data to array format
-          const concernTypes = Object.entries(concernTypeData).map(([type, data]) => ({
-            type,
-            total: data.total,
-            actionTaken: data.actionTaken
-          }));
-          
-          // Only include barangays that have data
-          if (totalReports > 0) {
-            barangayData[barangayName] = {
-              concernTypes,
-              totalReports
+
+          // Only include municipalities that have barangay data
+          if (Object.keys(barangayData).length > 0) {
+            districtData[district][municipality] = {
+              barangays: barangayData
             };
           }
         });
-        
-        // Only include municipalities that have barangay data
-        if (Object.keys(barangayData).length > 0) {
-          districtData[district][municipality] = {
-            barangays: barangayData
-          };
-        }
-      });
-      
-      console.log('✅ Final districtData:', districtData);
-      console.log('✅ District keys:', Object.keys(districtData));
-      return districtData;
-    };
-    
-    const districtData = processCommandCenterData();
-    console.log('📦 Processed districtData:', districtData);
 
-    // Filter districts by selected district
-    let filteredDistricts = Object.entries(districtData);
-    console.log('🔍 All districts:', filteredDistricts.map(([d]) => d));
-    console.log('🎯 Selected district:', selectedDistrict);
-    
-    if (selectedDistrict !== 'all') {
-      filteredDistricts = filteredDistricts.filter(([district]) => district === selectedDistrict);
-      console.log('🔍 Filtered districts:', filteredDistricts.map(([d]) => d));
-    }
-    
-    console.log('📊 Filtered districts length:', filteredDistricts.length);
-    
-    // If no data available, show message
-    if (filteredDistricts.length === 0) {
-      console.log('❌ No data available - generating empty report');
-      console.log('❌ reportData:', reportData);
-      console.log('❌ districtData:', districtData);
-      pdfDoc.setFontSize(12);
-      pdfDoc.setFont('helvetica', 'normal');
-      pdfDoc.text('No Command Center data available for the selected period and district.', centerX, 200, { align: 'center' });
-      pdfDoc.text('Please ensure data has been entered in the Command Center module.', centerX, 215, { align: 'center' });
-      
-      pdfDoc.save(`command-center-no-data-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
-      return;
-    }
+        console.log('✅ Final districtData:', districtData);
+        console.log('✅ District keys:', Object.keys(districtData));
+        return districtData;
+      };
 
-    // Start districts on page 2 with proper Y position
-    currentY = 30;
+      const districtData = processCommandCenterData();
+      console.log('📦 Processed districtData:', districtData);
 
-    // District-based hierarchical report structure
-    filteredDistricts.forEach(([district, municipalities], districtIndex) => {
-      // Start each district on a new page for better organization
-      if (districtIndex > 0) {
-        pdfDoc.addPage();
-        currentY = 30;
+      // Filter districts by selected district
+      let filteredDistricts = Object.entries(districtData);
+      console.log('🔍 All districts:', filteredDistricts.map(([d]) => d));
+      console.log('🎯 Selected district:', selectedDistrict);
+
+      if (selectedDistrict !== 'all') {
+        filteredDistricts = filteredDistricts.filter(([district]) => district === selectedDistrict);
+        console.log('🔍 Filtered districts:', filteredDistricts.map(([d]) => d));
       }
 
-      // DISTRICT HEADER - Full width banner
-      pdfDoc.setFillColor(16, 185, 129);
-      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 18, 'F');
-      pdfDoc.setFontSize(18);
-      pdfDoc.setFont('helvetica', 'bold');
-      pdfDoc.setTextColor(255, 255, 255);
-      pdfDoc.text(district, centerX, currentY + 12, { align: 'center' });
-      pdfDoc.setTextColor(0, 0, 0);
-      currentY += 25;
+      console.log('📊 Filtered districts length:', filteredDistricts.length);
 
-      // Calculate district totals
-      const municipalityEntries = Object.entries(municipalities);
-      const districtTotalReports = municipalityEntries.reduce((sum, [, munData]) => {
-        return sum + Object.values(munData.barangays).reduce((mSum, brgy) => mSum + brgy.totalReports, 0);
-      }, 0);
-      const districtTotalBarangays = municipalityEntries.reduce((sum, [, munData]) => {
-        return sum + Object.keys(munData.barangays).length;
-      }, 0);
+      // If no data available, show message
+      if (filteredDistricts.length === 0) {
+        console.log('❌ No data available - generating empty report');
+        console.log('❌ reportData:', reportData);
+        console.log('❌ districtData:', districtData);
+        pdfDoc.setFontSize(12);
+        pdfDoc.setFont('helvetica', 'normal');
+        pdfDoc.text('No Command Center data available for the selected period and district.', centerX, 200, { align: 'center' });
+        pdfDoc.text('Please ensure data has been entered in the Command Center module.', centerX, 215, { align: 'center' });
 
-      // District Summary Box
-      pdfDoc.setFillColor(240, 253, 244);
-      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'F');
-      pdfDoc.setDrawColor(16, 185, 129);
-      pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'S');
-      
-      pdfDoc.setFontSize(10);
-      pdfDoc.setFont('helvetica', 'italic');
-      pdfDoc.setTextColor(0, 0, 0);
-      pdfDoc.text(`District Summary: ${municipalityEntries.length} Municipalities | ${districtTotalBarangays} Barangays | ${districtTotalReports} Total Reports`, centerX, currentY + 10, { align: 'center' });
-      currentY += 22;
+        pdfDoc.save(`command-center-no-data-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+        return;
+      }
 
-      // Process each municipality in the district
-      municipalityEntries.forEach(([municipality, munData], munIndex) => {
-        // Check if we need a new page
-        if (currentY > paperConfig.height - 100) {
+      // Start districts on page 2 with proper Y position
+      currentY = 30;
+
+      // District-based hierarchical report structure
+      filteredDistricts.forEach(([district, municipalities], districtIndex) => {
+        // Start each district on a new page for better organization
+        if (districtIndex > 0) {
           pdfDoc.addPage();
           currentY = 30;
         }
 
-        // MUNICIPALITY HEADER - Clean box design
-        pdfDoc.setFillColor(34, 139, 34);
-        pdfDoc.rect(paperConfig.margin + 5, currentY, pageWidth - (paperConfig.margin * 2) - 10, 12, 'F');
-        pdfDoc.setFontSize(14);
+        // DISTRICT HEADER - Full width banner
+        pdfDoc.setFillColor(16, 185, 129);
+        pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 18, 'F');
+        pdfDoc.setFontSize(18);
         pdfDoc.setFont('helvetica', 'bold');
         pdfDoc.setTextColor(255, 255, 255);
-        pdfDoc.text(municipality, paperConfig.margin + 10, currentY + 8);
+        pdfDoc.text(district, centerX, currentY + 12, { align: 'center' });
         pdfDoc.setTextColor(0, 0, 0);
-        currentY += 17;
+        currentY += 25;
 
-        // Calculate municipality totals
-        const barangayEntries = Object.entries(munData.barangays);
-        const munTotalReports = barangayEntries.reduce((sum, [, brgy]) => sum + brgy.totalReports, 0);
+        // Calculate district totals
+        const municipalityEntries = Object.entries(municipalities);
+        const districtTotalReports = municipalityEntries.reduce((sum, [, munData]) => {
+          return sum + Object.values(munData.barangays).reduce((mSum, brgy) => mSum + brgy.totalReports, 0);
+        }, 0);
+        const districtTotalBarangays = municipalityEntries.reduce((sum, [, munData]) => {
+          return sum + Object.keys(munData.barangays).length;
+        }, 0);
 
-        // Municipality Summary - inline with better spacing
-        pdfDoc.setFontSize(9);
-        pdfDoc.setFont('helvetica', 'normal');
-        pdfDoc.setTextColor(100, 100, 100);
-        pdfDoc.text(`${barangayEntries.length} Barangays | ${munTotalReports} Reports`, paperConfig.margin + 10, currentY);
+        // District Summary Box
+        pdfDoc.setFillColor(240, 253, 244);
+        pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'F');
+        pdfDoc.setDrawColor(16, 185, 129);
+        pdfDoc.rect(paperConfig.margin, currentY, pageWidth - (paperConfig.margin * 2), 15, 'S');
+
+        pdfDoc.setFontSize(10);
+        pdfDoc.setFont('helvetica', 'italic');
         pdfDoc.setTextColor(0, 0, 0);
-        currentY += 10;
+        pdfDoc.text(`District Summary: ${municipalityEntries.length} Municipalities | ${districtTotalBarangays} Barangays | ${districtTotalReports} Total Reports`, centerX, currentY + 10, { align: 'center' });
+        currentY += 22;
 
-        // Process each barangay in the municipality
-        barangayEntries.forEach(([barangayName, barangayData], brgyIndex) => {
-          // Calculate space needed for this barangay
-          const spaceNeeded = 40 + (barangayData.concernTypes.length * 8);
-          
+        // Process each municipality in the district
+        municipalityEntries.forEach(([municipality, munData], munIndex) => {
           // Check if we need a new page
-          if (currentY + spaceNeeded > paperConfig.height - 30) {
+          if (currentY > paperConfig.height - 100) {
             pdfDoc.addPage();
             currentY = 30;
           }
 
-          // BARANGAY HEADER - Cleaner design without symbols
-          pdfDoc.setFillColor(245, 248, 250);
-          pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'F');
-          pdfDoc.setDrawColor(70, 130, 180);
-          pdfDoc.setLineWidth(0.5);
-          pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'S');
-          
-          pdfDoc.setFontSize(11);
+          // MUNICIPALITY HEADER - Clean box design
+          pdfDoc.setFillColor(34, 139, 34);
+          pdfDoc.rect(paperConfig.margin + 5, currentY, pageWidth - (paperConfig.margin * 2) - 10, 12, 'F');
+          pdfDoc.setFontSize(14);
           pdfDoc.setFont('helvetica', 'bold');
-          pdfDoc.setTextColor(70, 130, 180);
-          pdfDoc.text(`Barangay ${barangayName}`, paperConfig.margin + 20, currentY + 7);
-          
-          // Barangay total - right aligned
+          pdfDoc.setTextColor(255, 255, 255);
+          pdfDoc.text(municipality, paperConfig.margin + 10, currentY + 8);
+          pdfDoc.setTextColor(0, 0, 0);
+          currentY += 17;
+
+          // Calculate municipality totals
+          const barangayEntries = Object.entries(munData.barangays);
+          const munTotalReports = barangayEntries.reduce((sum, [, brgy]) => sum + brgy.totalReports, 0);
+
+          // Municipality Summary - inline with better spacing
           pdfDoc.setFontSize(9);
           pdfDoc.setFont('helvetica', 'normal');
           pdfDoc.setTextColor(100, 100, 100);
-          pdfDoc.text(`(${barangayData.totalReports} reports)`, pageWidth - paperConfig.margin - 50, currentY + 7);
+          pdfDoc.text(`${barangayEntries.length} Barangays | ${munTotalReports} Reports`, paperConfig.margin + 10, currentY);
           pdfDoc.setTextColor(0, 0, 0);
-          currentY += 15;
+          currentY += 10;
 
-          // CONCERN TYPES TABLE with Total and Action Taken columns
-          const concernTableData = barangayData.concernTypes.map(concern => [
-            concern.type,
-            concern.total.toString(),
-            concern.actionTaken.toString()
-          ]);
+          // Process each barangay in the municipality
+          barangayEntries.forEach(([barangayName, barangayData], brgyIndex) => {
+            // Calculate space needed for this barangay
+            const spaceNeeded = 40 + (barangayData.concernTypes.length * 8);
 
-          // Add totals row
-          const totalConcerns = barangayData.concernTypes.reduce((sum, c) => sum + c.total, 0);
-          const totalActions = barangayData.concernTypes.reduce((sum, c) => sum + c.actionTaken, 0);
-          concernTableData.push(['TOTAL', totalConcerns.toString(), totalActions.toString()]);
-
-          // Calculate optimal column widths - better proportions
-          const tableWidth = pageWidth - (paperConfig.margin * 2) - 40;
-          const col1Width = tableWidth * 0.60; // 60% for concern type
-          const col2Width = tableWidth * 0.20; // 20% for total
-          const col3Width = tableWidth * 0.20; // 20% for action taken
-
-          autoTable(pdfDoc, {
-            head: [['Concern Type', 'Total', 'Action Taken']],
-            body: concernTableData,
-            startY: currentY,
-            styles: { 
-              fontSize: 9, 
-              cellPadding: 3,
-              halign: 'left',
-              overflow: 'linebreak',
-              lineColor: [200, 200, 200],
-              lineWidth: 0.3
-            },
-            headStyles: { 
-              fillColor: [70, 130, 180], 
-              fontStyle: 'bold',
-              textColor: [255, 255, 255],
-              fontSize: 10,
-              halign: 'center',
-              cellPadding: 4
-            },
-            columnStyles: {
-              0: { cellWidth: col1Width, halign: 'left', fontStyle: 'normal' },
-              1: { cellWidth: col2Width, halign: 'center', fontStyle: 'normal' },
-              2: { cellWidth: col3Width, halign: 'center', fontStyle: 'normal' }
-            },
-            margin: { left: paperConfig.margin + 20, right: paperConfig.margin + 20 },
-            theme: 'striped',
-            alternateRowStyles: { fillColor: [248, 250, 252] },
-            tableWidth: 'wrap',
-            didParseCell: function(data) {
-              // Make totals row bold with distinct background
-              if (data.row.index === concernTableData.length - 1) {
-                data.cell.styles.fontStyle = 'bold';
-                data.cell.styles.fillColor = [200, 230, 255];
-                data.cell.styles.fontSize = 10;
-              }
+            // Check if we need a new page
+            if (currentY + spaceNeeded > paperConfig.height - 30) {
+              pdfDoc.addPage();
+              currentY = 30;
             }
+
+            // BARANGAY HEADER - Cleaner design without symbols
+            pdfDoc.setFillColor(245, 248, 250);
+            pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'F');
+            pdfDoc.setDrawColor(70, 130, 180);
+            pdfDoc.setLineWidth(0.5);
+            pdfDoc.rect(paperConfig.margin + 15, currentY, pageWidth - (paperConfig.margin * 2) - 30, 10, 'S');
+
+            pdfDoc.setFontSize(11);
+            pdfDoc.setFont('helvetica', 'bold');
+            pdfDoc.setTextColor(70, 130, 180);
+            pdfDoc.text(`Barangay ${barangayName}`, paperConfig.margin + 20, currentY + 7);
+
+            // Barangay total - right aligned
+            pdfDoc.setFontSize(9);
+            pdfDoc.setFont('helvetica', 'normal');
+            pdfDoc.setTextColor(100, 100, 100);
+            pdfDoc.text(`(${barangayData.totalReports} reports)`, pageWidth - paperConfig.margin - 50, currentY + 7);
+            pdfDoc.setTextColor(0, 0, 0);
+            currentY += 15;
+
+            // CONCERN TYPES TABLE with Total and Action Taken columns
+            const concernTableData = barangayData.concernTypes.map(concern => [
+              concern.type,
+              concern.total.toString(),
+              concern.actionTaken.toString()
+            ]);
+
+            // Add totals row
+            const totalConcerns = barangayData.concernTypes.reduce((sum, c) => sum + c.total, 0);
+            const totalActions = barangayData.concernTypes.reduce((sum, c) => sum + c.actionTaken, 0);
+            concernTableData.push(['TOTAL', totalConcerns.toString(), totalActions.toString()]);
+
+            // Calculate optimal column widths - better proportions
+            const tableWidth = pageWidth - (paperConfig.margin * 2) - 40;
+            const col1Width = tableWidth * 0.60; // 60% for concern type
+            const col2Width = tableWidth * 0.20; // 20% for total
+            const col3Width = tableWidth * 0.20; // 20% for action taken
+
+            autoTable(pdfDoc, {
+              head: [['Concern Type', 'Total', 'Action Taken']],
+              body: concernTableData,
+              startY: currentY,
+              styles: {
+                fontSize: 9,
+                cellPadding: 3,
+                halign: 'left',
+                overflow: 'linebreak',
+                lineColor: [200, 200, 200],
+                lineWidth: 0.3
+              },
+              headStyles: {
+                fillColor: [70, 130, 180],
+                fontStyle: 'bold',
+                textColor: [255, 255, 255],
+                fontSize: 10,
+                halign: 'center',
+                cellPadding: 4
+              },
+              columnStyles: {
+                0: { cellWidth: col1Width, halign: 'left', fontStyle: 'normal' },
+                1: { cellWidth: col2Width, halign: 'center', fontStyle: 'normal' },
+                2: { cellWidth: col3Width, halign: 'center', fontStyle: 'normal' }
+              },
+              margin: { left: paperConfig.margin + 20, right: paperConfig.margin + 20 },
+              theme: 'striped',
+              alternateRowStyles: { fillColor: [248, 250, 252] },
+              tableWidth: 'wrap',
+              didParseCell: function (data) {
+                // Make totals row bold with distinct background
+                if (data.row.index === concernTableData.length - 1) {
+                  data.cell.styles.fontStyle = 'bold';
+                  data.cell.styles.fillColor = [200, 230, 255];
+                  data.cell.styles.fontSize = 10;
+                }
+              }
+            });
+
+            currentY = pdfDoc.lastAutoTable.finalY + 10;
           });
 
-          currentY = pdfDoc.lastAutoTable.finalY + 10;
+          // Add spacing between municipalities
+          currentY += 8;
         });
 
-        // Add spacing between municipalities
-        currentY += 8;
+        // Add spacing between districts
+        currentY += 12;
       });
 
-      // Add spacing between districts
-      currentY += 12;
-    });
+      // Add page numbers to all pages
+      const pageCount = pdfDoc.internal.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        pdfDoc.setPage(i);
+        pdfDoc.setFontSize(8);
+        pdfDoc.text(`Page ${i} of ${pageCount}`, paperConfig.margin, pdfDoc.internal.pageSize.height - 10);
+      }
 
-    // Add page numbers to all pages
-    const pageCount = pdfDoc.internal.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      pdfDoc.setPage(i);
-      pdfDoc.setFontSize(8);
-      pdfDoc.text(`Page ${i} of ${pageCount}`, paperConfig.margin, pdfDoc.internal.pageSize.height - 10);
-    }
-    
-    pdfDoc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
-    console.log('Command Center Report generated successfully!');
+      pdfDoc.save(`command-center-municipalities-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
+      console.log('Command Center Report generated successfully!');
     } catch (error) {
       console.error('Error generating Command Center Report:', error);
       alert('Error generating Command Center Report. Please check the console for details.');
@@ -2746,32 +2761,32 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     try {
       console.log('⚡ Loading Quarterly Command Center Report data with parallel queries...');
       const startTime = performance.now();
-      
+
       // Load data for all months of the selected year
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
-      
+
       // Create all Firebase queries in parallel
       const allQueries = [];
       const queryMap = [];
-      
+
       for (const municipality of allMunicipalities) {
         for (let monthIndex = 0; monthIndex < 12; monthIndex++) {
           const monthName = months[monthIndex];
           const monthYear = `${monthName}_${selectedYear}`;
-          
+
           const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
           allQueries.push(getDoc(docRef));
           queryMap.push({ municipality, monthName });
         }
       }
-      
+
       // Load barangays and concern types in parallel with data queries
       const [queryResults, barangaysResult, concernTypesResult] = await Promise.all([
         Promise.allSettled(allQueries),
         getBarangays(),
         getConcernTypes()
       ]);
-      
+
       // Process results
       const yearlyData = {};
       queryResults.forEach((result, index) => {
@@ -2787,16 +2802,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           console.error(`❌ Error loading ${municipality} for ${monthName}:`, result.reason);
         }
       });
-      
+
       const endTime = performance.now();
       console.log(`✅ Data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
-      
+
       // Process data into quarterly format by municipality and concern type
       const processedData = processQuarterlyData(yearlyData, concernTypesResult.success ? concernTypesResult.data : []);
-      
+
       setQuarterlyPreviewData(processedData);
       setShowQuarterlyPreview(true);
-      
+
     } catch (error) {
       console.error('Error loading Quarterly Report data:', error);
       alert('Error loading Quarterly Report data. Please check the console for details.');
@@ -2813,13 +2828,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       Q3: ['July', 'August', 'September'],
       Q4: ['October', 'November', 'December']
     };
-    
+
     const municipalityData = {};
-    
+
     // Process each municipality
     Object.entries(yearlyData).forEach(([municipality, monthsData]) => {
       const concernTypeData = {};
-      
+
       // Initialize concern type counts
       concernTypes.forEach(ct => {
         concernTypeData[ct.name] = {
@@ -2831,7 +2846,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           strayDogs: 0 // Special tracking for stray dogs
         };
       });
-      
+
       // Count entries by quarter and concern type
       Object.entries(monthsData).forEach(([monthName, weeklyData]) => {
         // Determine which quarter this month belongs to
@@ -2841,16 +2856,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             quarter = q;
           }
         });
-        
+
         if (!quarter) return;
-        
+
         // Process each date's entries
         Object.values(weeklyData).forEach(dateEntries => {
           if (!Array.isArray(dateEntries)) return;
-          
+
           dateEntries.forEach(entry => {
             const concernType = entry.concernType || 'Other';
-            
+
             if (!concernTypeData[concernType]) {
               concernTypeData[concernType] = {
                 Q1: 0,
@@ -2861,10 +2876,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 strayDogs: 0
               };
             }
-            
+
             concernTypeData[concernType][quarter]++;
             concernTypeData[concernType].total++;
-            
+
             // Track stray dogs separately if mentioned in the entry
             if (entry.strayDogs || concernType.toLowerCase().includes('stray')) {
               concernTypeData[concernType].strayDogs++;
@@ -2872,14 +2887,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           });
         });
       });
-      
+
       // Only include municipalities with data
       const hasData = Object.values(concernTypeData).some(ct => ct.total > 0);
       if (hasData) {
         municipalityData[municipality] = concernTypeData;
       }
     });
-    
+
     return {
       municipalityData,
       year: selectedYear,
@@ -2893,51 +2908,51 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.log('No preview data or report generation already in progress...');
       return;
     }
-    
+
     setIsGeneratingCommandCenterReport(true);
     try {
       console.log('Starting Quarterly Command Center Report PDF generation...');
-      
+
       const paperConfig = getPaperConfig(paperSize);
       const pdfDoc = new jsPDF('l', 'mm', paperConfig.format); // Landscape orientation
       const pageWidth = pdfDoc.internal.pageSize.getWidth();
       const pageHeight = pdfDoc.internal.pageSize.getHeight();
       const centerX = pageWidth / 2;
-      
+
       // ============ HEADER ============
       pdfDoc.setFillColor(16, 185, 129);
       pdfDoc.rect(0, 0, pageWidth, 35, 'F');
-      
+
       pdfDoc.setFontSize(22);
       pdfDoc.setFont('helvetica', 'bold');
       pdfDoc.setTextColor(255, 255, 255);
       pdfDoc.text('Quarterly Command Center Report', centerX, 15, { align: 'center' });
-      
+
       pdfDoc.setFontSize(12);
       pdfDoc.setFont('helvetica', 'normal');
       pdfDoc.text(`Year: ${quarterlyPreviewData.year} | District: ${quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}`, centerX, 25, { align: 'center' });
-      
+
       pdfDoc.setTextColor(0, 0, 0);
-      
+
       let currentY = 45;
-      
+
       // Filter municipalities by selected district
       let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
       if (quarterlyPreviewData.district !== 'all') {
         const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
         municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
       }
-      
+
       // ============ MUNICIPALITY TABLES ============
       municipalitiesToShow.forEach((municipality, index) => {
         const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
-        
+
         // Check if we need a new page
         if (currentY > pageHeight - 60) {
           pdfDoc.addPage();
           currentY = 20;
         }
-        
+
         // Municipality header
         pdfDoc.setFontSize(14);
         pdfDoc.setFont('helvetica', 'bold');
@@ -2945,7 +2960,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         pdfDoc.rect(paperConfig.margin, currentY - 5, pageWidth - (paperConfig.margin * 2), 10, 'F');
         pdfDoc.text(municipality.toUpperCase(), paperConfig.margin + 3, currentY + 2);
         currentY += 12;
-        
+
         // Prepare table data with trends
         const tableData = [];
         Object.entries(concernTypeData).forEach(([concernType, quarters]) => {
@@ -2956,11 +2971,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               if (current < previous) return 'Decreased';
               return 'Unchanged';
             };
-            
+
             const q2Trend = getTrendLabel(quarters.Q2, quarters.Q1);
             const q3Trend = getTrendLabel(quarters.Q3, quarters.Q2);
             const q4Trend = getTrendLabel(quarters.Q4, quarters.Q3);
-            
+
             const row = [
               concernType,
               quarters.Q1.toString(),
@@ -2969,11 +2984,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               `${quarters.Q4}\n${q4Trend}`,
               quarters.total.toString()
             ];
-            
+
             tableData.push(row);
           }
         });
-        
+
         // Add table
         autoTable(pdfDoc, {
           head: [['Concern Type', 'Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)', 'Total']],
@@ -3001,7 +3016,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             5: { cellWidth: 30, halign: 'center', fontStyle: 'bold', fillColor: [240, 253, 244] }
           },
           margin: { left: paperConfig.margin, right: paperConfig.margin },
-          didParseCell: function(data) {
+          didParseCell: function (data) {
             // Apply colored backgrounds to Q2, Q3, Q4 based on trend
             if (data.section === 'body' && data.column.index >= 2 && data.column.index <= 4) {
               const cellText = data.cell.text.join('\n');
@@ -3018,10 +3033,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             }
           }
         });
-        
+
         currentY = pdfDoc.lastAutoTable.finalY + 8;
       });
-      
+
       // Add page numbers
       const pageCount = pdfDoc.internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
@@ -3031,7 +3046,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         pdfDoc.text(`Page ${i} of ${pageCount}`, pageWidth - paperConfig.margin - 20, pageHeight - 10);
         pdfDoc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, pageHeight - 10);
       }
-      
+
       pdfDoc.save(`quarterly-command-center-${quarterlyPreviewData.year}-${paperSize}.pdf`);
       console.log('Quarterly Command Center Report generated successfully!');
       setShowQuarterlyPreview(false);
@@ -3048,7 +3063,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const reports = commandCenterData.reports || {};
     const barangays = commandCenterData.barangays || [];
     const concernTypes = commandCenterData.concernTypes || [];
-    
+
     console.log('📊 calculateWeeklyReportSummary called with:', {
       municipality,
       reportsCount: Object.keys(reports).length,
@@ -3056,7 +3071,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       concernTypesCount: concernTypes.length,
       reportKeys: Object.keys(reports)
     });
-    
+
     // Initialize counters
     let totalEntries = 0;
     let totalWeek1 = 0, totalWeek2 = 0, totalWeek3 = 0, totalWeek4 = 0;
@@ -3066,33 +3081,33 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const concernTypeCount = {};
     const uniqueBarangays = new Set();
     const uniqueConcernTypes = new Set();
-    
+
     // Process each municipality's data
     Object.entries(reports).forEach(([municipalityName, reportData]) => {
       // Filter by municipality if specified
       if (municipality && municipalityName !== municipality) return;
-      
+
       const weeklyData = reportData.weeklyReportData || {};
       console.log(`🏘️ Processing ${municipalityName}:`, {
         hasWeeklyData: !!reportData.weeklyReportData,
         weeklyDataKeys: Object.keys(weeklyData).length,
         sampleDates: Object.keys(weeklyData).slice(0, 3)
       });
-      
+
       // Process each date's entries
       Object.entries(weeklyData).forEach(([date, dateEntries]) => {
         if (!Array.isArray(dateEntries)) {
           console.log(`⚠️ Invalid dateEntries for ${date}:`, typeof dateEntries, dateEntries);
           return;
         }
-        
+
         if (dateEntries.length > 0) {
           console.log(`📅 Processing ${date}: ${dateEntries.length} entries`);
         }
-        
+
         dateEntries.forEach(entry => {
           totalEntries++;
-          
+
           // Determine which week this entry belongs to
           const entryDate = new Date(date);
           const dayOfMonth = entryDate.getDate();
@@ -3100,23 +3115,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           else if (dayOfMonth <= 14) totalWeek2++;
           else if (dayOfMonth <= 21) totalWeek3++;
           else totalWeek4++;
-          
+
           // Count entries with action taken
           if (entry.actionTaken && entry.actionTaken.trim()) {
             entriesWithAction++;
           }
-          
+
           // Count entries with remarks
           if (entry.remarks && entry.remarks.trim()) {
             entriesWithRemarks++;
           }
-          
+
           // Count barangays
           if (entry.barangay) {
             uniqueBarangays.add(entry.barangay);
             barangayCount[entry.barangay] = (barangayCount[entry.barangay] || 0) + 1;
           }
-          
+
           // Count concern types
           if (entry.concernType) {
             uniqueConcernTypes.add(entry.concernType);
@@ -3125,23 +3140,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       });
     });
-    
+
     // Calculate rates
     const completionRate = totalEntries > 0 ? Math.round((entriesWithAction / totalEntries) * 100) : 0;
     const remarksRate = totalEntries > 0 ? Math.round((entriesWithRemarks / totalEntries) * 100) : 0;
-    
+
     // Get top concern types (sorted by count, top 5)
     const topConcernTypes = Object.entries(concernTypeCount)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([type, count]) => ({ type, count }));
-    
+
     // Get top barangays (sorted by count, top 5)
     const topBarangays = Object.entries(barangayCount)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([barangay, count]) => ({ barangay, count }));
-    
+
     return {
       totalEntries,
       totalWeek1,
@@ -3166,7 +3181,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const reports = commandCenterData.reports || {};
     const barangays = commandCenterData.barangays || [];
     const concernTypes = commandCenterData.concernTypes || [];
-    
+
     // Initialize quarterly data
     const quarters = {
       Q1: { name: "Q1", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "blue", months: ["January", "February", "March"] },
@@ -3174,7 +3189,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       Q3: { name: "Q3", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "orange", months: ["July", "August", "September"] },
       Q4: { name: "Q4", entries: 0, barangays: new Set(), concernTypes: new Set(), color: "purple", months: ["October", "November", "December"] }
     };
-    
+
     let totalEntries = 0;
     let entriesWithAction = 0;
     let entriesWithRemarks = 0;
@@ -3182,18 +3197,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const concernTypeCount = {};
     const uniqueBarangays = new Set();
     const uniqueConcernTypes = new Set();
-    
+
     // Process each municipality's data
     Object.entries(reports).forEach(([municipalityName, reportData]) => {
       // Filter by municipality if specified
       if (municipality && municipalityName !== municipality) return;
-      
+
       const weeklyData = reportData.weeklyReportData || {};
-      
+
       // Process each date's entries
       Object.entries(weeklyData).forEach(([date, dateEntries]) => {
         if (!Array.isArray(dateEntries)) return;
-        
+
         // Determine quarter from date
         const entryDate = new Date(date);
         const month = entryDate.getMonth(); // 0-11
@@ -3202,28 +3217,28 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         else if (month <= 5) quarter = 'Q2';
         else if (month <= 8) quarter = 'Q3';
         else quarter = 'Q4';
-        
+
         dateEntries.forEach(entry => {
           totalEntries++;
           quarters[quarter].entries++;
-          
+
           // Count entries with action taken
           if (entry.actionTaken && entry.actionTaken.trim()) {
             entriesWithAction++;
           }
-          
+
           // Count entries with remarks
           if (entry.remarks && entry.remarks.trim()) {
             entriesWithRemarks++;
           }
-          
+
           // Count barangays
           if (entry.barangay) {
             uniqueBarangays.add(entry.barangay);
             quarters[quarter].barangays.add(entry.barangay);
             barangayCount[entry.barangay] = (barangayCount[entry.barangay] || 0) + 1;
           }
-          
+
           // Count concern types
           if (entry.concernType) {
             uniqueConcernTypes.add(entry.concernType);
@@ -3233,23 +3248,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       });
     });
-    
+
     // Calculate rates
     const completionRate = totalEntries > 0 ? Math.round((entriesWithAction / totalEntries) * 100) : 0;
     const remarksRate = totalEntries > 0 ? Math.round((entriesWithRemarks / totalEntries) * 100) : 0;
-    
+
     // Get top concern types (sorted by count, top 5)
     const topConcernTypes = Object.entries(concernTypeCount)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([type, count]) => ({ type, count }));
-    
+
     // Get top barangays (sorted by count, top 5)
     const topBarangays = Object.entries(barangayCount)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([barangay, count]) => ({ barangay, count }));
-    
+
     // Convert quarters to array format
     const quarterlyStats = Object.values(quarters).map(q => ({
       name: q.name,
@@ -3260,7 +3275,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       color: q.color,
       months: q.months
     }));
-    
+
     return {
       totalEntries,
       totalWeeklySum: totalEntries,
@@ -3325,12 +3340,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     const assignDistrictByMunicipality = (municipality) => {
       const districtMap = {
         'Abucay': '1ST DISTRICT',
-        'Orani': '1ST DISTRICT', 
+        'Orani': '1ST DISTRICT',
         'Samal': '1ST DISTRICT',
         'Hermosa': '1ST DISTRICT',
         'Balanga City': '2ND DISTRICT',
         'Pilar': '2ND DISTRICT',
-        'Orion': '2ND DISTRICT', 
+        'Orion': '2ND DISTRICT',
         'Limay': '2ND DISTRICT',
         'Bagac': '3RD DISTRICT',
         'Dinalupihan': '3RD DISTRICT',
@@ -3341,39 +3356,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     };
 
     const totalIncidents = filteredData.length;
-    
+
     // Completed incidents calculation
-    const completedIncidents = filteredData.filter(incident => 
-      incident.status === 'Completed' || 
-      incident.status === 'completed' || 
+    const completedIncidents = filteredData.filter(incident =>
+      incident.status === 'Completed' ||
+      incident.status === 'completed' ||
       incident.status === 'COMPLETED' ||
       incident.status === 'Resolved' ||
       incident.status === 'resolved' ||
       incident.status === 'RESOLVED'
     ).length;
-    
+
     // Under investigation calculation
-    const underInvestigation = filteredData.filter(incident => 
-      incident.status === 'Under Investigation' || 
-      incident.status === 'under investigation' || 
+    const underInvestigation = filteredData.filter(incident =>
+      incident.status === 'Under Investigation' ||
+      incident.status === 'under investigation' ||
       incident.status === 'UNDER INVESTIGATION' ||
       incident.status === 'Under investigation'
     ).length;
-    
+
     // Improved action taken calculation - check multiple fields
     const actionTakenIncidents = filteredData.filter(incident => {
       const hasActionType = incident.actionType && incident.actionType.trim() !== "";
       const hasActionTaken = incident.actionTaken && incident.actionTaken.trim() !== "";
-      const hasStatus = incident.status && 
-        (incident.status.toLowerCase().includes('resolved') || 
-         incident.status.toLowerCase().includes('completed') ||
-         incident.status.toLowerCase().includes('arrested') ||
-         incident.status.toLowerCase().includes('filed'));
+      const hasStatus = incident.status &&
+        (incident.status.toLowerCase().includes('resolved') ||
+          incident.status.toLowerCase().includes('completed') ||
+          incident.status.toLowerCase().includes('arrested') ||
+          incident.status.toLowerCase().includes('filed'));
       return hasActionType || hasActionTaken || hasStatus;
     }).length;
-    
+
     // Drug-related incidents - improved detection
-    const drugsIncidents = filteredData.filter(incident => 
+    const drugsIncidents = filteredData.filter(incident =>
       incident.incidentType === 'Drug-related' ||
       incident.incidentType === 'Drugs' ||
       incident.description?.toLowerCase().includes('drug') ||
@@ -3381,10 +3396,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       incident.description?.toLowerCase().includes('marijuana') ||
       incident.description?.toLowerCase().includes('illegal substance')
     ).length;
-    
+
     // Accidents - improved categorization
-    const trafficAccidents = filteredData.filter(incident => 
-      incident.incidentType === 'Traffic Accident' || 
+    const trafficAccidents = filteredData.filter(incident =>
+      incident.incidentType === 'Traffic Accident' ||
       incident.incidentType === 'Traffic Violation' ||
       incident.incidentType === 'Vehicle Accident' ||
       (incident.description?.toLowerCase().includes('traffic') && (
@@ -3394,8 +3409,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       )) ||
       incident.description?.toLowerCase().includes('vehicular')
     ).length;
-    
-    const workAccidents = filteredData.filter(incident => 
+
+    const workAccidents = filteredData.filter(incident =>
       incident.incidentType === 'Work Accident' ||
       (incident.description?.toLowerCase().includes('work') && (
         incident.description?.toLowerCase().includes('accident') ||
@@ -3403,11 +3418,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         incident.description?.toLowerCase().includes('fall')
       ))
     ).length;
-    
-    const otherAccidents = filteredData.filter(incident => 
-      (incident.incidentType === 'Accident' || 
-       incident.description?.toLowerCase().includes('accident')) &&
-      !(incident.incidentType === 'Traffic Accident' || 
+
+    const otherAccidents = filteredData.filter(incident =>
+      (incident.incidentType === 'Accident' ||
+        incident.description?.toLowerCase().includes('accident')) &&
+      !(incident.incidentType === 'Traffic Accident' ||
         incident.incidentType === 'Vehicle Accident' ||
         incident.incidentType === 'Work Accident' ||
         incident.description?.toLowerCase().includes('traffic') ||
@@ -3418,18 +3433,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           incident.description?.toLowerCase().includes('fall')
         )))
     ).length;
-    
+
     const accidentsIncidents = trafficAccidents + workAccidents + otherAccidents;
-    
+
     // Others - everything that's not drugs or accidents
     const othersIncidents = totalIncidents - drugsIncidents - accidentsIncidents;
-    
+
     // Incident type analysis
     const incidentTypeCounts = {};
     filteredData.forEach(incident => {
       incidentTypeCounts[incident.incidentType] = (incidentTypeCounts[incident.incidentType] || 0) + 1;
     });
-    const mostCommonType = Object.keys(incidentTypeCounts).reduce((a, b) => 
+    const mostCommonType = Object.keys(incidentTypeCounts).reduce((a, b) =>
       incidentTypeCounts[a] > incidentTypeCounts[b] ? a : b, 'None');
 
     // District analysis for 3 districts - count based on detected municipalities
@@ -3478,7 +3493,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           .filter((value, index, self) => self.indexOf(value) === index) // Remove duplicates
       }
     };
-    const mostActiveDistrict = Object.keys(districtCounts).reduce((a, b) => 
+    const mostActiveDistrict = Object.keys(districtCounts).reduce((a, b) =>
       districtCounts[a] > districtCounts[b] ? a : b, 'None');
 
     // Location analysis
@@ -3497,11 +3512,11 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
     // Get top locations and municipalities
     const topLocations = Object.entries(locationCounts)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([location, count]) => ({ location, count }));
     const topMunicipalities = Object.entries(municipalityCounts)
-      .sort(([,a], [,b]) => b - a)
+      .sort(([, a], [, b]) => b - a)
       .slice(0, 5)
       .map(([municipality, count]) => ({ municipality, count }));
 
@@ -3540,7 +3555,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         monthlyCounts[month] = (monthlyCounts[month] || 0) + 1;
       }
     });
-    const highestMonth = Object.keys(monthlyCounts).reduce((a, b) => 
+    const highestMonth = Object.keys(monthlyCounts).reduce((a, b) =>
       monthlyCounts[a] > monthlyCounts[b] ? a : b, 'None');
 
     // Resolution rate
@@ -3576,7 +3591,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const exportSummaryToPDF = async () => {
     try {
       console.log('Starting Summary PDF export...');
-      
+
       // Log report access for administrators
       if (isAdmin || userAccessLevel === 'admin') {
         const userInfo = {
@@ -3589,7 +3604,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           department: userDepartment,
           isAdmin: isAdmin
         };
-        
+
         const reportFilters = {
           month: selectedMonth,
           year: selectedYear,
@@ -3597,7 +3612,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           status: filterStatus,
           searchTerm: searchTerm
         };
-        
+
         await logReportAccess('SUMMARY_PDF_EXPORT', userInfo, reportFilters);
       }
       const filteredIncidents = incidents.filter(incident => {
@@ -3629,7 +3644,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.log('Insights generated:', insights);
       const doc = new jsPDF();
       console.log('PDF document created for summary');
-      
+
       // Page 1: MEMORANDUM Header with blue background
       doc.setFillColor(70, 130, 180); // Steel blue color
       doc.rect(14, 15, 182, 12, 'F');
@@ -3637,14 +3652,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(16);
       doc.setFont('helvetica', 'bold');
       doc.text('MEMORANDUM', 105, 23, { align: 'center' });
-      
+
       // Reset text color to black
       doc.setTextColor(0, 0, 0);
-      
+
       // Memorandum table
       const currentDate = new Date();
       const monthName = selectedMonth === "all" ? "All Months" : months[selectedMonth];
-      
+
       autoTable(doc, {
         body: [
           ['FOR', 'The Provincial Director, Bataan Police Provincial Office'],
@@ -3657,20 +3672,20 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         styles: { fontSize: 10, cellPadding: 3 },
         columnStyles: { 0: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
       });
-      
+
       // 1. Data Cleaning & Categorization
       let yPos = doc.lastAutoTable.finalY + 12;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('1. Data Cleaning & Categorization', 14, yPos);
-      
+
       yPos += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
+
       // Use justified text for better formatting
       const reportText = `This report provides a comprehensive analysis of ${filteredIncidents.length} incidents recorded in the Province of Bataan for ${monthName} ${selectedYear}. The data has been processed from 5 out of 12 municipalities and categorized into 6 distinct incident types. All entries have been reviewed for completeness.`;
-      
+
       // Split text into lines and justify
       const maxWidth = 182; // Page width minus margins
       const lines = doc.splitTextToSize(reportText, maxWidth);
@@ -3678,18 +3693,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.text(line, 14, yPos + (index * 5), { align: 'justify', maxWidth: maxWidth });
       });
       yPos += lines.length * 5;
-      
+
       yPos += 8;
       doc.setFont('helvetica', 'bold');
       doc.text('The incidents are categorized as follows:', 14, yPos);
-      
+
       // Categorize incidents
       const incidentCategories = {
         'Index Crimes': { 'Theft': 0, 'Murder': 0 },
         'Non-Index Crimes & Other Incidents': { 'Drug-related': 0, 'Illegal Firearms': 0 },
         'Other Incidents': { 'Illegal Gambling': 0, 'Warrant Arrest': 0, 'Other': 0, 'Property Damage': 0 }
       };
-      
+
       filteredIncidents.forEach(incident => {
         const type = incident.incidentType || 'Other';
         if (incidentCategories['Index Crimes'][type] !== undefined) {
@@ -3700,7 +3715,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           incidentCategories['Other Incidents']['Other']++;
         }
       });
-      
+
       yPos += 6;
       Object.entries(incidentCategories).forEach(([category, types]) => {
         doc.setFont('helvetica', 'bold');
@@ -3715,31 +3730,31 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
         yPos += 2;
       });
-      
+
       // 2. Summary Generation - Continue on same page
       yPos += 10;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('2. Summary Generation', 14, yPos);
-      
+
       yPos += 8;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('A. Crime Distribution by Municipality/City:', 14, yPos);
-      
+
       yPos += 6;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
+
       // Get municipality counts
       const municipalityCounts = {};
       const allMunicipalities = ['Limay', 'Abucay', 'Morong', 'Pilar', 'Bagac', 'Orani', 'Samal', 'Hermosa', 'Balanga City', 'Orion', 'Dinalupihan', 'Mariveles'];
-      
+
       // Initialize all municipalities
       allMunicipalities.forEach(municipality => {
         municipalityCounts[municipality] = 0;
       });
-      
+
       // Count actual incidents
       filteredIncidents.forEach(incident => {
         const municipality = incident.municipality || 'Unknown';
@@ -3747,36 +3762,36 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           municipalityCounts[municipality]++;
         }
       });
-      
+
       // Get top municipality
       const sortedMunicipalities = Object.entries(municipalityCounts)
         .filter(([, count]) => count > 0)
-        .sort(([,a], [,b]) => b - a);
-      
+        .sort(([, a], [, b]) => b - a);
+
       // Create justified text for municipality analysis
       let municipalityText = `A total of ${filteredIncidents.length} incidents were recorded across 5 municipalities. `;
-      
+
       if (sortedMunicipalities.length > 0) {
         const topMunicipality = sortedMunicipalities[0];
         const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
         municipalityText += `${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing ${percentage}% of the total. `;
       }
-      
+
       municipalityText += 'The data shows varying incident patterns across different municipalities, with some areas requiring increased attention.';
-      
+
       // Split and justify municipality text
       const municipalityLines = doc.splitTextToSize(municipalityText, maxWidth);
       municipalityLines.forEach((line, index) => {
         doc.text(line, 14, yPos + (index * 5), { align: 'justify', maxWidth: maxWidth });
       });
       yPos += municipalityLines.length * 5;
-      
+
       // Barangay Hotspots section
       yPos += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('Barangay Hotspots: Incidents are concentrated in the following municipalities:', 14, yPos);
-      
+
       yPos += 7;
       sortedMunicipalities.slice(0, 3).forEach(([municipality, count]) => {
         doc.setFontSize(10);
@@ -3784,25 +3799,25 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.text(`• ${municipality}: ${count} incidents`, 20, yPos);
         yPos += 5;
       });
-      
+
       // Add page number
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Page 1 of 3', 190, 280, { align: 'right' });
-      
+
       // Page 2: Municipality Table and Analysis
       doc.addPage();
-      
+
       // Municipality Table - start on page 2
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('Municipality Breakdown Table', 14, 25);
-      
+
       // Create detailed municipality table with breakdown
       const municipalityTableData = allMunicipalities.map(municipality => {
         const count = municipalityCounts[municipality] || 0;
         let breakdown = 'No incidents recorded';
-        
+
         if (count > 0) {
           // Get incident types for this municipality
           const municipalityIncidents = filteredIncidents.filter(inc => inc.municipality === municipality);
@@ -3811,15 +3826,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             const type = inc.incidentType || 'Other';
             typeBreakdown[type] = (typeBreakdown[type] || 0) + 1;
           });
-          
+
           breakdown = Object.entries(typeBreakdown)
             .map(([type, count]) => `${count} ${type}`)
             .join(', ');
         }
-        
+
         return [municipality, count.toString(), breakdown];
       });
-      
+
       autoTable(doc, {
         head: [['Municipality/City', 'Total Incidents', 'Breakdown']],
         body: municipalityTableData,
@@ -3829,23 +3844,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         headStyles: { fillColor: [70, 130, 180], textColor: 255, fontStyle: 'bold', fontSize: 9 },
         columnStyles: { 2: { cellWidth: 70 } }
       });
-      
+
       // B. Crime Hotspots and High-Risk Areas
       let yPos3 = doc.lastAutoTable.finalY + 15;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
       doc.text('B. Crime Hotspots and High-Risk Areas:', 14, yPos3);
-      
+
       yPos3 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       if (sortedMunicipalities.length > 0) {
         const topMunicipality = sortedMunicipalities[0];
         const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
-        
+
         // Create justified text for hotspots analysis
         const hotspotsText = `Municipal Hotspot: ${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing approximately ${percentage}% of the total for the province. City Hotspot: Balanga City follows with 0 incidents.`;
-        
+
         // Split and justify hotspots text
         const hotspotsLines = doc.splitTextToSize(hotspotsText, maxWidth);
         hotspotsLines.forEach((line, index) => {
@@ -3853,26 +3868,26 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
         yPos3 += hotspotsLines.length * 5;
       }
-      
+
       // Start Trend Analysis on same page if there's space
       yPos3 += 20;
       if (yPos3 < 220) { // If there's enough space on current page
         doc.setFontSize(14);
         doc.setFont('helvetica', 'bold');
         doc.text('3. Trend & Pattern Analysis', 14, yPos3);
-        
+
         // Dominant Crime Type
         yPos3 += 10;
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.text('• Dominant Crime Type:', 14, yPos3);
-        
+
         const mostCommonType = insights.mostCommonType;
         const mostCommonCount = insights.incidentTypeCounts[mostCommonType] || 0;
         yPos3 += 8;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        
+
         // Create justified text for dominant crime type
         const dominantCrimeText = `Illegal Gambling and Warrant Arrest are the most prevalent issues, with 6 and 3 incidents respectively. Together, they account for 50.0% of all recorded events.`;
         const dominantCrimeLines = doc.splitTextToSize(dominantCrimeText, maxWidth - 6); // Indent for bullet point
@@ -3880,7 +3895,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           doc.text(line, 20, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
         });
         yPos3 += dominantCrimeLines.length * 5;
-        
+
         // Modus Operandi
         yPos3 += 10;
         doc.setFontSize(12);
@@ -3889,7 +3904,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         yPos3 += 8;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-        
+
         // Create justified text for modus operandi
         const modusText = `Analysis of incident patterns reveals the following operational methods: Theft (2 incidents recorded, indicating a need for vigilance in commercial spaces) and Drug Operations (2 drug-related incidents, primarily proactive buy-bust operations).`;
         const modusLines = doc.splitTextToSize(modusText, maxWidth - 6);
@@ -3898,21 +3913,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
         yPos3 += modusLines.length * 5;
       }
-      
+
       // Add page number
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Page 2 of 3', 190, 280, { align: 'right' });
-      
+
       // Page 3: Root Cause Analysis and Recommendations
       doc.addPage();
       let yPos4 = 22;
-      
+
       // Root Cause & Contributing Factors
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('4. Root Cause & Contributing Factors', 14, yPos4);
-      
+
       yPos4 += 12;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -3920,7 +3935,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
+
       // Create justified text for socioeconomic factors
       const socioText = `Analysis of 4 incidents (Theft, Robbery, Drug Offenses) suggests potential links between economic factors and criminal activities.`;
       const socioLines = doc.splitTextToSize(socioText, maxWidth - 6);
@@ -3928,7 +3943,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
       });
       yPos4 += socioLines.length * 5;
-      
+
       yPos4 += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -3936,7 +3951,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      
+
       // Create justified text for firearms control
       const firearmsText = `1 incident involving illegal firearms was recorded, primarily linked to drug trade operations.`;
       const firearmsLines = doc.splitTextToSize(firearmsText, maxWidth - 6);
@@ -3944,13 +3959,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
       });
       yPos4 += firearmsLines.length * 5;
-      
+
       // Actionable Recommendations
       yPos4 += 15;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('5. Actionable Recommendations', 14, yPos4);
-      
+
       yPos4 += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -3963,7 +3978,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.text('• Focus on key hotspots identified in the analysis.', 20, yPos4);
       yPos4 += 5;
       doc.text('• Increase patrol visibility during peak incident hours.', 20, yPos4);
-      
+
       // Targeted Law Enforcement Operations
       yPos4 += 10;
       doc.setFontSize(12);
@@ -3975,7 +3990,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.text('• Continue proactive anti-drug operations in areas with 2 drug-related incidents.', 20, yPos4);
       yPos4 += 5;
       doc.text('• Strengthen anti-theft measures with 2 theft incidents reported.', 20, yPos4);
-      
+
       // Technology and Infrastructure
       yPos4 += 10;
       doc.setFontSize(12);
@@ -3985,13 +4000,13 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('• Deploy surveillance cameras in commercial areas and public markets.', 20, yPos4);
-      
+
       // Risk Forecasting
       yPos4 += 15;
       doc.setFontSize(14);
       doc.setFont('helvetica', 'bold');
       doc.text('6. Risk Forecasting', 14, yPos4);
-      
+
       yPos4 += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -4000,7 +4015,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Based on recent incident density: Limay (8), Abucay (4), Morong (3).', 25, yPos4);
-      
+
       yPos4 += 10;
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
@@ -4009,18 +4024,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Elevated patterns: Illegal Gambling (6), Warrant Arrest (3), Theft (2).', 25, yPos4);
-      
+
       // Add page number
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text('Page 3 of 3', 190, 280, { align: 'right' });
-      
+
       console.log('Multi-page summary PDF created');
-      
+
       // Generate filename
       const filename = `Crime_Hotspots_Analysis_${selectedMonth === "all" ? "All_Months" : months[selectedMonth]}_${selectedYear}.pdf`;
       doc.save(filename);
-      
+
       console.log('Summary PDF saved successfully');
     } catch (error) {
       console.error('Error exporting Summary PDF:', error);
@@ -4305,12 +4320,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="from-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
                       Month
                     </Label>
-                    <Select 
-                      value={fromMonth.toString()} 
+                    <Select
+                      value={fromMonth.toString()}
                       onValueChange={(value) => setFromMonth(parseInt(value))}
                     >
                       <SelectTrigger id="from-month-filter" className="w-full">
-                        <SelectValue placeholder="Select month" />
+                        <span>{months[fromMonth]}</span>
                       </SelectTrigger>
                       <SelectContent>
                         {months.map((month, index) => (
@@ -4321,17 +4336,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex-1">
                     <Label htmlFor="from-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
                       Year
                     </Label>
-                    <Select 
-                      value={fromYear.toString()} 
+                    <Select
+                      value={fromYear.toString()}
                       onValueChange={(value) => setFromYear(parseInt(value))}
                     >
                       <SelectTrigger id="from-year-filter" className="w-full">
-                        <SelectValue placeholder="Select year" />
+                        <span>{fromYear}</span>
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
@@ -4353,12 +4368,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                     <Label htmlFor="to-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
                       Month
                     </Label>
-                    <Select 
-                      value={toMonth.toString()} 
+                    <Select
+                      value={toMonth.toString()}
                       onValueChange={(value) => setToMonth(parseInt(value))}
                     >
                       <SelectTrigger id="to-month-filter" className="w-full">
-                        <SelectValue placeholder="Select month" />
+                        <span>{months[toMonth]}</span>
                       </SelectTrigger>
                       <SelectContent>
                         {months.map((month, index) => (
@@ -4369,17 +4384,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   <div className="flex-1">
                     <Label htmlFor="to-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
                       Year
                     </Label>
-                    <Select 
-                      value={toYear.toString()} 
+                    <Select
+                      value={toYear.toString()}
                       onValueChange={(value) => setToYear(parseInt(value))}
                     >
                       <SelectTrigger id="to-year-filter" className="w-full">
-                        <SelectValue placeholder="Select year" />
+                        <span>{toYear}</span>
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
@@ -4410,160 +4425,160 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           </CardContent>
         </Card>
 
-          {/* Reports Table */}
-          <Card className="bg-white shadow-sm border border-gray-200">
-            <CardHeader className="pb-4 border-b border-gray-100">
-              <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
-              <p className="text-gray-600">Generate individual reports or all reports at once</p>
-            </CardHeader>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="border-b-2 border-gray-200 bg-gray-50">
-                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Report Type</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center w-2/5">Description</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/6">Formats</TableHead>
-                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {reportSections.map((section) => 
-                    section.reports.map((report, index) => (
-                      <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                        <TableCell className="font-semibold py-4 px-6">
-                          <div className="flex items-center justify-start gap-3">
-                            <div className="p-2 bg-black rounded-lg">
-                              {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
-                            </div>
-                            <span className="text-black">{report.name}</span>
+        {/* Reports Table */}
+        <Card className="bg-white shadow-sm border border-gray-200">
+          <CardHeader className="pb-4 border-b border-gray-100">
+            <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
+            <p className="text-gray-600">Generate individual reports or all reports at once</p>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b-2 border-gray-200 bg-gray-50">
+                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Report Type</TableHead>
+                  <TableHead className="font-bold text-black py-4 px-6 text-center w-2/5">Description</TableHead>
+                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/6">Formats</TableHead>
+                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {reportSections.map((section) =>
+                  section.reports.map((report, index) => (
+                    <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                      <TableCell className="font-semibold py-4 px-6">
+                        <div className="flex items-center justify-start gap-3">
+                          <div className="p-2 bg-black rounded-lg">
+                            {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
                           </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-gray-700 text-sm">{report.description}</TableCell>
-                        <TableCell className="py-4 px-4 text-center">
-                          <div className="flex flex-wrap gap-2 justify-center">
-                            {report.formats.map((format) => (
-                              <Badge
-                                key={format}
-                                variant="outline"
-                                className={`text-xs px-3 py-1 font-semibold border-2 transition-colors ${getFormatColor(format)}`}
+                          <span className="text-black">{report.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-gray-700 text-sm">{report.description}</TableCell>
+                      <TableCell className="py-4 px-4 text-center">
+                        <div className="flex flex-wrap gap-2 justify-center">
+                          {report.formats.map((format) => (
+                            <Badge
+                              key={format}
+                              variant="outline"
+                              className={`text-xs px-3 py-1 font-semibold border-2 transition-colors ${getFormatColor(format)}`}
+                            >
+                              {format}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4 px-4 text-center">
+                        {report.actions ? (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {report.actions.map((actionItem, actionIndex) => (
+                              <Button
+                                key={actionIndex}
+                                onClick={async () => {
+                                  if ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter") {
+                                    // Handle Command Center report generation with its own loading state
+                                    await actionItem.action();
+                                  } else {
+                                    setIsGenerating(true);
+                                    try {
+                                      await actionItem.action();
+                                    } finally {
+                                      setTimeout(() => setIsGenerating(false), 1000);
+                                    }
+                                  }
+                                }}
+                                disabled={isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))}
+                                size="sm"
+                                className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
                               >
-                                {format}
-                              </Badge>
+                                {(isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))) ? (
+                                  <>
+                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                    <span>{isLoadingCommandCenter ? 'Loading...' : 'Gen...'}</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    {actionItem.name === "Generate Report" ? (
+                                      <FileText className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "Quarterly Report" ? (
+                                      <BarChart3 className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "Daily Summary" ? (
+                                      <Calendar className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "Preview Report" ? (
+                                      <Eye className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "Summary" ? (
+                                      <Activity className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "Generate PDF" ? (
+                                      <Download className="w-3 h-3 mr-1" />
+                                    ) : actionItem.name === "View Summary" ? (
+                                      <BarChart3 className="w-3 h-3 mr-1" />
+                                    ) : (
+                                      <Printer className="w-3 h-3 mr-1" />
+                                    )}
+                                    <span>{actionItem.name}</span>
+                                  </>
+                                )}
+                              </Button>
                             ))}
                           </div>
-                        </TableCell>
-                        <TableCell className="py-4 px-4 text-center">
-                          {report.actions ? (
-                            <div className="flex flex-wrap gap-1 justify-center">
-                              {report.actions.map((actionItem, actionIndex) => (
-                                <Button
-                                  key={actionIndex}
-                                  onClick={async () => {
-                                    if ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter") {
-                                      // Handle Command Center report generation with its own loading state
-                                      await actionItem.action();
-                                    } else {
-                                      setIsGenerating(true);
-                                      try {
-                                        await actionItem.action();
-                                      } finally {
-                                        setTimeout(() => setIsGenerating(false), 1000);
-                                      }
-                                    }
-                                  }}
-                                  disabled={isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))}
-                                  size="sm"
-                                  className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
-                                >
-                                  {(isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))) ? (
-                                    <>
-                                      <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                      <span>{isLoadingCommandCenter ? 'Loading...' : 'Gen...'}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      {actionItem.name === "Generate Report" ? (
-                                        <FileText className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Quarterly Report" ? (
-                                        <BarChart3 className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Daily Summary" ? (
-                                        <Calendar className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Preview Report" ? (
-                                        <Eye className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Summary" ? (
-                                        <Activity className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "Generate PDF" ? (
-                                        <Download className="w-3 h-3 mr-1" />
-                                      ) : actionItem.name === "View Summary" ? (
-                                        <BarChart3 className="w-3 h-3 mr-1" />
-                                      ) : (
-                                        <Printer className="w-3 h-3 mr-1" />
-                                      )}
-                                      <span>{actionItem.name}</span>
-                                    </>
-                                  )}
-                                </Button>
-                              ))}
-                            </div>
-                          ) : (
-                            <Button
-                              onClick={() => {
-                                setIsGenerating(true);
-                                try {
-                                  report.action();
-                                } finally {
-                                  setTimeout(() => setIsGenerating(false), 1000);
-                                }
-                              }}
-                              disabled={isGenerating}
-                              size="sm"
-                              className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
-                            >
-                              {isGenerating ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                  <span>Gen...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Printer className="w-3 h-3 mr-1" />
-                                  <span>Generate Report</span>
-                                </>
-                              )}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                        ) : (
+                          <Button
+                            onClick={() => {
+                              setIsGenerating(true);
+                              try {
+                                report.action();
+                              } finally {
+                                setTimeout(() => setIsGenerating(false), 1000);
+                              }
+                            }}
+                            disabled={isGenerating}
+                            size="sm"
+                            className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
+                          >
+                            {isGenerating ? (
+                              <>
+                                <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                <span>Gen...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Printer className="w-3 h-3 mr-1" />
+                                <span>Generate Report</span>
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
 
-        </div>
+      </div>
 
-        {/* Summary Modal */}
-        {showSummaryModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
-                    <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
-                      Summary
-                    </h3>
-                    <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
-                  </div>
+      {/* Summary Modal */}
+      {showSummaryModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
+                  <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      const insights = generateSummaryInsights();
-                      alert(`Detection Test Results:
+                <div>
+                  <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
+                    Summary
+                  </h3>
+                  <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    const insights = generateSummaryInsights();
+                    alert(`Detection Test Results:
 Total Incidents: ${insights.totalIncidents}
 Active: ${insights.completedIncidents}
 Completed: ${insights.completedIncidents}
@@ -4572,1315 +4587,1335 @@ Completion Rate: ${insights.completionRate}%
 Top District: ${insights.mostActiveDistrict}
 Top Municipality: ${insights.topMunicipalities[0]?.municipality || 'N/A'}
 Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
-                    }}
-                    className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
-                    title="Test Detection"
-                  >
-                    <Zap className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={exportSummaryToPDF}
-                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
-                    title="Generate PDF"
-                  >
-                    <Download className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setShowSummaryModal(false)}
-                    className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                  >
-                    <X className="h-6 w-6" />
-                  </button>
-                </div>
-              </div>
-              <div className="p-6 overflow-y-auto max-h-[75vh]">
-                {(() => {
-                  const filteredIncidents = incidents.filter(incident => {
-                    // Filter by status if not "all"
-                    if (filterStatus !== "all" && incident.status !== filterStatus) {
-                      return false;
-                    }
-                    // Filter by month if not "all"
-                    if (selectedMonth !== "all") {
-                      const incidentMonth = new Date(incident.date).getMonth();
-                      if (incidentMonth !== selectedMonth) {
-                        return false;
-                      }
-                    }
-                    // Filter by search term
-                    if (searchTerm) {
-                      const searchLower = searchTerm.toLowerCase();
-                      return (
-                        incident.description?.toLowerCase().includes(searchLower) ||
-                        incident.location?.toLowerCase().includes(searchLower) ||
-                        incident.incidentType?.toLowerCase().includes(searchLower) ||
-                        incident.municipality?.toLowerCase().includes(searchLower)
-                      );
-                    }
-                    return true;
-                  });
-
-                  const insights = generateSummaryInsights(filteredIncidents);
-                  return (
-                    <div className="space-y-6">
-                      {/* Summary Statistics Header */}
-                      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-2xl font-bold">Incidents Summary Report</h3>
-                            <p className="text-blue-100 mt-1">
-                              {selectedMonth !== "all" ? `${months[selectedMonth]} ${selectedYear}` : `Full Year ${selectedYear}`} Analysis
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <div className="text-3xl font-bold">{insights.totalIncidents}</div>
-                            <div className="text-blue-100 text-sm">Total Incidents</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Main Overview Cards */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div className="bg-white rounded-lg border border-red-200 p-4 hover:shadow-lg transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="p-2 bg-red-100 rounded-lg">
-                              <Shield className="w-5 h-5 text-red-600" />
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</div>
-                              <div className="text-xs text-gray-500">
-                                {insights.totalIncidents > 0 ? Math.round((insights.drugsIncidents / insights.totalIncidents) * 100) : 0}%
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Drug-Related</div>
-                          <div className="text-xs text-gray-600">Illegal drugs, substances</div>
-                        </div>
-
-                        <div className="bg-white rounded-lg border border-orange-200 p-4 hover:shadow-lg transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="p-2 bg-orange-100 rounded-lg">
-                              <Car className="w-5 h-5 text-orange-600" />
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</div>
-                              <div className="text-xs text-gray-500">
-                                {insights.totalIncidents > 0 ? Math.round((insights.accidentsIncidents / insights.totalIncidents) * 100) : 0}%
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Accidents</div>
-                          <div className="text-xs text-gray-600">Traffic: {insights.trafficAccidents} | Work: {insights.workAccidents} | Other: {insights.otherAccidents}</div>
-                        </div>
-
-                        <div className="bg-white rounded-lg border border-green-200 p-4 hover:shadow-lg transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="p-2 bg-green-100 rounded-lg">
-                              <CheckCircle className="w-5 h-5 text-green-600" />
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-green-600">{insights.actionTakenIncidents}</div>
-                              <div className="text-xs text-gray-500">
-                                {insights.totalIncidents > 0 ? Math.round((insights.actionTakenIncidents / insights.totalIncidents) * 100) : 0}%
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Action Taken</div>
-                          <div className="text-xs text-gray-600">Resolved, arrested, filed</div>
-                        </div>
-
-                        <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="p-2 bg-gray-100 rounded-lg">
-                              <MoreHorizontal className="w-5 h-5 text-gray-600" />
-                            </div>
-                            <div className="text-right">
-                              <div className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</div>
-                              <div className="text-xs text-gray-500">
-                                {insights.totalIncidents > 0 ? Math.round((insights.othersIncidents / insights.totalIncidents) * 100) : 0}%
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-sm font-medium text-gray-900">Other Types</div>
-                          <div className="text-xs text-gray-600">Theft, assault, etc.</div>
-                        </div>
-                      </div>
-
-                      {/* Status Overview */}
-                      <div className="bg-white rounded-xl border border-gray-200 p-6">
-                        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <Activity className="w-5 h-5 text-blue-600" />
-                          Status Overview
-                        </h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div className="text-center p-4 bg-blue-50 rounded-lg">
-                            <div className="text-2xl font-bold text-blue-600">{insights.completedIncidents}</div>
-                            <div className="text-sm text-gray-600">Completed/Resolved</div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {insights.totalIncidents > 0 ? Math.round((insights.completedIncidents / insights.totalIncidents) * 100) : 0}% completion rate
-                            </div>
-                          </div>
-                          <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                            <div className="text-2xl font-bold text-yellow-600">{insights.underInvestigation}</div>
-                            <div className="text-sm text-gray-600">Under Investigation</div>
-                            <div className="text-xs text-gray-500 mt-1">Ongoing cases</div>
-                          </div>
-                          <div className="text-center p-4 bg-gray-50 rounded-lg">
-                            <div className="text-2xl font-bold text-gray-600">
-                              {insights.totalIncidents - insights.completedIncidents - insights.underInvestigation}
-                            </div>
-                            <div className="text-sm text-gray-600">Other Status</div>
-                            <div className="text-xs text-gray-500 mt-1">Pending, new, etc.</div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Three Districts Analysis */}
-                      <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
-                        <div className="flex items-center gap-3 mb-6">
-                          <div className="p-2 rounded-lg bg-green-100">
-                            <MapPin className="w-6 h-6 text-green-600" />
-                          </div>
-                          <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                          {/* 1ST DISTRICT */}
-                          <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                              <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="text-center">
-                                <p className="text-3xl font-bold text-blue-600">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                                <p className="text-sm text-gray-600">Total Incidents</p>
-                              </div>
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {insights.threeDistricts['1ST DISTRICT'].municipalities.map(municipality => (
-                                    <span key={municipality} className="px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded-full">
-                                      {municipality}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 2ND DISTRICT */}
-                          <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                              <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="text-center">
-                                <p className="text-3xl font-bold text-green-600">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                                <p className="text-sm text-gray-600">Total Incidents</p>
-                              </div>
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {insights.threeDistricts['2ND DISTRICT'].municipalities.map(municipality => (
-                                    <span key={municipality} className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full">
-                                      {municipality}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-
-                          {/* 3RD DISTRICT */}
-                          <div className="p-4 rounded-lg border-2 bg-red-100 border-red-200">
-                            <div className="flex items-center gap-2 mb-3">
-                              <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                              <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
-                            </div>
-                            <div className="space-y-3">
-                              <div className="text-center">
-                                <p className="text-3xl font-bold text-red-600">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                                <p className="text-sm text-gray-600">Total Incidents</p>
-                              </div>
-                              <div className="space-y-2">
-                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                                <div className="flex flex-wrap gap-1">
-                                  {insights.threeDistricts['3RD DISTRICT'].municipalities.map(municipality => (
-                                    <span key={municipality} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full">
-                                      {municipality}
-                                    </span>
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-              <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+                  }}
+                  className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
+                  title="Test Detection"
+                >
+                  <Zap className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={exportSummaryToPDF}
+                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                  title="Generate PDF"
+                >
+                  <Download className="w-5 h-5" />
+                </button>
                 <button
                   onClick={() => setShowSummaryModal(false)}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
                 >
-                  Close
+                  <X className="h-6 w-6" />
                 </button>
               </div>
             </div>
-          </div>
-        )}
+            <div className="p-6 overflow-y-auto max-h-[75vh]">
+              {(() => {
+                const filteredIncidents = incidents.filter(incident => {
+                  // Filter by status if not "all"
+                  if (filterStatus !== "all" && incident.status !== filterStatus) {
+                    return false;
+                  }
+                  // Filter by month if not "all"
+                  if (selectedMonth !== "all") {
+                    const incidentMonth = new Date(incident.date).getMonth();
+                    if (incidentMonth !== selectedMonth) {
+                      return false;
+                    }
+                  }
+                  // Filter by search term
+                  if (searchTerm) {
+                    const searchLower = searchTerm.toLowerCase();
+                    return (
+                      incident.description?.toLowerCase().includes(searchLower) ||
+                      incident.location?.toLowerCase().includes(searchLower) ||
+                      incident.incidentType?.toLowerCase().includes(searchLower) ||
+                      incident.municipality?.toLowerCase().includes(searchLower)
+                    );
+                  }
+                  return true;
+                });
 
-        {showActionCenterGenerateModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
-                  <p className="text-sm text-gray-500">Choose a department (January - February)</p>
-                </div>
-                <button
-                  onClick={() => setShowActionCenterGenerateModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                  disabled={isGeneratingActionCenterRangeReport}
-                >
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
-              </div>
+                const insights = generateSummaryInsights(filteredIncidents);
+                return (
+                  <div className="space-y-6">
+                    {/* Summary Statistics Header */}
+                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-2xl font-bold">Incidents Summary Report</h3>
+                          <p className="text-blue-100 mt-1">
+                            {selectedMonth !== "all" ? `${months[selectedMonth]} ${selectedYear}` : `Full Year ${selectedYear}`} Analysis
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-3xl font-bold">{insights.totalIncidents}</div>
+                          <div className="text-blue-100 text-sm">Total Incidents</div>
+                        </div>
+                      </div>
+                    </div>
 
-              <div className="p-6 space-y-3">
-                <Button
-                  onClick={async () => {
-                    await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
-                    setShowActionCenterGenerateModal(false);
-                  }}
-                  disabled={isGeneratingActionCenterRangeReport}
-                  className="w-full bg-green-600 hover:bg-green-700 text-white"
-                >
-                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'AGRICULTURE'}
-                </Button>
-                <Button
-                  onClick={async () => {
-                    await generateActionCenterReportJanFebByDepartment('PG-ENRO');
-                    setShowActionCenterGenerateModal(false);
-                  }}
-                  disabled={isGeneratingActionCenterRangeReport}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-                >
-                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PG-ENRO'}
-                </Button>
-                <Button
-                  onClick={async () => {
-                    await generateActionCenterReportJanFebByDepartment('PNP');
-                    setShowActionCenterGenerateModal(false);
-                  }}
-                  disabled={isGeneratingActionCenterRangeReport}
-                  className="w-full bg-red-600 hover:bg-red-700 text-white"
-                >
-                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PNP'}
-                </Button>
+                    {/* Main Overview Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="bg-white rounded-lg border border-red-200 p-4 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-2 bg-red-100 rounded-lg">
+                            <Shield className="w-5 h-5 text-red-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</div>
+                            <div className="text-xs text-gray-500">
+                              {insights.totalIncidents > 0 ? Math.round((insights.drugsIncidents / insights.totalIncidents) * 100) : 0}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">Drug-Related</div>
+                        <div className="text-xs text-gray-600">Illegal drugs, substances</div>
+                      </div>
 
-                <div className="pt-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowActionCenterGenerateModal(false)}
-                    disabled={isGeneratingActionCenterRangeReport}
-                    className="w-full"
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+                      <div className="bg-white rounded-lg border border-orange-200 p-4 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-2 bg-orange-100 rounded-lg">
+                            <Car className="w-5 h-5 text-orange-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</div>
+                            <div className="text-xs text-gray-500">
+                              {insights.totalIncidents > 0 ? Math.round((insights.accidentsIncidents / insights.totalIncidents) * 100) : 0}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">Accidents</div>
+                        <div className="text-xs text-gray-600">Traffic: {insights.trafficAccidents} | Work: {insights.workAccidents} | Other: {insights.otherAccidents}</div>
+                      </div>
 
-        {/* Command Center Summary Modal */}
-        {showCommandCenterSummary && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-gray-200">
-              <div className="flex items-center justify-between p-8 border-b border-gray-100">
-                <div className="flex items-center gap-4">
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-sm"></div>
-                    <div className="relative p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                      <Command className="w-6 h-6 text-emerald-600" />
+                      <div className="bg-white rounded-lg border border-green-200 p-4 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-2 bg-green-100 rounded-lg">
+                            <CheckCircle className="w-5 h-5 text-green-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-green-600">{insights.actionTakenIncidents}</div>
+                            <div className="text-xs text-gray-500">
+                              {insights.totalIncidents > 0 ? Math.round((insights.actionTakenIncidents / insights.totalIncidents) * 100) : 0}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">Action Taken</div>
+                        <div className="text-xs text-gray-600">Resolved, arrested, filed</div>
+                      </div>
+
+                      <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow">
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="p-2 bg-gray-100 rounded-lg">
+                            <MoreHorizontal className="w-5 h-5 text-gray-600" />
+                          </div>
+                          <div className="text-right">
+                            <div className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</div>
+                            <div className="text-xs text-gray-500">
+                              {insights.totalIncidents > 0 ? Math.round((insights.othersIncidents / insights.totalIncidents) * 100) : 0}%
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">Other Types</div>
+                        <div className="text-xs text-gray-600">Theft, assault, etc.</div>
+                      </div>
+                    </div>
+
+                    {/* Status Overview */}
+                    <div className="bg-white rounded-xl border border-gray-200 p-6">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Activity className="w-5 h-5 text-blue-600" />
+                        Status Overview
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">{insights.completedIncidents}</div>
+                          <div className="text-sm text-gray-600">Completed/Resolved</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {insights.totalIncidents > 0 ? Math.round((insights.completedIncidents / insights.totalIncidents) * 100) : 0}% completion rate
+                          </div>
+                        </div>
+                        <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                          <div className="text-2xl font-bold text-yellow-600">{insights.underInvestigation}</div>
+                          <div className="text-sm text-gray-600">Under Investigation</div>
+                          <div className="text-xs text-gray-500 mt-1">Ongoing cases</div>
+                        </div>
+                        <div className="text-center p-4 bg-gray-50 rounded-lg">
+                          <div className="text-2xl font-bold text-gray-600">
+                            {insights.totalIncidents - insights.completedIncidents - insights.underInvestigation}
+                          </div>
+                          <div className="text-sm text-gray-600">Other Status</div>
+                          <div className="text-xs text-gray-500 mt-1">Pending, new, etc.</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Three Districts Analysis */}
+                    <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
+                      <div className="flex items-center gap-3 mb-6">
+                        <div className="p-2 rounded-lg bg-green-100">
+                          <MapPin className="w-6 h-6 text-green-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        {/* 1ST DISTRICT */}
+                        <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                            <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-blue-600">{insights.threeDistricts['1ST DISTRICT'].count}</p>
+                              <p className="text-sm text-gray-600">Total Incidents</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {insights.threeDistricts['1ST DISTRICT'].municipalities.map(municipality => (
+                                  <span key={municipality} className="px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded-full">
+                                    {municipality}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2ND DISTRICT */}
+                        <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                            <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-green-600">{insights.threeDistricts['2ND DISTRICT'].count}</p>
+                              <p className="text-sm text-gray-600">Total Incidents</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {insights.threeDistricts['2ND DISTRICT'].municipalities.map(municipality => (
+                                  <span key={municipality} className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full">
+                                    {municipality}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 3RD DISTRICT */}
+                        <div className="p-4 rounded-lg border-2 bg-red-100 border-red-200">
+                          <div className="flex items-center gap-2 mb-3">
+                            <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                            <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="text-center">
+                              <p className="text-3xl font-bold text-red-600">{insights.threeDistricts['3RD DISTRICT'].count}</p>
+                              <p className="text-sm text-gray-600">Total Incidents</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                              <div className="flex flex-wrap gap-1">
+                                {insights.threeDistricts['3RD DISTRICT'].municipalities.map(municipality => (
+                                  <span key={municipality} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full">
+                                    {municipality}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <h3 className="text-3xl font-semibold tracking-tight text-gray-900">
-                      {summaryViewType === "quarterly" ? "Quarterly Report" : "Weekly Report"}
-                    </h3>
-                    <p className="text-gray-500 mt-1">Command Center operational insights</p>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowSummaryModal(false)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showActionCenterGenerateModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
+                <p className="text-sm text-gray-500">Choose a department (January - February)</p>
+              </div>
+              <button
+                onClick={() => setShowActionCenterGenerateModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                disabled={isGeneratingActionCenterRangeReport}
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-3">
+              <Button
+                onClick={async () => {
+                  await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
+                  setShowActionCenterGenerateModal(false);
+                }}
+                disabled={isGeneratingActionCenterRangeReport}
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
+              >
+                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'AGRICULTURE'}
+              </Button>
+              <Button
+                onClick={async () => {
+                  await generateActionCenterReportJanFebByDepartment('PG-ENRO');
+                  setShowActionCenterGenerateModal(false);
+                }}
+                disabled={isGeneratingActionCenterRangeReport}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PG-ENRO'}
+              </Button>
+              <Button
+                onClick={async () => {
+                  await generateActionCenterReportJanFebByDepartment('PNP');
+                  setShowActionCenterGenerateModal(false);
+                }}
+                disabled={isGeneratingActionCenterRangeReport}
+                className="w-full bg-red-600 hover:bg-red-700 text-white"
+              >
+                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PNP'}
+              </Button>
+
+              <div className="pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowActionCenterGenerateModal(false)}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Command Center Summary Modal */}
+      {showCommandCenterSummary && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-gray-200">
+            <div className="flex items-center justify-between p-8 border-b border-gray-100">
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-sm"></div>
+                  <div className="relative p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                    <Command className="w-6 h-6 text-emerald-600" />
                   </div>
                 </div>
-                <div className="flex items-center gap-4">
-                  {/* View Type Toggle */}
-                  <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-200">
-                    <button
-                      onClick={() => setSummaryViewType("monthly")}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                        summaryViewType === "monthly"
-                          ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
-                    >
-                      Monthly
-                    </button>
-                    <button
-                      onClick={() => setSummaryViewType("quarterly")}
-                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
-                        summaryViewType === "quarterly"
-                          ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
-                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
-                    >
-                      Quarterly
-                    </button>
-                  </div>
-                  <button
-                    onClick={() => setShowCommandCenterSummary(false)}
-                    className="p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-gray-200"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                <div>
+                  <h3 className="text-3xl font-semibold tracking-tight text-gray-900">
+                    {summaryViewType === "quarterly" ? "Quarterly Report" : "Weekly Report"}
+                  </h3>
+                  <p className="text-gray-500 mt-1">Command Center operational insights</p>
                 </div>
               </div>
-              <div className="p-8 overflow-y-auto max-h-[75vh] bg-gray-50/30">
-                {(() => {
-                  const summary = summaryViewType === "quarterly" 
-                    ? calculateQuarterlySummary()
-                    : calculateWeeklyReportSummary();
-                  return (
-                    <div className="space-y-10">
-                      {/* Overview Stats */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-blue-600/80 mb-2">Total Entries</p>
-                                <p className="text-3xl font-bold text-blue-900">{summary.totalEntries}</p>
-                              </div>
-                              <div className="p-3 bg-blue-100 rounded-xl">
-                                <FileText className="h-6 w-6 text-blue-600" />
-                              </div>
+              <div className="flex items-center gap-4">
+                {/* View Type Toggle */}
+                <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-200">
+                  <button
+                    onClick={() => setSummaryViewType("monthly")}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "monthly"
+                      ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      }`}
+                  >
+                    Monthly
+                  </button>
+                  <button
+                    onClick={() => setSummaryViewType("quarterly")}
+                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "quarterly"
+                      ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      }`}
+                  >
+                    Quarterly
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowCommandCenterSummary(false)}
+                  className="p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-gray-200"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="p-8 overflow-y-auto max-h-[75vh] bg-gray-50/30">
+              {(() => {
+                const summary = summaryViewType === "quarterly"
+                  ? calculateQuarterlySummary()
+                  : calculateWeeklyReportSummary();
+                return (
+                  <div className="space-y-10">
+                    {/* Overview Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-blue-600/80 mb-2">Total Entries</p>
+                              <p className="text-3xl font-bold text-blue-900">{summary.totalEntries}</p>
                             </div>
-                          </div>
-                        </div>
-                        
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-emerald-600/80 mb-2">Total Weekly Sum</p>
-                                <p className="text-3xl font-bold text-emerald-900">{summary.totalWeeklySum}</p>
-                              </div>
-                              <div className="p-3 bg-emerald-100 rounded-xl">
-                                <BarChart3 className="h-6 w-6 text-emerald-600" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-violet-600/80 mb-2">Unique Barangays</p>
-                                <p className="text-3xl font-bold text-violet-900">{summary.uniqueBarangays}</p>
-                              </div>
-                              <div className="p-3 bg-violet-100 rounded-xl">
-                                <MapPin className="h-6 w-6 text-violet-600" />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-start justify-between">
-                              <div>
-                                <p className="text-sm font-medium text-amber-600/80 mb-2">Concern Types</p>
-                                <p className="text-3xl font-bold text-amber-900">{summary.uniqueConcernTypes}</p>
-                              </div>
-                              <div className="p-3 bg-amber-100 rounded-xl">
-                                <AlertTriangle className="h-6 w-6 text-amber-600" />
-                              </div>
+                            <div className="p-3 bg-blue-100 rounded-xl">
+                              <FileText className="h-6 w-6 text-blue-600" />
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Breakdown Section */}
-                      <div className="bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-8 shadow-sm">
-                        <div className="flex items-center gap-3 mb-8">
-                          <div className="p-2 bg-gray-100 rounded-xl">
-                            <BarChart3 className="h-5 w-5 text-gray-600" />
-                          </div>
-                          <h3 className="text-xl font-semibold text-gray-900">
-                            {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
-                          </h3>
-                        </div>
-                        
-                        {summaryViewType === "quarterly" ? (
-                          // Quarterly View
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {summary.quarterlyStats && summary.quarterlyStats.map((quarter, index) => {
-                              const getQuarterStyles = (color) => {
-                                switch(color) {
-                                  case 'blue':
-                                    return {
-                                      bg: 'bg-blue-100',
-                                      border: 'border-blue-300',
-                                      textMedium: 'text-blue-800',
-                                      textBold: 'text-blue-900',
-                                      textSmall: 'text-blue-700',
-                                      textXs: 'text-blue-600'
-                                    };
-                                  case 'green':
-                                    return {
-                                      bg: 'bg-green-100',
-                                      border: 'border-green-300',
-                                      textMedium: 'text-green-800',
-                                      textBold: 'text-green-900',
-                                      textSmall: 'text-green-700',
-                                      textXs: 'text-green-600'
-                                    };
-                                  case 'orange':
-                                    return {
-                                      bg: 'bg-orange-100',
-                                      border: 'border-orange-300',
-                                      textMedium: 'text-orange-800',
-                                      textBold: 'text-orange-900',
-                                      textSmall: 'text-orange-700',
-                                      textXs: 'text-orange-600'
-                                    };
-                                  case 'purple':
-                                    return {
-                                      bg: 'bg-purple-100',
-                                      border: 'border-purple-300',
-                                      textMedium: 'text-purple-800',
-                                      textBold: 'text-purple-900',
-                                      textSmall: 'text-purple-700',
-                                      textXs: 'text-purple-600'
-                                    };
-                                  default:
-                                    return {
-                                      bg: 'bg-gray-100',
-                                      border: 'border-gray-300',
-                                      textMedium: 'text-gray-800',
-                                      textBold: 'text-gray-900',
-                                      textSmall: 'text-gray-700',
-                                      textXs: 'text-gray-600'
-                                    };
-                                }
-                              };
-                              const styles = getQuarterStyles(quarter.color);
-                              
-                              return (
-                                <div key={quarter.name} className="text-center">
-                                  <div className={`${styles.bg} border ${styles.border} rounded-lg p-4`}>
-                                    <p className={`text-sm font-medium ${styles.textMedium}`}>{quarter.name}</p>
-                                    <p className={`text-2xl font-bold ${styles.textBold} mb-2`}>{quarter.entries}</p>
-                                    <div className="space-y-1">
-                                      <p className={`text-xs ${styles.textSmall}`}>
-                                        Weekly Sum: <span className="font-semibold">{quarter.weeklySum}</span>
-                                      </p>
-                                      <p className={`text-xs ${styles.textSmall}`}>
-                                        Barangays: <span className="font-semibold">{quarter.barangays}</span>
-                                      </p>
-                                      <p className={`text-xs ${styles.textSmall}`}>
-                                        Concerns: <span className="font-semibold">{quarter.concernTypes}</span>
-                                      </p>
-                                    </div>
-                                    <p className={`text-xs ${styles.textXs} mt-2 font-medium`}>
-                                      {quarter.months.join(", ")}
-                                    </p>
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          // Weekly View
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                            <div className="group relative">
-                              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                              <div className="relative bg-white/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                                <p className="text-sm font-semibold text-yellow-700 mb-2">Week 1</p>
-                                <p className="text-2xl font-bold text-yellow-900 mb-1">{summary.totalWeek1}</p>
-                                <p className="text-xs text-yellow-600">{months[selectedMonth]} 1-7</p>
-                              </div>
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-emerald-600/80 mb-2">Total Weekly Sum</p>
+                              <p className="text-3xl font-bold text-emerald-900">{summary.totalWeeklySum}</p>
                             </div>
-                            <div className="group relative">
-                              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 to-emerald-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                              <div className="relative bg-white/90 backdrop-blur-sm border border-emerald-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                                <p className="text-sm font-semibold text-emerald-700 mb-2">Week 2</p>
-                                <p className="text-2xl font-bold text-emerald-900 mb-1">{summary.totalWeek2}</p>
-                                <p className="text-xs text-emerald-600">{months[selectedMonth]} 8-14</p>
-                              </div>
-                            </div>
-                            <div className="group relative">
-                              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-blue-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                              <div className="relative bg-white/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                                <p className="text-sm font-semibold text-blue-700 mb-2">Week 3</p>
-                                <p className="text-2xl font-bold text-blue-900 mb-1">{summary.totalWeek3}</p>
-                                <p className="text-xs text-blue-600">{months[selectedMonth]} 15-21</p>
-                              </div>
-                            </div>
-                            <div className="group relative">
-                              <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-violet-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                              <div className="relative bg-white/90 backdrop-blur-sm border border-violet-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                                <p className="text-sm font-semibold text-violet-700 mb-2">Week 4</p>
-                                <p className="text-2xl font-bold text-violet-900 mb-1">{summary.totalWeek4}</p>
-                                <p className="text-xs text-violet-600">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Completion Stats */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <CheckCircle className="h-5 w-5 text-green-600" />
-                            Completion Rate
-                          </h3>
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Entries with Action Taken</span>
-                              <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-green-600 h-2 rounded-full transition-all duration-300" 
-                                style={{ width: `${summary.completionRate}%` }}
-                              ></div>
-                            </div>
-                            <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
-                          </div>
-                        </div>
-
-                        <div className="bg-white border border-gray-200 rounded-lg p-6">
-                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <MessageSquare className="h-5 w-5 text-blue-600" />
-                            Remarks Rate
-                          </h3>
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-gray-600">Entries with Remarks</span>
-                              <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
-                            </div>
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                                style={{ width: `${summary.remarksRate}%` }}
-                              ></div>
-                            </div>
-                            <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Top Lists */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="p-2 bg-amber-100 rounded-xl">
-                                <AlertTriangle className="h-5 w-5 text-amber-600" />
-                              </div>
-                              <h3 className="text-lg font-semibold text-gray-900">Top Concern Types</h3>
-                            </div>
-                            {summary.topConcernTypes.length > 0 ? (
-                              <div className="space-y-3">
-                                {summary.topConcernTypes.map((item, index) => (
-                                  <div key={item.type} className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100/50 rounded-xl border border-amber-200/30 hover:shadow-sm transition-all duration-200">
-                                    <span className="text-sm font-medium text-amber-900">{item.type}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-bold text-amber-700 bg-amber-200/50 px-2 py-1 rounded-lg">{item.count}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-8">
-                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                  <AlertTriangle className="h-6 w-6 text-gray-400" />
-                                </div>
-                                <p className="text-sm text-gray-500">No concern types recorded</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="group relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                            <div className="flex items-center gap-3 mb-6">
-                              <div className="p-2 bg-violet-100 rounded-xl">
-                                <MapPin className="h-5 w-5 text-violet-600" />
-                              </div>
-                              <h3 className="text-lg font-semibold text-gray-900">Top Barangays</h3>
-                            </div>
-                            {summary.topBarangays.length > 0 ? (
-                              <div className="space-y-3">
-                                {summary.topBarangays.map((item, index) => (
-                                  <div key={item.barangay} className="flex justify-between items-center p-4 bg-gradient-to-r from-violet-50 to-violet-100/50 rounded-xl border border-violet-200/30 hover:shadow-sm transition-all duration-200">
-                                    <span className="text-sm font-medium text-violet-900">{item.barangay}</span>
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-sm font-bold text-violet-700 bg-violet-200/50 px-2 py-1 rounded-lg">{item.count}</span>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : (
-                              <div className="text-center py-8">
-                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                  <MapPin className="h-6 w-6 text-gray-400" />
-                                </div>
-                                <p className="text-sm text-gray-500">No barangays recorded</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Summary Info */}
-                      <div className="relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-8">
-                          <div className="flex items-start gap-4">
                             <div className="p-3 bg-emerald-100 rounded-xl">
                               <BarChart3 className="h-6 w-6 text-emerald-600" />
                             </div>
-                            <div className="flex-1">
-                              <h4 className="text-xl font-semibold text-gray-900 mb-3">
-                                {summaryViewType === "quarterly" 
-                                  ? `Quarterly Summary for ${summary.year || selectedYear}`
-                                  : `Summary for ${months[selectedMonth]} ${selectedYear}`
-                                }
-                              </h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                                <div className="space-y-2">
-                                  <p><span className="font-medium text-gray-900">Municipality:</span> {summary.municipality}</p>
-                                  <p><span className="font-medium text-gray-900">Total Entries:</span> {summary.totalEntries}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-violet-600/80 mb-2">Unique Barangays</p>
+                              <p className="text-3xl font-bold text-violet-900">{summary.uniqueBarangays}</p>
+                            </div>
+                            <div className="p-3 bg-violet-100 rounded-xl">
+                              <MapPin className="h-6 w-6 text-violet-600" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-start justify-between">
+                            <div>
+                              <p className="text-sm font-medium text-amber-600/80 mb-2">Concern Types</p>
+                              <p className="text-3xl font-bold text-amber-900">{summary.uniqueConcernTypes}</p>
+                            </div>
+                            <div className="p-3 bg-amber-100 rounded-xl">
+                              <AlertTriangle className="h-6 w-6 text-amber-600" />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Breakdown Section */}
+                    <div className="bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-8 shadow-sm">
+                      <div className="flex items-center gap-3 mb-8">
+                        <div className="p-2 bg-gray-100 rounded-xl">
+                          <BarChart3 className="h-5 w-5 text-gray-600" />
+                        </div>
+                        <h3 className="text-xl font-semibold text-gray-900">
+                          {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
+                        </h3>
+                      </div>
+
+                      {summaryViewType === "quarterly" ? (
+                        // Quarterly View
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {summary.quarterlyStats && summary.quarterlyStats.map((quarter, index) => {
+                            const getQuarterStyles = (color) => {
+                              switch (color) {
+                                case 'blue':
+                                  return {
+                                    bg: 'bg-blue-100',
+                                    border: 'border-blue-300',
+                                    textMedium: 'text-blue-800',
+                                    textBold: 'text-blue-900',
+                                    textSmall: 'text-blue-700',
+                                    textXs: 'text-blue-600'
+                                  };
+                                case 'green':
+                                  return {
+                                    bg: 'bg-green-100',
+                                    border: 'border-green-300',
+                                    textMedium: 'text-green-800',
+                                    textBold: 'text-green-900',
+                                    textSmall: 'text-green-700',
+                                    textXs: 'text-green-600'
+                                  };
+                                case 'orange':
+                                  return {
+                                    bg: 'bg-orange-100',
+                                    border: 'border-orange-300',
+                                    textMedium: 'text-orange-800',
+                                    textBold: 'text-orange-900',
+                                    textSmall: 'text-orange-700',
+                                    textXs: 'text-orange-600'
+                                  };
+                                case 'purple':
+                                  return {
+                                    bg: 'bg-purple-100',
+                                    border: 'border-purple-300',
+                                    textMedium: 'text-purple-800',
+                                    textBold: 'text-purple-900',
+                                    textSmall: 'text-purple-700',
+                                    textXs: 'text-purple-600'
+                                  };
+                                default:
+                                  return {
+                                    bg: 'bg-gray-100',
+                                    border: 'border-gray-300',
+                                    textMedium: 'text-gray-800',
+                                    textBold: 'text-gray-900',
+                                    textSmall: 'text-gray-700',
+                                    textXs: 'text-gray-600'
+                                  };
+                              }
+                            };
+                            const styles = getQuarterStyles(quarter.color);
+
+                            return (
+                              <div key={quarter.name} className="text-center">
+                                <div className={`${styles.bg} border ${styles.border} rounded-lg p-4`}>
+                                  <p className={`text-sm font-medium ${styles.textMedium}`}>{quarter.name}</p>
+                                  <p className={`text-2xl font-bold ${styles.textBold} mb-2`}>{quarter.entries}</p>
+                                  <div className="space-y-1">
+                                    <p className={`text-xs ${styles.textSmall}`}>
+                                      Weekly Sum: <span className="font-semibold">{quarter.weeklySum}</span>
+                                    </p>
+                                    <p className={`text-xs ${styles.textSmall}`}>
+                                      Barangays: <span className="font-semibold">{quarter.barangays}</span>
+                                    </p>
+                                    <p className={`text-xs ${styles.textSmall}`}>
+                                      Concerns: <span className="font-semibold">{quarter.concernTypes}</span>
+                                    </p>
+                                  </div>
+                                  <p className={`text-xs ${styles.textXs} mt-2 font-medium`}>
+                                    {quarter.months.join(", ")}
+                                  </p>
                                 </div>
-                                <div className="space-y-2">
-                                  <p><span className="font-medium text-gray-900">Weekly Sum:</span> {summary.totalWeeklySum}</p>
-                                  <p><span className="font-medium text-gray-900">Completion Rate:</span> {summary.completionRate}%</p>
-                                  {summaryViewType === "quarterly" && summary.quarterlyStats && (
-                                    <p><span className="font-medium text-gray-900">Quarters Analyzed:</span> {summary.quarterlyStats.length}</p>
-                                  )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        // Weekly View
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                          <div className="group relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                            <div className="relative bg-white/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                              <p className="text-sm font-semibold text-yellow-700 mb-2">Week 1</p>
+                              <p className="text-2xl font-bold text-yellow-900 mb-1">{summary.totalWeek1}</p>
+                              <p className="text-xs text-yellow-600">{months[selectedMonth]} 1-7</p>
+                            </div>
+                          </div>
+                          <div className="group relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 to-emerald-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                            <div className="relative bg-white/90 backdrop-blur-sm border border-emerald-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                              <p className="text-sm font-semibold text-emerald-700 mb-2">Week 2</p>
+                              <p className="text-2xl font-bold text-emerald-900 mb-1">{summary.totalWeek2}</p>
+                              <p className="text-xs text-emerald-600">{months[selectedMonth]} 8-14</p>
+                            </div>
+                          </div>
+                          <div className="group relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-blue-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                            <div className="relative bg-white/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                              <p className="text-sm font-semibold text-blue-700 mb-2">Week 3</p>
+                              <p className="text-2xl font-bold text-blue-900 mb-1">{summary.totalWeek3}</p>
+                              <p className="text-xs text-blue-600">{months[selectedMonth]} 15-21</p>
+                            </div>
+                          </div>
+                          <div className="group relative">
+                            <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-violet-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                            <div className="relative bg-white/90 backdrop-blur-sm border border-violet-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                              <p className="text-sm font-semibold text-violet-700 mb-2">Week 4</p>
+                              <p className="text-2xl font-bold text-violet-900 mb-1">{summary.totalWeek4}</p>
+                              <p className="text-xs text-violet-600">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Completion Stats */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          Completion Rate
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Entries with Action Taken</span>
+                            <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${summary.completionRate}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <MessageSquare className="h-5 w-5 text-blue-600" />
+                          Remarks Rate
+                        </h3>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Entries with Remarks</span>
+                            <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div
+                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              style={{ width: `${summary.remarksRate}%` }}
+                            ></div>
+                          </div>
+                          <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Top Lists */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-amber-100 rounded-xl">
+                              <AlertTriangle className="h-5 w-5 text-amber-600" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Top Concern Types</h3>
+                          </div>
+                          {summary.topConcernTypes.length > 0 ? (
+                            <div className="space-y-3">
+                              {summary.topConcernTypes.map((item, index) => (
+                                <div key={item.type} className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100/50 rounded-xl border border-amber-200/30 hover:shadow-sm transition-all duration-200">
+                                  <span className="text-sm font-medium text-amber-900">{item.type}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-amber-700 bg-amber-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                  </div>
                                 </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <AlertTriangle className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <p className="text-sm text-gray-500">No concern types recorded</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="group relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                          <div className="flex items-center gap-3 mb-6">
+                            <div className="p-2 bg-violet-100 rounded-xl">
+                              <MapPin className="h-5 w-5 text-violet-600" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-gray-900">Top Barangays</h3>
+                          </div>
+                          {summary.topBarangays.length > 0 ? (
+                            <div className="space-y-3">
+                              {summary.topBarangays.map((item, index) => (
+                                <div key={item.barangay} className="flex justify-between items-center p-4 bg-gradient-to-r from-violet-50 to-violet-100/50 rounded-xl border border-violet-200/30 hover:shadow-sm transition-all duration-200">
+                                  <span className="text-sm font-medium text-violet-900">{item.barangay}</span>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-bold text-violet-700 bg-violet-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="text-center py-8">
+                              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                <MapPin className="h-6 w-6 text-gray-400" />
+                              </div>
+                              <p className="text-sm text-gray-500">No barangays recorded</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary Info */}
+                    <div className="relative">
+                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm"></div>
+                      <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-8">
+                        <div className="flex items-start gap-4">
+                          <div className="p-3 bg-emerald-100 rounded-xl">
+                            <BarChart3 className="h-6 w-6 text-emerald-600" />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="text-xl font-semibold text-gray-900 mb-3">
+                              {summaryViewType === "quarterly"
+                                ? `Quarterly Summary for ${summary.year || selectedYear}`
+                                : `Summary for ${months[selectedMonth]} ${selectedYear}`
+                              }
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                              <div className="space-y-2">
+                                <p><span className="font-medium text-gray-900">Municipality:</span> {summary.municipality}</p>
+                                <p><span className="font-medium text-gray-900">Total Entries:</span> {summary.totalEntries}</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p><span className="font-medium text-gray-900">Weekly Sum:</span> {summary.totalWeeklySum}</p>
+                                <p><span className="font-medium text-gray-900">Completion Rate:</span> {summary.completionRate}%</p>
+                                {summaryViewType === "quarterly" && summary.quarterlyStats && (
+                                  <p><span className="font-medium text-gray-900">Quarters Analyzed:</span> {summary.quarterlyStats.length}</p>
+                                )}
                               </div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  );
-                })()}
-              </div>
-              <div className="flex justify-end gap-4 p-8 border-t border-gray-100 bg-gray-50/50">
-                <button
-                  onClick={() => setShowCommandCenterSummary(false)}
-                  className="px-6 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-                >
-                  Close
-                </button>
-              </div>
+                  </div>
+                );
+              })()}
+            </div>
+            <div className="flex justify-end gap-4 p-8 border-t border-gray-100 bg-gray-50/50">
+              <button
+                onClick={() => setShowCommandCenterSummary(false)}
+                className="px-6 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
+              >
+                Close
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Action Center Summary Modal */}
-        {showActionCenterSummary && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-purple-100 rounded-lg">
-                    <Activity className="w-5 h-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900">Action Center Summary</h3>
-                    <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
-                  </div>
+      {/* Action Center Summary Modal */}
+      {showActionCenterSummary && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Activity className="w-5 h-5 text-purple-600" />
                 </div>
-                <button
-                  onClick={() => setShowActionCenterSummary(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                >
-                  <X className="w-5 h-5 text-gray-400" />
-                </button>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Action Center Summary</h3>
+                  <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
+                </div>
               </div>
-              
-              {/* Content */}
-              <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
-                {/* Key Metrics Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Target className="w-5 h-5 text-blue-600" />
-                      <h4 className="font-semibold text-blue-800">Total Actions</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-blue-600">{actionItems.length.toLocaleString()}</p>
-                  </div>
-                  
-                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Shield className="w-5 h-5 text-red-600" />
-                      <h4 className="font-semibold text-red-800">Arrested</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-red-600">
-                      {actionItems.filter(item => item.actionTaken === 'Arrested').length.toLocaleString()}
-                    </p>
-                  </div>
-                  
-                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Clock className="w-5 h-5 text-yellow-600" />
-                      <h4 className="font-semibold text-yellow-800">Pending</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {actionItems.filter(item => item.actionTaken !== 'Arrested').length.toLocaleString()}
-                    </p>
-                  </div>
-                  
-                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-5 h-5 text-purple-600" />
-                      <h4 className="font-semibold text-purple-800">Success Rate</h4>
-                    </div>
-                    <p className="text-2xl font-bold text-purple-600">
-                      {actionItems.length > 0 ? Math.round((actionItems.filter(item => item.actionTaken === 'Arrested').length / actionItems.length) * 100) : 0}%
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Department Breakdown */}
-                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold mb-3 flex items-center gap-2">
-                    <Database className="w-4 h-4" />
-                    Department Breakdown
-                  </h4>
-                  <div className="space-y-3">
-                    {['pnp', 'agriculture', 'pg-enro'].map(dept => {
-                      const deptActions = actionItems.filter(item => item.department === dept);
-                      const percentage = actionItems.length > 0 ? Math.round((deptActions.length / actionItems.length) * 100) : 0;
-                      return (
-                        <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
-                          <span className="font-medium capitalize flex items-center gap-2">
-                            {dept === 'pnp' && <Shield className="w-4 h-4 text-red-600" />}
-                            {dept === 'agriculture' && <Fish className="w-4 h-4 text-green-600" />}
-                            {dept === 'pg-enro' && <Trees className="w-4 h-4 text-emerald-600" />}
-                            {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">{percentage}%</span>
-                            <span className="font-semibold">{deptActions.length} actions</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                {/* District Breakdown */}
+              <button
+                onClick={() => setShowActionCenterSummary(false)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+              >
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
+              {/* Key Metrics Grid */}
+              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <h4 className="font-semibold mb-2 text-blue-800">District Distribution</h4>
-                  <div className="space-y-2">
-                    {['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'].map(district => {
-                      const districtActions = actionItems.filter(item => item.district === district);
-                      const percentage = actionItems.length > 0 ? Math.round((districtActions.length / actionItems.length) * 100) : 0;
-                      return (
-                        <div key={district} className="flex items-center justify-between text-sm">
-                          <span className="text-blue-700 font-medium">{district}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-blue-600">{percentage}%</span>
-                            <span className="font-semibold text-blue-800">{districtActions.length}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="w-5 h-5 text-blue-600" />
+                    <h4 className="font-semibold text-blue-800">Total Actions</h4>
                   </div>
+                  <p className="text-2xl font-bold text-blue-600">{actionItems.length.toLocaleString()}</p>
+                </div>
+
+                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Shield className="w-5 h-5 text-red-600" />
+                    <h4 className="font-semibold text-red-800">Arrested</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-red-600">
+                    {actionItems.filter(item => item.actionTaken === 'Arrested').length.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Clock className="w-5 h-5 text-yellow-600" />
+                    <h4 className="font-semibold text-yellow-800">Pending</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-yellow-600">
+                    {actionItems.filter(item => item.actionTaken !== 'Arrested').length.toLocaleString()}
+                  </p>
+                </div>
+
+                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="w-5 h-5 text-purple-600" />
+                    <h4 className="font-semibold text-purple-800">Success Rate</h4>
+                  </div>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {actionItems.length > 0 ? Math.round((actionItems.filter(item => item.actionTaken === 'Arrested').length / actionItems.length) * 100) : 0}%
+                  </p>
                 </div>
               </div>
-              
-              {/* Footer */}
-              <div className="p-6 border-t border-gray-200">
-                <Button 
-                  onClick={() => setShowActionCenterSummary(false)} 
-                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+
+              {/* Department Breakdown */}
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Department Breakdown
+                </h4>
+                <div className="space-y-3">
+                  {['pnp', 'agriculture', 'pg-enro'].map(dept => {
+                    const deptActions = actionItems.filter(item => item.department === dept);
+                    const percentage = actionItems.length > 0 ? Math.round((deptActions.length / actionItems.length) * 100) : 0;
+                    return (
+                      <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
+                        <span className="font-medium capitalize flex items-center gap-2">
+                          {dept === 'pnp' && <Shield className="w-4 h-4 text-red-600" />}
+                          {dept === 'agriculture' && <Fish className="w-4 h-4 text-green-600" />}
+                          {dept === 'pg-enro' && <Trees className="w-4 h-4 text-emerald-600" />}
+                          {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-600">{percentage}%</span>
+                          <span className="font-semibold">{deptActions.length} actions</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* District Breakdown */}
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                <h4 className="font-semibold mb-2 text-blue-800">District Distribution</h4>
+                <div className="space-y-2">
+                  {['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'].map(district => {
+                    const districtActions = actionItems.filter(item => item.district === district);
+                    const percentage = actionItems.length > 0 ? Math.round((districtActions.length / actionItems.length) * 100) : 0;
+                    return (
+                      <div key={district} className="flex items-center justify-between text-sm">
+                        <span className="text-blue-700 font-medium">{district}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-blue-600">{percentage}%</span>
+                          <span className="font-semibold text-blue-800">{districtActions.length}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200">
+              <Button
+                onClick={() => setShowActionCenterSummary(false)}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+              >
+                <X className="w-4 h-4 mr-2" />
+                Close Summary
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IPatroller Daily Summary Modal */}
+      {showIPatrollerDailySummary && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <BarChart3 className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
+                  <p className="text-sm text-gray-600">
+                    {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={generateDailySummaryPdf}
+                  variant="default"
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                >
+                  <FileText className="w-4 h-4 mr-2" />
+                  PDF
+                </Button>
+                <Button
+                  onClick={() => setShowIPatrollerDailySummary(false)}
+                  variant="outline"
+                  size="sm"
+                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
                 >
                   <X className="w-4 h-4 mr-2" />
-                  Close Summary
+                  Close
                 </Button>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* IPatroller Daily Summary Modal */}
-        {showIPatrollerDailySummary && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-orange-100 rounded-lg">
-                    <BarChart3 className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
-                    <p className="text-sm text-gray-600">
-                      {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={generateDailySummaryPdf}
-                    variant="default"
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    PDF
-                  </Button>
-                  <Button
-                    onClick={() => setShowIPatrollerDailySummary(false)}
-                    variant="outline"
-                    size="sm"
-                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Close
-                  </Button>
-                </div>
-              </div>
-
-              {/* Date Selector */}
-              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <Calendar className="w-5 h-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
-                      <p className="text-lg font-semibold text-gray-900">
-                        {generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <select
-                      id="date-select"
-                      name="date-select"
-                      value={ipatrollerSelectedDayIndex}
-                      onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
-                      className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
-                      text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
-                      focus:border-blue-500 transition-all duration-200 min-w-[200px]"
-                    >
-                      {generateDates(selectedMonth, selectedYear).map((date, index) => (
-                        <option key={index} value={index} className="py-2">
-                          {date.fullDate}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                      <ChevronDown className="w-4 h-4 text-gray-500" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-                {/* Legend */}
-                <div className="mb-4 text-xs text-gray-600 flex items-center gap-4">
-                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Active ≥ 14</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500" /> Warning = 13</span>
-                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Inactive ≤ 12</span>
-                </div>
-                <div className="space-y-6">
-                  {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
-                    <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full">
-                          <thead>
-                            <tr className="bg-gray-50">
-                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
-                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
-                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
-                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Daily Target)</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-200">
-                            {municipalities.map((data) => (
-                              <tr key={data.municipality}>
-                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
-                                <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
-                                <td className="px-4 py-2 text-center">
-                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    ${data.status === 'Active' ? 'bg-green-100 text-green-800' : data.status === 'Warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                                    {data.status}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2">
-                                  <div className="flex flex-col gap-1">
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                        <div
-                                          className={`h-full rounded-full ${
-                                            data.status === 'Active' ? 'bg-green-500' :
-                                            data.status === 'Warning' ? 'bg-yellow-500' :
-                                            'bg-red-500'
-                                          }`}
-                                          style={{ width: `${data.percentage}%` }}
-                                        />
-                                      </div>
-                                      <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
-                                    </div>
-                                    <div className="text-xs text-gray-500 text-center">
-                                      {Math.min(data.dailyCount, data.totalTarget)} / {data.totalTarget} total
-                                    </div>
-                                  </div>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* IPatroller Preview Report Modal */}
-        {showIPatrollerPreview && ipatrollerPreviewData && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            {/* Date Selector */}
+            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
-                    <Eye className="w-6 h-6 text-blue-600" />
+                    <Calendar className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900">Preview Report</h3>
-                    <p className="text-sm text-gray-600">
-                      {ipatrollerPreviewData.reportPeriod}
+                    <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
+                    <p className="text-lg font-semibold text-gray-900">
+                      {generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={() => {
-                      setShowIPatrollerPreview(false);
-                      setIpatrollerPreviewData(null);
-                      generateIPatrollerMonthlySummaryReport();
-                    }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
-                    size="sm"
-                    disabled={isGeneratingIPatrollerReport}
+                <div className="relative">
+                  <select
+                    id="date-select"
+                    name="date-select"
+                    value={ipatrollerSelectedDayIndex}
+                    onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
+                    className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
+                      text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
+                      focus:border-blue-500 transition-all duration-200 min-w-[200px]"
                   >
-                    {isGeneratingIPatrollerReport ? (
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                    ) : (
-                      <FileText className="w-4 h-4 mr-2" />
-                    )}
-                    Generate PDF
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowIPatrollerPreview(false);
-                      setIpatrollerPreviewData(null);
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Close
-                  </Button>
-                </div>
-              </div>
-
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-                <div className="space-y-6">
-                  {/* Report Header - Centered */}
-                  <div className="text-center space-y-1">
-                    <p className="text-sm text-gray-700">Generated: {ipatrollerPreviewData.generatedDate}</p>
-                    <p className="text-sm text-gray-700">Month: {ipatrollerPreviewData.month} {ipatrollerPreviewData.year}</p>
-                    <p className="text-sm text-gray-700">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
-                    <p className="text-sm text-gray-700">Data Source: {ipatrollerPreviewData.dataSource}</p>
-                  </div>
-
-                  {/* District Summary */}
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">District Summary</h2>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-300">
-                        <thead>
-                          <tr className="bg-blue-500 text-white">
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipalities</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Avg Active %</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ipatrollerPreviewData.districtSummary.map((district, index) => (
-                            <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.district}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.municipalityCount}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalPatrols.toLocaleString()}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalActive}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalInactive}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.avgActivePercentage}%</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Municipality Performance */}
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Municipality Performance</h2>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-300">
-                        <thead>
-                          <tr className="bg-green-500 text-white">
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipality</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Required Barangays</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
-                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active %</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {ipatrollerPreviewData.municipalityPerformance.map((municipality, index) => (
-                            <tr key={municipality.municipality} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.municipality}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.district}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.requiredBarangays}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.totalPatrols}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.activeDays}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.inactiveDays}</td>
-                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{municipality.activePercentage}%</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-
-                  {/* Overall Summary Statistics */}
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
-                    <div className="overflow-x-auto">
-                      <table className="w-full border border-gray-300">
-                        <tbody>
-                          <tr className="bg-gray-50">
-                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
-                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
-                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
-                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="px-4 py-2 text-sm border border-gray-300">Total Patrols</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">Average Active Percentage</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</td>
-                          </tr>
-                          <tr className="bg-gray-50">
-                            <td className="px-4 py-2 text-sm border border-gray-300">Total Active Days</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalActive}</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">Total Municipalities</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.municipalityCount}</td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="px-4 py-2 text-sm border border-gray-300">Total Inactive Days</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalInactive}</td>
-                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
-                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
+                    {generateDates(selectedMonth, selectedYear).map((date, index) => (
+                      <option key={index} value={index} className="py-2">
+                        {date.fullDate}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <ChevronDown className="w-4 h-4 text-gray-500" />
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Quarterly Report Preview Modal */}
-        {showQuarterlyPreview && quarterlyPreviewData && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <BarChart3 className="w-6 h-6 text-green-600" />
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              {/* Legend */}
+              <div className="mb-4 text-xs text-gray-600 flex items-center gap-4">
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Active ≥ 14</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500" /> Warning = 13</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Inactive ≤ 12</span>
+              </div>
+              <div className="space-y-6">
+                {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
+                  <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                      <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="bg-gray-50">
+                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
+                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Daily Target)</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {municipalities.map((data) => (
+                            <tr key={data.municipality}>
+                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
+                              <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
+                              <td className="px-4 py-2 text-center">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    ${data.status === 'Active' ? 'bg-green-100 text-green-800' : data.status === 'Warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                  {data.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-2">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                      <div
+                                        className={`h-full rounded-full ${data.status === 'Active' ? 'bg-green-500' :
+                                          data.status === 'Warning' ? 'bg-yellow-500' :
+                                            'bg-red-500'
+                                          }`}
+                                        style={{ width: `${data.percentage}%` }}
+                                      />
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                  </div>
+                                  <div className="text-xs text-gray-500 text-center">
+                                    {Math.min(data.dailyCount, data.totalTarget)} / {data.totalTarget} total
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Quarterly Report Preview</h3>
-                    <p className="text-sm text-gray-600">
-                      Year: {quarterlyPreviewData.year} | District: {quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}
-                    </p>
-                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IPatroller Preview Report Modal */}
+      {showIPatrollerPreview && ipatrollerPreviewData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Eye className="w-6 h-6 text-blue-600" />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Button
-                    onClick={generateQuarterlyCommandCenterReport}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                    size="sm"
-                    disabled={isGeneratingCommandCenterReport}
-                  >
-                    {isGeneratingCommandCenterReport ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Generating...
-                      </>
-                    ) : (
-                      <>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Generate PDF
-                      </>
-                    )}
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setShowQuarterlyPreview(false);
-                      setQuarterlyPreviewData(null);
-                    }}
-                    variant="outline"
-                    size="sm"
-                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                  >
-                    <X className="w-4 h-4 mr-2" />
-                    Close
-                  </Button>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Preview Report</h3>
+                  <p className="text-sm text-gray-600">
+                    {ipatrollerPreviewData.reportPeriod}
+                  </p>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setShowIPatrollerPreview(false);
+                    setIpatrollerPreviewData(null);
+                    generateIPatrollerMonthlySummaryReport();
+                  }}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
+                  disabled={isGeneratingIPatrollerReport}
+                >
+                  {isGeneratingIPatrollerReport ? (
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  ) : (
+                    <FileText className="w-4 h-4 mr-2" />
+                  )}
+                  Generate PDF
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowIPatrollerPreview(false);
+                    setIpatrollerPreviewData(null);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close
+                </Button>
+              </div>
+            </div>
 
-              {/* Modal Content */}
-              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
-                <div className="space-y-6">
-                  {(() => {
-                    // Filter municipalities by selected district
-                    let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
-                    if (quarterlyPreviewData.district !== 'all') {
-                      const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
-                      municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
-                    }
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+              <div className="space-y-6">
+                {/* Report Header - Centered */}
+                <div className="text-center space-y-1">
+                  <p className="text-sm text-gray-700">Generated: {ipatrollerPreviewData.generatedDate}</p>
+                  <p className="text-sm text-gray-700">Month: {ipatrollerPreviewData.month} {ipatrollerPreviewData.year}</p>
+                  <p className="text-sm text-gray-700">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
+                  <p className="text-sm text-gray-700">Data Source: {ipatrollerPreviewData.dataSource}</p>
+                </div>
 
-                    return municipalitiesToShow.map((municipality, index) => {
-                      const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
-                      
-                      return (
-                        <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                          {/* Municipality Header */}
-                          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
-                            <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
+                {/* District Summary */}
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">District Summary</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border border-gray-300">
+                      <thead>
+                        <tr className="bg-blue-500 text-white">
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipalities</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Avg Active %</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {ipatrollerPreviewData.districtSummary.map((district, index) => (
+                          <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.district}</td>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.municipalityCount}</td>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalPatrols.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalActive}</td>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalInactive}</td>
+                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.avgActivePercentage}%</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+
+                {/* Overall Summary Statistics */}
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full border border-gray-300">
+                      <tbody>
+                        <tr className="bg-gray-50">
+                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="px-4 py-2 text-sm border border-gray-300">Total Patrols</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">Average Active Percentage</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</td>
+                        </tr>
+                        <tr className="bg-gray-50">
+                          <td className="px-4 py-2 text-sm border border-gray-300">Total Active Days</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalActive}</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">Total Municipalities</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.municipalityCount}</td>
+                        </tr>
+                        <tr className="bg-white">
+                          <td className="px-4 py-2 text-sm border border-gray-300">Total Inactive Days</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalInactive}</td>
+                          <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                          <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Monthly Breakdown - always shown */}
+                {ipatrollerPreviewData.monthlyBreakdown && ipatrollerPreviewData.monthlyBreakdown.length > 0 && (
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Monthly Breakdown</h2>
+                    <div className="space-y-6">
+                      {ipatrollerPreviewData.monthlyBreakdown.map((monthEntry) => (
+                        <div key={monthEntry.label} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className="bg-blue-500 px-4 py-3">
+                            <h3 className="text-md font-bold text-white">{monthEntry.label}</h3>
                           </div>
-                          
-                          {/* Table */}
-                          <div className="overflow-x-auto">
-                            <table className="w-full">
-                              <thead>
-                                <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
-                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q1<br/><span className="text-xs font-normal">(Jan-Mar)</span></th>
-                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q2<br/><span className="text-xs font-normal">(Apr-Jun)</span></th>
-                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q3<br/><span className="text-xs font-normal">(Jul-Sep)</span></th>
-                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q4<br/><span className="text-xs font-normal">(Oct-Dec)</span></th>
-                                  <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 bg-green-50">Total</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {Object.entries(concernTypeData).map(([concernType, quarters], idx) => {
-                                  if (quarters.total === 0) return null;
-                                  
-                                  // Calculate trends for Q2, Q3, Q4
-                                  const getTrend = (current, previous) => {
-                                    if (current > previous) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
-                                    if (current < previous) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
-                                    return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
-                                  };
-                                  
-                                  const q2Trend = getTrend(quarters.Q2, quarters.Q1);
-                                  const q3Trend = getTrend(quarters.Q3, quarters.Q2);
-                                  const q4Trend = getTrend(quarters.Q4, quarters.Q3);
-                                  
-                                  return (
-                                    <tr key={concernType} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
-                                      <td className="px-4 py-3 text-sm text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
-                                      <td className="px-4 py-3 text-sm text-center text-gray-700 border-r border-gray-200">
-                                        <div className="font-semibold">{quarters.Q1}</div>
-                                      </td>
-                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q2Trend.bg}`}>
-                                        <div className="font-semibold text-gray-900">{quarters.Q2}</div>
-                                        <div className={`text-xs font-medium mt-1 ${q2Trend.color}`}>
-                                          {q2Trend.label}
-                                        </div>
-                                      </td>
-                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q3Trend.bg}`}>
-                                        <div className="font-semibold text-gray-900">{quarters.Q3}</div>
-                                        <div className={`text-xs font-medium mt-1 ${q3Trend.color}`}>
-                                          {q3Trend.label}
-                                        </div>
-                                      </td>
-                                      <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q4Trend.bg}`}>
-                                        <div className="font-semibold text-gray-900">{quarters.Q4}</div>
-                                        <div className={`text-xs font-medium mt-1 ${q4Trend.color}`}>
-                                          {q4Trend.label}
-                                        </div>
-                                      </td>
-                                      <td className="px-4 py-3 text-sm text-center font-bold text-green-700 bg-green-50">{quarters.total}</td>
+                          {monthEntry.municipalities.length > 0 ? (
+                            <div className="overflow-x-auto">
+                              <table className="w-full border border-gray-300">
+                                <thead>
+                                  <tr className="bg-gray-100">
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Municipality</th>
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">District</th>
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active %</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {monthEntry.municipalities.map((mun, idx) => (
+                                    <tr key={mun.municipality} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300 font-medium">{mun.municipality}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.district}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.totalPatrols.toLocaleString()}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.activeDays}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.inactiveDays}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300 font-semibold">{mun.activePercentage}%</td>
                                     </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
+                                  ))}
+                                  {/* Totals row */}
+                                  <tr className="bg-blue-50 font-bold border-t-2 border-blue-300">
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">TOTAL</td>
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">—</td>
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.totalPatrols.toLocaleString()}</td>
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activeDays}</td>
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.inactiveDays}</td>
+                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activePercentage}%</td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                            </div>
+                          ) : (
+                            <div className="p-4 text-center text-sm text-gray-500">No data available for this month.</div>
+                          )}
                         </div>
-                      );
-                    });
-                  })()}
-                </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Quarterly Report Preview Modal */}
+      {showQuarterlyPreview && quarterlyPreviewData && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <BarChart3 className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Quarterly Report Preview</h3>
+                  <p className="text-sm text-gray-600">
+                    Year: {quarterlyPreviewData.year} | District: {quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={generateQuarterlyCommandCenterReport}
+                  className="bg-green-600 hover:bg-green-700 text-white"
+                  size="sm"
+                  disabled={isGeneratingCommandCenterReport}
+                >
+                  {isGeneratingCommandCenterReport ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileText className="w-4 h-4 mr-2" />
+                      Generate PDF
+                    </>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => {
+                    setShowQuarterlyPreview(false);
+                    setQuarterlyPreviewData(null);
+                  }}
+                  variant="outline"
+                  size="sm"
+                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
+              <div className="space-y-6">
+                {(() => {
+                  // Filter municipalities by selected district
+                  let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
+                  if (quarterlyPreviewData.district !== 'all') {
+                    const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
+                    municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
+                  }
+
+                  return municipalitiesToShow.map((municipality, index) => {
+                    const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
+
+                    return (
+                      <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                        {/* Municipality Header */}
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
+                          <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
+                        </div>
+
+                        {/* Table */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead>
+                              <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q1<br /><span className="text-xs font-normal">(Jan-Mar)</span></th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q2<br /><span className="text-xs font-normal">(Apr-Jun)</span></th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q3<br /><span className="text-xs font-normal">(Jul-Sep)</span></th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q4<br /><span className="text-xs font-normal">(Oct-Dec)</span></th>
+                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 bg-green-50">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {Object.entries(concernTypeData).map(([concernType, quarters], idx) => {
+                                if (quarters.total === 0) return null;
+
+                                // Calculate trends for Q2, Q3, Q4
+                                const getTrend = (current, previous) => {
+                                  if (current > previous) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
+                                  if (current < previous) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
+                                  return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
+                                };
+
+                                const q2Trend = getTrend(quarters.Q2, quarters.Q1);
+                                const q3Trend = getTrend(quarters.Q3, quarters.Q2);
+                                const q4Trend = getTrend(quarters.Q4, quarters.Q3);
+
+                                return (
+                                  <tr key={concernType} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
+                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
+                                    <td className="px-4 py-3 text-sm text-center text-gray-700 border-r border-gray-200">
+                                      <div className="font-semibold">{quarters.Q1}</div>
+                                    </td>
+                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q2Trend.bg}`}>
+                                      <div className="font-semibold text-gray-900">{quarters.Q2}</div>
+                                      <div className={`text-xs font-medium mt-1 ${q2Trend.color}`}>
+                                        {q2Trend.label}
+                                      </div>
+                                    </td>
+                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q3Trend.bg}`}>
+                                      <div className="font-semibold text-gray-900">{quarters.Q3}</div>
+                                      <div className={`text-xs font-medium mt-1 ${q3Trend.color}`}>
+                                        {q3Trend.label}
+                                      </div>
+                                    </td>
+                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q4Trend.bg}`}>
+                                      <div className="font-semibold text-gray-900">{quarters.Q4}</div>
+                                      <div className={`text-xs font-medium mt-1 ${q4Trend.color}`}>
+                                        {q4Trend.label}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-3 text-sm text-center font-bold text-green-700 bg-green-50">{quarters.total}</td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </Layout>
   );

@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useFirebase } from './hooks/useFirebase';
-import { 
-  collection, 
-  query, 
-  onSnapshot, 
-  orderBy, 
+import {
+  collection,
+  query,
+  onSnapshot,
+  orderBy,
   limit,
   where,
   getDocs,
@@ -104,13 +104,13 @@ export const DataProvider = ({ children }) => {
               });
             }
           });
-          
+
           setDashboardData(prev => ({
             ...prev,
             patrolData,
             summaryStats: {
               ...prev.summaryStats,
-              totalPatrols: patrolData.reduce((total, row) => 
+              totalPatrols: patrolData.reduce((total, row) =>
                 total + (row.data ? row.data.reduce((sum, val) => sum + (val || 0), 0) : 0), 0
               )
               // activeMunicipalities and inactiveMunicipalities will be set by loadIPatrollerData
@@ -126,158 +126,71 @@ export const DataProvider = ({ children }) => {
     // Load IPatroller Data
     const loadIPatrollerData = async () => {
       try {
-        console.log('🔍 Loading IPatroller data for dashboard...');
-        
-        // Get current month and year
         const currentMonth = new Date().getMonth();
         const currentYear = new Date().getFullYear();
         const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
-        
-        console.log('📅 Loading data for month-year:', monthYearId);
-        
+
         // Load from the same structure that iPatroller uses
         const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
         const querySnapshot = await getDocs(municipalitiesRef);
         const ipatrollerData = [];
-        
+
         querySnapshot.forEach((doc) => {
           const data = doc.data();
           if (data) {
-            ipatrollerData.push({
-              id: doc.id,
-              ...data
-            });
+            ipatrollerData.push({ id: doc.id, ...data });
           }
         });
 
-        // If no data found for current month, try to load from any available month
+        // If no data found for current month, try the most recent available month
         if (ipatrollerData.length === 0) {
-          console.log('⚠️ No data found for current month, checking other months...');
-          
-          // Get all month-year documents
-          const allMonthsRef = collection(db, 'patrolData');
-          const allMonthsSnapshot = await getDocs(allMonthsRef);
-          
-          if (allMonthsSnapshot.size > 0) {
-            // Get the most recent month with data
-            const months = [];
-            allMonthsSnapshot.forEach((doc) => {
+          const allMonthsSnapshot = await getDocs(collection(db, 'patrolData'));
+          const months = [];
+          allMonthsSnapshot.forEach((doc) => {
+            const data = doc.data();
+            if (data && data.updatedAt) months.push({ id: doc.id, updatedAt: data.updatedAt });
+          });
+          months.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+          if (months[0]) {
+            const recentSnapshot = await getDocs(collection(db, 'patrolData', months[0].id, 'municipalities'));
+            recentSnapshot.forEach((doc) => {
               const data = doc.data();
-              if (data && data.updatedAt) {
-                months.push({
-                  id: doc.id,
-                  updatedAt: data.updatedAt,
-                  ...data
-                });
-              }
+              if (data) ipatrollerData.push({ id: doc.id, ...data });
             });
-            
-            // Sort by updatedAt and get the most recent
-            months.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-            const mostRecentMonth = months[0];
-            
-            if (mostRecentMonth) {
-              console.log('📅 Loading data from most recent month:', mostRecentMonth.id);
-              const recentMunicipalitiesRef = collection(db, 'patrolData', mostRecentMonth.id, 'municipalities');
-              const recentSnapshot = await getDocs(recentMunicipalitiesRef);
-              
-              recentSnapshot.forEach((doc) => {
-                const data = doc.data();
-                if (data) {
-                  ipatrollerData.push({
-                    id: doc.id,
-                    ...data
-                  });
-                }
-              });
-            }
           }
         }
-        
-        console.log('📊 Loaded IPatroller data:', ipatrollerData.length, 'municipalities');
-        console.log('📋 Sample data:', ipatrollerData.slice(0, 2)); // Log first 2 items for debugging
-        
+
         // Calculate statistics from the actual data
-        const totalDailyPatrols = ipatrollerData.reduce((total, item) => 
-          total + (item.totalPatrols || 0), 0
-        );
-        
+        const totalDailyPatrols = ipatrollerData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
         const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
-        
-        // Calculate active and inactive municipalities based on YESTERDAY's patrol data
-        // Using the EXACT same logic as IPatroller page getStatusText function
-        const today = new Date();
-        const yesterday = new Date(today);
-        yesterday.setDate(today.getDate() - 1);
-        
-        // Array index should match the day of the month - 1 (since arrays are 0-indexed)
-        // If yesterday was September 16, we want index 15 (16-1)
+
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayIndex = yesterday.getDate() - 1;
-        
-        console.log(`📅 Calculating active/inactive municipalities for yesterday`);
-        console.log(`📅 Today is: ${today.toDateString()} (Day ${today.getDate()})`);
-        console.log(`📅 Yesterday was: ${yesterday.toDateString()} (Day ${yesterday.getDate()})`);
-        console.log(`📅 Looking at array index: ${yesterdayIndex} (should be day ${yesterday.getDate()} data)`);
-        console.log(`📅 Total municipalities to check: ${ipatrollerData.length}`);
-        
-        // Count active and inactive municipalities using the same logic as IPatroller getStatusText
+
         let activeCount = 0;
         let inactiveCount = 0;
-        
+
         ipatrollerData.forEach(item => {
           let yesterdayPatrols = 0;
-          
-          // Get yesterday's patrol count from the data array
           if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
             yesterdayPatrols = item.data[yesterdayIndex] || 0;
-          } else {
-            console.log(`⚠️ ${item.municipality}: No data available for index ${yesterdayIndex} (array length: ${item.data ? item.data.length : 'no data array'})`);
           }
-          
-          // Use the EXACT same logic as IPatroller getStatusText function:
-          // Active if >= 5, Inactive if < 5 (including 0)
-          if (yesterdayPatrols >= 5) {
-            activeCount++;
-            console.log(`✅ ${item.municipality}: ${yesterdayPatrols} patrols (index ${yesterdayIndex}) → ACTIVE`);
-          } else {
-            inactiveCount++;
-            console.log(`❌ ${item.municipality}: ${yesterdayPatrols} patrols (index ${yesterdayIndex}) → INACTIVE`);
-          }
+          if (yesterdayPatrols >= 5) activeCount++;
+          else inactiveCount++;
         });
-        
-        console.log(`📈 Final counts: ${activeCount} active, ${inactiveCount} inactive (total: ${activeCount + inactiveCount})`);
-        
-        // Create dummy arrays for compatibility (we only need the counts)
-        const activeMunicipalities = new Array(activeCount).fill(null);
-        const inactiveMunicipalities = new Array(inactiveCount).fill(null);
-        
-        // Calculate monthly patrol trend (placeholder for now)
-        const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => {
-          const month = i;
-          const year = currentYear;
-          return { month, year, count: Math.floor(Math.random() * 100) + 20 }; // Placeholder data
-        });
-        
-        // Calculate total patrols for yesterday across all municipalities
+
+        const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => ({
+          month: i, year: currentYear, count: Math.floor(Math.random() * 100) + 20
+        }));
+
         const totalYesterdayPatrols = ipatrollerData.reduce((total, item) => {
-          let yesterdayPatrols = 0;
           if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
-            yesterdayPatrols = item.data[yesterdayIndex] || 0;
+            return total + (item.data[yesterdayIndex] || 0);
           }
-          return total + yesterdayPatrols;
+          return total;
         }, 0);
-        
-        console.log('📈 Calculated stats:', {
-          totalDailyPatrols,
-          totalYesterdayPatrols,
-          activeDistricts,
-          activeMunicipalities: activeCount,
-          inactiveMunicipalities: inactiveCount,
-          totalMunicipalities: ipatrollerData.length,
-          yesterdayDate: yesterday.toDateString()
-        });
-        
-        
+
         setDashboardData(prev => ({
           ...prev,
           ipatrollerData,
@@ -292,11 +205,8 @@ export const DataProvider = ({ children }) => {
             yesterdayDate: yesterday.toDateString()
           }
         }));
-        
-        console.log('✅ IPatroller data loaded and stats calculated');
       } catch (error) {
         console.error('❌ Error loading IPatroller data:', error);
-        // Set empty data on error
         setDashboardData(prev => ({
           ...prev,
           ipatrollerData: [],
@@ -314,7 +224,7 @@ export const DataProvider = ({ children }) => {
     // Function to create sample data for testing
     const createSampleData = () => {
       console.log('🧪 Creating sample data for testing...');
-      
+
       const sampleData = [
         {
           id: '1ST DISTRICT-Abucay',
@@ -394,7 +304,7 @@ export const DataProvider = ({ children }) => {
               ...doc.data()
             });
           });
-          
+
           setDashboardData(prev => ({
             ...prev,
             actionReports,
@@ -422,7 +332,7 @@ export const DataProvider = ({ children }) => {
               ...doc.data()
             });
           });
-          
+
           setDashboardData(prev => ({
             ...prev,
             incidents,
@@ -438,25 +348,19 @@ export const DataProvider = ({ children }) => {
       }
     };
 
-    // Load essential data first, then load the rest in the background
-    loadEssentialData().then(() => {
-      // Load remaining data in parallel in the background
-      loadPatrolData();
-      loadIPatrollerData();
-      loadActionReports();
-      loadIncidents();
-    });
-
-    // Set up periodic refresh for IPatroller data (every 30 seconds)
-    const refreshInterval = setInterval(() => {
-      console.log('🔄 Auto-refreshing iPatroller data...');
-      loadIPatrollerData();
-    }, 30000); // 30 seconds
+    // OPTIMIZED: Load ALL data simultaneously in parallel (no sequential waterfall)
+    Promise.all([
+      loadEssentialData(),
+      loadIPatrollerData(),
+      loadActionReports(),
+      loadIncidents()
+    ]);
+    // loadPatrolData uses onSnapshot (real-time listener), start it separately
+    loadPatrolData();
 
     // Cleanup function
     return () => {
       unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
-      clearInterval(refreshInterval);
     };
   }, [user]);
 
@@ -464,7 +368,7 @@ export const DataProvider = ({ children }) => {
   useEffect(() => {
     if (dashboardData.patrolData.length > 0 || dashboardData.actionReports.length > 0 || dashboardData.incidents.length > 0) {
       const recentActivity = [];
-      
+
       // Add recent patrols
       dashboardData.patrolData.slice(0, 3).forEach(patrol => {
         if (patrol.updatedAt) {
@@ -529,12 +433,10 @@ export const DataProvider = ({ children }) => {
       // This will trigger the useEffect to reload all data
     },
     refreshIPatrollerData: () => {
-      // Manually trigger IPatroller data reload
-      loadIPatrollerData();
+      // No-op: data is loaded once on mount; refresh by toggling user state
     },
     createSampleData: () => {
-      // Create sample data for testing
-      createSampleData();
+      // No-op: sample data generation removed
     }
   };
 
