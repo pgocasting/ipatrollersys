@@ -110,6 +110,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [topPerformersActionData, setTopPerformersActionData] = useState({});
   const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(true);
   const topPerformersPreviewRef = useRef(null);
+  // Weight sliders for Top Performers ranking formula
+  const [activeDaysWeight, setActiveDaysWeight] = useState(30);
+  const [actionTakenWeight, setActionTakenWeight] = useState(70);
 
   // Date Range PDF Modal state variables
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
@@ -908,8 +911,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         let rawPercentage; // Uncapped value — used for sorting
 
         if (isJan2026OrLater) {
-          // Jan 2026 onwards: exactly mirrors Criteria tab Overall Percentage
-          // = sum of each week's floor(attended / 98 * 100), NO per-week or total cap
+          // Jan 2026 onwards: weighted formula
+          // Action Taken score: sum of each week's floor(attended / 98 * 100), uncapped total
           const weeklyEfficiency = [];
           for (let week = 0; week < 4; week++) {
             const weekStart = week * 7;
@@ -920,7 +923,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               weeklyEfficiency.push(0);
             }
           }
-          rawPercentage = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
+          const actionTakenScore = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
+          // Active Days score: (activeDays / totalDays) * 100, capped at 100
+          const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
+          // Weighted combined score
+          const wAD = activeDaysWeight / 100;
+          const wAT = actionTakenWeight / 100;
+          rawPercentage = Math.round((activeDaysScore * wAD) + (actionTakenScore * wAT));
 
         } else if (isNovDec2025) {
           // Nov–Dec 2025: average of 4 weekly efficiencies (each capped per week at 100)
@@ -967,7 +976,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         };
       })
       .sort((a, b) => {
-        // Jan 2026+: sort by rawPercentage (uncapped) so municipalities with higher total weekly efficiency rank higher
+        // Jan 2026+: sort by rawPercentage (uncapped) so municipalities with higher total weighted score rank higher
         // March–Oct 2025: sort by total patrols first
         // All others: sort by rawPercentage
         const isMarchToOctober2025Sort = selectedTopPerformersYear === 2025 && selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9;
@@ -3224,20 +3233,75 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                         <div className="space-y-2">
                           <p><strong>Ranking Criteria:</strong> {selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9
                             ? 'March-October: Ranked by total patrols first, then active days, then performance %'
-                            : 'Other months: Ranked by performance % first, then active days, then total patrols'
+                            : 'Other months: Ranked by weighted performance % first, then active days, then total patrols'
                           }</p>
                           <p><strong>Active Days:</strong> Days with 14 or more patrols (from Daily Counts tab)</p>
                           <p><strong>Total Patrols:</strong> Sum of Week 1-4 actual reports (from Criteria tab)</p>
                         </div>
                         <div className="space-y-2">
-                          <p><strong>Performance %:</strong> {selectedTopPerformersMonth >= 2 && selectedTopPerformersMonth <= 9
-                            ? 'March-October: (Total Patrols / Expected Max Patrols) × 100'
-                            : 'Other months: Overall percentage from Criteria tab (sum of weekly efficiency)'
-                          }</p>
-                          <p><strong>Status Levels:</strong> Very Satisfactory (96-100%), Very Good (86-95%), Good (75-85%), Needs Improvement (&lt;75%)</p>
+                          <p><strong>Performance % (Jan 2026+):</strong> Weighted score = (Active Days % × {activeDaysWeight}%) + (Action Taken % × {actionTakenWeight}%)</p>
+                          <p><strong>Status Levels:</strong> Outstanding (≥90%), Very Satisfactory (75–89%), Satisfactory (60–74%), Good (50–59%), Needs Improvement (&lt;50%)</p>
                           <p><strong>Top 12 Display:</strong> Shows the best performing municipalities for the selected month</p>
                         </div>
                       </div>
+
+                      {/* Weight Controls */}
+                      {selectedTopPerformersYear >= 2026 && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                            <Zap className="w-4 h-4 text-emerald-500" />
+                            Performance Formula Weights (Jan 2026+)
+                          </p>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Active Days Weight */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <label className="text-xs font-medium text-gray-700">Active Days Weight</label>
+                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{activeDaysWeight}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={activeDaysWeight}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  setActiveDaysWeight(val);
+                                  setActionTakenWeight(100 - val);
+                                }}
+                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                              />
+                              <p className="text-xs text-gray-500">Active Days % (days ≥14 patrols / total days) × 100</p>
+                            </div>
+                            {/* Action Taken Weight */}
+                            <div className="space-y-1">
+                              <div className="flex justify-between items-center">
+                                <label className="text-xs font-medium text-gray-700">Action Taken Weight</label>
+                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{actionTakenWeight}%</span>
+                              </div>
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                step="5"
+                                value={actionTakenWeight}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  setActionTakenWeight(val);
+                                  setActiveDaysWeight(100 - val);
+                                }}
+                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-blue-500"
+                              />
+                              <p className="text-xs text-gray-500">Action Taken efficiency from Criteria tab weekly reports</p>
+                            </div>
+                          </div>
+                          <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
+                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
+                            <span>Weights always sum to 100% — adjusting one automatically updates the other.</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -3366,16 +3430,18 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   const activePercentage = performer.activePercentage;
 
                                   const getStatusStyle = () => {
-                                    if (activePercentage >= 96) return 'bg-blue-100 text-blue-800 border-blue-200'; // Very Satisfactory (96-100)
-                                    if (activePercentage >= 86) return 'bg-green-100 text-green-800 border-green-200'; // Very Good (86-95)
-                                    if (activePercentage >= 75) return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Good (75-85)
-                                    return 'bg-red-100 text-red-800 border-red-200'; // Needs Improvement (<75)
+                                    if (activePercentage >= 90) return 'bg-blue-100 text-blue-800 border-blue-200';    // Outstanding (≥90)
+                                    if (activePercentage >= 75) return 'bg-emerald-100 text-emerald-800 border-emerald-200'; // Very Satisfactory (75-89)
+                                    if (activePercentage >= 60) return 'bg-green-100 text-green-800 border-green-200'; // Satisfactory (60-74)
+                                    if (activePercentage >= 50) return 'bg-yellow-100 text-yellow-800 border-yellow-200'; // Good (50-59)
+                                    return 'bg-red-100 text-red-800 border-red-200'; // Needs Improvement (<50)
                                   };
 
                                   const getStatusText = () => {
-                                    if (activePercentage >= 96) return 'Very Satisfactory';
-                                    if (activePercentage >= 86) return 'Very Good';
-                                    if (activePercentage >= 75) return 'Good';
+                                    if (activePercentage >= 90) return 'Outstanding';
+                                    if (activePercentage >= 75) return 'Very Satisfactory';
+                                    if (activePercentage >= 60) return 'Satisfactory';
+                                    if (activePercentage >= 50) return 'Good';
                                     return 'Needs Improvement';
                                   };
 

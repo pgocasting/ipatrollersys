@@ -16,6 +16,8 @@ import { logReportAccess } from './utils/adminLogger';
 import { useAuth } from './contexts/AuthContext';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import {
   Shield,
   AlertTriangle,
@@ -2666,7 +2668,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       console.log(`✅ Data loaded in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
       // Process data into quarterly format by municipality and concern type
-      const processedData = processQuarterlyData(yearlyData, concernTypesResult.success ? concernTypesResult.data : []);
+      const barangays = barangaysResult.success ? barangaysResult.data : [];
+      const concernTypes = concernTypesResult.success ? concernTypesResult.data : [];
+      const processedData = processQuarterlyData(yearlyData, concernTypes, barangays);
 
       setQuarterlyPreviewData(processedData);
       setShowQuarterlyPreview(true);
@@ -2680,7 +2684,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   };
 
   // Process yearly data into quarterly format grouped by municipality and concern type
-  const processQuarterlyData = (yearlyData, concernTypes) => {
+  const processQuarterlyData = (yearlyData, concernTypes, barangays = []) => {
     const quarters = {
       Q1: ['January', 'February', 'March'],
       Q2: ['April', 'May', 'June'],
@@ -2689,68 +2693,97 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     };
 
     const municipalityData = {};
+    const emptyQtrs = () => ({ Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 });
+
+    // Build a case-insensitive lookup map: lowercase name → canonical master list name
+    const canonicalCTMap = new Map(concernTypes.map(ct => [ct.name.toLowerCase(), ct.name]));
+    // Normalize: case-insensitive match → canonical name; no match or empty → null (skip, no "Other" row)
+    const normalizeCT = (raw) => {
+      const v = (raw || '').trim();
+      if (!v) return null;
+      return canonicalCTMap.get(v.toLowerCase()) || v;
+    };
+
+    const getQuarter = (monthName) => {
+      for (const [q, qMonths] of Object.entries(quarters)) {
+        if (qMonths.includes(monthName)) return q;
+      }
+      return null;
+    };
 
     // Process each municipality
     Object.entries(yearlyData).forEach(([municipality, monthsData]) => {
-      const concernTypeData = {};
 
-      // Initialize concern type counts
-      concernTypes.forEach(ct => {
-        concernTypeData[ct.name] = {
-          Q1: 0,
-          Q2: 0,
-          Q3: 0,
-          Q4: 0,
-          total: 0,
-          strayDogs: 0 // Special tracking for stray dogs
-        };
-      });
-
-      // Count entries by quarter and concern type
-      Object.entries(monthsData).forEach(([monthName, weeklyData]) => {
-        // Determine which quarter this month belongs to
-        let quarter = null;
-        Object.entries(quarters).forEach(([q, months]) => {
-          if (months.includes(monthName)) {
-            quarter = q;
-          }
-        });
-
-        if (!quarter) return;
-
-        // Process each date's entries
+      // ── PASS 1: collect only the (normalized) concern types recorded in this municipality ──
+      const municipalConcernTypeSet = new Set();
+      Object.values(monthsData).forEach(weeklyData => {
         Object.values(weeklyData).forEach(dateEntries => {
           if (!Array.isArray(dateEntries)) return;
-
           dateEntries.forEach(entry => {
-            const concernType = entry.concernType || 'Other';
-
-            if (!concernTypeData[concernType]) {
-              concernTypeData[concernType] = {
-                Q1: 0,
-                Q2: 0,
-                Q3: 0,
-                Q4: 0,
-                total: 0,
-                strayDogs: 0
-              };
-            }
-
-            concernTypeData[concernType][quarter]++;
-            concernTypeData[concernType].total++;
-
-            // Track stray dogs separately if mentioned in the entry
-            if (entry.strayDogs || concernType.toLowerCase().includes('stray')) {
-              concernTypeData[concernType].strayDogs++;
-            }
+            const ct = normalizeCT(entry.concernType);
+            if (ct) municipalConcernTypeSet.add(ct);
           });
         });
       });
 
-      // Only include municipalities with data
+      const municipalConcernTypes = Array.from(municipalConcernTypeSet); // only this municipality's types
+
+      // ── Initialize data structures ──
+      const concernTypeData = {};
+      municipalConcernTypes.forEach(ct => {
+        concernTypeData[ct] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0, strayDogs: 0 };
+      });
+
+      const barangayData = {};
+      // Pre-initialize all registered barangays for this municipality with this municipality's concern types
+      const municipalityBarangays = barangays.filter(b => b.municipality === municipality);
+      municipalityBarangays.forEach(b => {
+        barangayData[b.name] = {};
+        municipalConcernTypes.forEach(ct => {
+          barangayData[b.name][ct] = emptyQtrs();
+        });
+      });
+
+      // ── PASS 2: count entries (using normalized concern types) ──
+      Object.entries(monthsData).forEach(([monthName, weeklyData]) => {
+        const quarter = getQuarter(monthName);
+        if (!quarter) return;
+
+        Object.values(weeklyData).forEach(dateEntries => {
+          if (!Array.isArray(dateEntries)) return;
+
+          dateEntries.forEach(entry => {
+            const concernType = normalizeCT(entry.concernType); // normalized = no extra types
+            if (!concernType) return; // skip entries with no valid concern type
+            // Municipality-level totals
+            if (!concernTypeData[concernType]) {
+              concernTypeData[concernType] = { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0, strayDogs: 0 };
+            }
+            concernTypeData[concernType][quarter]++;
+            concernTypeData[concernType].total++;
+            if (entry.strayDogs || concernType.toLowerCase().includes('stray')) {
+              concernTypeData[concernType].strayDogs++;
+            }
+
+            // Per-barangay breakdown
+            const barangayName = entry.barangay || 'Unknown';
+            if (!barangayData[barangayName]) {
+              // barangay not in registered list — still track it
+              barangayData[barangayName] = {};
+              municipalConcernTypes.forEach(ct => { barangayData[barangayName][ct] = emptyQtrs(); });
+            }
+            if (!barangayData[barangayName][concernType]) {
+              barangayData[barangayName][concernType] = emptyQtrs();
+            }
+            barangayData[barangayName][concernType][quarter]++;
+            barangayData[barangayName][concernType].total++;
+          });
+        });
+      });
+
       const hasData = Object.values(concernTypeData).some(ct => ct.total > 0);
       if (hasData) {
-        municipalityData[municipality] = concernTypeData;
+        municipalityData[municipality] = { concernTypeData, barangayData };
       }
     });
 
@@ -2802,98 +2835,139 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
       }
 
-      // ============ MUNICIPALITY TABLES ============
-      municipalitiesToShow.forEach((municipality, index) => {
-        const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
+      // Helper: render one concern-type table and return the new Y position
+      const renderConcernTypeTable = (concernTypeDataObj, startY, lMargin, rMargin, fSize) => {
+        const getTrendLabel = (cur, prev) => {
+          if (cur > prev) return 'Increased';
+          if (cur < prev) return 'Decreased';
+          return 'Unchanged';
+        };
+        const tableData = [];
+        Object.entries(concernTypeDataObj).forEach(([ct, q]) => {
+          tableData.push([
+            ct,
+            (q.Q1 || 0).toString(),
+            `${q.Q2 || 0}\n${getTrendLabel(q.Q2 || 0, q.Q1 || 0)}`,
+            `${q.Q3 || 0}\n${getTrendLabel(q.Q3 || 0, q.Q2 || 0)}`,
+            `${q.Q4 || 0}\n${getTrendLabel(q.Q4 || 0, q.Q3 || 0)}`,
+            (q.total || 0).toString()
+          ]);
+        });
+        if (tableData.length === 0) return startY;
+        autoTable(pdfDoc, {
+          head: [['Concern Type', 'Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)', 'Total']],
+          body: tableData,
+          startY,
+          theme: 'grid',
+          styles: { fontSize: fSize || 9, cellPadding: 3, lineColor: [200, 200, 200], lineWidth: 0.5 },
+          headStyles: { fillColor: [16, 185, 129], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+          columnStyles: {
+            0: { cellWidth: 70, halign: 'left' },
+            1: { cellWidth: 28, halign: 'center' },
+            2: { cellWidth: 28, halign: 'center' },
+            3: { cellWidth: 28, halign: 'center' },
+            4: { cellWidth: 28, halign: 'center' },
+            5: { cellWidth: 28, halign: 'center', fontStyle: 'bold', fillColor: [240, 253, 244] }
+          },
+          margin: { left: lMargin, right: rMargin },
+          didParseCell: function (data) {
+            if (data.section === 'body' && data.column.index >= 2 && data.column.index <= 4) {
+              const cellText = data.cell.text.join('\n');
+              if (cellText.includes('Increased')) {
+                data.cell.styles.fillColor = [254, 202, 202];
+                data.cell.styles.textColor = [185, 28, 28];
+              } else if (cellText.includes('Decreased')) {
+                data.cell.styles.fillColor = [187, 247, 208];
+                data.cell.styles.textColor = [21, 128, 61];
+              } else if (cellText.includes('Unchanged')) {
+                data.cell.styles.fillColor = [254, 240, 138];
+                data.cell.styles.textColor = [161, 98, 7];
+              }
+            }
+          }
+        });
+        return pdfDoc.lastAutoTable.finalY + 6;
+      };
 
-        // Check if we need a new page
+      // ============ MUNICIPALITY + BARANGAY TABLES ============
+      municipalitiesToShow.forEach((municipality) => {
+        const munEntry = quarterlyPreviewData.municipalityData[municipality];
+        // Support both old shape (plain object) and new shape ({concernTypeData, barangayData})
+        const concernTypeData = munEntry.concernTypeData || munEntry;
+        const barangayData = munEntry.barangayData || {};
+
         if (currentY > pageHeight - 60) {
           pdfDoc.addPage();
           currentY = 20;
         }
 
-        // Municipality header
-        pdfDoc.setFontSize(14);
+        // MUNICIPALITY HEADER
+        pdfDoc.setFillColor(16, 185, 129);
+        pdfDoc.rect(paperConfig.margin, currentY - 2, pageWidth - (paperConfig.margin * 2), 12, 'F');
+        pdfDoc.setFontSize(13);
         pdfDoc.setFont('helvetica', 'bold');
-        pdfDoc.setFillColor(240, 253, 244);
-        pdfDoc.rect(paperConfig.margin, currentY - 5, pageWidth - (paperConfig.margin * 2), 10, 'F');
-        pdfDoc.text(municipality.toUpperCase(), paperConfig.margin + 3, currentY + 2);
-        currentY += 12;
+        pdfDoc.setTextColor(255, 255, 255);
+        pdfDoc.text(municipality.toUpperCase(), paperConfig.margin + 4, currentY + 7);
+        // Draw barangay count badge
+        if (barangayCounts[municipality]) {
+          const countText = String(barangayCounts[municipality]);
+          const badgeX = paperConfig.margin + 4 + pdfDoc.getTextWidth(municipality.toUpperCase()) + 5;
+          pdfDoc.setFillColor(255, 255, 255);
+          pdfDoc.circle(badgeX + 3, currentY + 6, 4, 'F');
+          pdfDoc.setFontSize(8);
+          pdfDoc.setTextColor(21, 128, 61);
+          pdfDoc.text(countText, badgeX + 3, currentY + 8, { align: 'center' });
+          pdfDoc.setFontSize(13);
+          pdfDoc.setTextColor(255, 255, 255);
+        }
+        pdfDoc.setTextColor(0, 0, 0);
+        currentY += 16;
 
-        // Prepare table data with trends
-        const tableData = [];
-        Object.entries(concernTypeData).forEach(([concernType, quarters]) => {
-          if (quarters.total > 0) {
-            // Calculate trends
-            const getTrendLabel = (current, previous) => {
-              if (current > previous) return 'Increased';
-              if (current < previous) return 'Decreased';
-              return 'Unchanged';
-            };
+        const barangayEntries = Object.entries(barangayData);
+        if (barangayEntries.length > 0) {
+          // Render per-barangay sub-tables
+          barangayEntries.forEach(([barangayName, brgyData]) => {
+            const hasBrgyData = Object.values(brgyData).some(q => (q.total || 0) > 0);
+            if (!hasBrgyData) return;
 
-            const q2Trend = getTrendLabel(quarters.Q2, quarters.Q1);
-            const q3Trend = getTrendLabel(quarters.Q3, quarters.Q2);
-            const q4Trend = getTrendLabel(quarters.Q4, quarters.Q3);
-
-            const row = [
-              concernType,
-              quarters.Q1.toString(),
-              `${quarters.Q2}\n${q2Trend}`,
-              `${quarters.Q3}\n${q3Trend}`,
-              `${quarters.Q4}\n${q4Trend}`,
-              quarters.total.toString()
-            ];
-
-            tableData.push(row);
-          }
-        });
-
-        // Add table
-        autoTable(pdfDoc, {
-          head: [['Concern Type', 'Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)', 'Total']],
-          body: tableData,
-          startY: currentY,
-          theme: 'grid',
-          styles: {
-            fontSize: 9,
-            cellPadding: 3,
-            lineColor: [200, 200, 200],
-            lineWidth: 0.5
-          },
-          headStyles: {
-            fillColor: [16, 185, 129],
-            textColor: [255, 255, 255],
-            fontStyle: 'bold',
-            halign: 'center'
-          },
-          columnStyles: {
-            0: { cellWidth: 80, halign: 'left' },
-            1: { cellWidth: 30, halign: 'center' },
-            2: { cellWidth: 30, halign: 'center' },
-            3: { cellWidth: 30, halign: 'center' },
-            4: { cellWidth: 30, halign: 'center' },
-            5: { cellWidth: 30, halign: 'center', fontStyle: 'bold', fillColor: [240, 253, 244] }
-          },
-          margin: { left: paperConfig.margin, right: paperConfig.margin },
-          didParseCell: function (data) {
-            // Apply colored backgrounds to Q2, Q3, Q4 based on trend
-            if (data.section === 'body' && data.column.index >= 2 && data.column.index <= 4) {
-              const cellText = data.cell.text.join('\n');
-              if (cellText.includes('Increased')) {
-                data.cell.styles.fillColor = [254, 202, 202]; // Light red (bg-red-200)
-                data.cell.styles.textColor = [185, 28, 28]; // Dark red (text-red-700)
-              } else if (cellText.includes('Decreased')) {
-                data.cell.styles.fillColor = [187, 247, 208]; // Light green (bg-green-200)
-                data.cell.styles.textColor = [21, 128, 61]; // Dark green (text-green-700)
-              } else if (cellText.includes('Unchanged')) {
-                data.cell.styles.fillColor = [254, 240, 138]; // Light yellow (bg-yellow-200)
-                data.cell.styles.textColor = [161, 98, 7]; // Dark yellow (text-yellow-700)
-              }
+            if (currentY > pageHeight - 60) {
+              pdfDoc.addPage();
+              currentY = 20;
             }
-          }
-        });
 
-        currentY = pdfDoc.lastAutoTable.finalY + 8;
+            // Barangay sub-header
+            pdfDoc.setFillColor(229, 246, 235);
+            pdfDoc.rect(paperConfig.margin + 5, currentY - 1, pageWidth - (paperConfig.margin * 2) - 10, 10, 'F');
+            pdfDoc.setDrawColor(21, 128, 61);
+            pdfDoc.setLineWidth(0.4);
+            pdfDoc.rect(paperConfig.margin + 5, currentY - 1, pageWidth - (paperConfig.margin * 2) - 10, 10, 'S');
+            pdfDoc.setFontSize(10);
+            pdfDoc.setFont('helvetica', 'bold');
+            pdfDoc.setTextColor(21, 128, 61);
+            pdfDoc.text(barangayName, paperConfig.margin + 9, currentY + 7);
+            pdfDoc.setTextColor(0, 0, 0);
+            currentY += 13;
+
+            currentY = renderConcernTypeTable(
+              brgyData,
+              currentY,
+              paperConfig.margin + 10,
+              paperConfig.margin + 10,
+              8
+            );
+          });
+        } else {
+          // Fallback: municipality-level table when no barangay data available
+          currentY = renderConcernTypeTable(
+            concernTypeData,
+            currentY,
+            paperConfig.margin,
+            paperConfig.margin,
+            9
+          );
+        }
+
+        currentY += 6;
       });
 
       // Add page numbers
@@ -2917,7 +2991,121 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  // Command Center Summary calculation functions (using real Firebase data)
+  // Export Quarterly Report to Excel — one sheet per municipality (ExcelJS for borders + styling)
+  const exportQuarterlyToExcel = async () => {
+    if (!quarterlyPreviewData) return;
+
+    const ExcelWorkbook = new ExcelJS.Workbook();
+    ExcelWorkbook.creator = 'iPatroller System';
+    const year = quarterlyPreviewData.year;
+
+    let municipalitiesToExport = Object.keys(quarterlyPreviewData.municipalityData);
+    if (quarterlyPreviewData.district !== 'all') {
+      const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
+      municipalitiesToExport = municipalitiesToExport.filter(m => districtMunicipalities.includes(m));
+    }
+
+    // Shared style helpers
+    const thinBorder = { style: 'thin', color: { argb: 'FFB0B0B0' } };
+    const allBorders = { top: thinBorder, left: thinBorder, bottom: thinBorder, right: thinBorder };
+    const thickBorder = { style: 'medium', color: { argb: 'FF10B981' } };
+
+    municipalitiesToExport.forEach(municipality => {
+      const munEntry = quarterlyPreviewData.municipalityData[municipality];
+      const barangayData = munEntry.barangayData || {};
+      const brgyCount = barangayCounts[municipality] || '';
+
+      // Safe sheet name (Excel limit: 31 chars, no special chars)
+      const sheetName = municipality.replace(/[\\/*?\[\]:]/g, '').slice(0, 31);
+      const ws = ExcelWorkbook.addWorksheet(sheetName);
+
+      // Column widths
+      ws.columns = [
+        { width: 40 }, // Concern Type / Barangay Name
+        { width: 2 }, // spacer
+        { width: 15 }, // Q1
+        { width: 15 }, // Q2
+        { width: 15 }, // Q3
+        { width: 15 }, // Q4
+        { width: 12 }  // Total
+      ];
+
+      // ── Title row
+      const titleRow = ws.addRow([`${municipality} (${brgyCount} Barangays) — Quarterly Report ${year}`]);
+      titleRow.getCell(1).font = { bold: true, size: 13, color: { argb: 'FF065F46' } };
+      ws.mergeCells(titleRow.number, 1, titleRow.number, 7);
+      ws.addRow([]); // blank spacer
+
+      // ── Loop barangays
+      Object.entries(barangayData).forEach(([barangayName, brgyData]) => {
+        const allConcernEntries = Object.entries(brgyData);
+
+        // Skip barangays with no data
+        const brgyTotal = allConcernEntries.reduce((sum, [, q]) => sum + (q.total || 0), 0);
+        if (brgyTotal === 0) return;
+
+        // Barangay header row (green)
+        const brgyHeaderRow = ws.addRow([barangayName]);
+        ws.mergeCells(brgyHeaderRow.number, 1, brgyHeaderRow.number, 7);
+        brgyHeaderRow.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
+        brgyHeaderRow.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+        brgyHeaderRow.getCell(1).border = { top: thickBorder, bottom: thickBorder, left: thickBorder, right: thickBorder };
+        brgyHeaderRow.height = 20;
+
+        // Column sub-header row (gray)
+        const colHeaderRow = ws.addRow(['Concern Type', '', 'Q1 (Jan-Mar)', 'Q2 (Apr-Jun)', 'Q3 (Jul-Sep)', 'Q4 (Oct-Dec)', 'Total']);
+        [1, 3, 4, 5, 6, 7].forEach(c => {
+          const cell = colHeaderRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD1FAE5' } };
+          cell.font = { bold: true, color: { argb: 'FF065F46' } };
+          cell.border = allBorders;
+          cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+        });
+        colHeaderRow.height = 18;
+
+        // Concern type data rows
+        allConcernEntries.forEach(([concernType, q]) => {
+          const dataRow = ws.addRow([concernType, '', q.Q1 || 0, q.Q2 || 0, q.Q3 || 0, q.Q4 || 0, q.total || 0]);
+          [1, 3, 4, 5, 6, 7].forEach(c => {
+            const cell = dataRow.getCell(c);
+            cell.border = allBorders;
+            cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+            if (c === 7) cell.font = { bold: true, color: { argb: 'FF065F46' } }; // Total col bold green
+          });
+        });
+
+        // Subtotal row
+        const totals = allConcernEntries.reduce((acc, [, q]) => ({
+          Q1: acc.Q1 + (q.Q1 || 0), Q2: acc.Q2 + (q.Q2 || 0),
+          Q3: acc.Q3 + (q.Q3 || 0), Q4: acc.Q4 + (q.Q4 || 0),
+          total: acc.total + (q.total || 0)
+        }), { Q1: 0, Q2: 0, Q3: 0, Q4: 0, total: 0 });
+
+        const subtotalRow = ws.addRow(['SUBTOTAL', '', totals.Q1, totals.Q2, totals.Q3, totals.Q4, totals.total]);
+        [1, 3, 4, 5, 6, 7].forEach(c => {
+          const cell = subtotalRow.getCell(c);
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } };
+          cell.font = { bold: true, color: { argb: 'FF065F46' } };
+          cell.border = { top: { style: 'medium', color: { argb: 'FF10B981' } }, ...allBorders };
+          cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+        });
+
+        ws.addRow([]); // spacer between barangays
+      });
+    });
+
+    // Download
+    const buffer = await ExcelWorkbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `quarterly-report-${year}.xlsx`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+
   const calculateWeeklyReportSummary = (municipality = null) => {
     const reports = commandCenterData.reports || {};
     const barangays = commandCenterData.barangays || [];
@@ -5653,6 +5841,34 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {/* Year selector */}
+                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+                  <Calendar className="w-4 h-4 text-gray-500" />
+                  <select
+                    value={fromYear}
+                    onChange={(e) => {
+                      setFromYear(Number(e.target.value));
+                      setShowQuarterlyPreview(false);
+                      setQuarterlyPreviewData(null);
+                      setTimeout(() => loadQuarterlyReportData(), 100);
+                    }}
+                    className="text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+                  >
+                    {[2025, 2026, 2027].map(y => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+                {/* Export Excel */}
+                <Button
+                  onClick={exportQuarterlyToExcel}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  size="sm"
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Excel
+                </Button>
+                {/* Generate PDF */}
                 <Button
                   onClick={generateQuarterlyCommandCenterReport}
                   className="bg-green-600 hover:bg-green-700 text-white"
@@ -5686,6 +5902,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
               </div>
             </div>
 
+
             {/* Modal Content */}
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
               <div className="space-y-6">
@@ -5697,75 +5914,96 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
                   }
 
-                  return municipalitiesToShow.map((municipality, index) => {
-                    const concernTypeData = quarterlyPreviewData.municipalityData[municipality];
+                  return municipalitiesToShow.map((municipality) => {
+                    const munEntry = quarterlyPreviewData.municipalityData[municipality];
+                    // Support both old shape (plain object) and new shape ({concernTypeData, barangayData})
+                    const barangayData = munEntry.barangayData || {};
+                    const barangayEntries = Object.entries(barangayData).filter(([, brgyData]) =>
+                      Object.values(brgyData).some(q => (q.total || 0) > 0)
+                    );
 
-                    return (
-                      <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                        {/* Municipality Header */}
-                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3">
-                          <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
-                        </div>
+                    const renderBrgyTable = (brgyData, rowKey) => {
+                      const getTrend = (cur, prev) => {
+                        if (cur > prev) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
+                        if (cur < prev) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
+                        return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
+                      };
 
-                        {/* Table */}
+                      return (
                         <div className="overflow-x-auto">
-                          <table className="w-full">
+                          <table className="w-full text-sm">
                             <thead>
                               <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q1<br /><span className="text-xs font-normal">(Jan-Mar)</span></th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q2<br /><span className="text-xs font-normal">(Apr-Jun)</span></th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q3<br /><span className="text-xs font-normal">(Jul-Sep)</span></th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 border-r border-gray-300">Q4<br /><span className="text-xs font-normal">(Oct-Dec)</span></th>
-                                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-700 bg-green-50">Total</th>
+                                <th className="px-3 py-2 text-left font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
+                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q1<br /><span className="text-xs font-normal">(Jan-Mar)</span></th>
+                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q2<br /><span className="text-xs font-normal">(Apr-Jun)</span></th>
+                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q3<br /><span className="text-xs font-normal">(Jul-Sep)</span></th>
+                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q4<br /><span className="text-xs font-normal">(Oct-Dec)</span></th>
+                                <th className="px-3 py-2 text-center font-semibold text-gray-700 bg-green-50">Total</th>
                               </tr>
                             </thead>
                             <tbody>
-                              {Object.entries(concernTypeData).map(([concernType, quarters], idx) => {
-                                if (quarters.total === 0) return null;
-
-                                // Calculate trends for Q2, Q3, Q4
-                                const getTrend = (current, previous) => {
-                                  if (current > previous) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
-                                  if (current < previous) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
-                                  return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
-                                };
-
-                                const q2Trend = getTrend(quarters.Q2, quarters.Q1);
-                                const q3Trend = getTrend(quarters.Q3, quarters.Q2);
-                                const q4Trend = getTrend(quarters.Q4, quarters.Q3);
-
+                              {Object.entries(brgyData).map(([concernType, q], idx) => {
+                                const q2t = getTrend(q.Q2 || 0, q.Q1 || 0);
+                                const q3t = getTrend(q.Q3 || 0, q.Q2 || 0);
+                                const q4t = getTrend(q.Q4 || 0, q.Q3 || 0);
                                 return (
-                                  <tr key={concernType} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
-                                    <td className="px-4 py-3 text-sm text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
-                                    <td className="px-4 py-3 text-sm text-center text-gray-700 border-r border-gray-200">
-                                      <div className="font-semibold">{quarters.Q1}</div>
+                                  <tr key={`${rowKey}-${concernType}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
+                                    <td className="px-3 py-2 text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
+                                    <td className="px-3 py-2 text-center text-gray-700 border-r border-gray-200 font-semibold">{q.Q1 || 0}</td>
+                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q2t.bg}`}>
+                                      <div className="font-semibold text-gray-900">{q.Q2 || 0}</div>
+                                      <div className={`text-xs font-medium mt-0.5 ${q2t.color}`}>{q2t.label}</div>
                                     </td>
-                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q2Trend.bg}`}>
-                                      <div className="font-semibold text-gray-900">{quarters.Q2}</div>
-                                      <div className={`text-xs font-medium mt-1 ${q2Trend.color}`}>
-                                        {q2Trend.label}
-                                      </div>
+                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q3t.bg}`}>
+                                      <div className="font-semibold text-gray-900">{q.Q3 || 0}</div>
+                                      <div className={`text-xs font-medium mt-0.5 ${q3t.color}`}>{q3t.label}</div>
                                     </td>
-                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q3Trend.bg}`}>
-                                      <div className="font-semibold text-gray-900">{quarters.Q3}</div>
-                                      <div className={`text-xs font-medium mt-1 ${q3Trend.color}`}>
-                                        {q3Trend.label}
-                                      </div>
+                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q4t.bg}`}>
+                                      <div className="font-semibold text-gray-900">{q.Q4 || 0}</div>
+                                      <div className={`text-xs font-medium mt-0.5 ${q4t.color}`}>{q4t.label}</div>
                                     </td>
-                                    <td className={`px-4 py-3 text-sm text-center border-r border-gray-200 ${q4Trend.bg}`}>
-                                      <div className="font-semibold text-gray-900">{quarters.Q4}</div>
-                                      <div className={`text-xs font-medium mt-1 ${q4Trend.color}`}>
-                                        {q4Trend.label}
-                                      </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm text-center font-bold text-green-700 bg-green-50">{quarters.total}</td>
+                                    <td className="px-3 py-2 text-center font-bold text-green-700 bg-green-50">{q.total || 0}</td>
                                   </tr>
                                 );
                               })}
                             </tbody>
                           </table>
                         </div>
+                      );
+                    };
+
+                    return (
+                      <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                        {/* Municipality Header */}
+                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-3">
+                          <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
+                          {barangayCounts[municipality] && (
+                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-green-700 text-sm font-extrabold shadow">
+                              {barangayCounts[municipality]}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Per-Barangay sub-tables */}
+                        {barangayEntries.length > 0 ? (
+                          <div className="divide-y divide-gray-200">
+                            {barangayEntries.map(([barangayName, brgyData]) => (
+                              <div key={barangayName} className="p-0">
+                                {/* Barangay Sub-Header */}
+                                <div className="bg-green-50 border-b border-green-200 px-4 py-2 flex items-center gap-2">
+                                  <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                  <span className="text-sm font-semibold text-green-800">
+                                    {barangayName}
+                                  </span>
+                                </div>
+                                {renderBrgyTable(brgyData, `${municipality}-${barangayName}`)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="p-4 text-center text-gray-500 text-sm italic">No barangay data available</div>
+                        )}
                       </div>
                     );
                   });
