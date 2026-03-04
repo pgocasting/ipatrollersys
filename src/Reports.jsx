@@ -94,6 +94,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [actionItems, setActionItems] = useState([]);
   const [showActionCenterGenerateModal, setShowActionCenterGenerateModal] = useState(false);
   const [isGeneratingActionCenterRangeReport, setIsGeneratingActionCenterRangeReport] = useState(false);
+  const [actionCenterReportYear, setActionCenterReportYear] = useState(new Date().getFullYear());
+  const [actionCenterFromMonth, setActionCenterFromMonth] = useState(0); // 0 = January
+  const [actionCenterToMonth, setActionCenterToMonth] = useState(1);    // 1 = February
 
   // IPatroller Daily Summary modal state
   const [showIPatrollerDailySummary, setShowIPatrollerDailySummary] = useState(false);
@@ -1712,7 +1715,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     doc.save(`action-center-${months[selectedMonth]}-${selectedYear}-${paperSize}.pdf`);
   };
 
-  const generateActionCenterReportJanFebByDepartment = async (department) => {
+  const generateActionCenterReportJanFebByDepartment = async (department, year = actionCenterReportYear, fromMonth = actionCenterFromMonth, toMonth = actionCenterToMonth) => {
     setIsGeneratingActionCenterRangeReport(true);
     try {
       const normalizedDept = department === 'PG-ENRO' ? 'pg-enro' : department.toLowerCase();
@@ -1752,39 +1755,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
       doc.setFontSize(11);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${department} | January - February ${selectedYear}`, centerX, 26, { align: 'center' });
+      doc.text(`${department} | ${months[fromMonth]} - ${months[toMonth]} ${year}`, centerX, 26, { align: 'center' });
 
       let filteredActions = actionItems.length > 0 ? actionItems : (actionReports || []);
-
-      const janActions = filteredActions.filter(action => {
-        const dept = (action.department || '').toLowerCase();
-        if (dept !== normalizedDept) return false;
-
-        if (selectedDistrict !== 'all') {
-          if ((action.district || '') !== selectedDistrict) return false;
-        }
-
-        const actionDate = action.when ? new Date(action.when) : null;
-        if (!actionDate || isNaN(actionDate.getTime())) return false;
-
-        const isSameYear = actionDate.getFullYear() === Number(selectedYear);
-        return isSameYear && actionDate.getMonth() === 0;
-      });
-
-      const febActions = filteredActions.filter(action => {
-        const dept = (action.department || '').toLowerCase();
-        if (dept !== normalizedDept) return false;
-
-        if (selectedDistrict !== 'all') {
-          if ((action.district || '') !== selectedDistrict) return false;
-        }
-
-        const actionDate = action.when ? new Date(action.when) : null;
-        if (!actionDate || isNaN(actionDate.getTime())) return false;
-
-        const isSameYear = actionDate.getFullYear() === Number(selectedYear);
-        return isSameYear && actionDate.getMonth() === 1;
-      });
 
       const getComparableDate = (value) => {
         const d = value ? new Date(value) : null;
@@ -1798,7 +1771,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           if (aTime !== null && bTime !== null && aTime !== bTime) return aTime - bTime;
           if (aTime !== null && bTime === null) return -1;
           if (aTime === null && bTime !== null) return 1;
-
           const aMun = (a?.municipality || '').toString().toLowerCase();
           const bMun = (b?.municipality || '').toString().toLowerCase();
           if (aMun < bMun) return -1;
@@ -1807,8 +1779,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         });
       };
 
-      const sortedJanActions = sortActions(janActions);
-      const sortedFebActions = sortActions(febActions);
+      // Build per-month action arrays for every month in the selected range
+      const monthRange = [];
+      for (let m = fromMonth; m <= toMonth; m++) {
+        const monthActions = filteredActions.filter(action => {
+          const dept = (action.department || '').toLowerCase();
+          if (dept !== normalizedDept) return false;
+          if (selectedDistrict !== 'all') {
+            if ((action.district || '') !== selectedDistrict) return false;
+          }
+          const actionDate = action.when ? new Date(action.when) : null;
+          if (!actionDate || isNaN(actionDate.getTime())) return false;
+          return actionDate.getFullYear() === Number(year) && actionDate.getMonth() === m;
+        });
+        monthRange.push({ month: m, actions: sortActions(monthActions) });
+      }
 
       const infoY = 40;
       doc.setFontSize(10);
@@ -1911,21 +1896,21 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       };
 
       let nextY = startY;
-      nextY = drawMonthSection(`January ${selectedYear}`, sortedJanActions, nextY);
-
-      if (sortedFebActions.length > 0) {
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const remaining = pageHeight - nextY;
-        if (remaining < 60) {
-          doc.addPage();
-          nextY = paperConfig.margin;
-        } else {
-          nextY += 12;
+      for (const { month, actions } of monthRange) {
+        if (actions.length === 0) continue; // skip months with no data
+        if (nextY !== startY) {
+          const pageHeight = doc.internal.pageSize.getHeight();
+          if (pageHeight - nextY < 60) {
+            doc.addPage();
+            nextY = paperConfig.margin;
+          } else {
+            nextY += 12;
+          }
         }
-        drawMonthSection(`February ${selectedYear}`, sortedFebActions, nextY);
+        nextY = drawMonthSection(`${months[month]} ${year}`, actions, nextY);
       }
 
-      const filename = `action-center-${normalizedDept}-jan-feb-${selectedYear}-${paperSize}.pdf`;
+      const filename = `action-center-${normalizedDept}-${months[fromMonth].toLowerCase()}-${months[toMonth].toLowerCase()}-${year}-${paperSize}.pdf`;
       doc.save(filename);
     } finally {
       setIsGeneratingActionCenterRangeReport(false);
@@ -4901,7 +4886,9 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
             <div className="flex items-center justify-between p-6 border-b border-gray-200">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
-                <p className="text-sm text-gray-500">Choose a department (January - February)</p>
+                <p className="text-sm text-gray-500">
+                  {months[actionCenterFromMonth]} – {months[actionCenterToMonth]} {actionCenterReportYear}
+                </p>
               </div>
               <button
                 onClick={() => setShowActionCenterGenerateModal(false)}
@@ -4912,7 +4899,44 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
               </button>
             </div>
 
-            <div className="p-6 space-y-3">
+            {/* Year + Month selectors */}
+            <div className="px-6 pt-4 pb-2 grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
+                <select
+                  value={actionCenterReportYear}
+                  onChange={e => setActionCenterReportYear(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={isGeneratingActionCenterRangeReport}
+                >
+                  {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">From Month</label>
+                <select
+                  value={actionCenterFromMonth}
+                  onChange={e => setActionCenterFromMonth(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={isGeneratingActionCenterRangeReport}
+                >
+                  {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">To Month</label>
+                <select
+                  value={actionCenterToMonth}
+                  onChange={e => setActionCenterToMonth(Number(e.target.value))}
+                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  disabled={isGeneratingActionCenterRangeReport}
+                >
+                  {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="px-6 pb-6 pt-2 space-y-3">
               <Button
                 onClick={async () => {
                   await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
