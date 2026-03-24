@@ -1,0 +1,3558 @@
+{
+  "daily_counts": {
+    "0Pia18UWSdrArqoJddMy": {
+      "date": "2025-07-25",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:25.157Z"
+      }
+    },
+    "0TlvoA9f3AIwFxHbWJBt": {
+      "date": "2025-06-30",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-06",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:33.121Z"
+      }
+    },
+    "0uQB7hdiY6zpVYyfZQ6C": {
+      "date": "2025-07-20",
+      "municipality": "ORANI",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:51.512Z"
+      }
+    },
+    "1ch2VkEK7nZBZOLIHsbu": {
+      "date": "2025-07-16",
+      "municipality": "ABUCAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:39.505Z"
+      }
+    },
+    "1iTd3dkMkbtuOFmoQNho": {
+      "date": "2025-07-22",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:44.996Z"
+      }
+    },
+    "1mNPXuvTRnmpvlO2E3J0": {
+      "date": "2025-07-14",
+      "municipality": "MORONG",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:34.745Z"
+      }
+    },
+    "1qZe7UOOYERCMbgtByN0": {
+      "date": "2025-07-18",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:53.859Z"
+      }
+    },
+    "1wHMXC6GCq8IW3LY8K3Z": {
+      "date": "2025-07-21",
+      "municipality": "LIMAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:55.158Z"
+      }
+    },
+    "23NAoPUjQvEUTLC6xcuj": {
+      "date": "2025-07-08",
+      "municipality": "SAMAL",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:57.178Z"
+      }
+    },
+    "24uHQ5xfwIbsvvzIrUpH": {
+      "date": "2025-07-08",
+      "municipality": "PILAR",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:28.772Z"
+      }
+    },
+    "2E2t6z2NsmVIxAm2gHU4": {
+      "date": "2025-07-17",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:21.931Z"
+      }
+    },
+    "2qeuH0L0IckKPg8dQcWN": {
+      "date": "2025-07-25",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:56.762Z"
+      }
+    },
+    "3AHnbEAiJYngEN2DoZts": {
+      "date": "2025-07-17",
+      "municipality": "ORION",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:42.993Z"
+      }
+    },
+    "3EsJvJKnLNmcp58UGNXc": {
+      "date": "2025-07-15",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:42.198Z"
+      }
+    },
+    "3GrUdMQVtXRLOynpN7ay": {
+      "date": "2025-07-25",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:53.540Z"
+      }
+    },
+    "3XCq39BxntNVrbdras8t": {
+      "date": "2025-07-20",
+      "municipality": "DINALUPIHAN",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:15.926Z"
+      }
+    },
+    "3hRpaOQqGvAxU7lttKGk": {
+      "date": "2025-07-04",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:34.731Z"
+      }
+    },
+    "4BohHij5RamIcljPjJXS": {
+      "date": "2025-07-06",
+      "municipality": "DINALUPIHAN",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:10.209Z"
+      }
+    },
+    "4O7IdyTgAGUaQnjwowfc": {
+      "date": "2025-07-11",
+      "municipality": "LIMAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:51.023Z"
+      }
+    },
+    "4wE18m8BAh71BfKnzsXx": {
+      "date": "2025-07-17",
+      "municipality": "MORONG",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:35.944Z"
+      }
+    },
+    "5drAKdv6OOX0wwHmcid5": {
+      "date": "2025-07-21",
+      "municipality": "MARIVELES",
+      "count": 11,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:26.983Z"
+      }
+    },
+    "61eMIxpF8B2NBx5eKoAO": {
+      "date": "2025-07-19",
+      "municipality": "ABUCAY",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:40.679Z"
+      }
+    },
+    "6DZ9p93WyRR49XcXfM57": {
+      "date": "2025-07-08",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:07.688Z"
+      }
+    },
+    "6EMLD2uVxylccllJsyC9": {
+      "date": "2025-07-12",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:51.425Z"
+      }
+    },
+    "6HMaTOTa0dbi7oyM5ynr": {
+      "date": "2025-07-23",
+      "municipality": "SAMAL",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:03.222Z"
+      }
+    },
+    "6IWMVFtFrHj3E1Hln9he": {
+      "date": "2025-07-12",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:40.986Z"
+      }
+    },
+    "6OBAXSDmfIsLm53n8pBk": {
+      "date": "2025-07-07",
+      "municipality": "PILAR",
+      "count": 13,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:28.371Z"
+      }
+    },
+    "6ZuTu8BUJ1syTMHET6Z6": {
+      "date": "2025-07-20",
+      "municipality": "LIMAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:54.742Z"
+      }
+    },
+    "6aqWgEEewFWux3ddgdqa": {
+      "date": "2025-07-09",
+      "municipality": "MARIVELES",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:22.131Z"
+      }
+    },
+    "7OpCrHHwgaFsA47zG4rz": {
+      "date": "2025-07-19",
+      "municipality": "DINALUPIHAN",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:15.494Z"
+      }
+    },
+    "7PP5RAtnRIfhI0wI4W4m": {
+      "date": "2025-07-21",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:23.543Z"
+      }
+    },
+    "7XyX9HsQ3VcbJHeRO0cq": {
+      "date": "2025-07-10",
+      "municipality": "MARIVELES",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:22.539Z"
+      }
+    },
+    "7bZqWGVnVr1lwayVsg68": {
+      "date": "2025-07-16",
+      "municipality": "PILAR",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:32.001Z"
+      }
+    },
+    "7dUXcAJWMHIUtmMf42bc": {
+      "date": "2025-07-15",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:39.102Z"
+      }
+    },
+    "7fNu6uXpxcIw3BbdhtVM": {
+      "date": "2025-07-02",
+      "municipality": "ORION",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:36.983Z"
+      }
+    },
+    "7gigwhBs0cZ1BrqDHIfv": {
+      "date": "2025-07-09",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:39.796Z"
+      }
+    },
+    "7yWDwMWNFqxHAuKIAhDS": {
+      "date": "2025-07-07",
+      "municipality": "SAMAL",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:56.775Z"
+      }
+    },
+    "8U7mYhDwX8LGla17ev5h": {
+      "month": "2025-07",
+      "municipality": "ORION",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 9,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:36.172Z"
+      }
+    },
+    "995wTPNct0EXdJC1sGSH": {
+      "date": "2025-07-22",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:02.821Z"
+      }
+    },
+    "9TCNkWDJHIeu1OJzLfcP": {
+      "date": "2025-07-03",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:34.334Z"
+      }
+    },
+    "9hRqjs0nGvp10wOZhlFI": {
+      "date": "2025-07-18",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:40.287Z"
+      }
+    },
+    "9jRcnMkS5f8QJEgVctpQ": {
+      "date": "2025-07-14",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:20.688Z"
+      }
+    },
+    "9oN3YsEGg6deDICsJTJM": {
+      "date": "2025-07-06",
+      "municipality": "ABUCAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:35.532Z"
+      }
+    },
+    "A5vMaJj9mUoSdpRop9RZ": {
+      "date": "2025-07-13",
+      "municipality": "MORONG",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:34.345Z"
+      }
+    },
+    "AQd1QQNQCiBNSwjwl3WB": {
+      "date": "2025-07-12",
+      "municipality": "HERMOSA",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:09.316Z"
+      }
+    },
+    "Acci3ZCsL7CfjAEYAFhq": {
+      "date": "2025-07-07",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:38.986Z"
+      }
+    },
+    "AjL4mGC4aSWuSpkWsa6r": {
+      "date": "2025-07-04",
+      "municipality": "HERMOSA",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:06.084Z"
+      }
+    },
+    "B5cjcoU2U7bTcKey55g2": {
+      "date": "2025-07-20",
+      "municipality": "MARIVELES",
+      "count": 15,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:26.578Z"
+      }
+    },
+    "B6muX8vLqO05CNHBdkPn": {
+      "date": "2025-07-15",
+      "municipality": "PILAR",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:31.601Z"
+      }
+    },
+    "BG87ulC6aOP8y9k2uU6a": {
+      "date": "2025-07-05",
+      "municipality": "ABUCAY",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:35.132Z"
+      }
+    },
+    "BONl2KVq7s24RqrJrNgP": {
+      "date": "2025-07-23",
+      "municipality": "DINALUPIHAN",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:17.137Z"
+      }
+    },
+    "BWPfqgogOtBQodqQtBgE": {
+      "date": "2025-07-22",
+      "municipality": "MARIVELES",
+      "count": 24,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:27.386Z"
+      }
+    },
+    "BXFZfFik3g09X3La1IoB": {
+      "date": "2025-07-05",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:55.974Z"
+      }
+    },
+    "BrICfklie2c8aPGTPjKl": {
+      "date": "2025-07-10",
+      "municipality": "SAMAL",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:57.996Z"
+      }
+    },
+    "BvM5Wc16NYRNH6lpMDiK": {
+      "date": "2025-07-15",
+      "municipality": "MORONG",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:35.144Z"
+      }
+    },
+    "C3YLiE9TOr8hE6rJizdJ": {
+      "date": "2025-07-16",
+      "municipality": "ORANI",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:49.912Z"
+      }
+    },
+    "CINQpWEZx1hWNlG1RsEy": {
+      "date": "2025-07-04",
+      "municipality": "LIMAY",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:48.214Z"
+      }
+    },
+    "CWsDlajLZuXZdwoWcEjK": {
+      "date": "2025-07-23",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:38.373Z"
+      }
+    },
+    "Ce1qlTNg4rLJ9fKf9O2f": {
+      "date": "2025-07-14",
+      "municipality": "MARIVELES",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:24.142Z"
+      }
+    },
+    "DV4ULv2bYYW5h7ReinOV": {
+      "date": "2025-07-12",
+      "municipality": "SAMAL",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:58.797Z"
+      }
+    },
+    "Db9vyBxGsJwBH7eUxu0i": {
+      "date": "2025-07-25",
+      "municipality": "MARIVELES",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:28.589Z"
+      }
+    },
+    "DhuDNvJeqr741kuGipoA": {
+      "month": "2025-07",
+      "municipality": "LIMAY",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 2,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:46.602Z"
+      }
+    },
+    "DvHXuAjqaqJOUFBCAFrf": {
+      "date": "2025-07-15",
+      "municipality": "LIMAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:52.645Z"
+      }
+    },
+    "E2SWq5UURkkyZYqEqoV5": {
+      "date": "2025-07-04",
+      "municipality": "DINALUPIHAN",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:09.407Z"
+      }
+    },
+    "E5c8Vmku5KyNy3VcMPkz": {
+      "date": "2025-07-08",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:18.298Z"
+      }
+    },
+    "EYTDMK6pTeupXk5BXi1T": {
+      "date": "2025-07-23",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:13.726Z"
+      }
+    },
+    "Ea6HoOndoyXLRkGuyp7t": {
+      "date": "2025-07-06",
+      "municipality": "ORANI",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:45.900Z"
+      }
+    },
+    "EkPsNTbc0YRi633SRiVM": {
+      "date": "2025-07-24",
+      "municipality": "ORION",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:45.802Z"
+      }
+    },
+    "F6qInvRkl57Wmqoysruz": {
+      "date": "2025-07-09",
+      "municipality": "BAGAC",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:00.778Z"
+      }
+    },
+    "FF6tog4YejsZUbFNuyhh": {
+      "date": "2025-07-05",
+      "municipality": "LIMAY",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:48.619Z"
+      }
+    },
+    "FPB4fR7QIj2VSgVF0ZrI": {
+      "date": "2025-07-09",
+      "municipality": "DINALUPIHAN",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:11.422Z"
+      }
+    },
+    "FhwMqg4NnaaGj1AL7kxs": {
+      "date": "2025-07-07",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:46.313Z"
+      }
+    },
+    "FirrGNRs6KrA0sUP7xye": {
+      "date": "2025-07-20",
+      "municipality": "BALANGA",
+      "count": 120,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:23.134Z"
+      }
+    },
+    "Fo69icMDKcaVwcjlmWZT": {
+      "month": "2025-07",
+      "municipality": "BAGAC",
+      "date": "2025-07-02",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 12,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:57.964Z"
+      }
+    },
+    "G3NE0Xnb71EhDpaW77GE": {
+      "date": "2025-07-21",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:51.928Z"
+      }
+    },
+    "G76zaKeOmKjELJFKyAzX": {
+      "date": "2025-07-08",
+      "municipality": "ORANI",
+      "count": 13,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:46.711Z"
+      }
+    },
+    "GECungUuFPwOAVyhhVN7": {
+      "date": "2025-07-25",
+      "municipality": "DINALUPIHAN",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:17.940Z"
+      }
+    },
+    "GNl9mQzQhq3gJJjDxXWK": {
+      "date": "2025-07-13",
+      "municipality": "SAMAL",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:59.204Z"
+      }
+    },
+    "GSmiq6CeyHSq10gzfFYF": {
+      "date": "2025-07-20",
+      "municipality": "MORONG",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:37.166Z"
+      }
+    },
+    "GT5IAhOr1P3YbOAzcE2b": {
+      "date": "2025-07-03",
+      "municipality": "HERMOSA",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:05.682Z"
+      }
+    },
+    "GnqBjh1b5Jw4FRfwhZx0": {
+      "date": "2025-07-19",
+      "municipality": "HERMOSA",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:12.130Z"
+      }
+    },
+    "GoRSHthHNCkyIsiBLJDj": {
+      "date": "2025-07-21",
+      "municipality": "BAGAC",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:05.630Z"
+      }
+    },
+    "Gt3docbynjUQwWKz2dEY": {
+      "date": "2025-07-21",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:41.468Z"
+      }
+    },
+    "HIY0icTRPJeMIFuBuRtP": {
+      "date": "2025-07-24",
+      "municipality": "PILAR",
+      "count": 12,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:35.376Z"
+      }
+    },
+    "HTAx6hhyXpWTwQeKkj1O": {
+      "date": "2025-07-11",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:47.912Z"
+      }
+    },
+    "IrM716S52yiNEMRapbql": {
+      "date": "2025-07-12",
+      "municipality": "PILAR",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:30.387Z"
+      }
+    },
+    "J2iJNEoATb5WcEXKiLHg": {
+      "date": "2025-07-03",
+      "municipality": "ORANI",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:44.699Z"
+      }
+    },
+    "JDUBTdy44XVAIZAmdxMk": {
+      "month": "2025-07",
+      "municipality": "BAGAC",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 6,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:57.165Z"
+      }
+    },
+    "JF9PzQ1e9HW1CnDLVi88": {
+      "date": "2025-07-09",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:18.694Z"
+      }
+    },
+    "JSzrML28iFcGR8pnntuc": {
+      "date": "2025-07-12",
+      "municipality": "BAGAC",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:01.981Z"
+      }
+    },
+    "JU2Nolqo4tO9s7pXnFXc": {
+      "month": "2025-07",
+      "municipality": "MARIVELES",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 5,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:18.348Z"
+      }
+    },
+    "JdZoW895vwmWZIV1MZhT": {
+      "date": "2025-07-15",
+      "municipality": "HERMOSA",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:10.523Z"
+      }
+    },
+    "Jse1XITTeDzR2QiFKl1O": {
+      "date": "2025-07-13",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:41.387Z"
+      }
+    },
+    "Jw9A2fXIucmTMJyttw6x": {
+      "date": "2025-07-04",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:30.729Z"
+      }
+    },
+    "KE22ysGc8YaPcKgulagA": {
+      "date": "2025-07-20",
+      "municipality": "SAMAL",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:02.027Z"
+      }
+    },
+    "KNRHNbkfxCIKRqSBUNKi": {
+      "date": "2025-07-05",
+      "municipality": "HERMOSA",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:06.483Z"
+      }
+    },
+    "KRH71rWru0OWVbbyJnjf": {
+      "date": "2025-07-11",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:33.529Z"
+      }
+    },
+    "KTgQH33z4XLgLnWMFPk0": {
+      "date": "2025-07-13",
+      "municipality": "BAGAC",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:02.385Z"
+      }
+    },
+    "LLIQMzpdI4ejAmq6bEZd": {
+      "date": "2025-07-17",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:53.455Z"
+      }
+    },
+    "M6L2WmR5Xuc1a38hRu9Q": {
+      "date": "2025-07-17",
+      "municipality": "MARIVELES",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:25.359Z"
+      }
+    },
+    "MKOT6KQuyrBI4tfdPszq": {
+      "date": "2025-07-16",
+      "municipality": "BAGAC",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:03.595Z"
+      }
+    },
+    "Me3HIGHn6i5DNYbNshJz": {
+      "date": "2025-07-11",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:40.588Z"
+      }
+    },
+    "MvLXYJSaRqkryQBKPlaN": {
+      "date": "2025-07-04",
+      "municipality": "BALANGA",
+      "count": 80,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:16.554Z"
+      }
+    },
+    "N1QCCUDZGCu4r47PUN86": {
+      "date": "2025-07-06",
+      "municipality": "LIMAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:49.022Z"
+      }
+    },
+    "N6B1y2BmWmlIbZb52BF7": {
+      "date": "2025-07-13",
+      "municipality": "DINALUPIHAN",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:13.033Z"
+      }
+    },
+    "NHsYmoPRX3C6sF9YvPxS": {
+      "date": "2025-07-13",
+      "municipality": "MARIVELES",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:23.740Z"
+      }
+    },
+    "NONOJBiRH7IykiNQ3Ocg": {
+      "date": "2025-07-22",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:13.323Z"
+      }
+    },
+    "NiV0UXAAzKrJzdRzc7BL": {
+      "date": "2025-07-22",
+      "municipality": "ABUCAY",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:41.874Z"
+      }
+    },
+    "O2M0YGVBwlYpAti66BE9": {
+      "date": "2025-07-02",
+      "municipality": "MORONG",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:29.933Z"
+      }
+    },
+    "ObBnrONXtSc45iLFZs8y": {
+      "date": "2025-07-19",
+      "municipality": "MARIVELES",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:26.172Z"
+      }
+    },
+    "PI55pCnMPSwYMUiDPWqZ": {
+      "date": "2025-07-24",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:14.143Z"
+      }
+    },
+    "PILfEU4bjYOYTlne2LZ8": {
+      "month": "2025-07",
+      "municipality": "MORONG",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 3,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:29.532Z"
+      }
+    },
+    "Pmhzf6dsem2fzjdnwSb1": {
+      "date": "2025-07-23",
+      "municipality": "PILAR",
+      "count": 12,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:34.980Z"
+      }
+    },
+    "QVPoMrav50aNYit0O2fn": {
+      "date": "2025-07-15",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:21.090Z"
+      }
+    },
+    "Qz8KeCE5pRwEvXgEb8aT": {
+      "date": "2025-07-02",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:54.767Z"
+      }
+    },
+    "RASeqRqVe34OJXyzyNQO": {
+      "date": "2025-07-18",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:43.389Z"
+      }
+    },
+    "RDoTELSBJyhMFel1J0n0": {
+      "month": "2025-07",
+      "municipality": "HERMOSA",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 6,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:04.850Z"
+      }
+    },
+    "RLsDg9qs1sWj7cQ9SUyz": {
+      "date": "2025-07-25",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:46.196Z"
+      }
+    },
+    "RPj9qw4LeKNgRMnMGdAY": {
+      "date": "2025-07-08",
+      "municipality": "BAGAC",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:00.376Z"
+      }
+    },
+    "RQvJ5CE1O1JWTWF3MGQx": {
+      "date": "2025-07-18",
+      "municipality": "BAGAC",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:04.431Z"
+      }
+    },
+    "RYA6VE2H5D4cZKR6tpYy": {
+      "date": "2025-07-17",
+      "municipality": "HERMOSA",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:11.332Z"
+      }
+    },
+    "RfobabJPkBoMlUUSbCH8": {
+      "date": "2025-07-06",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:38.587Z"
+      }
+    },
+    "RhPFrQUvPt0TLBSaFNAN": {
+      "date": "2025-07-19",
+      "municipality": "PILAR",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:33.341Z"
+      }
+    },
+    "Rn88BqbqKuWy2g2eT9Gd": {
+      "date": "2025-07-08",
+      "municipality": "LIMAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:49.824Z"
+      }
+    },
+    "RrHGbfQY9UyB9VuHWh8o": {
+      "date": "2025-07-18",
+      "municipality": "MARIVELES",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:25.767Z"
+      }
+    },
+    "RusZ3QmeRr8E9SovbF19": {
+      "date": "2025-07-24",
+      "municipality": "DINALUPIHAN",
+      "count": 11,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:17.542Z"
+      }
+    },
+    "S7HePGVSg22pxZjcavpB": {
+      "date": "2025-07-06",
+      "municipality": "MARIVELES",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:20.913Z"
+      }
+    },
+    "SVaZV1uCx1C5fwGPCDCk": {
+      "date": "2025-07-05",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:38.183Z"
+      }
+    },
+    "SsjfTHT50clb2upV5K9X": {
+      "date": "2025-07-19",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:01.628Z"
+      }
+    },
+    "T2hY4gWqBKKlNS0nPsUn": {
+      "date": "2025-07-05",
+      "municipality": "PILAR",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:27.573Z"
+      }
+    },
+    "TKkxKKOzb9CxUstl6Ejs": {
+      "date": "2025-07-11",
+      "municipality": "BAGAC",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:01.577Z"
+      }
+    },
+    "TNQuSvJgXFFqvopm1DcL": {
+      "date": "2025-07-24",
+      "municipality": "MARIVELES",
+      "count": 16,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:28.188Z"
+      }
+    },
+    "TS99YpjcDWmk21jp3PL3": {
+      "date": "2025-07-13",
+      "municipality": "BALANGA",
+      "count": 98,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:20.289Z"
+      }
+    },
+    "TcpHMItjQCkMTj1Z9tPQ": {
+      "date": "2025-07-19",
+      "municipality": "BAGAC",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:04.830Z"
+      }
+    },
+    "Tdqlrk1lf5JLdufoapUu": {
+      "date": "2025-07-09",
+      "municipality": "ORANI",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:47.110Z"
+      }
+    },
+    "Teh2XyuyBwvWetyjPDk6": {
+      "date": "2025-07-16",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:42.596Z"
+      }
+    },
+    "TsfOtim0WTgjG2QtqQcg": {
+      "month": "2025-07",
+      "municipality": "SAMAL",
+      "date": "2025-06-30",
+      "count": 0,
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:53.941Z"
+      }
+    },
+    "ULqSFSfdXhPVRhB2W3hU": {
+      "date": "2025-07-22",
+      "municipality": "ORANI",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:52.328Z"
+      }
+    },
+    "URURsoskswM6K7CAj4x7": {
+      "date": "2025-07-03",
+      "municipality": "PILAR",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:26.778Z"
+      }
+    },
+    "VF0n2r6dHmSt2lmivyYo": {
+      "date": "2025-07-21",
+      "municipality": "PILAR",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:34.163Z"
+      }
+    },
+    "VI4k2665Ol8mcvcBHsrB": {
+      "date": "2025-07-10",
+      "municipality": "PILAR",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:29.571Z"
+      }
+    },
+    "VTbnZIhSuHXiD3FS9W35": {
+      "date": "2025-07-18",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:22.327Z"
+      }
+    },
+    "VkwNr0vM8S2vZGD11fgU": {
+      "date": "2025-07-17",
+      "municipality": "SAMAL",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:00.819Z"
+      }
+    },
+    "Vz8wVYzNljGDQgJgzRC6": {
+      "date": "2025-07-04",
+      "municipality": "SAMAL",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:55.579Z"
+      }
+    },
+    "W5jZuwJDq7zUo0lxg14C": {
+      "date": "2025-07-08",
+      "municipality": "MORONG",
+      "count": 10,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:32.324Z"
+      }
+    },
+    "W5r2QkhDuvB0JGNDKObX": {
+      "date": "2025-07-13",
+      "municipality": "HERMOSA",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:09.718Z"
+      }
+    },
+    "WDHP0wzss0wFx6bPacR1": {
+      "date": "2025-07-19",
+      "municipality": "ORANI",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:51.113Z"
+      }
+    },
+    "WSts335hWynGie849ymx": {
+      "date": "2025-07-08",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:39.387Z"
+      }
+    },
+    "WYnQLF900qgfkgBKQBVz": {
+      "date": "2025-07-16",
+      "municipality": "MARIVELES",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:24.956Z"
+      }
+    },
+    "X07KP4Ie10z3DZNaJzoI": {
+      "date": "2025-07-19",
+      "municipality": "LIMAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:54.312Z"
+      }
+    },
+    "XBZoX9wXGrDitB9T4hFG": {
+      "date": "2025-07-23",
+      "municipality": "ORANI",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:52.730Z"
+      }
+    },
+    "XFu33J7Vx13rqJkBBuDL": {
+      "date": "2025-07-10",
+      "municipality": "DINALUPIHAN",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:11.823Z"
+      }
+    },
+    "XH0EOddqwJf5ghWAbNOH": {
+      "month": "2025-07",
+      "municipality": "BAGAC",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 4,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:57.561Z"
+      }
+    },
+    "XO4r0kV50ogO9SwdEZmW": {
+      "date": "2025-07-24",
+      "municipality": "LIMAY",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:56.360Z"
+      }
+    },
+    "XZXsVUm0luMOeh3MpxpR": {
+      "date": "2025-07-07",
+      "municipality": "MARIVELES",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:21.321Z"
+      }
+    },
+    "Xe6pVZtbcO2OYNbQfSJc": {
+      "date": "2025-07-17",
+      "municipality": "PILAR",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:32.546Z"
+      }
+    },
+    "XeNJ2PaZXoPlpWDey0Qp": {
+      "date": "2025-07-15",
+      "municipality": "BAGAC",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:03.188Z"
+      }
+    },
+    "XuPVMXtRDIZ2oihpsukB": {
+      "month": "2025-07",
+      "municipality": "SAMAL",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 2,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:54.354Z"
+      }
+    },
+    "XvE27QRbTzOLUqOM9wSJ": {
+      "date": "2025-07-25",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:39.178Z"
+      }
+    },
+    "Xz8e5KHrFx6f29cZmC3z": {
+      "date": "2025-07-04",
+      "municipality": "ORANI",
+      "count": 12,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:45.094Z"
+      }
+    },
+    "Y0D6psY7RWDuwNIVIkni": {
+      "date": "2025-07-25",
+      "municipality": "PILAR",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:35.774Z"
+      }
+    },
+    "YFhNATwzxInx0xOzS13C": {
+      "date": "2025-07-01",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:15.360Z"
+      }
+    },
+    "YWlN4VYQpZwo0fDcFQ0O": {
+      "date": "2025-07-05",
+      "municipality": "DINALUPIHAN",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:09.807Z"
+      }
+    },
+    "YZ0MggfszZ9hqRfSuup1": {
+      "date": "2025-07-12",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:33.924Z"
+      }
+    },
+    "YeLU2EKqGdVGizEOTQ5M": {
+      "date": "2025-07-08",
+      "municipality": "MARIVELES",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:21.721Z"
+      }
+    },
+    "YmNnn2eO7vAri1iO3U1z": {
+      "date": "2025-07-02",
+      "municipality": "ORANI",
+      "count": 10,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:44.290Z"
+      }
+    },
+    "YxxS7PjndZzwjoPLhFJT": {
+      "date": "2025-07-11",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:19.488Z"
+      }
+    },
+    "Z2HbJsbiqpyPt3g4ua16": {
+      "date": "2025-07-23",
+      "municipality": "BAGAC",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:06.435Z"
+      }
+    },
+    "Z7P9ncZkcYeqcH1JiQyI": {
+      "date": "2025-07-24",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:38.766Z"
+      }
+    },
+    "ZIbPHuPRgKgnKI6Z2JBS": {
+      "date": "2025-07-05",
+      "municipality": "BAGAC",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:59.175Z"
+      }
+    },
+    "ZR5gebz0h85tMkaLuZBb": {
+      "date": "2025-07-01",
+      "municipality": "PILAR",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:25.958Z"
+      }
+    },
+    "ZSzzZzWNTkLPsrp6GIIL": {
+      "date": "2025-07-09",
+      "municipality": "LIMAY",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:50.221Z"
+      }
+    },
+    "a1TIJVTFSUJPMdaBGLhS": {
+      "date": "2025-07-22",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:37.977Z"
+      }
+    },
+    "aBnzB1keMtXzUrZAByEE": {
+      "date": "2025-07-09",
+      "municipality": "MORONG",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:32.723Z"
+      }
+    },
+    "aNPDQJ8s6PPMQcetKLbn": {
+      "date": "2025-07-03",
+      "municipality": "ORION",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:37.385Z"
+      }
+    },
+    "avcIMVIxt891pezX34XW": {
+      "date": "2025-07-20",
+      "municipality": "ABUCAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:41.077Z"
+      }
+    },
+    "b13yrJMYAt2n9YzVeSfc": {
+      "date": "2025-07-07",
+      "municipality": "LIMAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:49.422Z"
+      }
+    },
+    "bHmrMht180ppWr5LxoKU": {
+      "date": "2025-07-09",
+      "municipality": "PILAR",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:29.169Z"
+      }
+    },
+    "bQRTTBQtCtikjQapjLfk": {
+      "date": "2025-07-07",
+      "municipality": "BAGAC",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:59.975Z"
+      }
+    },
+    "bQaKfrfz35KLN1CW5DFN": {
+      "date": "2025-07-14",
+      "municipality": "HERMOSA",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:10.123Z"
+      }
+    },
+    "c1Mu9wK0n4KD8L1glhQw": {
+      "date": "2025-07-20",
+      "municipality": "PILAR",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:33.745Z"
+      }
+    },
+    "c7yRwsNWhjxWIwQQ2mfx": {
+      "date": "2025-07-12",
+      "municipality": "ABUCAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:37.918Z"
+      }
+    },
+    "cPKuAXEfTRlmgu6BrSNZ": {
+      "date": "2025-07-13",
+      "municipality": "PILAR",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:30.788Z"
+      }
+    },
+    "cR630k1s7Xi3LgBR2edm": {
+      "date": "2025-07-10",
+      "municipality": "ABUCAY",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:37.121Z"
+      }
+    },
+    "ct8CLuat166nCapTMK4O": {
+      "date": "2025-07-06",
+      "municipality": "BAGAC",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:59.573Z"
+      }
+    },
+    "dCOGUN1VupY2iqMnh7lr": {
+      "date": "2025-07-14",
+      "municipality": "DINALUPIHAN",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:13.444Z"
+      }
+    },
+    "dJ7bKCERwI8frB4eMnD4": {
+      "date": "2025-07-25",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:43.073Z"
+      }
+    },
+    "dLHR4SxgMGDzI7Q8TNah": {
+      "date": "2025-07-10",
+      "municipality": "ORANI",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:47.510Z"
+      }
+    },
+    "dmK8TEHnpT2oVA6GWiJX": {
+      "date": "2025-07-03",
+      "municipality": "SAMAL",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:55.179Z"
+      }
+    },
+    "e71qqdgc4TWPP05ZLOCy": {
+      "date": "2025-07-18",
+      "municipality": "PILAR",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:32.941Z"
+      }
+    },
+    "eKV5vyforEsjxE8dX9OO": {
+      "date": "2025-07-09",
+      "municipality": "HERMOSA",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:08.090Z"
+      }
+    },
+    "eMgYUS8YWIe3FU1AI4Xy": {
+      "date": "2025-07-24",
+      "municipality": "SAMAL",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:03.625Z"
+      }
+    },
+    "eRiuY1T3UG549NH9Ngz9": {
+      "date": "2025-07-13",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:38.313Z"
+      }
+    },
+    "eWCQTnenRR9XnJcOLeEp": {
+      "date": "2025-07-07",
+      "municipality": "DINALUPIHAN",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:10.607Z"
+      }
+    },
+    "eYQWZtVXNMm8jYFzWPXg": {
+      "date": "2025-07-05",
+      "municipality": "ORANI",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:45.496Z"
+      }
+    },
+    "egIVOrYN2hqzydH7yPYx": {
+      "date": "2025-07-16",
+      "municipality": "SAMAL",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:00.411Z"
+      }
+    },
+    "eiMsUm5iNPCheFaUpJYB": {
+      "date": "2025-07-06",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:17.500Z"
+      }
+    },
+    "epTuNIlBMAHuZBW3wJDK": {
+      "date": "2025-07-19",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:22.730Z"
+      }
+    },
+    "esSPeMQj1RdEYwk1t7pP": {
+      "date": "2025-07-25",
+      "municipality": "BAGAC",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:07.251Z"
+      }
+    },
+    "ext8fwNWrG7BLLUtVFFP": {
+      "date": "2025-07-23",
+      "municipality": "ORION",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:45.398Z"
+      }
+    },
+    "f1RtfwjRMgung4scl2et": {
+      "date": "2025-07-10",
+      "municipality": "ORION",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:40.194Z"
+      }
+    },
+    "fAgctL965ETRU89vvrIh": {
+      "date": "2025-07-11",
+      "municipality": "ABUCAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:37.517Z"
+      }
+    },
+    "fDOaQbiJjW933ONxc9R1": {
+      "date": "2025-07-23",
+      "municipality": "MARIVELES",
+      "count": 11,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:27.783Z"
+      }
+    },
+    "fXm1fJvFXHTDojMSknFF": {
+      "date": "2025-07-10",
+      "municipality": "LIMAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:50.624Z"
+      }
+    },
+    "g6gMunIzMgr5bXlqRUCs": {
+      "date": "2025-07-22",
+      "municipality": "DINALUPIHAN",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:16.739Z"
+      }
+    },
+    "gEUHcxcKWN5pX5qA8Z2D": {
+      "date": "2025-07-22",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:23.940Z"
+      }
+    },
+    "gZWx1M9bnpqrctWyWiVX": {
+      "date": "2025-07-16",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:21.527Z"
+      }
+    },
+    "gfQwHzk77BU43CoqPBBv": {
+      "date": "2025-07-23",
+      "municipality": "ABUCAY",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:42.273Z"
+      }
+    },
+    "h2Xgi3dDYbNZ2OZombuB": {
+      "date": "2025-07-25",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:04.027Z"
+      }
+    },
+    "hPww8cNSdYfde5felT1a": {
+      "date": "2025-07-01",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:33.519Z"
+      }
+    },
+    "hyct620SPFpIN78thET5": {
+      "date": "2025-07-16",
+      "municipality": "DINALUPIHAN",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:14.276Z"
+      }
+    },
+    "i1F0qHIUNP3j6uLqp6x2": {
+      "month": "2025-07",
+      "municipality": "ORION",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 7,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:36.572Z"
+      }
+    },
+    "iH7SfoPgUYGa8yD8fWQ9": {
+      "date": "2025-07-02",
+      "municipality": "PILAR",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:26.374Z"
+      }
+    },
+    "iMzJMx44wva7DabY1rQq": {
+      "date": "2025-07-18",
+      "municipality": "DINALUPIHAN",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:15.088Z"
+      }
+    },
+    "iPiQSZPqSvHq3KwDvlpI": {
+      "date": "2025-07-16",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:35.544Z"
+      }
+    },
+    "iS7vPXsafFNvBmHT7I6p": {
+      "date": "2025-07-07",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:17.894Z"
+      }
+    },
+    "iW0M40xekVnp6ATq4RTk": {
+      "date": "2025-07-13",
+      "municipality": "LIMAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:51.839Z"
+      }
+    },
+    "iWoDY2ErHWX1kLUv98Es": {
+      "date": "2025-07-12",
+      "municipality": "ORANI",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:48.311Z"
+      }
+    },
+    "ihz0moLPw1I5AW74eLky": {
+      "date": "2025-07-14",
+      "municipality": "BAGAC",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:02.790Z"
+      }
+    },
+    "j12e9grwEc0LJLZ2yhad": {
+      "date": "2025-07-11",
+      "municipality": "SAMAL",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:58.398Z"
+      }
+    },
+    "jD9Aw8P7xr9vOChlGeW9": {
+      "date": "2025-07-24",
+      "municipality": "ABUCAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:42.670Z"
+      }
+    },
+    "jIRQ15OOjppifwPlrujS": {
+      "date": "2025-07-03",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:16.156Z"
+      }
+    },
+    "jLbEgd7o2YnYilYPkxe4": {
+      "date": "2025-07-07",
+      "municipality": "MORONG",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:31.929Z"
+      }
+    },
+    "jNKrxLaPdvtSjUUgaQW3": {
+      "date": "2025-07-06",
+      "municipality": "HERMOSA",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:06.882Z"
+      }
+    },
+    "jOsy9yruWC8ovTWaZEde": {
+      "date": "2025-07-12",
+      "municipality": "DINALUPIHAN",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:12.639Z"
+      }
+    },
+    "jdV4MxTlK3ypHe77OlgG": {
+      "month": "2025-07",
+      "municipality": "DINALUPIHAN",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 5,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:08.201Z"
+      }
+    },
+    "jukHbbLJs4qpiky7pNQd": {
+      "date": "2025-07-03",
+      "municipality": "DINALUPIHAN",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:09.009Z"
+      }
+    },
+    "jvYsT1WuoEYwj2Q4jNSL": {
+      "date": "2025-07-02",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:33.915Z"
+      }
+    },
+    "jwiMBju46Ece4n83RSCY": {
+      "date": "2025-07-10",
+      "municipality": "HERMOSA",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:08.493Z"
+      }
+    },
+    "k5vmjjyYdGjw5ZlhEdlM": {
+      "date": "2025-07-15",
+      "municipality": "SAMAL",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:00.003Z"
+      }
+    },
+    "k9T4BLMippqxzDii6rDe": {
+      "date": "2025-07-17",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:39.901Z"
+      }
+    },
+    "kABhcQJo6bQGV4aStUVu": {
+      "date": "2025-07-07",
+      "municipality": "ABUCAY",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:35.929Z"
+      }
+    },
+    "kEpBlxCSCVFu12T0aUZ6": {
+      "date": "2025-07-20",
+      "municipality": "ORION",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:44.188Z"
+      }
+    },
+    "kFDYwjScMOaL20vImcQ9": {
+      "month": "2025-07",
+      "municipality": "LIMAY",
+      "date": "2025-07-01",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "count": 1,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:47.003Z"
+      }
+    },
+    "kIoAuws5Cf0QWCQjMi4C": {
+      "date": "2025-07-17",
+      "municipality": "DINALUPIHAN",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:14.682Z"
+      }
+    },
+    "kJDkC5WLOe2TX0haml4K": {
+      "date": "2025-07-10",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:19.090Z"
+      }
+    },
+    "kdSOEDjA0z1VgM6FFhvv": {
+      "date": "2025-06-30",
+      "municipality": "PILAR",
+      "count": 9,
+      "month": "2025-06",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:25.557Z"
+      }
+    },
+    "khHEHBhK84vPQVZpxqO9": {
+      "date": "2025-07-11",
+      "municipality": "HERMOSA",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:08.906Z"
+      }
+    },
+    "kj8twWAj4g4Kb239GXiO": {
+      "date": "2025-07-16",
+      "municipality": "LIMAY",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:53.043Z"
+      }
+    },
+    "knL08YIBvBkoCRomguP1": {
+      "date": "2025-07-12",
+      "municipality": "MARIVELES",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:23.342Z"
+      }
+    },
+    "kv0nChVJXmuxddXlw2hn": {
+      "date": "2025-07-11",
+      "municipality": "MARIVELES",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:22.938Z"
+      }
+    },
+    "kyCZK1rmlGAUpW4eDS4i": {
+      "date": "2025-07-02",
+      "municipality": "HERMOSA",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:05.249Z"
+      }
+    },
+    "lE02b97O3mUVzf6hWEE5": {
+      "date": "2025-07-08",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:36.329Z"
+      }
+    },
+    "lGCYDtBpzdmdQo5HyiIZ": {
+      "date": "2025-07-16",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:10.926Z"
+      }
+    },
+    "lKPENuAs7AFzqOTqXVAX": {
+      "date": "2025-07-22",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:55.562Z"
+      }
+    },
+    "lT6f5zoWcdXGKHrC7Y0j": {
+      "date": "2025-07-24",
+      "municipality": "BALANGA",
+      "count": 105,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:24.753Z"
+      }
+    },
+    "lpv7N9lOcxByOlxqWg9K": {
+      "date": "2025-06-30",
+      "municipality": "ORANI",
+      "count": 5,
+      "month": "2025-06",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:43.480Z"
+      }
+    },
+    "lrKNGhPMjAxuJXZ2rdZC": {
+      "date": "2025-07-02",
+      "municipality": "DINALUPIHAN",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:08.605Z"
+      }
+    },
+    "luJdiN2b1nkw6dj24X7q": {
+      "date": "2025-07-15",
+      "municipality": "DINALUPIHAN",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:13.841Z"
+      }
+    },
+    "lzKAjED1f0u6qspMJXNp": {
+      "date": "2025-07-14",
+      "municipality": "SAMAL",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:59.606Z"
+      }
+    },
+    "mawE8yeIljXvaDm0aRNN": {
+      "date": "2025-07-18",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:50.711Z"
+      }
+    },
+    "mcpuTj1MxzzThn83Bq0W": {
+      "date": "2025-07-17",
+      "municipality": "BAGAC",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:04.015Z"
+      }
+    },
+    "mjlv1nKU7bYjcDUr3gyT": {
+      "date": "2025-07-17",
+      "municipality": "ORANI",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:50.307Z"
+      }
+    },
+    "mygUshWqQ9k2fXeyDoCd": {
+      "date": "2025-07-18",
+      "municipality": "MORONG",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:36.342Z"
+      }
+    },
+    "n8uhJYV7hbgmInFMWese": {
+      "date": "2025-07-04",
+      "municipality": "PILAR",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:27.177Z"
+      }
+    },
+    "nFQhzxwIQ4dMejgyvauw": {
+      "date": "2025-07-21",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:12.925Z"
+      }
+    },
+    "nIvh3nKKlkrUTjQCM11Y": {
+      "month": "2025-07",
+      "municipality": "DINALUPIHAN",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 5,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:07.650Z"
+      }
+    },
+    "nT47Fwk2ZYtvsQ0VOjXe": {
+      "date": "2025-07-04",
+      "municipality": "MARIVELES",
+      "count": 15,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:20.111Z"
+      }
+    },
+    "nmfZav2tAUhGLkPvifxe": {
+      "date": "2025-07-14",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:38.710Z"
+      }
+    },
+    "pC392ORNBUuu35TT5L45": {
+      "date": "2025-07-21",
+      "municipality": "DINALUPIHAN",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:16.337Z"
+      }
+    },
+    "pPZjTeyXZoI8Xxo0rXmz": {
+      "date": "2025-07-04",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:37.779Z"
+      }
+    },
+    "pUwPpTR4cJftoBrytbhJ": {
+      "date": "2025-07-11",
+      "municipality": "DINALUPIHAN",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:12.226Z"
+      }
+    },
+    "psqEPTpScOcW6IppNWto": {
+      "date": "2025-07-20",
+      "municipality": "BAGAC",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:05.236Z"
+      }
+    },
+    "py2qqbe4iVURfDPCAPwa": {
+      "date": "2025-07-10",
+      "municipality": "BAGAC",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:01.177Z"
+      }
+    },
+    "q6PYmdfV6JgKnJwzOhmO": {
+      "date": "2025-07-06",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:31.533Z"
+      }
+    },
+    "qS5PfSLqbtT86hyTIaOZ": {
+      "date": "2025-07-07",
+      "municipality": "HERMOSA",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:07.289Z"
+      }
+    },
+    "qXapyaygPQ5TjgoTwgRm": {
+      "date": "2025-07-23",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:55.964Z"
+      }
+    },
+    "ql3PpzwTuLr7UOQEhPW4": {
+      "date": "2025-07-01",
+      "municipality": "ORANI",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:43.882Z"
+      }
+    },
+    "qqFuOiFZiQZZ9E61Hdbf": {
+      "date": "2025-07-14",
+      "municipality": "LIMAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:52.244Z"
+      }
+    },
+    "qqboPlCHS4TL1RwC9sVG": {
+      "date": "2025-07-03",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:30.333Z"
+      }
+    },
+    "qvdZ1UatXeP3Lu5RzuqC": {
+      "date": "2025-07-19",
+      "municipality": "ORION",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:43.790Z"
+      }
+    },
+    "rAvwn4nKxGJPsMpkTuNv": {
+      "date": "2025-07-04",
+      "municipality": "BAGAC",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:58.777Z"
+      }
+    },
+    "rFf70UpMlFknPKQ4fh9F": {
+      "date": "2025-07-18",
+      "municipality": "SAMAL",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:01.222Z"
+      }
+    },
+    "rljFshLFltOofIAvDlin": {
+      "date": "2025-07-14",
+      "municipality": "PILAR",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:31.197Z"
+      }
+    },
+    "sDGzIGJKMtrTOeNpbc8S": {
+      "date": "2025-07-19",
+      "municipality": "MORONG",
+      "count": 8,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:36.767Z"
+      }
+    },
+    "skNy9v2D0o8QPiV72OND": {
+      "month": "2025-07",
+      "municipality": "LIMAY",
+      "date": "2025-07-02",
+      "count": 0,
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:47.400Z"
+      }
+    },
+    "swDJFqMluYQZFWAFVAbS": {
+      "date": "2025-07-05",
+      "municipality": "MARIVELES",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:20.514Z"
+      }
+    },
+    "tMwZjyqgvjS74mbRjojq": {
+      "date": "2025-07-10",
+      "municipality": "MORONG",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:33.128Z"
+      }
+    },
+    "tUJt2uYYkXqZzYXNxtaf": {
+      "date": "2025-07-22",
+      "municipality": "BAGAC",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:06.032Z"
+      }
+    },
+    "tqsWPjHgHTFDENAbLw8m": {
+      "date": "2025-07-01",
+      "municipality": "MARIVELES",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:18.899Z"
+      }
+    },
+    "u3vb0LfF5UfPGOrSl7g8": {
+      "date": "2025-07-15",
+      "municipality": "ORANI",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:49.512Z"
+      }
+    },
+    "u6OVq7jDHAYEzfvkgVIn": {
+      "date": "2025-07-06",
+      "municipality": "PILAR",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:27.974Z"
+      }
+    },
+    "uAeul97LxwdMw00FU1hC": {
+      "date": "2025-07-08",
+      "municipality": "DINALUPIHAN",
+      "count": 9,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:11.021Z"
+      }
+    },
+    "uIt9oPYgT7kvgFit9c40": {
+      "date": "2025-07-25",
+      "municipality": "HERMOSA",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:14.559Z"
+      }
+    },
+    "uprFpNRY1mWcRukTwS96": {
+      "date": "2025-07-05",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:16.956Z"
+      }
+    },
+    "v1EdZS0cwAohDyL4WZx4": {
+      "date": "2025-07-20",
+      "municipality": "HERMOSA",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:12.527Z"
+      }
+    },
+    "v2fj1PCdJMK0wBuZDUVY": {
+      "date": "2025-07-15",
+      "municipality": "MARIVELES",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:24.547Z"
+      }
+    },
+    "vLI9PXdGWzWSpfGZDUE4": {
+      "date": "2025-07-22",
+      "municipality": "PILAR",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:34.585Z"
+      }
+    },
+    "vflqP6qLYzAlVELwVYwS": {
+      "date": "2025-07-03",
+      "municipality": "MARIVELES",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:19.709Z"
+      }
+    },
+    "vfpDmDV75zv71G90srQX": {
+      "date": "2025-07-03",
+      "municipality": "LIMAY",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:47.805Z"
+      }
+    },
+    "vu2as2x0z3gCS8lxoewa": {
+      "date": "2025-07-23",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:24.346Z"
+      }
+    },
+    "vx3yHCgfXBvri5Nv5flU": {
+      "date": "2025-06-30",
+      "municipality": "BALANGA",
+      "count": 85,
+      "month": "2025-06",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:14.955Z"
+      }
+    },
+    "wMXZWaeEFreHgElGPozU": {
+      "date": "2025-07-05",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:31.132Z"
+      }
+    },
+    "waeJ9Iv2XYt3xELo66Oq": {
+      "date": "2025-07-09",
+      "municipality": "ABUCAY",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:36.726Z"
+      }
+    },
+    "wlJLvRYiC8ef5cjfhnm6": {
+      "date": "2025-07-06",
+      "municipality": "SAMAL",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:56.374Z"
+      }
+    },
+    "x49yWfTisIYOput85UlF": {
+      "date": "2025-07-02",
+      "municipality": "MARIVELES",
+      "count": 4,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:19.297Z"
+      }
+    },
+    "x4PJXeGRkVIA5ozDQsnX": {
+      "date": "2025-07-13",
+      "municipality": "ORANI",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:48.711Z"
+      }
+    },
+    "x5nD5YgTDEZPUDbxOghl": {
+      "date": "2025-07-03",
+      "municipality": "BAGAC",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:58.372Z"
+      }
+    },
+    "x6yDA8Q7hkFQ2MSUwM67": {
+      "date": "2025-07-12",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:19.890Z"
+      }
+    },
+    "xBU0n2kVzr8K4TXr7xER": {
+      "date": "2025-07-24",
+      "municipality": "BAGAC",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:06.848Z"
+      }
+    },
+    "xwAYweC6csp9zTCmURoH": {
+      "date": "2025-07-21",
+      "municipality": "ORION",
+      "count": 1,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:44.599Z"
+      }
+    },
+    "y0vBepNcSm1ByStIamZp": {
+      "date": "2025-07-11",
+      "municipality": "PILAR",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:29.971Z"
+      }
+    },
+    "y6TDJ42owIuNqFNH1skM": {
+      "date": "2025-07-21",
+      "municipality": "MORONG",
+      "count": 2,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:37.563Z"
+      }
+    },
+    "yEQCKSk8hcKO7DupqRSM": {
+      "date": "2025-07-14",
+      "municipality": "ORION",
+      "count": 0,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:41.796Z"
+      }
+    },
+    "yGy0v8xwEdeYOffVTKqX": {
+      "date": "2025-07-09",
+      "municipality": "SAMAL",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:57.583Z"
+      }
+    },
+    "yJ0xEDfc95Z7GyCElpua": {
+      "date": "2025-07-02",
+      "municipality": "BALANGA",
+      "count": 95,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:15.759Z"
+      }
+    },
+    "yJA8pc44XA5uUoOnVqok": {
+      "month": "2025-07",
+      "municipality": "HERMOSA",
+      "date": "2025-06-30",
+      "count": 0,
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.107Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:04.450Z"
+      }
+    },
+    "yNzbVUO3DmXha0QDcI6n": {
+      "date": "2025-07-24",
+      "municipality": "ORANI",
+      "count": 7,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:53.133Z"
+      }
+    },
+    "ysIvZ6CmRyDp3odabgE5": {
+      "month": "2025-07",
+      "municipality": "MORONG",
+      "date": "2025-06-30",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T07:52:29.108Z"
+      },
+      "count": 5,
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:56:29.132Z"
+      }
+    },
+    "zHM8UbRkNjOt9B1QDoq0": {
+      "date": "2025-07-14",
+      "municipality": "ORANI",
+      "count": 5,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:54:49.107Z"
+      }
+    },
+    "ziL7p8pGbyhzdP3B71QT": {
+      "date": "2025-07-18",
+      "municipality": "HERMOSA",
+      "count": 3,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:11.730Z"
+      }
+    },
+    "zvLPlBaZZqfbsTUdB7J3": {
+      "date": "2025-07-21",
+      "municipality": "SAMAL",
+      "count": 6,
+      "month": "2025-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T11:55:02.423Z"
+      }
+    }
+  },
+  "municipalityPrivileges": {
+    "1": {
+      "id": 1,
+      "name": "Balanga City",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Manage Users",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2024-01-15",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.607Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.607Z"
+      }
+    },
+    "2": {
+      "id": 2,
+      "name": "Dinalupihan",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2024-01-14",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.668Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.668Z"
+      }
+    },
+    "3": {
+      "id": 3,
+      "name": "Hermosa",
+      "privileges": [
+        "View Reports"
+      ],
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.737Z"
+      },
+      "lastUpdated": "2025-07-26",
+      "status": "Active",
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:42.624Z"
+      }
+    },
+    "4": {
+      "id": 4,
+      "name": "Limay",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Manage Users",
+        "Access Command Center",
+        "Export Data"
+      ],
+      "lastUpdated": "2024-01-12",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.792Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.792Z"
+      }
+    },
+    "5": {
+      "id": 5,
+      "name": "Mariveles",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2024-01-13",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.856Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.856Z"
+      }
+    },
+    "6": {
+      "id": 6,
+      "name": "Morong",
+      "privileges": [
+        "View Reports"
+      ],
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.915Z"
+      },
+      "lastUpdated": "2025-07-26",
+      "status": "Active",
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:52.478Z"
+      }
+    },
+    "7": {
+      "id": 7,
+      "name": "Orani",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Manage Users"
+      ],
+      "lastUpdated": "2024-01-11",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.977Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:37.977Z"
+      }
+    },
+    "8": {
+      "id": 8,
+      "name": "Orion",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2024-01-09",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.088Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.088Z"
+      }
+    },
+    "9": {
+      "id": 9,
+      "name": "Pilar",
+      "status": "Active",
+      "privileges": [
+        "View Reports"
+      ],
+      "lastUpdated": "2024-01-07",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.157Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.157Z"
+      }
+    },
+    "10": {
+      "id": 10,
+      "name": "Samal",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2024-01-06",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.214Z"
+      },
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T07:04:38.214Z"
+      }
+    }
+  },
+  "municipality_privileges": {
+    "5": {
+      "id": 5,
+      "name": "BALANGA",
+      "status": "Active",
+      "privileges": [
+        "View Reports",
+        "Access Command Center"
+      ],
+      "lastUpdated": "2025-07-26"
+    }
+  },
+  "password_changes": {
+    "MMOCVH8XDZOyuShbA3He": {
+      "userId": "nreWHSeqqiVEv0JzuuY0iyctMV22",
+      "email": "admin@admin.com",
+      "changedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-21T14:09:03.692Z"
+      }
+    },
+    "Q6FMNC8nIrh0rh8fAuvj": {
+      "userId": "5TFoa7k8g4a3h3dWqS5aozUIG433",
+      "email": "admin@admin.com",
+      "changedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-22T11:28:55.778Z"
+      }
+    },
+    "gIrGCDEkJNaUernC6iWI": {
+      "userId": "nreWHSeqqiVEv0JzuuY0iyctMV22",
+      "email": "admin@admin.com",
+      "changedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-21T14:19:50.811Z"
+      }
+    },
+    "kUGWCSdKw6iNPOTA5AXE": {
+      "userId": "nreWHSeqqiVEv0JzuuY0iyctMV22",
+      "email": "admin@admin.com",
+      "changedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-21T14:13:30.009Z"
+      }
+    },
+    "oVN5Ta2J5KGRRQjUenow": {
+      "userId": "nreWHSeqqiVEv0JzuuY0iyctMV22",
+      "email": "admin@admin.com",
+      "changedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-21T15:22:31.364Z"
+      }
+    }
+  },
+  "system_settings": {
+    "main": {
+      "general": {
+        "systemName": "IPatroller System",
+        "defaultLanguage": "en",
+        "enableNotifications": true,
+        "timezone": "Asia/Manila"
+      },
+      "security": {
+        "sessionTimeout": 1,
+        "enable2FA": false,
+        "enableAuditLogging": true,
+        "passwordPolicy": "medium"
+      },
+      "ipatroller": {
+        "autoBackup": true,
+        "backupFrequency": "daily",
+        "dataRetention": 90,
+        "enableDataValidation": true
+      },
+      "lastUpdated": "2025-07-26T16:51:57.569Z",
+      "updatedBy": "admin@admin.com"
+    }
+  },
+  "test_connection": {
+    "3NMt6rHBtNXIq3EhH8yD": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:24:50.074Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "DkLB946L1a4IsihUbpgD": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:43:22.808Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "KdVlWAJkH9i0WCO7Qv3w": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:43:22.805Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "Ksjew5ftecDevOP5RZch": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:39:43.641Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "L8yRKbvv2W5DsvoXY4nu": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:54:02.382Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "iIJeT4NDvBbynVpsuJmb": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:39:43.642Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "kulqXVHxtrpJisJdQFdt": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:54:02.384Z"
+      },
+      "message": "Firestore connection test"
+    },
+    "o8xTHHBzDSqiyVBOpGAg": {
+      "test": "hello",
+      "timestamp": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T14:24:50.071Z"
+      },
+      "message": "Firestore connection test"
+    }
+  },
+  "users": {
+    "5TFoa7k8g4a3h3dWqS5aozUIG433": {
+      "first name": "admin",
+      "last name": "user",
+      "email": "admin@admin.com",
+      "phoneNumber": "(optional)",
+      "municipality": "(optional)",
+      "role": "Administrator",
+      "firstName": "Admin",
+      "lastName": "User",
+      "location": "Balanga, Bataan",
+      "status": "Inactive",
+      "lastLogout": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T04:39:49.401Z"
+      }
+    },
+    "Jd0iP3stlheyUNfZfOM7LDtaj962": {
+      "firstName": "Rhon Jeffrey",
+      "lastName": "Ronquillo",
+      "email": "petercarlos@gmail.com",
+      "role": "User",
+      "createdAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-25T18:26:57.710Z"
+      },
+      "id": "Jd0iP3stlheyUNfZfOM7LDtaj962",
+      "location": "Balanga, Bataan",
+      "municipality": "BALANGA",
+      "updatedAt": {
+        "_datatype": "timestamp",
+        "value": "2025-07-26T17:20:43.838Z"
+      },
+      "status": "Inactive",
+      "lastLogout": {
+        "_datatype": "timestamp",
+        "value": "2025-07-27T03:07:34.499Z"
+      }
+    }
+  }
+}
