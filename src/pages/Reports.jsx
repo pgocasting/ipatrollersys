@@ -4360,7 +4360,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       value={fromMonth.toString()}
                       onValueChange={(value) => setFromMonth(parseInt(value))}
                     >
-                      <SelectTrigger id="from-month-filter" className="w-full">
+                      <SelectTrigger id="from-month-filter" className="w-full bg-white border border-gray-300 !text-black">
                         <span>{months[fromMonth]}</span>
                       </SelectTrigger>
                       <SelectContent>
@@ -4381,7 +4381,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       value={fromYear.toString()}
                       onValueChange={(value) => setFromYear(parseInt(value))}
                     >
-                      <SelectTrigger id="from-year-filter" className="w-full">
+                      <SelectTrigger id="from-year-filter" className="w-full bg-white border border-gray-300 !text-black">
                         <span>{fromYear}</span>
                       </SelectTrigger>
                       <SelectContent>
@@ -4408,7 +4408,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       value={toMonth.toString()}
                       onValueChange={(value) => setToMonth(parseInt(value))}
                     >
-                      <SelectTrigger id="to-month-filter" className="w-full">
+                      <SelectTrigger id="to-month-filter" className="w-full bg-white border border-gray-300 !text-black">
                         <span>{months[toMonth]}</span>
                       </SelectTrigger>
                       <SelectContent>
@@ -4429,7 +4429,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                       value={toYear.toString()}
                       onValueChange={(value) => setToYear(parseInt(value))}
                     >
-                      <SelectTrigger id="to-year-filter" className="w-full">
+                      <SelectTrigger id="to-year-filter" className="w-full bg-white border border-gray-300 !text-black">
                         <span>{toYear}</span>
                       </SelectTrigger>
                       <SelectContent>
