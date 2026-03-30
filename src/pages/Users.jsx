@@ -386,26 +386,27 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      {!isAdmin ? (
-        <div className="flex flex-col items-center justify-center h-screen">
-          <h2 className="text-xl font-semibold text-gray-900">Access Restricted</h2>
-          <p className="text-gray-600">Admin access required.</p>
-        </div>
-      ) : (
-        <div className="container mx-auto p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-6 bg-gray-50 min-h-screen">
-          {/* Header Section */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
-            <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900">User Management</h1>
-              <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage system users and their access levels</p>
-            </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="bg-black hover:bg-black/90 text-white text-sm sm:text-base w-full sm:w-auto">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Add New User
-                </Button>
-              </DialogTrigger>
+      <div className="h-full flex flex-col overflow-hidden bg-gray-50">
+        {!isAdmin ? (
+          <div className="flex flex-col items-center justify-center h-screen">
+            <h2 className="text-xl font-semibold text-gray-900">Access Restricted</h2>
+            <p className="text-gray-600">Admin access required.</p>
+          </div>
+        ) : (
+          <>
+            {/* Fixed Header Navbar */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200 sticky top-0 z-50">
+              <div>
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">User Management</h1>
+                <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">Manage system users and their access levels</p>
+              </div>
+              <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="bg-black hover:bg-black/90 text-white text-sm sm:text-base w-full sm:w-auto shadow-lg hover:shadow-xl transition-all duration-300">
+                    <UserPlus className="mr-2 h-4 w-4" />
+                    Add New User
+                  </Button>
+                </DialogTrigger>
               <DialogContent className="sm:max-w-[500px] bg-white border border-slate-200">
                 <DialogHeader>
                   <DialogTitle>Create New User</DialogTitle>
@@ -750,7 +751,10 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                 </DialogFooter>
               </DialogContent>
             </Dialog>
-          </div>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
 
           {/* Stats Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -1185,8 +1189,10 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
               </div>
             );
           })()}
-        </div>
-      )}
+            </div>
+          </>
+        )}
+      </div>
     </Layout>
   );
 }

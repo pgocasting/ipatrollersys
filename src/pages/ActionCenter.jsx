@@ -2033,7 +2033,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           </div>
         </div>
 
-        <div className="px-4 sm:px-6 lg:px-8 py-3 space-y-3">
+        <div className="px-4 sm:px-6 lg:px-8 py-3 space-y-3 flex-1 overflow-y-auto scrollbar-thin">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
             <div className="h-full">
 
@@ -2393,7 +2393,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         {/* Actions Table */}
         <div className="border rounded-md border-gray-200 shadow-sm overflow-hidden">
-          <div className="overflow-x-auto overflow-y-auto max-h-[60vh] relative" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
+          <div className="overflow-x-auto relative" style={{paddingBottom: '8px', marginBottom: '-8px', paddingRight: '8px', marginRight: '-8px'}}>
             <Table className="border-gray-200 w-full">
               <TableCaption className="text-black">Action reports and their current status.</TableCaption>
               <TableHeader className="sticky top-0 z-10 bg-white">

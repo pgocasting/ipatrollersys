@@ -3834,10 +3834,10 @@ const handleSaveAllMonths = async () => {
   return (
     <Layout onNavigate={onNavigate} currentPage={currentPage} onLogout={onLogout} onShowHelp={() => setShowCommandCenterHelp(true)}>
       <div className="h-full flex flex-col overflow-hidden">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-1.5 border-b border-slate-200">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200 sticky top-0 z-50">
           <div>
-            <h1 className="text-lg sm:text-xl font-bold text-gray-900">Command Center</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0">
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Command Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
               {selectedMonth} {selectedYear} • Command Center Dashboard
             </p>
           </div>

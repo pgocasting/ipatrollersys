@@ -4238,14 +4238,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={handleLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Header/Navbar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200 sticky top-0 z-50">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Reports Center</h1>
-            <p className="text-gray-500 mt-2">Generate comprehensive reports across all system modules</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Reports Center</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Generate comprehensive reports across all system modules</p>
           </div>
         </div>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+          {/* Quick Stats - Hidden as requested */}
 
         {/* Quick Stats - Hidden as requested */}
         {/* 
@@ -6037,7 +6041,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
           </div>
         </div>
       )}
-
+      </div>
     </Layout>
   );
 }

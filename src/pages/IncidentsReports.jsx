@@ -3414,20 +3414,20 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   };
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
-      <div className="container mx-auto p-6 space-y-8">
-        {/* Header */}
-        <div className="flex justify-between items-center">
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Header/Navbar */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200 sticky top-0 z-50">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Incidents Reports</h1>
-            <p className="text-gray-500 mt-2">Manage and track incident reports with comprehensive analytics</p>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Incidents Reports</h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-1">Manage and track incident reports with comprehensive analytics</p>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 w-full sm:w-auto">
             {/* View Options Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button
-                  className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center gap-2"
+                  className="bg-black hover:bg-gray-800 text-white px-4 py-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto"
                 >
                   <Menu className="w-5 h-5" />
                   <span className="text-sm font-medium">View Options</span>
@@ -3504,7 +3504,10 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
             />
           </div>
         </div>
-        {/* Connection Error Display */}
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+          {/* Connection Error Display */}
         {connectionError && (
           <div className="mb-4 p-4 rounded-lg bg-red-50 border border-red-200">
             <div className="flex items-center gap-3">
@@ -5958,6 +5961,7 @@ Top Location: ${insights.topLocation}`);
           </div>
         </div>
       )}
+      </div>
     </Layout>
   );
 }
