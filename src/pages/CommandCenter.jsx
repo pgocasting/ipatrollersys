@@ -3955,7 +3955,7 @@ const handleSaveAllMonths = async () => {
           </div>
         </div>
 
-        <section className={`flex-1 ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4 overflow-hidden' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
+        <section className={`flex-1 overflow-y-auto ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
         {/* Firestore Quota Warning Banner */}
         {isBlocked && blockedUntil && (
           <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-4 shadow-md">
@@ -4775,7 +4775,7 @@ const handleSaveAllMonths = async () => {
               
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
-                  <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 260px)', paddingBottom: '72px', paddingRight: '8px' }}>
+                  <div className="overflow-x-auto" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
                     <table className="command-center-table w-full min-w-[1200px]">
                       <thead className="sticky top-0 z-20">
                       <tr className="bg-white border-b-2 border-gray-300">
