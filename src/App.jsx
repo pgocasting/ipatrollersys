@@ -200,10 +200,19 @@ function AppContent() {
     // Show loading spinner only if we don't have user access level yet
     if (currentPage === 'loading' && user && !userAccessLevel) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="min-h-screen flex items-center justify-center bg-white">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading user access level...</p>
+            <div className="mb-8 relative">
+              <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-50 animate-pulse"></div>
+              <img 
+                src="/images/Ipatroller_Logo.png"
+                alt="Bataan Logo"
+                className="w-32 h-32 object-contain mx-auto relative z-10 drop-shadow-2xl animate-bounce duration-1000"
+              />
+            </div>
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-6"></div>
+            <p className="text-gray-600 font-medium tracking-wide">Loading user access level...</p>
+            <p className="text-xs text-gray-400 mt-2">Provincial Government of Bataan</p>
           </div>
         </div>
       );
@@ -310,10 +319,19 @@ function AppContent() {
   // Show loading spinner only while Firebase is initializing (not logged in yet)
   if (loading && !user) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Initializing...</p>
+          <div className="mb-8 relative">
+            <div className="absolute inset-0 bg-blue-100 rounded-full blur-2xl opacity-50 animate-pulse"></div>
+            <img 
+              src="/images/Ipatroller_Logo.png"
+              alt="Bataan Logo"
+              className="w-32 h-32 object-contain mx-auto relative z-10 drop-shadow-2xl animate-bounce duration-1000"
+            />
+          </div>
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-6"></div>
+          <p className="text-gray-600 font-medium tracking-wide">Initializing...</p>
+          <p className="text-xs text-gray-400 mt-2">Provincial Government of Bataan</p>
         </div>
       </div>
     );
