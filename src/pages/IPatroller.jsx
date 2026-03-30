@@ -66,7 +66,8 @@ import {
   WifiOff,
   Menu,
   Eye,
-  Loader2
+  Loader2,
+  Info
 } from "lucide-react";
 
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
@@ -924,12 +925,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             }
           }
           const actionTakenScore = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
+          // Calculate average action efficiency (max 100) for weighting
+          const avgActionEfficiency = actionTakenScore / 4;
+          
           // Active Days score: (activeDays / totalDays) * 100, capped at 100
           const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
-          // Weighted combined score
-          const wAD = activeDaysWeight / 100;
-          const wAT = actionTakenWeight / 100;
-          rawPercentage = Math.round((activeDaysScore * wAD) + (actionTakenScore * wAT));
+          
+          // Weighted combined score: 30% Active Days + 70% Action Taken
+          rawPercentage = Math.round((activeDaysScore * 0.3) + (avgActionEfficiency * 0.7));
 
         } else if (isNovDec2025) {
           // Nov–Dec 2025: average of 4 weekly efficiencies (each capped per week at 100)
@@ -965,6 +968,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // activePercentage = display value, capped at 100% for the ranking column
         const activePercentage = Math.min(rawPercentage, 100);
 
+        const overallActionPercentage = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
+          return sum + Math.floor((attended / WEEKLY_MIN) * 100);
+        }, 0);
+
         return {
           ...item,
           activeDays,
@@ -972,7 +979,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           totalDays,
           activePercentage,   // capped at 100 — for display
           rawPercentage,      // uncapped — for sorting
-          totalPatrols
+          totalPatrols,
+          overallActionPercentage
         };
       })
       .sort((a, b) => {
@@ -1058,6 +1066,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           performer.district,
           performer.activeDays,
           performer.totalPatrols,
+          performer.overallActionPercentage || 0,
           `${activePercentage}%`,
           getStatusText()
         ];
@@ -1065,7 +1074,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Add table using autoTable with auto-fit columns
       autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Performa\nnce', 'Status']],
+        head: [['Rank', 'Municipality', 'District', 'Active\nDays\n(30%)', 'Total\nPatrols', 'Action\nTaken\n(70%)', 'Performa\nnce\n(30/70)', 'Status']],
         body: tableData,
         startY: 105,
         margin: { left: 30, right: 30 },
@@ -1087,13 +1096,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           halign: 'center'
         },
         columnStyles: {
-          0: { halign: 'center', cellWidth: 'auto', minCellWidth: 30 },  // Rank
-          1: { halign: 'left', cellWidth: 'auto', minCellWidth: 80 },    // Municipality
-          2: { halign: 'center', cellWidth: 'auto', minCellWidth: 70 },  // District
-          3: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },  // Active Days
-          4: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },  // Total Patrols
-          5: { halign: 'center', cellWidth: 'auto', minCellWidth: 55 },  // Performance
-          6: { halign: 'center', cellWidth: 'auto', minCellWidth: 90 }   // Status
+          0: { halign: 'center', cellWidth: 'auto', minCellWidth: 25 },  // Rank
+          1: { halign: 'left', cellWidth: 'auto', minCellWidth: 70 },    // Municipality
+          2: { halign: 'center', cellWidth: 'auto', minCellWidth: 60 },  // District
+          3: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Active Days
+          4: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Total Patrols
+          5: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Action Taken
+          6: { halign: 'center', cellWidth: 'auto', minCellWidth: 50 },  // Performance
+          7: { halign: 'center', cellWidth: 'auto', minCellWidth: 80 }   // Status
         },
         alternateRowStyles: {
           fillColor: [248, 250, 252]
@@ -1145,19 +1155,25 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             data.cell.styles.fontStyle = 'bold';
           }
 
-          // Color coding for Total Patrols column (blue)
-          if (data.column.index === 4 && data.section === 'body') {
-            data.cell.styles.textColor = [59, 130, 246]; // Blue
-            data.cell.styles.fontStyle = 'bold';
-          }
-
-          // Color coding for Performance column (purple)
-          if (data.column.index === 5 && data.section === 'body') {
-            data.cell.styles.textColor = [147, 51, 234]; // Purple
-            data.cell.styles.fontStyle = 'bold';
-          }
-        }
-      });
+              // Color coding for columns
+              if (data.column.index === 3 && data.section === 'body') {
+                data.cell.styles.textColor = [34, 197, 94]; // Green
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 4 && data.section === 'body') {
+                data.cell.styles.textColor = [59, 130, 246]; // Blue
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 5 && data.section === 'body') {
+                data.cell.styles.textColor = [16, 185, 129]; // Emerald
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 6 && data.section === 'body') {
+                data.cell.styles.textColor = [147, 51, 234]; // Purple
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          });
 
       // Add summary statistics in formal format
       const finalY = doc.lastAutoTable.finalY + 40;
@@ -1224,9 +1240,45 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         }
       });
 
-      // Add Prepared By and Approved By sections after summary statistics
-      // Add roughly 1 inch (72pt) of space above the signature blocks
-      const signatureY = Math.min(doc.lastAutoTable.finalY + 72, pageHeight - 120);
+      // Add Performance Status Guide after Summary Statistics
+      const guideY = doc.lastAutoTable.finalY + 40;
+      doc.setFontSize(13);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Performance Status Guide', 30, guideY);
+
+      const guideTableData = [
+        ['Outstanding', '≥ 90%', 'Exceptional performance in both active days and action taken.'],
+        ['Very Satisfactory', '75% - 89%', 'High level of performance exceeding basic requirements.'],
+        ['Satisfactory', '60% - 74%', 'Meets performance standards with steady attendance.'],
+        ['Good', '50% - 59%', 'Basic performance meeting minimum expectations.'],
+        ['Needs Improvement', '< 50%', 'Performance is below the expected minimum standard.']
+      ];
+
+      autoTable(doc, {
+        body: guideTableData,
+        startY: guideY + 10,
+        margin: { left: 30, right: 30 },
+        theme: 'grid',
+        styles: { fontSize: 9, cellPadding: 5, valign: 'middle' },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 100 },
+          1: { halign: 'center', cellWidth: 80 },
+          2: { cellWidth: 'auto' }
+        },
+        didParseCell: function(data) {
+          if (data.column.index === 0 && data.section === 'body') {
+            const status = data.cell.text[0];
+            if (status === 'Outstanding') data.cell.styles.textColor = [59, 130, 246];
+            if (status === 'Very Satisfactory') data.cell.styles.textColor = [34, 197, 94];
+            if (status === 'Satisfactory') data.cell.styles.textColor = [22, 163, 74];
+            if (status === 'Good') data.cell.styles.textColor = [245, 158, 11];
+            if (status === 'Needs Improvement') data.cell.styles.textColor = [220, 38, 38];
+          }
+        }
+      });
+
+      // Add Prepared By and Approved By sections after guide
+      const signatureY = Math.min(doc.lastAutoTable.finalY + 50, pageHeight - 110);
 
       // Common horizontal padding inside the page border
       const signatureMarginX = 40; // left & right padding from border
@@ -1374,6 +1426,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               performer.district,
               performer.activeDays,
               performer.totalPatrols,
+              performer.overallActionPercentage || 0,
               `${activePercentage}%`,
               getStatusText()
             ];
@@ -1381,7 +1434,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
           // Add table using autoTable
           autoTable(doc, {
-            head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Performa\nnce', 'Status']],
+            head: [['Rank', 'Municipality', 'District', 'Active\nDays\n(30%)', 'Total\nPatrols', 'Action\nTaken\n(70%)', 'Performa\nnce\n(30/70)', 'Status']],
             body: tableData,
             startY: 105,
             margin: { left: 30, right: 30 },
@@ -1403,13 +1456,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               halign: 'center'
             },
             columnStyles: {
-              0: { halign: 'center', cellWidth: 'auto', minCellWidth: 30 },
-              1: { halign: 'left', cellWidth: 'auto', minCellWidth: 80 },
-              2: { halign: 'center', cellWidth: 'auto', minCellWidth: 70 },
-              3: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },
-              4: { halign: 'center', cellWidth: 'auto', minCellWidth: 45 },
-              5: { halign: 'center', cellWidth: 'auto', minCellWidth: 55 },
-              6: { halign: 'center', cellWidth: 'auto', minCellWidth: 90 }
+              0: { halign: 'center', cellWidth: 'auto', minCellWidth: 25 },  // Rank
+              1: { halign: 'left', cellWidth: 'auto', minCellWidth: 70 },    // Municipality
+              2: { halign: 'center', cellWidth: 'auto', minCellWidth: 60 },  // District
+              3: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Active Days
+              4: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Total Patrols
+              5: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Action Taken
+              6: { halign: 'center', cellWidth: 'auto', minCellWidth: 50 },  // Performance
+              7: { halign: 'center', cellWidth: 'auto', minCellWidth: 80 }   // Status
             },
             alternateRowStyles: {
               fillColor: [248, 250, 252]
@@ -1465,6 +1519,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 data.cell.styles.fontStyle = 'bold';
               }
               if (data.column.index === 5 && data.section === 'body') {
+                data.cell.styles.textColor = [16, 185, 129]; // Emerald
+                data.cell.styles.fontStyle = 'bold';
+              }
+              if (data.column.index === 6 && data.section === 'body') {
                 data.cell.styles.textColor = [147, 51, 234]; // Purple
                 data.cell.styles.fontStyle = 'bold';
               }
@@ -1533,8 +1591,29 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             }
           });
 
-          // Signatures for range PDF (match single-month layout)
-          const rangeSignatureY = doc.lastAutoTable.finalY + 80;
+          // Add Performance Status Guide in Range PDF
+          const rangeGuideY = doc.lastAutoTable.finalY + 30;
+          doc.setFontSize(11);
+          doc.setFont('helvetica', 'bold');
+          doc.text('Performance Status Guide', 30, rangeGuideY);
+
+          autoTable(doc, {
+            body: [
+              ['Outstanding', '≥ 90%', 'Exceptional performance'],
+              ['Very Satisfactory', '75-89%', 'High level performance'],
+              ['Satisfactory', '60-74%', 'Standard performance'],
+              ['Good', '50-59%', 'Basic performance'],
+              ['Needs Improvement', '< 50%', 'Below standard']
+            ],
+            startY: rangeGuideY + 10,
+            margin: { left: 30, right: 30 },
+            theme: 'grid',
+            styles: { fontSize: 8, cellPadding: 3 },
+            columnStyles: { 0: { fontStyle: 'bold', cellWidth: 90 }, 1: { halign: 'center', cellWidth: 60 } }
+          });
+
+          // Signatures for range PDF (after guide)
+          const rangeSignatureY = Math.min(doc.lastAutoTable.finalY + 40, pageHeight - 90);
 
           // Common horizontal padding inside the page border
           const rangeSignatureMarginX = 40; // same as single-month
@@ -1678,9 +1757,53 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Try to get data from Firestore for this specific month
       const monthDocRef = doc(db, 'patrolData', monthYearId);
-      const municipalitiesRef = collection(monthDocRef, 'municipalities');
+      
+      // Load patrol data AND Command Center action data in parallel
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const monthYear = `${monthNames[month]}_${year}`;
+      const municipalities = ["Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa", "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"];
+      const isMarchToOctoberCurrent = month >= 2 && month <= 9;
 
-      const snapshot = await getDocs(municipalitiesRef);
+      const [snapshot, ccResults] = await Promise.all([
+        getDocs(collection(monthDocRef, 'municipalities')),
+        Promise.all(municipalities.map(async (municipality) => {
+          try {
+            const ccDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+            const ccDocSnap = await getDoc(ccDocRef);
+            if (!ccDocSnap.exists()) return { municipality, totalActionTaken: 0 };
+            const ccData = ccDocSnap.data();
+            const weeklyReportData = ccData.weeklyReportData || {};
+            let totalActionTakenCount = 0;
+
+            Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
+              if (Array.isArray(dateEntries)) {
+                dateEntries.forEach(entry => {
+                  if (isMarchToOctoberCurrent) {
+                    if (entry.actionTaken && entry.actionTaken.trim() !== '') totalActionTakenCount++;
+                  } else {
+                    let rowsCount = 0;
+                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
+                      rowsCount = entry.photos.rows.filter(row => row.after && Array.isArray(row.after) && row.after.length > 0).length;
+                    } else if (entry.photos && entry.photos.after && entry.photos.before) {
+                      rowsCount = 1;
+                    }
+                    totalActionTakenCount += rowsCount;
+                  }
+                });
+              }
+            });
+            return { municipality, totalActionTaken: totalActionTakenCount };
+          } catch {
+            return { municipality, totalActionTaken: 0 };
+          }
+        }))
+      ]);
+
+      const actionDataMap = {};
+      ccResults.forEach(({ municipality, totalActionTaken }) => {
+        actionDataMap[municipality] = totalActionTaken;
+      });
+
       const firestoreData = [];
 
       snapshot.forEach((doc) => {
@@ -1751,7 +1874,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             ...item,
             totalPatrols,
             activeDays,
-            activePercentage
+            activePercentage,
+            totalActionTaken: actionDataMap[item.municipality] || 0
           };
         }
 
@@ -3410,13 +3534,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                     District
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                    Active Days
+                                    <div className="flex flex-col items-center">
+                                      <span>Active Days</span>
+                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">(30%)</span>
+                                    </div>
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     Total Patrols
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                    Performance
+                                    <div className="flex flex-col items-center">
+                                      <span>Overall Action Taken</span>
+                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">(70%)</span>
+                                    </div>
+                                  </th>
+                                  <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                    <div className="flex flex-col items-center">
+                                      <span>Performance</span>
+                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">
+                                        (30% Active Days + 70% Action Taken)
+                                      </span>
+                                    </div>
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     Status
@@ -3484,6 +3622,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       <td className="px-6 py-4 text-center">
                                         <span className="text-lg font-semibold transition-colors duration-300 text-blue-600">
                                           {performer.totalPatrols}
+                                        </span>
+                                      </td>
+                                      <td className="px-6 py-4 text-center">
+                                        <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
+                                          {performer.overallActionPercentage || 0}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 text-center">
