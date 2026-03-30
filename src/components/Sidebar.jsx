@@ -42,90 +42,63 @@ const Sidebar = React.memo(({
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   return (
     <TooltipProvider>
-      <aside className={`flex h-screen flex-col bg-white border-r border-gray-200 transition-all duration-300 ease-in-out flex-shrink-0 shadow-lg
-        ${isCollapsed && !isMobile ? 'w-16' : 'w-72'}
+      <aside className={`flex h-screen flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
+        ${isCollapsed && !isMobile ? 'w-20' : 'w-72'}
         ${isMobile ? 'block' : 'hidden md:block'}`}>
         
-        {/* Header Section */}
-        <div className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-blue-600"></div>
-          <div className={`relative flex h-20 items-center text-white ${
-            isCollapsed && !isMobile ? 'justify-center px-2' : 'justify-between px-6'
+        {/* Header Section - Modern White Theme */}
+        <div className="relative border-b border-slate-100">
+          <div className={`relative flex h-24 items-center ${
+            isCollapsed && !isMobile ? 'justify-center px-4' : 'justify-between px-6'
           }`}>
             {isCollapsed && !isMobile ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
                     onClick={() => onToggleCollapsed && onToggleCollapsed()}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 hover:bg-white/30 transition-all duration-200"
+                    className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shadow-sm hover:bg-blue-100 transition-all duration-300"
                   >
                     <img 
                       src="/images/Ipatroller_Logo.png" 
                       alt="IPatroller Logo" 
-                      className="h-8 w-8 rounded-lg object-contain"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
-                      }}
+                      className="h-8 w-8 object-contain"
                     />
-                    <div className="h-8 w-8 rounded-lg bg-blue-600 text-white font-bold text-lg flex items-center justify-center" style={{display: 'none'}}>
-                      IP
-                    </div>
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right">
-                  <p>Expand sidebar</p>
+                <TooltipContent side="right" className="bg-slate-900">
+                  <p>Expand navigation</p>
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <>
-                <div className="flex items-center gap-4 min-w-0">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20 backdrop-blur-sm border border-white/30 flex-shrink-0">
-                    <img 
-                      src="/images/Ipatroller_Logo.png" 
-                      alt="IPatroller Logo" 
-                      className="h-8 w-8 rounded-lg object-contain"
-                      onError={(e) => {
-                        e.target.style.display = 'none';
-                        e.target.nextSibling.style.display = 'flex';
-                      }}
-                    />
-                    <div className="h-8 w-8 rounded-lg bg-blue-600 text-white font-bold text-lg flex items-center justify-center" style={{display: 'none'}}>
-                      IP
-                    </div>
-                  </div>
-                  <div className="flex flex-col">
-                    <h1 className="text-xl font-bold leading-none tracking-tight whitespace-nowrap">
-                      IPatroller
-                    </h1>
-                    <p className="text-sm text-gray-200 font-medium whitespace-nowrap">System Dashboard</p>
+              <div className="flex items-center gap-4 min-w-0">
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shadow-sm flex-shrink-0">
+                  <img 
+                    src="/images/Ipatroller_Logo.png" 
+                    alt="IPatroller Logo" 
+                    className="h-8 w-8 object-contain"
+                  />
+                </div>
+                <div className="flex flex-col">
+                  <h1 className="text-xl font-black text-slate-900 leading-tight tracking-tight whitespace-nowrap">
+                    IPatroller
+                  </h1>
+                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100/50 w-fit">
+                    <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse"></span>
+                    <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider whitespace-nowrap">Access Level: {isAdmin ? 'Admin' : userAccessLevel}</p>
                   </div>
                 </div>
-              </>
-            )}
-            
-            
-            {isMobile && onCloseSidebar && (
-              <SidebarToggle
-                type="mobile-close"
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 text-white hover:bg-white/10"
-                onClose={onCloseSidebar}
-                showTooltip={false}
-              />
+              </div>
             )}
           </div>
         </div>
-      
 
-        {/* Navigation */}
-        <ScrollArea className="flex-1 py-4">
-          <nav className="px-3 space-y-1">
+        {/* Navigation - Enhanced White Theme */}
+        <ScrollArea className="flex-1 py-6">
+          <nav className="px-4 space-y-1.5">
             {(!isCollapsed || isMobile) && (
-              <div className="px-3 pb-3">
-                <h2 className="text-xs font-bold tracking-wider text-gray-600 uppercase">
-                  Main Menu
+              <div className="px-3 pb-4">
+                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">
+                  Main Hub
                 </h2>
               </div>
             )}
@@ -138,35 +111,45 @@ const Sidebar = React.memo(({
                   key={item.id}
                   variant="ghost"
                   size={isCollapsed && !isMobile ? "icon" : "default"}
-                  className={`w-full h-11 font-medium transition-all duration-300 group ${
+                  className={`relative w-full h-12 font-semibold transition-all duration-300 group ${
                     isActive 
-                      ? 'bg-blue-600 text-white shadow-lg hover:shadow-xl transform hover:scale-[1.02]' 
-                      : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900 hover:translate-x-1 hover:shadow-md'
+                      ? 'bg-blue-50 text-blue-700' 
+                      : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
                   } ${
-                    isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-3 justify-start'
-                  } rounded-lg`}
+                    isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4 justify-start'
+                  } rounded-xl overflow-hidden`}
                   onClick={() => handleNavigation(item.id)}
                 >
+                  {/* Active Indicator Line */}
+                  {isActive && (
+                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-blue-600 rounded-r-full shadow-[0_0_8px_rgba(37,99,235,0.4)]"></div>
+                  )}
+
                   {isCollapsed && !isMobile ? (
-                    <Icon className={`h-5 w-5 ${
-                      isActive ? 'text-white' : 'text-gray-600'
-                    }`} />
+                    <div className={`p-2 rounded-lg transition-all duration-300 ${
+                      isActive ? 'bg-blue-100/50 text-blue-600' : 'text-slate-500 group-hover:text-slate-900'
+                    }`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
                   ) : (
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className={`p-1.5 rounded-md transition-all duration-300 flex-shrink-0 ${
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
                         isActive 
-                          ? 'bg-white/20 text-white' 
-                          : 'bg-gray-200 text-gray-600 group-hover:bg-gray-300 group-hover:text-gray-800'
+                          ? 'bg-white text-blue-600 shadow-sm border border-blue-100' 
+                          : 'bg-slate-100/50 text-slate-500 group-hover:bg-slate-100 group-hover:text-slate-900'
                       }`}>
-                        <Icon className="h-4 w-4" />
+                        <Icon className="h-4.5 w-4.5" />
                       </div>
-                      <span className="text-sm font-medium">
+                      <span className="text-sm font-bold tracking-tight">
                         {item.label}
                       </span>
                     </div>
                   )}
-                  {isActive && (!isCollapsed || isMobile) && (
-                    <div className="ml-auto w-2 h-2 bg-white rounded-full animate-pulse"></div>
+                  
+                  {!isCollapsed && isActive && (
+                    <div className="ml-auto flex items-center gap-1">
+                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    </div>
                   )}
                 </Button>
               );
@@ -176,8 +159,8 @@ const Sidebar = React.memo(({
                   <TooltipTrigger asChild>
                     {NavButton}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-gray-700 text-white">
-                    <p className="font-medium">{item.label}</p>
+                  <TooltipContent side="right" className="bg-slate-900 text-white font-bold text-xs px-3 py-2 border-none">
+                    <p>{item.label}</p>
                   </TooltipContent>
                 </Tooltip>
               ) : NavButton;
@@ -185,152 +168,110 @@ const Sidebar = React.memo(({
           </nav>
         </ScrollArea>
 
-        {/* Footer Section */}
-        <div className="border-t border-gray-200 bg-white px-3 py-3">
-          {/* Settings and Logout Section */}
-          {!isCollapsed && (
-            <div className="mt-3 pt-3 border-t border-gray-200 space-y-1">
-              {/* Settings Button */}
-              {isAdmin && (() => {
-                const isActive = currentPage === 'settings';
-                return (
-                  <Button
-                    variant="ghost"
-                    size="default"
-                    className={`w-full h-11 font-medium transition-all duration-300 group ${
-                      isActive 
-                        ? 'bg-blue-600 text-white shadow-lg' 
-                        : 'hover:bg-gray-100 text-gray-700 hover:text-gray-900'
-                    } px-3 justify-start rounded-lg`}
-                    onClick={() => handleNavigation('settings')}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Settings className="h-4 w-4" />
-                      <span className="text-sm font-medium">Settings</span>
-                    </div>
-                  </Button>
-                );
-              })()}
-              
-              {/* View Instructions Button - for command-center users */}
-              {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
-                <Button
-                  variant="ghost"
-                  size="default"
-                  className="w-full h-9 font-medium transition-all duration-300 group hover:bg-blue-50 text-gray-700 hover:text-blue-600 px-3 justify-start rounded-lg"
-                  onClick={onShowHelp}
-                >
-                  <div className="flex items-center gap-3">
-                    <HelpCircle className="h-4 w-4" />
-                    <span className="text-sm font-medium">View Instructions</span>
-                  </div>
-                </Button>
-              )}
-              
-              {/* Logout Button */}
+        {/* Footer Section - Integrated Profile */}
+        <div className="p-4 border-t border-slate-100">
+          <div className="space-y-1.5 mb-4">
+            {/* View Instructions - for command-center users */}
+            {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && !isCollapsed && (
               <Button
                 variant="ghost"
-                size="default"
-                className="w-full h-9 font-medium transition-all duration-300 group hover:bg-red-50 text-gray-700 hover:text-red-600 px-3 justify-start rounded-lg"
-                onClick={onLogout}
+                className="w-full h-10 font-bold bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 px-4 justify-start rounded-xl border border-emerald-100/50 transition-all duration-300"
+                onClick={onShowHelp}
               >
-                <div className="flex items-center gap-3">
-                  <LogOut className="h-4 w-4" />
-                  <span className="text-sm font-medium">Logout</span>
-                </div>
+                <HelpCircle className="h-4 w-4 mr-3" />
+                <span className="text-xs">Help & Guide</span>
               </Button>
-            </div>
-          )}
-          
-          {/* Collapse Button at Bottom */}
-          <div className="mt-3 pt-3 border-t border-gray-200">
-            <SidebarToggle
-              type="collapse"
-              isCollapsed={isCollapsed}
-              variant="ghost"
-              size={isCollapsed ? "icon" : "default"}
-              className={`w-full h-9 font-medium text-gray-700 hover:bg-gray-100 hover:text-gray-900 ${
-                isCollapsed ? 'px-2 justify-center' : 'px-3 justify-start'
-              } rounded-lg`}
-              onToggle={onToggleCollapsed}
-              showTooltip={true}
-            />
+            )}
+
+            {!isCollapsed && (
+              <>
+                <Button
+                  variant="ghost"
+                  className="w-full h-10 font-bold hover:bg-slate-50 text-slate-600 hover:text-slate-900 px-4 justify-start rounded-xl transition-all duration-300"
+                  onClick={() => handleNavigation('settings')}
+                >
+                  <Settings className="h-4 w-4 mr-3 text-slate-400 group-hover:text-slate-600" />
+                  <span className="text-xs">System Settings</span>
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  className="w-full h-10 font-bold hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-4 justify-start rounded-xl transition-all duration-300"
+                  onClick={onLogout}
+                >
+                  <LogOut className="h-4 w-4 mr-3 text-slate-400 group-hover:text-rose-500" />
+                  <span className="text-xs">Sign Out</span>
+                </Button>
+              </>
+            )}
           </div>
 
-          {/* User Profile (Bottom) */}
+          {/* New Modern Integration Style User Profile */}
           {isCollapsed && !isMobile ? (
-            <div className="mt-3 pt-3 border-t border-gray-200 flex justify-center">
+            <div className="flex flex-col items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-all duration-300 p-0 overflow-hidden shadow-sm">
+                    <Avatar className="h-full w-full rounded-none">
+                      <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                      <AvatarFallback className="text-xs font-black bg-blue-600 text-white rounded-none">{initials}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-64 p-2 bg-white rounded-2xl border-slate-200 shadow-2xl ml-2" align="end" side="right">
+                   <div className="flex items-center gap-4 p-4 mb-2 bg-slate-50 rounded-xl">
+                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm">
+                        <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                        <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex flex-col overflow-hidden">
+                        <p className="text-sm font-black text-slate-900 truncate">{userInfo.name}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">@{userInfo.username}</p>
+                      </div>
+                    </div>
+                  <DropdownMenuSeparator className="bg-slate-100" />
+                  <DropdownMenuItem onClick={onLogout} className="rounded-lg mt-1 text-rose-600 font-bold hover:bg-rose-50 focus:bg-rose-50 focus:text-rose-600">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Disconnect</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-lg border-2 border-gray-300 hover:border-gray-400 transition-all duration-300">
-                        <Avatar className="h-7 w-7">
-                          <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                          <AvatarFallback className="text-xs font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
-                        </Avatar>
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="w-64 bg-white border-gray-300" align="end" side="right">
-                      <DropdownMenuLabel className="font-normal p-4">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="h-12 w-12">
-                            <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                            <AvatarFallback className="text-sm font-bold bg-gray-600 text-white">{initials}</AvatarFallback>
-                          </Avatar>
-                          <div className="flex flex-col space-y-1">
-                            <p className="text-sm font-semibold leading-none text-gray-800">{userInfo.name}</p>
-                            <p className="text-xs text-gray-500">@{userInfo.username}</p>
-                            <Badge variant="secondary" className="w-fit text-xs mt-2 bg-gray-200 text-gray-800">
-                              {isAdmin ? 'Administrator' : userAccessLevel}
-                            </Badge>
-                          </div>
-                        </div>
-                      </DropdownMenuLabel>
-                      <DropdownMenuSeparator />
-                      {isAdmin && (
-                        <DropdownMenuItem onClick={() => handleNavigation('settings')} className="text-gray-700 hover:bg-gray-100">
-                          <Settings className="mr-2 h-4 w-4 text-gray-600" />
-                          <span>Settings</span>
-                        </DropdownMenuItem>
-                      )}
-                      {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && (
-                        <DropdownMenuItem onClick={onShowHelp} className="text-gray-700 hover:bg-blue-50 hover:text-blue-600">
-                          <HelpCircle className="mr-2 h-4 w-4" />
-                          <span>Help & Commands</span>
-                        </DropdownMenuItem>
-                      )}
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={onLogout} className="text-gray-600 hover:bg-gray-100 focus:text-gray-800">
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Log out</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <button onClick={onToggleCollapsed} className="p-2 text-slate-400 hover:text-blue-500 transition-colors">
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-black text-white">
-                  <p className="font-medium">{userInfo.name}</p>
+                <TooltipContent side="right" className="bg-slate-900 text-white text-xs font-bold">
+                   <p>Expand Sidebar</p>
                 </TooltipContent>
               </Tooltip>
             </div>
           ) : (
-            <div className="mt-3 pt-3 border-t border-gray-200">
-              {/* User Profile Card */}
-              <div className="relative overflow-hidden rounded-xl bg-gray-100 p-3 text-gray-800">
-                <div className="absolute inset-0 bg-gray-50/50"></div>
-                <div className="relative flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border-2 border-gray-300">
-                    <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                    <AvatarFallback className="text-xs font-bold bg-blue-600 text-white">{initials}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 space-y-1 min-w-0">
-                    <p className="text-sm font-bold leading-none truncate">{userInfo.name}</p>
-                    <Badge variant="secondary" className="bg-blue-100 text-blue-800 border-blue-200 text-xs mt-1 w-fit">
-                      {isAdmin ? 'Administrator' : userAccessLevel}
+            <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 transition-all duration-300 hover:shadow-md hover:border-blue-200">
+              <div className="flex items-center gap-4">
+                <Avatar className="h-12 w-12 border-2 border-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
+                  <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-black text-slate-900 truncate leading-tight mb-1">{userInfo.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 border border-white"></span>
+                    <Badge variant="secondary" className="bg-blue-100/50 text-blue-700 border-none text-[9px] font-black uppercase tracking-widest px-1.5 py-0 h-4">
+                      {isAdmin ? 'SYSTEM ADMIN' : userAccessLevel}
                     </Badge>
                   </div>
                 </div>
               </div>
+              
+              <button 
+                onClick={onToggleCollapsed}
+                className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white text-slate-400 hover:text-blue-500 shadow-sm"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </button>
             </div>
           )}
         </div>
