@@ -2136,73 +2136,73 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           /* Command Center Stats - Modern shadcn Design */
           <div>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-5 lg:mt-6 mb-4 sm:mb-6 lg:mb-8">
-            {/* 1. Total Reports - FIRST */}
-            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-violet-500 via-violet-600 to-violet-700 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+            {/* 1. Total Reports - WHITE THEME */}
+            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-violet-500"></div>
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                        <FileText className="w-5 h-5 text-white" />
+                      <div className="p-2 bg-violet-50 rounded-lg">
+                        <FileText className="w-5 h-5 text-violet-600" />
                       </div>
-                      <p className="text-xs font-semibold text-violet-100 uppercase tracking-wider">Total Reports</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Reports</p>
                     </div>
-                    <p className="text-5xl font-black text-white tracking-tight">
+                    <p className="text-5xl font-black text-slate-900 tracking-tight">
                       {commandCenterData.totalReports.toLocaleString()}
                     </p>
-                    <p className="text-sm text-violet-100/80">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
+                    <p className="text-sm text-slate-400 font-medium">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
                   </div>
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                    <FileText className="w-10 h-10 text-white" />
+                  <div className="p-3 bg-violet-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <FileText className="w-10 h-10 text-violet-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* 2. Total Barangays - SECOND */}
-            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-blue-500 via-blue-600 to-blue-700 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+            {/* 2. Total Barangays - WHITE THEME */}
+            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                        <Building2 className="w-5 h-5 text-white" />
+                      <div className="p-2 bg-blue-50 rounded-lg">
+                        <Building2 className="w-5 h-5 text-blue-600" />
                       </div>
-                      <p className="text-xs font-semibold text-blue-100 uppercase tracking-wider">Total Barangays</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Barangays</p>
                     </div>
-                    <p className="text-5xl font-black text-white tracking-tight">
+                    <p className="text-5xl font-black text-slate-900 tracking-tight">
                       {commandCenterData.totalBarangays.toLocaleString()}
                     </p>
-                    <p className="text-sm text-blue-100/80">In {userMunicipality || 'all municipalities'}</p>
+                    <p className="text-sm text-slate-400 font-medium">In {userMunicipality || 'all municipalities'}</p>
                   </div>
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                    <Building2 className="w-10 h-10 text-white" />
+                  <div className="p-3 bg-blue-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <Building2 className="w-10 h-10 text-blue-600" />
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* 3. Concern Types - THIRD */}
-            <Card className="border-none shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700 overflow-hidden relative group">
-              <div className="absolute inset-0 bg-grid-white/10 [mask-image:linear-gradient(0deg,white,rgba(255,255,255,0.5))] group-hover:scale-105 transition-transform duration-500"></div>
+            {/* 3. Concern Types - WHITE THEME */}
+            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
+              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-start justify-between">
                   <div className="space-y-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-2 bg-white/20 backdrop-blur-sm rounded-lg">
-                        <AlertTriangle className="w-5 h-5 text-white" />
+                      <div className="p-2 bg-emerald-50 rounded-lg">
+                        <AlertTriangle className="w-5 h-5 text-emerald-600" />
                       </div>
-                      <p className="text-xs font-semibold text-emerald-100 uppercase tracking-wider">Concern Types</p>
+                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Concern Types</p>
                     </div>
-                    <p className="text-5xl font-black text-white tracking-tight">
+                    <p className="text-5xl font-black text-slate-900 tracking-tight">
                       {commandCenterData.totalConcernTypes.toLocaleString()}
                     </p>
-                    <p className="text-sm text-emerald-100/80">Active categories</p>
+                    <p className="text-sm text-slate-400 font-medium">Active categories</p>
                   </div>
-                  <div className="p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 group-hover:scale-110 transition-transform duration-300">
-                    <AlertTriangle className="w-10 h-10 text-white" />
+                  <div className="p-3 bg-emerald-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                    <AlertTriangle className="w-10 h-10 text-emerald-600" />
                   </div>
                 </div>
               </CardContent>

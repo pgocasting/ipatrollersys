@@ -108,8 +108,35 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
 
   if (!mounted) {
     return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-muted border-t-primary"></div>
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+        <div className="relative flex flex-col items-center">
+          <div className="relative w-32 h-32 flex items-center justify-center mb-4">
+            {/* White Theme Mini Atomic Core */}
+            <div className="relative z-10 w-16 h-16 p-2 bg-white/40 backdrop-blur-md rounded-full border border-white shadow-[0_4px_16px_rgba(37,99,235,0.08)] animate-pulse flex items-center justify-center">
+              <img 
+                src="/images/Ipatroller_Logo.png"
+                alt="Bataan Logo"
+                className="w-full h-full object-contain"
+              />
+            </div>
+            {/* High-Contrast Mini Orbits */}
+            <div className="absolute w-full h-[30px] border border-blue-500/20 rounded-[100%] rotate-x-60 animate-orbit-fast-1"></div>
+            <div className="absolute w-full h-[30px] border border-purple-500/20 rounded-[100%] rotate-[60deg] rotate-x-60 animate-orbit-fast-2"></div>
+            <div className="absolute w-full h-[30px] border border-emerald-500/20 rounded-[100%] rotate-[-60deg] rotate-x-60 animate-orbit-fast-3"></div>
+          </div>
+          <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-[0.2em] animate-pulse">Syncing Resources...</p>
+          
+          <style dangerouslySetInnerHTML={{ __html: `
+            .rotate-x-60 { transform: rotateX(60deg); }
+            @keyframes orbit-fast {
+              from { transform: rotateX(65deg) rotate(0deg); }
+              to { transform: rotateX(65deg) rotate(360deg); }
+            }
+            .animate-orbit-fast-1 { animation: orbit-fast 1.5s infinite linear; }
+            .animate-orbit-fast-2 { animation: orbit-fast 2s infinite linear; }
+            .animate-orbit-fast-3 { animation: orbit-fast 2.5s infinite linear; }
+          `}} />
+        </div>
       </div>
     );
   }
