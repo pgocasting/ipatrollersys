@@ -2063,8 +2063,9 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
             </div>
           )}
         </div>
-
-        {/* Quick Stats */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+        <div className="pb-8">
+          {/* Quick Stats */}
         {userAccessLevel === 'quarry-monitoring' ? (
           /* Quarry Monitoring Stats */
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
@@ -2288,7 +2289,6 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
         )}
 
-        <div className="flex-1 min-h-0 overflow-y-auto">
         {/* Analytics Section */}
         <div className="w-full px-4 sm:px-6 lg:px-8">
         {userAccessLevel === 'quarry-monitoring' ? (
@@ -3033,6 +3033,7 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
           </div>
           </div>
         )}
+        </div>
         </div>
         </div>
 

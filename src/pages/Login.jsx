@@ -4,7 +4,7 @@ import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Loader2, Lock, Eye, EyeOff, Mail, Shield, Brain } from "lucide-react";
+import { Loader2, Lock, Eye, EyeOff, Mail, Shield, Brain, User } from "lucide-react";
 import { useFirebase } from "../hooks/useFirebase";
 
 // Import logo images
@@ -136,9 +136,9 @@ export default function Login({ onLogin }) {
                   System Identity
                 </Label>
                 <div className="relative">
-                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500 text-slate-300">
-                      <Mail className="w-4 h-4" />
-                   </div>
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500 text-slate-300">
+                       <User className="w-4 h-4" />
+                    </div>
                    <Input
                     id="username"
                     name="username"
@@ -146,9 +146,8 @@ export default function Login({ onLogin }) {
                     value={formData.username}
                     onChange={handleChange}
                     required
-                    style={{ color: "#000", WebkitTextFillColor: "#000", caretColor: "#000" }}
-                    className="h-11 pl-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-200 focus:border-blue-400 focus:ring-blue-100/50 rounded-xl transition-all font-bold text-sm"
-                    placeholder="Registered Identity"
+                    className="h-11 pl-11 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:!opacity-50 placeholder:!font-medium focus:border-blue-400 focus:ring-blue-100/50 rounded-xl transition-all font-bold text-sm"
+                    placeholder="Username"
                     autoComplete="username"
                   />
                 </div>
@@ -160,9 +159,9 @@ export default function Login({ onLogin }) {
                   Access Key
                 </Label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500 text-slate-300">
-                      <Lock className="w-4 h-4" />
-                   </div>
+                   <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none transition-colors group-focus-within:text-blue-500 text-slate-300">
+                       <Lock className="w-4 h-4" />
+                    </div>
                   <Input
                     id="password"
                     name="password"
@@ -170,9 +169,8 @@ export default function Login({ onLogin }) {
                     value={formData.password}
                     onChange={handleChange}
                     required
-                    style={{ color: "#000", WebkitTextFillColor: "#000", caretColor: "#000" }}
-                    className="h-11 pl-11 pr-12 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:text-slate-200 focus:border-blue-400 focus:ring-blue-100/50 rounded-xl transition-all font-bold text-sm"
-                    placeholder="••••••••••••"
+                    className="h-11 pl-11 pr-12 bg-slate-50/50 border-slate-200 text-slate-900 placeholder:!opacity-50 placeholder:!font-medium focus:border-blue-400 focus:ring-blue-100/50 rounded-xl transition-all font-bold text-sm"
+                    placeholder="Password"
                     autoComplete="current-password"
                   />
                   <button
@@ -249,6 +247,25 @@ export default function Login({ onLogin }) {
         .animate-gradient-x {
           background-size: 200% 200%;
           animation: gradient-x 15s ease infinite;
+        }
+        input::placeholder {
+          color: #64748b !important; /* slate-500 */
+          opacity: 0.5 !important;
+          font-weight: 500 !important;
+          -webkit-text-fill-color: rgba(100, 116, 139, 0.5) !important;
+        }
+        /* Hide browser-native password reveal buttons */
+        input::-ms-reveal,
+        input::-ms-clear {
+          display: none;
+        }
+        input::-webkit-contacts-auto-fill-button,
+        input::-webkit-credentials-auto-fill-button {
+          visibility: hidden;
+          display: none !important;
+          pointer-events: none;
+          position: absolute;
+          right: 0;
         }
       `}} />
     </div>

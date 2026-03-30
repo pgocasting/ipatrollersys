@@ -56,12 +56,12 @@ const Sidebar = React.memo(({
                 <TooltipTrigger asChild>
                   <button 
                     onClick={() => onToggleCollapsed && onToggleCollapsed()}
-                    className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shadow-sm hover:bg-blue-100 transition-all duration-300"
+                    className="flex h-12 w-12 items-center justify-center transition-all duration-300"
                   >
                     <img 
                       src="/images/Ipatroller_Logo.png" 
                       alt="IPatroller Logo" 
-                      className="h-8 w-8 object-contain"
+                      className="h-18 w-18 object-contain"
                     />
                   </button>
                 </TooltipTrigger>
@@ -71,20 +71,21 @@ const Sidebar = React.memo(({
               </Tooltip>
             ) : (
               <div className="flex items-center gap-4 min-w-0">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 border border-blue-100 shadow-sm flex-shrink-0">
+                <div className="flex h-20 w-20 items-center justify-center flex-shrink-0">
                   <img 
                     src="/images/Ipatroller_Logo.png" 
                     alt="IPatroller Logo" 
-                    className="h-8 w-8 object-contain"
+                    className="h-18 w-18 object-contain"
                   />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-xl font-black text-slate-900 leading-tight tracking-tight whitespace-nowrap">
-                    IPatroller
-                  </h1>
-                  <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100/50 w-fit">
-                    <span className="w-1 h-1 rounded-full bg-blue-500 animate-pulse"></span>
-                    <p className="text-[10px] text-blue-600 font-bold uppercase tracking-wider whitespace-nowrap">Access Level: {isAdmin ? 'Admin' : userAccessLevel}</p>
+                  <div className="flex flex-col">
+                    <h1 className="text-[11px] font-black text-slate-500 leading-none tracking-[0.2em] uppercase">
+                      1Bataan
+                    </h1>
+                    <h2 className="text-xl font-black text-blue-600 leading-tight tracking-tight uppercase">
+                      I-Patroller
+                    </h2>
                   </div>
                 </div>
               </div>
