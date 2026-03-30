@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import Layout from "./Layout";
-import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
-import { useFirebase } from "./hooks/useFirebase";
-import { useFirestoreQuota } from "./hooks/useFirestoreQuota";
-import { useAuth } from "./contexts/AuthContext";
+import Layout from "../components/Layout";
+import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
+import { useFirebase } from "../hooks/useFirebase";
+import { useFirestoreQuota } from "../hooks/useFirestoreQuota";
+import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../lib/firebase';
 import { 
   Command, 
   Terminal, 
@@ -43,7 +43,7 @@ import {
   Copy
 } from "lucide-react";
 import { toast } from "sonner";
-import { useNotification, NotificationContainer } from './components/ui/notification';
+import { useNotification, NotificationContainer } from '../components/ui/notification';
 import * as XLSX from 'xlsx';
 import { 
   Dialog, 
@@ -53,10 +53,10 @@ import {
   DialogHeader, 
   DialogTitle, 
   DialogTrigger 
-} from "./components/ui/dialog";
-import { Badge } from "./components/ui/badge";
-import { cloudinaryUtils } from './utils/cloudinary';
-import PhotoCarousel from './components/PhotoCarousel';
+} from "../components/ui/dialog";
+import { Badge } from "../components/ui/badge";
+import { cloudinaryUtils } from '../utils/cloudinary';
+import PhotoCarousel from '../components/PhotoCarousel';
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const { user } = useFirebase();
@@ -682,8 +682,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const debugFirestoreDocuments = async () => {
     try {
       console.log('🔍 COMPREHENSIVE FIRESTORE DEBUG - Starting analysis...');
-      const { collection, getDocs, listCollections } = await import('firebase/firestore');
-      const { db } = await import('./firebase');
       
       // Check if database is available
       if (!db) {
@@ -752,8 +750,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const testDataLoading = async (collectionName, documentId) => {
     try {
       console.log(`🧪 TESTING: Loading from ${collectionName}/${documentId}`);
-      const { doc, getDoc } = await import('firebase/firestore');
-      const { db } = await import('./firebase');
       
       const docRef = doc(db, collectionName, documentId);
       const docSnap = await getDoc(docRef);

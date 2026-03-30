@@ -1,15 +1,15 @@
 import React, { useState } from "react";
-import Layout from "./Layout";
-import { settingsLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import Layout from "../components/Layout";
+import { settingsLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 
 import { 
   Lock,
   UserCircle,
   Clock
 } from "lucide-react";
-import { useAuth } from "./contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Settings({ onLogout, onNavigate, currentPage }) {
   const { isAdmin } = useAuth();

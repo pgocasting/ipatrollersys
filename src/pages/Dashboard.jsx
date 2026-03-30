@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import Layout from './Layout';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
-import { Badge } from './components/ui/badge';
-import { Label } from './components/ui/label';
+import Layout from '../components/Layout';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Badge } from '../components/ui/badge';
+import { Label } from '../components/ui/label';
 import { Bar } from 'react-chartjs-2';
-import { useData } from './DataContext';
-import { useAuth } from './contexts/AuthContext';
-import { useNotification, NotificationContainer } from './components/ui/notification';
+import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
+import { useNotification, NotificationContainer } from '../components/ui/notification';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
-import { dashboardLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
+import { db } from '../lib/firebase';
+import { dashboardLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import {
   Chart as ChartJS,
   CategoryScale,

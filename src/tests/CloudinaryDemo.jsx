@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Button } from './components/ui/button';
-import { Badge } from './components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
+import { Badge } from '../components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { 
   Upload, 
   Image, 
@@ -16,9 +16,9 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react';
-import CloudinaryUpload from './components/CloudinaryUpload';
-import CloudinaryManager from './components/CloudinaryManager';
-import { cloudinaryUtils, clientUploadUtils } from './utils/cloudinary';
+import CloudinaryUpload from '../components/CloudinaryUpload';
+import CloudinaryManager from '../components/CloudinaryManager';
+import { cloudinaryUtils, clientUploadUtils } from '../utils/cloudinary';
 
 export default function CloudinaryDemo() {
   const [activeTab, setActiveTab] = useState('upload');

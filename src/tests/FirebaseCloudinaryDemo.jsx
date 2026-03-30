@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import PatrolPhotoUpload from './components/PatrolPhotoUpload';
-import PatrolPhotoGallery from './components/PatrolPhotoGallery';
-import IncidentEvidenceUpload from './components/IncidentEvidenceUpload';
+import PatrolPhotoUpload from '../components/PatrolPhotoUpload';
+import PatrolPhotoGallery from '../components/PatrolPhotoGallery';
+import IncidentEvidenceUpload from '../components/IncidentEvidenceUpload';
 
 const FirebaseCloudinaryDemo = () => {
   const [activeTab, setActiveTab] = useState('overview');

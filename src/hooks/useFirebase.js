@@ -21,7 +21,7 @@ import {
   deleteDoc, 
   updateDoc 
 } from 'firebase/firestore';
-import { auth, db } from '../firebase';
+import { auth, db } from '../lib/firebase';
 
 export const useFirebase = () => {
   const [user, setUser] = useState(null);

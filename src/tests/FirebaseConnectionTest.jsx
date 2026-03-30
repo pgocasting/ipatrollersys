@@ -4,7 +4,7 @@ import {
   checkFirebaseConnection, 
   checkConnectionHealth,
   handleQUICError 
-} from './firebase';
+} from '../lib/firebase';
 
 const FirebaseConnectionTest = () => {
   const [connectionStatus, setConnectionStatus] = useState('Testing...');

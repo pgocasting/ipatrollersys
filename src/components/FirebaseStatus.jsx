@@ -17,7 +17,7 @@ import {
   checkFirebaseConnection, 
   checkConnectionHealth, 
   initializeAndTest 
-} from '../firebase';
+} from '../lib/firebase';
 
 export default function FirebaseStatus() {
   const [connectionStatus, setConnectionStatus] = useState('checking');

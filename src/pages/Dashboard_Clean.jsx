@@ -1,10 +1,10 @@
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import Layout from "./Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Badge } from "./components/ui/badge";
-import { useData } from "./DataContext";
-import { BarChart } from './components/ui/bar-chart';
-import { PieChart } from './components/ui/pie-chart';
+import Layout from "../components/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { useData } from "../contexts/DataContext";
+import { BarChart } from '../components/ui/bar-chart';
+import { PieChart } from '../components/ui/pie-chart';
 import { 
   MapPin, 
   AlertTriangle, 

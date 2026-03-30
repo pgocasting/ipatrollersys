@@ -10,9 +10,9 @@ import {
   query,
   limit
 } from 'firebase/firestore';
-import { db } from './firebase';
-import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card';
-import { Button } from './components/ui/button';
+import { db } from '../lib/firebase';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Button } from '../components/ui/button';
 import { Database, Wifi, WifiOff, Activity, AlertTriangle } from 'lucide-react';
 
 const FirestoreTest = () => {

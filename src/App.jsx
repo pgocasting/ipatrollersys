@@ -1,26 +1,26 @@
 import React, { useState, useEffect } from "react";
-import Login from "./Login";
-import Dashboard from "./Dashboard";
-import IPatroller from "./IPatroller";
-import Reports from "./Reports";
-import IncidentsReports from "./IncidentsReports";
-import ActionCenter from "./ActionCenter";
-import CommandCenter from "./CommandCenter";
-import Settings from "./Settings";
-import FirestoreTest from "./FirestoreTest";
-import Users from "./Users";
+import Login from "./pages/Login";
+import Dashboard from "./pages/Dashboard";
+import IPatroller from "./pages/IPatroller";
+import Reports from "./pages/Reports";
+import IncidentsReports from "./pages/IncidentsReports";
+import ActionCenter from "./pages/ActionCenter";
+import CommandCenter from "./pages/CommandCenter";
+import Settings from "./pages/Settings";
+import FirestoreTest from "./tests/FirestoreTest";
+import Users from "./pages/Users";
 // Firebase-related components removed
 
-import { PatrolDataProvider } from "./PatrolDataContext";
-import { DataProvider } from "./DataContext";
+import { PatrolDataProvider } from "./contexts/PatrolDataContext";
+import { DataProvider } from "./contexts/DataContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import { initializeUsers } from "./utils/initUsers";
 import "./utils/consoleHelpers"; // Load console helper functions
 import "./utils/authTest"; // Load authentication test functions
-import "./firebase"; // Initialize Firebase
-import "./mobile.css"; // Mobile responsive styles
+import "./lib/firebase"; // Initialize Firebase
+import "./styles/mobile.css"; // Mobile responsive styles
 import { Toaster } from "sonner";
 import { logPageNavigation, logAdminLogout } from './utils/adminLogger';
 

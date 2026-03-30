@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import Layout from "./Layout";
-import { Card, CardContent, CardHeader, CardTitle } from "./components/ui/card";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Badge } from "./components/ui/badge";
-import { Label } from "./components/ui/label";
+import Layout from "../components/Layout";
+import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Badge } from "../components/ui/badge";
+import { Label } from "../components/ui/label";
 import { toast } from "sonner";
-import { useNotification, NotificationContainer } from './components/ui/notification';
+import { useNotification, NotificationContainer } from '../components/ui/notification';
 import {
   collection,
   query,
@@ -21,11 +21,11 @@ import {
   onSnapshot,
   serverTimestamp
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../lib/firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from "xlsx";
-import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
+import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import {
   Plus,
   Save,

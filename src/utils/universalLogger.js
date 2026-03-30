@@ -1,5 +1,5 @@
 import { collection, addDoc, serverTimestamp, query, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../lib/firebase';
 
 /**
  * Universal Logger Utility

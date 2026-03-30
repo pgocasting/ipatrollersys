@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Label } from "./components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./components/ui/dialog";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
 import { Loader2, Lock, Eye, EyeOff, Mail, Shield, Brain } from "lucide-react";
-import { useFirebase } from "./hooks/useFirebase";
+import { useFirebase } from "../hooks/useFirebase";
 
 // Import logo images
 import ipatrollerLogo from "/images/Ipatroller_Logo.png";

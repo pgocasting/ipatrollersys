@@ -16,7 +16,7 @@ import {
   Database
 } from 'lucide-react';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { auth } from '../lib/firebase';
 
 export default function UserManager() {
   const { getUsers, addUser, user: currentUser } = useFirebase();

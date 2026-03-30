@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useFirebase } from './hooks/useFirebase';
+import { useFirebase } from '../hooks/useFirebase';
 import {
   collection,
   query,
@@ -11,7 +11,7 @@ import {
   doc,
   getDoc
 } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../lib/firebase';
 
 const DataContext = createContext();
 

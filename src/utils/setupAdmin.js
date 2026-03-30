@@ -1,5 +1,5 @@
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db } from '../lib/firebase';
 
 export const setupAdminRole = async () => {
   try {

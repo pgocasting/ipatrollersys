@@ -1,21 +1,21 @@
 import React, { useEffect, useState } from "react";
-import Layout from "./Layout";
-import { usersLog, createSectionGroup, CONSOLE_GROUPS } from './utils/consoleGrouping';
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Label } from "./components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "./components/ui/card";
-import { Badge } from "./components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./components/ui/select";
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
-import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "./components/ui/table";
-import { useFirebase } from "./hooks/useFirebase";
+import Layout from "../components/Layout";
+import { usersLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Label } from "../components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
+import { Badge } from "../components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../components/ui/dialog";
+import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "../components/ui/table";
+import { useFirebase } from "../hooks/useFirebase";
 import { doc, getDoc } from 'firebase/firestore';
-import { db } from './firebase';
+import { db } from '../lib/firebase';
 import { toast } from "sonner";
 import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2 } from "lucide-react";
-import { logUserManagementAction, logAdminAccess } from './utils/adminLogger';
-import { useAuth } from './contexts/AuthContext';
+import { logUserManagementAction, logAdminAccess } from '../utils/adminLogger';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Users({ onLogout, onNavigate, currentPage }) {
   const { user, getUsers, createUserByAdmin, updateUser, deleteUser } = useFirebase();
