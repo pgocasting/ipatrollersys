@@ -4344,7 +4344,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               <Filter className="w-5 h-5" />
               Report Filters
             </CardTitle>
-            <p className="text-gray-600">Select month and year for report generation</p>
+            <p className="text-gray-700 font-medium">Select month and year for report generation</p>
           </CardHeader>
           <CardContent className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -4353,7 +4353,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 <Label className="text-sm font-semibold text-gray-900 block">From</Label>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <Label htmlFor="from-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                    <Label htmlFor="from-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
                       Month
                     </Label>
                     <Select
@@ -4374,7 +4374,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   <div className="flex-1">
-                    <Label htmlFor="from-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                    <Label htmlFor="from-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
                       Year
                     </Label>
                     <Select
@@ -4401,7 +4401,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                 <Label className="text-sm font-semibold text-gray-900 block">To</Label>
                 <div className="flex gap-3">
                   <div className="flex-1">
-                    <Label htmlFor="to-month-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                    <Label htmlFor="to-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
                       Month
                     </Label>
                     <Select
@@ -4422,7 +4422,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
                   </div>
 
                   <div className="flex-1">
-                    <Label htmlFor="to-year-filter" className="text-sm font-medium text-gray-700 mb-2 block">
+                    <Label htmlFor="to-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
                       Year
                     </Label>
                     <Select
@@ -4447,7 +4447,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
             {/* Current Selection Display */}
             <div className="mt-6 pt-4 border-t border-gray-200">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block">
+              <Label className="text-sm font-semibold text-gray-900 mb-2 block">
                 Current Selection
               </Label>
               <div className="bg-gray-50 border border-gray-200 rounded-md px-4 py-3 text-sm text-gray-900">
