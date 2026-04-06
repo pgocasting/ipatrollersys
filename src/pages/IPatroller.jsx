@@ -913,13 +913,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         if (isJan2026OrLater) {
           // Jan 2026 onwards: weighted formula
-          // Action Taken score: sum of each week's floor(attended / 98 * 100), uncapped total
+          // Action Taken score: sum of each week's floor(attended / 98 * 100), capped at 100 per week
           const weeklyEfficiency = [];
           for (let week = 0; week < 4; week++) {
             const weekStart = week * 7;
             if (weekStart < totalDays) {
               const attended = municipalityActionCounts[week] || 0;
-              weeklyEfficiency.push(Math.floor((attended / WEEKLY_MIN) * 100));
+              weeklyEfficiency.push(Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100));
             } else {
               weeklyEfficiency.push(0);
             }
@@ -929,10 +929,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           const avgActionEfficiency = actionTakenScore / 4;
           
           // Active Days score: (activeDays / totalDays) * 100, capped at 100
-          const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
+          const computedActiveDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
           
-          // Weighted combined score: 30% Active Days + 70% Action Taken
-          rawPercentage = Math.round((activeDaysScore * 0.3) + (avgActionEfficiency * 0.7));
+          // Weighted combined score using dynamic state variables
+          rawPercentage = Math.round((computedActiveDaysScore * (activeDaysWeight / 100)) + (avgActionEfficiency * (actionTakenWeight / 100)));
 
         } else if (isNovDec2025) {
           // Nov–Dec 2025: average of 4 weekly efficiencies (each capped per week at 100)
@@ -968,13 +968,22 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // activePercentage = display value, capped at 100% for the ranking column
         const activePercentage = Math.min(rawPercentage, 100);
 
-        const overallActionPercentage = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
-          return sum + Math.floor((attended / WEEKLY_MIN) * 100);
+        // Always compute it so we can show it to the user.
+        const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
+
+        let overallActionPercentage = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
+          // Cap weekly attendance at 100 before summing
+          return sum + Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100);
         }, 0);
+        // If the formula divides by 4 to get the average (Nov 2025+), we average the UI display too.
+        if (isJan2026OrLater || isNovDec2025) {
+          overallActionPercentage = Math.round(overallActionPercentage / 4);
+        }
 
         return {
           ...item,
           activeDays,
+          activeDaysScore,
           inactiveDays,
           totalDays,
           activePercentage,   // capped at 100 — for display
@@ -1054,9 +1063,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         const activePercentage = performer.activePercentage;
 
         const getStatusText = () => {
-          if (activePercentage >= 96) return 'Very Satisfactory';
-          if (activePercentage >= 86) return 'Very Good';
-          if (activePercentage >= 75) return 'Good';
+          if (activePercentage >= 90) return 'Outstanding';
+          if (activePercentage >= 75) return 'Very Satisfactory';
+          if (activePercentage >= 60) return 'Satisfactory';
+          if (activePercentage >= 50) return 'Good';
           return 'Needs Improvement';
         };
 
@@ -1074,7 +1084,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Add table using autoTable with auto-fit columns
       autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', 'Active\nDays\n(30%)', 'Total\nPatrols', 'Action\nTaken\n(70%)', 'Performa\nnce\n(30/70)', 'Status']],
+        head: [['Rank', 'Municipality', 'District', `Active\nDays\n(${activeDaysWeight}%)`, 'Total\nPatrols', `Action\nTaken\n(${actionTakenWeight}%)`, `Performa\nnce\n(${activeDaysWeight}/${actionTakenWeight})`, 'Status']],
         body: tableData,
         startY: 105,
         margin: { left: 30, right: 30 },
@@ -1132,12 +1142,15 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           }
 
           // Color coding for status column
-          if (data.column.index === 6 && data.section === 'body') {
+          if (data.column.index === 7 && data.section === 'body') {
             const status = data.cell.text[0];
-            if (status === 'Very Satisfactory') {
+            if (status === 'Outstanding') {
               data.cell.styles.fillColor = [59, 130, 246]; // Blue
               data.cell.styles.textColor = [255, 255, 255];
-            } else if (status === 'Very Good') {
+            } else if (status === 'Very Satisfactory') {
+              data.cell.styles.fillColor = [16, 185, 129]; // Emerald
+              data.cell.styles.textColor = [255, 255, 255];
+            } else if (status === 'Satisfactory') {
               data.cell.styles.fillColor = [34, 197, 94]; // Green
               data.cell.styles.textColor = [255, 255, 255];
             } else if (status === 'Good') {
@@ -1176,7 +1189,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           });
 
       // Add summary statistics in formal format
-      const finalY = doc.lastAutoTable.finalY + 40;
+      const finalY = doc.lastAutoTable.finalY + 20;
 
       doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
@@ -1202,7 +1215,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       autoTable(doc, {
         body: summaryTableData,
-        startY: finalY + 10,
+        startY: finalY + 8,
         margin: { left: 30, right: 30 },
         theme: 'grid',
         styles: {
@@ -1240,14 +1253,36 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         }
       });
 
-      // Add Performance Status Guide after Summary Statistics
-      const guideY = doc.lastAutoTable.finalY + 40;
+      // Add Performance Formula Context
+      let formGuideY = doc.lastAutoTable.finalY + 20;
+      doc.setFontSize(11);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
+      doc.text('How Performance is Calculated:', 30, formGuideY);
+      
+      // Spacing between header and the actual formula text block
+      formGuideY += 10;
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(80, 80, 80);
+      
+      const formulaText = `Performance % is a weighted score derived from two primary indicators:
+• Active Days (${activeDaysWeight}%): Percentage of days with 14 or more patrols logged.
+• Action Taken (${actionTakenWeight}%): Average weekly efficiency based on patrols with resolved incidents.
+Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTakenWeight}%) = Final Performance %`;
+
+      const splitFormulaText = doc.splitTextToSize(formulaText, pageWidth - 60);
+      doc.text(splitFormulaText, 30, formGuideY);
+
+      // Add Performance Status Guide after Formula
+      const guideY = formGuideY + (splitFormulaText.length * 12) + 12;
       doc.setFontSize(13);
       doc.setFont('helvetica', 'bold');
+      doc.setTextColor(0, 0, 0);
       doc.text('Performance Status Guide', 30, guideY);
 
       const guideTableData = [
-        ['Outstanding', '≥ 90%', 'Exceptional performance in both active days and action taken.'],
+        ['Outstanding', '90% - 100%', 'Exceptional performance in both active days and action taken.'],
         ['Very Satisfactory', '75% - 89%', 'High level of performance exceeding basic requirements.'],
         ['Satisfactory', '60% - 74%', 'Meets performance standards with steady attendance.'],
         ['Good', '50% - 59%', 'Basic performance meeting minimum expectations.'],
@@ -1256,7 +1291,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       autoTable(doc, {
         body: guideTableData,
-        startY: guideY + 10,
+        startY: guideY + 8,
         margin: { left: 30, right: 30 },
         theme: 'grid',
         styles: { fontSize: 9, cellPadding: 5, valign: 'middle' },
@@ -3536,7 +3571,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     <div className="flex flex-col items-center">
                                       <span>Active Days</span>
-                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">(30%)</span>
+                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">({activeDaysWeight}%)</span>
                                     </div>
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
@@ -3545,14 +3580,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     <div className="flex flex-col items-center">
                                       <span>Overall Action Taken</span>
-                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">(70%)</span>
+                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">({actionTakenWeight}%)</span>
                                     </div>
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     <div className="flex flex-col items-center">
                                       <span>Performance</span>
                                       <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">
-                                        (30% Active Days + 70% Action Taken)
+                                        ({activeDaysWeight}% Active Days + {actionTakenWeight}% Action Taken)
                                       </span>
                                     </div>
                                   </th>

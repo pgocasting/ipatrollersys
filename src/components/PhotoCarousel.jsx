@@ -1,8 +1,18 @@
-import React, { useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, X, Maximize2 } from 'lucide-react';
 
 export const PhotoCarousel = ({ photos, timestamps, title }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
+  // Close fullscreen on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isFullscreen) setIsFullscreen(false);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
   
   // Ensure photos is an array
   const photoArray = Array.isArray(photos) ? photos : [photos];
@@ -38,12 +48,18 @@ export const PhotoCarousel = ({ photos, timestamps, title }) => {
       {/* Carousel Container */}
       <div className="relative">
         {/* Main Image */}
-        <div className="border rounded-md overflow-hidden bg-gray-100 flex items-center justify-center h-[280px]">
+        <div 
+          className="border rounded-md overflow-hidden bg-gray-100 flex items-center justify-center h-[280px] cursor-pointer group relative"
+          onClick={() => setIsFullscreen(true)}
+        >
           <img
             src={currentPhoto}
             alt={`${title} ${currentIndex + 1}`}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
+            <Maximize2 className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+          </div>
         </div>
 
         {/* Navigation Arrows - Only show if multiple photos */}
@@ -103,6 +119,50 @@ export const PhotoCarousel = ({ photos, timestamps, title }) => {
             hour12: true
           })}
         </span>
+      )}
+
+      {/* Fullscreen Overlay */}
+      {isFullscreen && (
+        <div 
+          className="fixed inset-0 z-[9999] bg-black/95 flex mx-auto flex-col items-center justify-center p-4 backdrop-blur-sm"
+          onClick={() => setIsFullscreen(false)}
+        >
+          <button 
+            className="absolute top-6 right-6 text-white hover:text-red-400 p-2 bg-black/50 hover:bg-black/80 rounded-full transition-all"
+            onClick={(e) => { e.stopPropagation(); setIsFullscreen(false); }}
+            title="Close (Esc)"
+          >
+            <X className="w-6 h-6" />
+          </button>
+          
+          <img
+            src={currentPhoto}
+            alt="Fullscreen view"
+            className="max-w-full max-h-[90vh] object-contain rounded-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()} // Prevent click from bubbling to backdrop
+          />
+          
+          {/* Navigation while in fullscreen */}
+          {photoArray.length > 1 && (
+            <>
+              <button
+                className="absolute left-6 top-1/2 -translate-y-1/2 text-white hover:text-white p-3 bg-black/50 hover:bg-black/80 rounded-full transition-all"
+                onClick={(e) => { e.stopPropagation(); goToPrevious(); }}
+              >
+                <ChevronLeft className="w-8 h-8" />
+              </button>
+              <button
+                className="absolute right-6 top-1/2 -translate-y-1/2 text-white hover:text-white p-3 bg-black/50 hover:bg-black/80 rounded-full transition-all"
+                onClick={(e) => { e.stopPropagation(); goToNext(); }}
+              >
+                <ChevronRight className="w-8 h-8" />
+              </button>
+              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white bg-black/60 px-5 py-2 rounded-full text-sm font-medium tracking-wide">
+                {title} — {currentIndex + 1} of {photoArray.length}
+              </div>
+            </>
+          )}
+        </div>
       )}
     </div>
   );

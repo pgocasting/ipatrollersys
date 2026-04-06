@@ -53,6 +53,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
+  const [selectedWhat, setSelectedWhat] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
   const { notifications, showSuccess, removeNotification } = useNotification();
   const [activeTab, setActiveTab] = useState(() => {
@@ -624,7 +625,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       item?.why,
       item?.how,
       item?.source,
-      item?.otherInformation,
+item?.otherInformation,
       item?.when instanceof Date ? item.when.toLocaleString() : item?.when,
     ];
 
@@ -634,73 +635,182 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
       .join(' ');
   };
 
-  // Filter and sort data
-  const filteredItems = actionItems.filter(item => {
-    const normalizedSearch = normalizeText(searchTerm);
-    const matchesSearch = normalizedSearch === "" || getSearchBlobForItem(item).includes(normalizedSearch);
+  /**
+   * cleanWhatLabel – extracts a short, clean category label from a raw "what" value.
+   *
+   * Strategy:
+   *  1. Strip fully-closed parens  e.g. "(Manga, mahogany)" → removed
+   *  2. Strip trailing unclosed parens  e.g. " (" → removed
+   *  3. Strip after first comma  e.g. "Cutting Manga, mahogany" → "Cutting Manga"
+   *  4a. "Alleged Illegal [Type] [details]"
+   *        → keep 3 words (e.g. "Alleged Illegal Cutting")
+   *        → keep 5 words when word-4 is "and" (e.g. "Alleged Illegal Pusher and User")
+   *  4b. All other entries with prepositions (of, for, in, at, with, by, the, a)
+   *        → strip from the first preposition onward
+   *        e.g. "Arrest of Morees Pacaha..." → "Arrest"
+   *        e.g. "Seizure of Drugs in..."  → "Seizure"
+   *  4c. Anything else – kept as-is (short phrases like "Community Service")
+   */
+  const cleanWhatLabel = (raw) => {
+    if (!raw) return '';
 
-    const matchesDistrict = selectedDistrict === 'all' || normalizeText(item.district) === normalizeText(selectedDistrict);
-    const matchesYear = (() => {
-      // If we cannot reliably determine a year for this row, do not exclude it.
-      const detectedYear = detectYearFromItem(item);
-      if (detectedYear === null) return true;
-      return String(detectedYear) === selectedYear;
-    })();
-    
-    // Department filtering logic
-    let matchesDepartment;
-    if (isAdmin) {
-      // Admin users can see all departments
-      matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
-    } else if (userDepartment === 'agriculture' || userDepartment === 'pg-enro') {
-      // Agriculture and PG-ENRO users can only see their own department data
-      matchesDepartment = item.department && item.department.toLowerCase() === userDepartment.toLowerCase();
-    } else {
-      // Other users (like PNP) can see all departments
-      matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
-    }
-    
-    const matchesMunicipality = activeMunicipality === "all" || normalizeText(item.municipality) === normalizeText(activeMunicipality);
-    const matchesMonth = (() => {
-      if (item.when instanceof Date) {
-        return item.when.getMonth() === selectedMonth;
-      } else if (typeof item.when === 'string') {
-        // For text dates, try to extract month
-        try {
-          const parsedDate = new Date(item.when);
-          if (!isNaN(parsedDate.getTime())) {
-            return parsedDate.getMonth() === selectedMonth;
-          }
-        } catch (e) {
-          // If parsing fails, use enhanced month detection
-        }
-        
-        // Use the enhanced month detection function
-        const detectedMonth = detectMonthFromText(item.when);
-        return detectedMonth === selectedMonth;
+    let text = raw.trim();
+
+    // ── Step 0: Handle greeting-prefixed free-text entries ──────────────────
+    // e.g. "Good evening po alleged illegal quarrying..." or
+    //      "Good Morning mga Sir/Madam may ..."
+    // These are messages people typed into the 'what' field containing greetings.
+    // Try to find the real incident type embedded in the text.
+    const greetingRegex = /^(good\s+(morning|afternoon|evening|night|day)|hello|hi|magandang|maayong|kumusta|greetings)\b/i;
+    if (greetingRegex.test(text)) {
+      // Try to find "Alleged Illegal" anywhere inside the text
+      const allegedMatch = text.search(/alleged\s+illegal/i);
+      if (allegedMatch > 0) {
+        text = text.slice(allegedMatch); // extract from "Alleged Illegal..." onward
+      } else {
+        // No recognizable incident type found inside the greeting — exclude this entry
+        return '';
       }
-      return false;
-    })();
-    
-    // Additional filter to exclude any remaining unknown entries
-    const hasValidData = item.department && 
-      item.municipality && 
-      item.district && 
-      item.what && 
-      item.where &&
-      item.department.toLowerCase() !== 'unknown' &&
-      item.municipality.toLowerCase() !== 'unknown' &&
-      item.district.toLowerCase() !== 'unknown' &&
-      item.what.toLowerCase() !== 'no description' &&
-      item.where.toLowerCase() !== 'unknown location' &&
-      item.where.toLowerCase() !== 'unknown';
-    
-    return matchesSearch && matchesDistrict && matchesYear && matchesDepartment && matchesMunicipality && matchesMonth && hasValidData;
-  });
+    }
+
+    let cleaned = text
+      .replace(/\s*\([^)]*\)/g, '')   // 1. remove fully-closed parens
+      .replace(/\s*\([^)]*$/, '')     // 2. remove trailing unclosed parens
+      .replace(/,.*$/, '')            // 3. remove after first comma
+      .trim();
+
+    const words = cleaned.split(/\s+/);
+
+    // 4a. "Alleged / Allegedly Illegal ..." patterns
+    // First normalize "Allegedly" → "Alleged" so both spellings produce the same label.
+    if (/^allegedly$/i.test(words[0])) {
+      words[0] = 'Alleged';
+      cleaned = words.join(' ');
+    }
+
+    if (
+      words[0]?.toLowerCase() === 'alleged' &&
+      words[1]?.toLowerCase() === 'illegal'
+    ) {
+      if (words.length > 3) {
+        const w4 = words[3]?.toLowerCase();
+        if (
+          ['of', 'using', 'with', 'via', 'ng', 'sa', 'na'].includes(w4) &&
+          words.length >= 5
+        ) {
+          // e.g. "Alleged Illegal User of Dragon Bubu" → preserve object name (up to 6 words)
+          cleaned = words.slice(0, Math.min(6, words.length)).join(' ');
+        } else {
+          // Everything else ("and Sudsud seen", "seen", "Manga", etc.) → strip to 3 words
+          // e.g. "Allegedly Illegal Sapra and Sudsud seen" → "Alleged Illegal Sapra"
+          //      "Allegedly Illegal Sapra seen"            → "Alleged Illegal Sapra"
+          //      "Alleged Illegal Cutting Manga extra"     → "Alleged Illegal Cutting"
+          cleaned = words.slice(0, 3).join(' ');
+        }
+      }
+      // else: 3 words or fewer — keep as-is
+      return cleaned;
+    }
+
+    // 4b. Any other multi-word entry: stop at the first preposition/article
+    const stopWords = new Set(['of', 'for', 'in', 'at', 'with', 'by', 'the', 'a', 'an', 'and']);
+    const stopIdx = words.findIndex((w, i) => i > 0 && stopWords.has(w.toLowerCase()));
+    if (stopIdx > 0) {
+      cleaned = words.slice(0, stopIdx).join(' ');
+    }
+
+    return cleaned;
+  };
+
+  // ── Step 1: apply every filter EXCEPT 'what' ────────────────────────────
+  // This is the base set the What dropdown options are built from, so every
+  // option in the dropdown is guaranteed to have at least one visible row.
+  const baseFilteredItems = React.useMemo(() => {
+    return actionItems.filter(item => {
+      const normalizedSearch = normalizeText(searchTerm);
+      const matchesSearch = normalizedSearch === "" || getSearchBlobForItem(item).includes(normalizedSearch);
+
+      const matchesDistrict = selectedDistrict === 'all' || normalizeText(item.district) === normalizeText(selectedDistrict);
+
+      const matchesYear = (() => {
+        const detectedYear = detectYearFromItem(item);
+        if (detectedYear === null) return true;
+        return String(detectedYear) === selectedYear;
+      })();
+
+      let matchesDepartment;
+      if (isAdmin) {
+        matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
+      } else if (userDepartment === 'agriculture' || userDepartment === 'pg-enro') {
+        matchesDepartment = item.department && item.department.toLowerCase() === userDepartment.toLowerCase();
+      } else {
+        matchesDepartment = activeTab === 'all' || (item.department && item.department.toLowerCase() === activeTab);
+      }
+
+      const matchesMunicipality = activeMunicipality === "all" || normalizeText(item.municipality) === normalizeText(activeMunicipality);
+
+      const matchesMonth = (() => {
+        if (item.when instanceof Date) {
+          return item.when.getMonth() === selectedMonth;
+        } else if (typeof item.when === 'string') {
+          try {
+            const parsedDate = new Date(item.when);
+            if (!isNaN(parsedDate.getTime())) {
+              return parsedDate.getMonth() === selectedMonth;
+            }
+          } catch (e) { /* fall through */ }
+          return detectMonthFromText(item.when) === selectedMonth;
+        }
+        return false;
+      })();
+
+      const hasValidData = item.department &&
+        item.municipality &&
+        item.district &&
+        item.what &&
+        item.where &&
+        item.department.toLowerCase() !== 'unknown' &&
+        item.municipality.toLowerCase() !== 'unknown' &&
+        item.district.toLowerCase() !== 'unknown' &&
+        item.what.toLowerCase() !== 'no description' &&
+        item.where.toLowerCase() !== 'unknown location' &&
+        item.where.toLowerCase() !== 'unknown';
+
+      return matchesSearch && matchesDistrict && matchesYear && matchesDepartment && matchesMunicipality && matchesMonth && hasValidData;
+    });
+  }, [actionItems, searchTerm, selectedDistrict, selectedYear, activeTab, activeMunicipality, selectedMonth, isAdmin, userDepartment]);
+
+  // ── Step 2: derive dropdown options from the base set ───────────────────
+  // Only shows 'what' types that have at least one visible row right now.
+  const uniqueWhatOptions = React.useMemo(() => {
+    const seen = new Set();
+    const options = [];
+    baseFilteredItems.forEach(item => {
+      if (!item.what || !item.what.trim()) return;
+      const label = cleanWhatLabel(item.what);
+      if (!label) return;
+      const dedupeKey = label.toLowerCase().replace(/\s+/g, ' ');
+      if (!seen.has(dedupeKey)) {
+        seen.add(dedupeKey);
+        options.push(label);
+      }
+    });
+    return options.sort((a, b) => a.localeCompare(b));
+  }, [baseFilteredItems]);
+
+  // ── Step 3: apply the 'what' filter on top of the base set ──────────────
+  const filteredItems = React.useMemo(() => {
+    if (selectedWhat === 'all') return baseFilteredItems;
+    const selectedKey = selectedWhat.toLowerCase().replace(/\s+/g, ' ');
+    return baseFilteredItems.filter(item =>
+      item.what &&
+      cleanWhatLabel(item.what).toLowerCase().replace(/\s+/g, ' ') === selectedKey
+    );
+  }, [baseFilteredItems, selectedWhat]);
 
   useEffect(() => {
     setTablePage(1);
-  }, [searchTerm, selectedDistrict, selectedYear, activeTab, activeMunicipality, selectedMonth, itemsPerPage]);
+  }, [searchTerm, selectedWhat, selectedDistrict, selectedYear, activeTab, activeMunicipality, selectedMonth, itemsPerPage]);
 
   const currentYear = new Date().getFullYear();
   const yearOptions = Array.from({ length: 5 }, (_, i) => String(currentYear - 2 + i));
@@ -1578,10 +1688,11 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         if (updateResult.success) {
           actionCenterGroup.log('✅ Action updated successfully');
-          showSuccess('Action report updated successfully!');
-          await fetchAllActionData(); // Refresh data
+          // Close modal immediately so user sees the response right away
           setShowEditModal(false);
           setSelectedAction(null);
+          showSuccess('Action report updated successfully!');
+          fetchAllActionData(); // Refresh data in the background (no await)
         } else {
           actionCenterGroup.error('❌ Failed to update action:', updateResult.error);
           alert('Failed to update action: ' + updateResult.error);
@@ -2035,13 +2146,13 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
         <div className="px-4 sm:px-6 lg:px-8 py-3 space-y-3 flex-1 overflow-y-auto scrollbar-thin">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-stretch">
-            <div className="h-full">
+            <div className="flex flex-col h-full">
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 gap-2 h-full">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 flex-1 h-full">
           {/* Total Actions Card - Always shown */}
-          <Card className="bg-white shadow-sm border border-gray-200 col-span-2">
-            <CardContent className="p-1.5 sm:p-1.5">
+          <Card className="bg-white shadow-sm border border-gray-200 col-span-2 flex flex-col justify-center">
+            <CardContent className="p-3 sm:p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-black mb-1 truncate">Total Actions</p>
@@ -2058,8 +2169,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
           {/* Department-specific card for Agriculture and PG-ENRO users */}
           {!isAdmin && (userDepartment === 'agriculture' || userDepartment === 'pg-enro') ? (
-            <Card className="bg-white shadow-sm border border-gray-200 col-span-2">
-              <CardContent className="p-1.5 sm:p-1.5">
+            <Card className="bg-white shadow-sm border border-gray-200 col-span-2 flex flex-col justify-center">
+              <CardContent className="p-3 sm:p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-medium text-black mb-1 truncate">
@@ -2086,8 +2197,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
           ) : (
             /* Show all cards for admin and other users */
             <>
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-1.5 sm:p-1.5">
+              <Card className="bg-white shadow-sm border border-gray-200 flex flex-col justify-center">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-black mb-1 truncate">PNP (Monthly)</p>
@@ -2102,8 +2213,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-1.5 sm:p-1.5">
+              <Card className="bg-white shadow-sm border border-gray-200 flex flex-col justify-center">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-black mb-1 truncate">Agriculture (Bantay Dagat)</p>
@@ -2118,8 +2229,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-1.5 sm:p-1.5">
+              <Card className="bg-white shadow-sm border border-gray-200 flex flex-col justify-center">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-black mb-1 truncate">PG-Enro (Environment)</p>
@@ -2134,8 +2245,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                 </CardContent>
               </Card>
 
-              <Card className="bg-white shadow-sm border border-gray-200">
-                <CardContent className="p-1.5 sm:p-1.5">
+              <Card className="bg-white shadow-sm border border-gray-200 flex flex-col justify-center">
+                <CardContent className="p-3 sm:p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-medium text-black mb-1 truncate">Pending</p>
@@ -2158,8 +2269,8 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
 
             <div className="h-full">
               {/* Report Filters */}
-              <Card className="bg-white shadow-sm border border-gray-200 h-full">
-                <CardContent className="p-2">
+              <Card className="bg-white shadow-sm border border-gray-200 h-full flex flex-col">
+                <CardContent className="p-3 sm:p-4 flex-1 flex flex-col justify-center">
                   <div className="flex items-center justify-between gap-2">
                     <h3 className="text-base font-semibold text-black">Filters &amp; Search</h3>
                     <div className="flex items-center gap-2">
@@ -2179,6 +2290,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                         onClick={() => {
                           setSearchTerm("");
                           setSelectedDistrict("all");
+                          setSelectedWhat("all");
                           setSelectedMonth(new Date().getMonth());
                           setSelectedYear(new Date().getFullYear().toString());
                           setActiveMunicipality("all");
@@ -2191,7 +2303,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
 
-                  <div className="mt-1 grid grid-cols-1 sm:grid-cols-2 gap-1">
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="search" className="text-xs font-medium text-black">Search</Label>
                       <Input
@@ -2267,7 +2379,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </Select>
                     </div>
 
-                    <div className="flex flex-col gap-1.5 sm:col-span-2">
+                    <div className="flex flex-col gap-1.5">
                       <Label htmlFor="department-filter" className="text-xs font-medium text-black">Department</Label>
                       <Select
                         value={activeTab}
@@ -2285,7 +2397,28 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                           <SelectItem value="all" className="text-black">All Departments</SelectItem>
                           <SelectItem value="pnp" className="text-black">PNP</SelectItem>
                           <SelectItem value="agriculture" className="text-black">Agriculture</SelectItem>
-                          <SelectItem value="pg-enro" className="text-black">PG-ENRO</SelectItem>
+                      <SelectItem value="pg-enro" className="text-black">PG-ENRO</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <Label htmlFor="what-filter" className="text-xs font-medium text-black">What</Label>
+                      <Select value={selectedWhat} onValueChange={setSelectedWhat}>
+                        <SelectTrigger
+                          id="what-filter"
+                          name="what-filter"
+                          className="[&>span:not([data-placeholder])]:text-black [&>span[data-placeholder]]:text-gray-400"
+                        >
+                          <SelectValue placeholder="All Incident Types" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black max-h-60 overflow-y-auto">
+                          <SelectItem value="all" className="text-black">All Incident Types</SelectItem>
+                          {uniqueWhatOptions.map((what) => (
+                            <SelectItem key={what} value={what} className="text-black">
+                              <span className="block max-w-[250px] truncate" title={what}>{what}</span>
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
@@ -2485,15 +2618,17 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center table-cell-spacing">
                         <div className="py-2 px-1 min-w-0 text-center">
-                          <span 
-                            className={`inline-flex items-center px-2 py-1 text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
-                              item.actionTaken && item.actionTaken.trim() && item.actionTaken.toLowerCase().includes('arrested') ? 'bg-red-100 text-red-800 border border-red-200' :
-                              !item.actionTaken || !item.actionTaken.trim() || item.actionTaken === 'Pending' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
-                              'bg-gray-100 text-gray-800 border border-gray-200'
-                            }`}
-                          >
-                            {(item.actionTaken && item.actionTaken.trim()) || 'Pending'}
-                          </span>
+                          {item.actionTaken && item.actionTaken.trim() && item.actionTaken !== 'Pending' ? (
+                            <span
+                              className={`inline-flex items-center px-2 py-1 text-xs font-medium break-words hyphens-auto word-wrap whitespace-normal ${
+                                item.actionTaken.toLowerCase().includes('arrested')
+                                  ? 'bg-red-100 text-red-800 border border-red-200'
+                                  : 'bg-gray-100 text-gray-800 border border-gray-200'
+                              }`}
+                            >
+                              {item.actionTaken}
+                            </span>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell className="break-all align-top whitespace-normal text-center table-cell-spacing">

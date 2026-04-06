@@ -1759,9 +1759,16 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
       let filteredActions = actionItems.length > 0 ? actionItems : (actionReports || []);
 
+      const parseSafeDate = (value) => {
+        if (!value) return null;
+        let s = String(value).replace(/at about/ig, '').replace(/at around/ig, '').trim();
+        const d = new Date(s);
+        return !isNaN(d.getTime()) ? d : null;
+      };
+
       const getComparableDate = (value) => {
-        const d = value ? new Date(value) : null;
-        return d && !isNaN(d.getTime()) ? d.getTime() : null;
+        const d = parseSafeDate(value);
+        return d ? d.getTime() : null;
       };
 
       const sortActions = (actions) => {
@@ -1788,20 +1795,76 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           if (selectedDistrict !== 'all') {
             if ((action.district || '') !== selectedDistrict) return false;
           }
-          const actionDate = action.when ? new Date(action.when) : null;
-          if (!actionDate || isNaN(actionDate.getTime())) return false;
+          const actionDate = parseSafeDate(action.when);
+          if (!actionDate) return false;
           return actionDate.getFullYear() === Number(year) && actionDate.getMonth() === m;
         });
         monthRange.push({ month: m, actions: sortActions(monthActions) });
       }
-
       const infoY = 40;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
       doc.text(`Generated: ${new Date().toLocaleDateString()}`, paperConfig.margin, infoY);
       doc.text(`District: ${selectedDistrict === 'all' ? 'All Districts' : selectedDistrict}`, paperConfig.margin, infoY + 6);
-
       const startY = infoY + 16;
+
+      const deptAbbr = (dept) => {
+        const d = (dept || '').toLowerCase();
+        if (d === 'agriculture') return 'AGRI';
+        if (d === 'pg-enro') return 'PG-ENRO';
+        if (d === 'pnp') return 'PNP';
+        return (dept || '').toUpperCase();
+      };
+
+      // Inline what-label cleaner (mirrors ActionCenter.jsx cleanWhatLabel)
+      const cleanWhatForReport = (raw) => {
+        if (!raw) return '';
+        let text = raw.trim();
+        const greetingRx = /^(good\s+(morning|afternoon|evening|night|day)|hello|hi|magandang|maayong|kumusta|greetings)\b/i;
+        if (greetingRx.test(text)) {
+          const idx = text.search(/alleged\s+illegal/i);
+          if (idx > 0) text = text.slice(idx);
+          else return text; // keep raw if no pattern found
+        }
+        let cleaned = text
+          .replace(/\s*\([^)]*\)/g, '')
+          .replace(/\s*\([^)]*$/, '')
+          .replace(/,.*$/, '')
+          .trim();
+        const words = cleaned.split(/\s+/);
+        // Normalize "Allegedly" → "Alleged" so both spellings map to the same label
+        if (/^allegedly$/i.test(words[0])) {
+          words[0] = 'Alleged';
+          cleaned = words.join(' ');
+        }
+        if (words[0]?.toLowerCase() === 'alleged' && words[1]?.toLowerCase() === 'illegal') {
+          if (words.length > 3) {
+            const w4 = words[3]?.toLowerCase();
+            if (
+              ['of', 'using', 'with', 'via', 'ng', 'sa', 'na'].includes(w4) &&
+              words.length >= 5
+            ) {
+              // "Alleged Illegal User of Dragon Bubu ..." → up to 6 words (preserve object)
+              cleaned = words.slice(0, Math.min(6, words.length)).join(' ');
+            } else {
+              // "Allegedly Illegal Sapra and Sudsud seen" → "Alleged Illegal Sapra"
+              // "Allegedly Illegal Sapra seen"            → "Alleged Illegal Sapra"
+              cleaned = words.slice(0, 3).join(' ');
+            }
+          }
+          return cleaned;
+        }
+        const stopW = new Set(['of', 'for', 'in', 'at', 'with', 'by', 'the', 'a', 'an', 'and']);
+        const si = words.findIndex((w, i) => i > 0 && stopW.has(w.toLowerCase()));
+        if (si > 0) cleaned = words.slice(0, si).join(' ');
+        return cleaned;
+      };
+
+      const fmtDate = (when) => {
+        if (!when) return '';
+        const d = parseSafeDate(when);
+        return d ? d.toLocaleDateString() : String(when);
+      };
 
       const drawMonthSection = (title, actions, y) => {
         doc.setFontSize(11);
@@ -1811,38 +1874,106 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.setFont('helvetica', 'normal');
         doc.text(`Total Records: ${actions.length}`, paperConfig.margin, y + 6);
 
-        autoTable(doc, {
-          head: [[
-            'Dept',
-            'Mun',
-            'Dist',
-            'What',
-            'Date',
-            'Where',
-            'Action'
-          ]],
-          body: actions.map(a => {
-            const whenValue = a.when ? new Date(a.when) : null;
-            const whenText = whenValue && !isNaN(whenValue.getTime())
-              ? whenValue.toLocaleDateString()
+        if (actions.length === 0) return y + 20;
+
+        // ── Group by district ──────────────────────────────────────────────
+        const districtOrder = ['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'];
+        const byDistrict = {};
+        actions.forEach(a => {
+          const dist = (a.district || 'UNKNOWN').trim().toUpperCase();
+          if (!byDistrict[dist]) byDistrict[dist] = [];
+          byDistrict[dist].push(a);
+        });
+        const orderedDistricts = [
+          ...districtOrder.filter(d => byDistrict[d]),
+          ...Object.keys(byDistrict).filter(d => !districtOrder.includes(d) && byDistrict[d])
+        ];
+
+        // ── Build flat body array with header rows ─────────────────────────
+        const tableBody = [];
+
+        orderedDistricts.forEach(dist => {
+          // District header — spans all 7 columns
+          tableBody.push([{
+            content: `  ${dist}`,
+            colSpan: 7,
+            styles: {
+              fontStyle: 'bold',
+              fillColor: [180, 180, 180],
+              textColor: [0, 0, 0],
+              halign: 'left',
+              fontSize: 8.5,
+              cellPadding: { top: 2.5, bottom: 2.5, left: 4, right: 2 }
+            }
+          }]);
+
+          // Group by cleaned what label
+          const byWhat = {};
+          byDistrict[dist].forEach(a => {
+            const label = cleanWhatForReport(a.what || '') || (a.what || 'Unknown');
+            const key = label.toLowerCase().trim();
+            if (!byWhat[key]) byWhat[key] = { label, items: [] };
+            byWhat[key].items.push(a);
+          });
+
+          // Sort what-groups alphabetically
+          const whatGroups = Object.values(byWhat)
+            .sort((a, b) => a.label.localeCompare(b.label));
+
+          whatGroups.forEach(({ label: whatLabel, items: whatItems }) => {
+            // Sort items within the group by date (ascending)
+            const sorted = [...whatItems].sort((a, b) => {
+              const dA = parseSafeDate(a.when);
+              const dB = parseSafeDate(b.when);
+              const at = dA ? dA.getTime() : 0;
+              const bt = dB ? dB.getTime() : 0;
+              return at - bt;
+            });
+
+            // Compute date range for the group
+            const validDates = sorted
+              .map(a => parseSafeDate(a.when))
+              .filter(d => d !== null);
+            const minD = validDates.length ? new Date(Math.min(...validDates.map(d => d.getTime()))) : null;
+            const maxD = validDates.length ? new Date(Math.max(...validDates.map(d => d.getTime()))) : null;
+            const dateRange = minD && maxD
+              ? minD.getTime() === maxD.getTime()
+                ? minD.toLocaleDateString()
+                : `${minD.toLocaleDateString()} – ${maxD.toLocaleDateString()}`
               : '';
-            const deptText = (() => {
-              const d = (a.department || '').toLowerCase();
-              if (d === 'agriculture') return 'AGRI';
-              if (d === 'pg-enro') return 'PG-ENRO';
-              if (d === 'pnp') return 'PNP';
-              return (a.department || '').toUpperCase();
-            })();
-            return [
-              deptText,
-              a.municipality || '',
-              a.district || '',
-              a.what || '',
-              whenText,
-              a.where || '',
-              a.actionTaken || ''
-            ];
-          }),
+
+            // What-type group header — spans all 7 columns
+            tableBody.push([{
+              content: `    ${whatLabel}${dateRange ? '   |   ' + dateRange : ''}`,
+              colSpan: 7,
+              styles: {
+                fontStyle: 'bold',
+                fillColor: [235, 235, 235],
+                textColor: [30, 30, 30],
+                halign: 'left',
+                fontSize: 7.5,
+                cellPadding: { top: 1.5, bottom: 1.5, left: 8, right: 2 }
+              }
+            }]);
+
+            // Individual rows for this what-group
+            sorted.forEach(a => {
+              tableBody.push([
+                deptAbbr(a.department),
+                a.municipality || '',
+                a.district || '',
+                a.what || '',
+                fmtDate(a.when),
+                a.where || '',
+                (a.actionTaken && a.actionTaken.toLowerCase() !== 'pending' ? a.actionTaken : '')
+              ]);
+            });
+          });
+        });
+
+        autoTable(doc, {
+          head: [['Dept', 'Mun', 'Dist', 'What', 'Date', 'Where', 'Action']],
+          body: tableBody,
           startY: y + 10,
           styles: {
             fontSize: 8,
@@ -1883,12 +2014,6 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           showHead: 'everyPage',
           tableWidth: 'wrap',
           rowPageBreak: 'avoid',
-          didParseCell: (data) => {
-            if (data.section === 'head') return;
-            if (data.column.index === 4) {
-              data.cell.styles.halign = 'center';
-            }
-          },
           pageBreak: 'auto'
         });
 
