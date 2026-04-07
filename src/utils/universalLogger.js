@@ -41,7 +41,7 @@ export const logUserActivity = async (action, page, userInfo, additionalData = {
     await addDoc(collection(db, LOG_COLLECTION), logEntry);
     
     // Also log to console for development
-    console.log('📝 User Activity Logged:', {
+    console.log('📝 User Activity Logged (Firebase):', {
       action,
       page,
       user: userInfo.email,
@@ -50,12 +50,12 @@ export const logUserActivity = async (action, page, userInfo, additionalData = {
     });
 
   } catch (error) {
-    console.error('❌ Failed to log user activity:', error);
+    console.error('❌ Failed to log user activity to Firebase:', error);
   }
 };
 
 /**
- * Get recent user activity logs
+ * Get recent user activity logs from Firebase
  * @param {number} limitCount - Number of logs to retrieve (default: 100)
  * @returns {Array} Array of log entries
  */
@@ -75,7 +75,7 @@ export const getUserActivityLogs = async (limitCount = 100) => {
     
     return logs;
   } catch (error) {
-    console.error('❌ Failed to retrieve user activity logs:', error);
+    console.error('❌ Failed to retrieve user activity logs from Firebase:', error);
     return [];
   }
 };

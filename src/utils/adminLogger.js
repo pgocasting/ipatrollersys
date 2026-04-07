@@ -45,7 +45,7 @@ export const logAdminAccess = async (action, page, userInfo, additionalData = {}
     await addDoc(collection(db, LOG_COLLECTION), logEntry);
     
     // Also log to console for development
-    console.log('🔐 Admin Access Logged:', {
+    console.log('🔐 Admin Access Logged (Firebase):', {
       action,
       page,
       user: userInfo.email,
@@ -53,12 +53,12 @@ export const logAdminAccess = async (action, page, userInfo, additionalData = {}
     });
 
   } catch (error) {
-    console.error('❌ Failed to log admin access:', error);
+    console.error('❌ Failed to log admin access to Firebase:', error);
   }
 };
 
 /**
- * Get recent admin access logs
+ * Get recent admin access logs from Firebase
  * @param {number} limitCount - Number of logs to retrieve (default: 50)
  * @returns {Array} Array of log entries
  */
@@ -78,7 +78,7 @@ export const getAdminAccessLogs = async (limitCount = 50) => {
     
     return logs;
   } catch (error) {
-    console.error('❌ Failed to retrieve admin access logs:', error);
+    console.error('❌ Failed to retrieve admin access logs from Firebase:', error);
     return [];
   }
 };

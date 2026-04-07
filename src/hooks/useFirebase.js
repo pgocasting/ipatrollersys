@@ -154,6 +154,9 @@ export const useFirebase = () => {
   const logout = async () => {
     try {
       setLoading(true);
+      if (user) {
+        await updateUserPresence(user.email, 'offline');
+      }
       await signOut(auth);
       return { success: true };
     } catch (error) {
@@ -1238,6 +1241,20 @@ export const useFirebase = () => {
     }
   };
 
+  const updateUserPresence = async (email, status, extraData = {}) => {
+    if (!email || !db) return;
+    try {
+      const docRef = doc(db, 'userPresence', email);
+      await setDoc(docRef, {
+        status: status, // "online" | "idle" | "offline"
+        lastActive: new Date().toISOString(),
+        ...extraData
+      }, { merge: true });
+    } catch (error) {
+      console.error('❌ Error updating presence:', error);
+    }
+  };
+
   return {
     user,
     loading,
@@ -1262,6 +1279,7 @@ export const useFirebase = () => {
     updateUser,
     deleteUser,
     getUsers,
+    updateUserPresence,
     addActionReport,
     updateActionReport,
     deleteActionReport,

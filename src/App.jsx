@@ -9,6 +9,7 @@ import CommandCenter from "./pages/CommandCenter";
 import Settings from "./pages/Settings";
 import FirestoreTest from "./tests/FirestoreTest";
 import Users from "./pages/Users";
+import Logs from "./pages/Logs";
 // Firebase-related components removed
 
 import { PatrolDataProvider } from "./contexts/PatrolDataContext";
@@ -20,15 +21,19 @@ import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from 
 import { initializeUsers } from "./utils/initUsers";
 import "./utils/consoleHelpers"; // Load console helper functions
 import "./utils/authTest"; // Load authentication test functions
-import "./lib/firebase"; // Initialize Firebase
+import { db } from "./lib/firebase"; // Initialize Firebase
+import { collection, onSnapshot } from "firebase/firestore";
 import "./styles/mobile.css"; // Mobile responsive styles
-import { Toaster } from "sonner";
-import { logPageNavigation, logAdminLogout } from './utils/adminLogger';
+import { Toaster, toast } from "sonner";
+import { logPageNavigation, logAdminLogout, logAdminLogin } from './utils/adminLogger';
+import { logPageNavigation as logUserNavigation, logUserLogout, logUserLogin } from './utils/universalLogger';
 
 // Component that has access to AuthContext
 function AppContent() {
   const [currentPage, setCurrentPage] = useState('loading');
-  const { user, loading, logout } = useFirebase();
+  const [hasLoggedLogin, setHasLoggedLogin] = useState(false);
+  const [localPresence, setLocalPresence] = useState('offline');
+  const { user, loading, logout, updateUserPresence } = useFirebase();
   const { isAdmin, userAccessLevel, userViewingPage, userFirstName, userLastName, userUsername, userMunicipality, userDepartment, loading: authLoading } = useAuth();
 
   // Set initial page after auth is determined; force all non-admin users to their respective pages
@@ -111,24 +116,171 @@ function AppContent() {
     }
   }, [user, loading, userAccessLevel, userViewingPage, isAdmin, currentPage]);
 
+  // Log user logins successfully
+  useEffect(() => {
+    if (user && !loading && !authLoading && userAccessLevel && !hasLoggedLogin) {
+      const userInfo = {
+        email: user.email || '',
+        firstName: userFirstName,
+        lastName: userLastName,
+        username: userUsername,
+        accessLevel: userAccessLevel,
+        municipality: userMunicipality,
+        department: userDepartment,
+        isAdmin: isAdmin
+      };
+      if (isAdmin || userAccessLevel === 'admin') {
+        logAdminLogin(userInfo);
+      } else {
+        logUserLogin(userInfo);
+      }
+      setHasLoggedLogin(true);
+    }
+    
+    // Reset when logged out
+    if (!user && !loading && hasLoggedLogin) {
+      setHasLoggedLogin(false);
+    }
+  }, [user, loading, authLoading, userAccessLevel, isAdmin, hasLoggedLogin, userFirstName, userLastName, userUsername, userMunicipality, userDepartment]);
+
+  // Track global user presence (online/idle) based on window activity
+  useEffect(() => {
+    if (!user || loading) return;
+    
+    const fullName = `${userFirstName || ''} ${userLastName || ''}`.trim() || userUsername || user.email;
+
+    // Initial connection
+    updateUserPresence(user.email, 'online', { fullName });
+    setLocalPresence('online');
+
+    let idleTimer;
+    let throttleTimer;
+    const idleTimeout = 1 * 60 * 1000; // 1 minute timeout for idle status
+    
+    const setIdle = () => {
+      setLocalPresence('idle');
+      updateUserPresence(user.email, 'idle', { fullName });
+    };
+
+    const resetActivity = () => {
+      if (localPresence === 'idle' || localPresence === 'offline') {
+        setLocalPresence('online');
+        updateUserPresence(user.email, 'online', { fullName });
+      }
+      
+      clearTimeout(idleTimer);
+      idleTimer = setTimeout(setIdle, idleTimeout);
+      
+      // Throttle pings to avoid hammering DB
+      if (!throttleTimer) {
+        throttleTimer = setTimeout(() => {
+          updateUserPresence(user.email, 'online', { fullName });
+          throttleTimer = null;
+        }, 60000); // Max 1 active ping per minute
+      }
+    };
+
+    window.addEventListener('mousemove', resetActivity);
+    window.addEventListener('keydown', resetActivity);
+    window.addEventListener('click', resetActivity);
+    window.addEventListener('scroll', resetActivity);
+    
+    // Initial start
+    idleTimer = setTimeout(setIdle, idleTimeout);
+
+    return () => {
+      window.removeEventListener('mousemove', resetActivity);
+      window.removeEventListener('keydown', resetActivity);
+      window.removeEventListener('click', resetActivity);
+      window.removeEventListener('scroll', resetActivity);
+      clearTimeout(idleTimer);
+      clearTimeout(throttleTimer);
+    };
+  }, [user, loading, localPresence, updateUserPresence]);
+
+  // Set offline strictly if browser unloads
+  useEffect(() => {
+    const handleUnload = () => {
+      if (user && user.email) {
+        updateUserPresence(user.email, 'offline');
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    return () => window.removeEventListener('beforeunload', handleUnload);
+  }, [user, updateUserPresence]);
+
+  // Admin Notification: Watch for login, idle, and logout events
+  const prevPresenceRef = React.useRef({});
+  const isInitialLoadRef = React.useRef(true);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    
+    const presenceRef = collection(db, 'userPresence');
+    const unsubscribe = onSnapshot(presenceRef, (snapshot) => {
+      // Determine if this is the very first read
+      const isInitial = isInitialLoadRef.current;
+      if (isInitial) {
+        isInitialLoadRef.current = false;
+      }
+
+      snapshot.docChanges().forEach((change) => {
+        const data = change.doc.data();
+        const pStatus = prevPresenceRef.current[change.doc.id];
+        const name = data.fullName || change.doc.id;
+
+        if (!isInitial) {
+          // Detect state transitions for real-time notifications
+          if ((!pStatus || pStatus === 'offline') && data.status === 'online') {
+            toast.success(`User Connected`, {
+              description: `User ${name} has logged into the system.`,
+              duration: 5000,
+            });
+          } else if (pStatus === 'online' && data.status === 'idle') {
+            toast.warning(`User Idle Alert`, {
+              description: `User ${name} has become idle and is no longer moving.`,
+              duration: 5000,
+            });
+          } else if (pStatus && pStatus !== 'offline' && data.status === 'offline') {
+            toast.error(`User Disconnected`, {
+              description: `User ${name} has securely logged out of the system.`,
+              duration: 5000,
+            });
+          }
+        }
+        
+        // Always store latest status
+        prevPresenceRef.current[change.doc.id] = data.status;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+      isInitialLoadRef.current = true; // reset barrier when unmounted
+    };
+  }, [isAdmin]);
+
   const handleLogout = async () => {
     try {
       console.log('🚪 Logout initiated...');
       console.log('👤 Current user before logout:', user?.email);
       
-      // Log admin logout before logging out
+      const userInfo = {
+        email: user?.email || '',
+        firstName: userFirstName,
+        lastName: userLastName,
+        username: userUsername,
+        accessLevel: userAccessLevel,
+        municipality: userMunicipality,
+        department: userDepartment,
+        isAdmin: isAdmin
+      };
+      
+      // Log logout event before calling logout
       if (isAdmin || userAccessLevel === 'admin') {
-        const userInfo = {
-          email: user?.email || '',
-          firstName: userFirstName,
-          lastName: userLastName,
-          username: userUsername,
-          accessLevel: userAccessLevel,
-          municipality: userMunicipality,
-          department: userDepartment,
-          isAdmin: isAdmin
-        };
         await logAdminLogout(userInfo);
+      } else {
+        await logUserLogout(userInfo);
       }
       
       // First, call Firebase logout to clear authentication
@@ -158,20 +310,8 @@ function AppContent() {
     const previousPage = currentPage;
     setCurrentPage(page);
     
-    // Log page navigation for administrators
-    if (isAdmin || userAccessLevel === 'admin') {
-      const userInfo = {
-        email: user?.email || '',
-        firstName: userFirstName,
-        lastName: userLastName,
-        username: userUsername,
-        accessLevel: userAccessLevel,
-        municipality: userMunicipality,
-        department: userDepartment,
-        isAdmin: isAdmin
-      };
-      await logPageNavigation(previousPage, page, userInfo);
-    }
+    // Note: Page navigation tracking has been disabled to prevent database spam
+    // and to clean up the System Logs overview.
     
     // Use utility function to update URL
     window.history.replaceState({}, '', `/${page}`);
@@ -348,6 +488,8 @@ function AppContent() {
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'users':
         return <Users onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
+      case 'logs':
+        return <Logs onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'firestoretest':
         return <FirestoreTest onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       // Firebase test routes removed

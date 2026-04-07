@@ -22,7 +22,8 @@ import {
   Activity,
   Command,
   User,
-  Mountain
+  Mountain,
+  ScrollText
 } from "lucide-react";
 
 const SIDEBAR_WIDTH = 224; // 56 * 4 (w-56)
@@ -73,6 +74,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
     { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: ['admin', 'incidents'] },
     { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
     { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
+    { id: 'logs', label: 'Logs', icon: ScrollText, showFor: 'admin' },
   ], []);
 
   // Filter navigation items based on user role and access level - memoized to prevent recalculation

@@ -927,10 +927,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           const actionTakenScore = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
           // Calculate average action efficiency (max 100) for weighting
           const avgActionEfficiency = actionTakenScore / 4;
-          
+
           // Active Days score: (activeDays / totalDays) * 100, capped at 100
           const computedActiveDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
-          
+
           // Weighted combined score using dynamic state variables
           rawPercentage = Math.round((computedActiveDaysScore * (activeDaysWeight / 100)) + (avgActionEfficiency * (actionTakenWeight / 100)));
 
@@ -1168,25 +1168,25 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             data.cell.styles.fontStyle = 'bold';
           }
 
-              // Color coding for columns
-              if (data.column.index === 3 && data.section === 'body') {
-                data.cell.styles.textColor = [34, 197, 94]; // Green
-                data.cell.styles.fontStyle = 'bold';
-              }
-              if (data.column.index === 4 && data.section === 'body') {
-                data.cell.styles.textColor = [59, 130, 246]; // Blue
-                data.cell.styles.fontStyle = 'bold';
-              }
-              if (data.column.index === 5 && data.section === 'body') {
-                data.cell.styles.textColor = [16, 185, 129]; // Emerald
-                data.cell.styles.fontStyle = 'bold';
-              }
-              if (data.column.index === 6 && data.section === 'body') {
-                data.cell.styles.textColor = [147, 51, 234]; // Purple
-                data.cell.styles.fontStyle = 'bold';
-              }
-            }
-          });
+          // Color coding for columns
+          if (data.column.index === 3 && data.section === 'body') {
+            data.cell.styles.textColor = [34, 197, 94]; // Green
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.column.index === 4 && data.section === 'body') {
+            data.cell.styles.textColor = [59, 130, 246]; // Blue
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.column.index === 5 && data.section === 'body') {
+            data.cell.styles.textColor = [16, 185, 129]; // Emerald
+            data.cell.styles.fontStyle = 'bold';
+          }
+          if (data.column.index === 6 && data.section === 'body') {
+            data.cell.styles.textColor = [147, 51, 234]; // Purple
+            data.cell.styles.fontStyle = 'bold';
+          }
+        }
+      });
 
       // Add summary statistics in formal format
       const finalY = doc.lastAutoTable.finalY + 20;
@@ -1259,13 +1259,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(0, 0, 0);
       doc.text('How Performance is Calculated:', 30, formGuideY);
-      
+
       // Spacing between header and the actual formula text block
       formGuideY += 10;
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
-      
+
       const formulaText = `Performance % is a weighted score derived from two primary indicators:
 • Active Days (${activeDaysWeight}%): Percentage of days with 14 or more patrols logged.
 • Action Taken (${actionTakenWeight}%): Average weekly efficiency based on patrols with resolved incidents.
@@ -1300,7 +1300,7 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
           1: { halign: 'center', cellWidth: 80 },
           2: { cellWidth: 'auto' }
         },
-        didParseCell: function(data) {
+        didParseCell: function (data) {
           if (data.column.index === 0 && data.section === 'body') {
             const status = data.cell.text[0];
             if (status === 'Outstanding') data.cell.styles.textColor = [59, 130, 246];
@@ -1792,7 +1792,7 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
 
       // Try to get data from Firestore for this specific month
       const monthDocRef = doc(db, 'patrolData', monthYearId);
-      
+
       // Load patrol data AND Command Center action data in parallel
       const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       const monthYear = `${monthNames[month]}_${year}`;
