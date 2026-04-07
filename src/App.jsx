@@ -232,32 +232,47 @@ function AppContent() {
         if (!isInitial) {
           // Detect state transitions for real-time notifications
           if ((!pStatus || pStatus === 'offline') && data.status === 'online') {
-            toast.success(`User Connected`, {
-              description: `User ${name} has logged into the system.`,
-              duration: 5000,
-              action: {
-                label: 'Clear All',
-                onClick: () => toast.dismiss()
-              }
-            });
+            toast.success(
+              <div className="flex flex-col gap-1 w-full">
+                <p className="font-bold">User Connected</p>
+                <p className="text-xs opacity-90">User {name} has logged into the system.</p>
+                <button 
+                  onClick={() => toast.dismiss()}
+                  className="mt-2 text-[10px] uppercase font-black tracking-widest bg-emerald-600 text-white py-1.5 px-3 rounded-lg hover:bg-emerald-700 transition-colors self-start"
+                >
+                  Clear All Notifications
+                </button>
+              </div>,
+              { duration: 5000 }
+            );
           } else if (pStatus === 'online' && data.status === 'idle') {
-            toast.warning(`User Idle Alert`, {
-              description: `User ${name} has become idle and is no longer moving.`,
-              duration: 5000,
-              action: {
-                label: 'Clear All',
-                onClick: () => toast.dismiss()
-              }
-            });
+            toast.warning(
+              <div className="flex flex-col gap-1 w-full">
+                <p className="font-bold text-amber-800">User Idle Alert</p>
+                <p className="text-xs text-amber-700">User {name} has become idle and is no longer moving.</p>
+                <button 
+                  onClick={() => toast.dismiss()}
+                  className="mt-2 text-[10px] uppercase font-black tracking-widest bg-amber-600 text-white py-1.5 px-3 rounded-lg hover:bg-amber-700 transition-colors self-start"
+                >
+                  Clear All Notifications
+                </button>
+              </div>,
+              { duration: 5000 }
+            );
           } else if (pStatus && pStatus !== 'offline' && data.status === 'offline') {
-            toast.error(`User Disconnected`, {
-              description: `User ${name} has securely logged out of the system.`,
-              duration: 5000,
-              action: {
-                label: 'Clear All',
-                onClick: () => toast.dismiss()
-              }
-            });
+            toast.error(
+              <div className="flex flex-col gap-1 w-full">
+                <p className="font-bold text-rose-800">User Disconnected</p>
+                <p className="text-xs text-rose-700">User {name} has securely logged out of the system.</p>
+                <button 
+                  onClick={() => toast.dismiss()}
+                  className="mt-2 text-[10px] uppercase font-black tracking-widest bg-rose-600 text-white py-1.5 px-3 rounded-lg hover:bg-rose-700 transition-colors self-start"
+                >
+                  Clear All Notifications
+                </button>
+              </div>,
+              { duration: 5000 }
+            );
           }
         }
         
