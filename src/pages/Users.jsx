@@ -13,7 +13,7 @@ import { useFirebase } from "../hooks/useFirebase";
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2, Activity, Zap, WifiOff } from "lucide-react";
 import { logUserManagementAction, logAdminAccess } from '../utils/adminLogger';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,6 +33,13 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterAccessLevel, setFilterAccessLevel] = useState("all");
   const [presenceMap, setPresenceMap] = useState({});
+  const [currentTime, setCurrentTime] = useState(Date.now());
+
+  // Heartbeat for calculating live idle times
+  useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(Date.now()), 10000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -400,6 +407,10 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
       setDeleteLoading(false);
     }
   };
+
+  const onlineUsers = users.filter(u => u.role !== "Admin" && presenceMap[u.email]?.status === 'online').length;
+  const idleUsers = users.filter(u => u.role !== "Admin" && presenceMap[u.email]?.status === 'idle').length;
+  const offlineUsers = users.filter(u => u.role !== "Admin" && (!presenceMap[u.email] || presenceMap[u.email]?.status === 'offline')).length;
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
@@ -841,6 +852,43 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
               </CardContent>
             </Card>
           </div>
+          
+          {/* Presence Stats Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Card className="bg-gradient-to-br from-emerald-50 to-white dark:from-emerald-950/20 dark:to-slate-900 border-none ring-1 ring-emerald-100 dark:ring-emerald-900/50 shadow-sm rounded-2xl overflow-hidden hover:shadow-emerald-200/50 transition-all duration-300 group">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-emerald-100 dark:bg-emerald-900/40 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <Activity className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-emerald-800 dark:text-emerald-400 uppercase tracking-widest mb-0.5">Active Now</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-white leading-none">{onlineUsers}</p>
+                      <span className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-500 uppercase">Profiles</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/20 dark:to-slate-900 border-none ring-1 ring-rose-100 dark:ring-rose-900/50 shadow-sm rounded-2xl overflow-hidden hover:shadow-rose-200/50 transition-all duration-300 group">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-center gap-4">
+                  <div className="p-3 bg-rose-100 dark:bg-rose-900/40 rounded-xl group-hover:scale-110 transition-transform duration-300">
+                    <WifiOff className="w-5 h-5 sm:w-6 sm:h-6 text-rose-600 dark:text-rose-400" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[10px] font-black text-rose-800 dark:text-rose-400 uppercase tracking-widest mb-0.5">Offline Now</p>
+                    <div className="flex items-baseline gap-2">
+                      <p className="text-2xl sm:text-3xl font-black text-rose-950 dark:text-white leading-none">{offlineUsers}</p>
+                      <span className="text-[10px] font-bold text-rose-600/70 dark:text-emerald-500 uppercase">Users</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
           {/* Search and Filter Section */}
           <Card className="bg-white dark:bg-slate-900/40 backdrop-blur border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl">
@@ -1005,9 +1053,17 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                         </div>
                                       </div>
                                       <div className="flex flex-col">
-                                        <p className="font-bold text-slate-900 dark:text-white text-base leading-tight">
-                                          {`${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                                        </p>
+                                        <div className="flex items-center gap-2">
+                                          <p className="font-bold text-slate-900 dark:text-white text-base leading-tight">
+                                            {`${u.firstName || ""} ${u.lastName || ""}`.trim()}
+                                          </p>
+                                          {presenceMap[u.email]?.status === 'idle' && (
+                                            <div className="text-[10px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-lg animate-pulse border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
+                                              <Zap className="w-3 h-3" />
+                                              <span>{Math.floor((currentTime - (presenceMap[u.email]?.lastActive || currentTime)) / 60000)}m Idle</span>
+                                            </div>
+                                          )}
+                                        </div>
                                         <div className="flex items-center gap-1.5 mt-1.5">
                                           <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
                                           <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{u.municipality || 'Unspecified'}</p>

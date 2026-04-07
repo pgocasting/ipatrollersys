@@ -249,7 +249,7 @@ function AppContent() {
             toast.warning(
               <div className="flex flex-col gap-1 w-full">
                 <p className="font-bold text-amber-800">User Idle Alert</p>
-                <p className="text-xs text-amber-700">User {name} has become idle and is no longer moving.</p>
+                <p className="text-xs text-amber-700">User {name} has become idle (Idle for 1 minute).</p>
                 <button 
                   onClick={() => toast.dismiss()}
                   className="mt-2 text-[10px] uppercase font-black tracking-widest bg-amber-600 text-white py-1.5 px-3 rounded-lg hover:bg-amber-700 transition-colors self-start"
