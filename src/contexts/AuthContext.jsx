@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useFirebase } from '../hooks/useFirebase';
 import { logAdminLogin } from '../utils/adminLogger';
@@ -18,9 +18,9 @@ export function AuthProvider({ children }) {
   const [userAccessLevel, setUserAccessLevel] = useState("");
   const [userViewingPage, setUserViewingPage] = useState("");
   const [userDepartment, setUserDepartment] = useState("");
-  const [userFirstName, setUserFirstName] = useState("");
-  const [userLastName, setUserLastName] = useState("");
   const [userUsername, setUserUsername] = useState("");
+  const [userProfileName, setUserProfileName] = useState("");
+  const [userAvatar, setUserAvatar] = useState("");
   const [loading, setLoading] = useState(true);
 
   const normalizeViewingPage = (page) => {
@@ -41,61 +41,62 @@ export function AuthProvider({ children }) {
   };
 
   useEffect(() => {
-    const checkRole = async () => {
-      if (user) {
-        const docRef = doc(db, 'users', 'management');
-        const docSnap = await getDoc(docRef);
-        
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          const users = data.users || [];
-          const currentUser = users.find(u => u.email === user.email);
-          const isAdminUser = currentUser?.role === "Admin";
-          const userAccessLevelValue = currentUser?.accessLevel || "";
-          
-          setIsAdmin(isAdminUser);
-          setUserMunicipality(currentUser?.municipality || "");
-          setUserAccessLevel(userAccessLevelValue);
-          setUserViewingPage(
-            normalizeViewingPage(
-              currentUser?.viewingPage ||
-                currentUser?.allowedPage ||
-                currentUser?.viewPage ||
-                currentUser?.page ||
-                ""
-            )
-          );
-          setUserDepartment(currentUser?.department || "");
-          setUserFirstName(currentUser?.firstName || "");
-          setUserLastName(currentUser?.lastName || "");
-          setUserUsername(currentUser?.username || "");
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-          // Log user access for all users
-          const userInfo = {
-            email: user.email,
-            firstName: currentUser?.firstName || "",
-            lastName: currentUser?.lastName || "",
-            username: currentUser?.username || "",
-            userAccessLevel: userAccessLevelValue,
-            accessLevel: userAccessLevelValue,
-            municipality: currentUser?.municipality || "",
-            department: currentUser?.department || "",
-            isAdmin: isAdminUser,
-            role: currentUser?.role || ""
-          };
-          
-          // Log user login for all users
-          await logUserLogin(userInfo);
-          
-          // Also log admin login if user is admin
-          if (isAdminUser || userAccessLevelValue === 'admin') {
-            await logAdminLogin(userInfo);
-          }
+    const docRef = doc(db, 'users', 'management');
+    const unsubscribe = onSnapshot(docRef, async (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        const users = data.users || [];
+        const currentUser = users.find(u => u.email === user.email);
+        const isAdminUser = currentUser?.role === "Admin";
+        const userAccessLevelValue = currentUser?.accessLevel || "";
+        
+        setIsAdmin(isAdminUser);
+        setUserMunicipality(currentUser?.municipality || "");
+        setUserAccessLevel(userAccessLevelValue);
+        setUserViewingPage(
+          normalizeViewingPage(
+            currentUser?.viewingPage ||
+              currentUser?.allowedPage ||
+              currentUser?.viewPage ||
+              currentUser?.page ||
+              ""
+          )
+        );
+        setUserDepartment(currentUser?.department || "");
+        setUserUsername(currentUser?.username || "");
+        setUserProfileName(currentUser?.profileName || `${currentUser?.firstName || ''} ${currentUser?.lastName || ''}`.trim() || user.displayName || "Administrator");
+        setUserAvatar(currentUser?.avatar || "");
+
+        // Log user access
+        const userInfo = {
+          email: user.email,
+          firstName: currentUser?.firstName || "",
+          lastName: currentUser?.lastName || "",
+          username: currentUser?.username || "",
+          userAccessLevel: userAccessLevelValue,
+          accessLevel: userAccessLevelValue,
+          municipality: currentUser?.municipality || "",
+          department: currentUser?.department || "",
+          isAdmin: isAdminUser,
+          role: currentUser?.role || ""
+        };
+        
+        if (isAdminUser || userAccessLevelValue === 'admin') {
+          await logAdminLogin(userInfo);
         }
       }
       setLoading(false);
-    };
-    checkRole();
+    }, (error) => {
+      console.error("Auth listener error:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user]);
 
   const value = {
@@ -104,9 +105,9 @@ export function AuthProvider({ children }) {
     userAccessLevel,
     userViewingPage,
     userDepartment,
-    userFirstName,
-    userLastName,
     userUsername,
+    userProfileName,
+    userAvatar,
     loading
   };
 

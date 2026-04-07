@@ -1255,6 +1255,60 @@ export const useFirebase = () => {
     }
   };
 
+  const updateOwnAvatar = async (avatarUrl) => {
+    if (!user || !db) return { success: false, error: "Not authenticated" };
+    try {
+      const docRef = doc(db, 'users', 'management');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return { success: false, error: "Management doc not found" };
+
+      const data = docSnap.data();
+      const usersList = data.users || [];
+      const userIndex = usersList.findIndex(u => u.email === user.email);
+
+      if (userIndex === -1) return { success: false, error: "User record not found" };
+
+      usersList[userIndex] = {
+        ...usersList[userIndex],
+        avatar: avatarUrl,
+        lastUpdated: new Date().toISOString()
+      };
+
+      await setDoc(docRef, { ...data, users: usersList, updatedAt: new Date() });
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating avatar:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const updateOwnProfile = async (profileData) => {
+    if (!user || !db) return { success: false, error: "Not authenticated" };
+    try {
+      const docRef = doc(db, 'users', 'management');
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) return { success: false, error: "Management doc not found" };
+
+      const data = docSnap.data();
+      const usersList = data.users || [];
+      const userIndex = usersList.findIndex(u => u.email === user.email);
+
+      if (userIndex === -1) return { success: false, error: "User record not found" };
+
+      usersList[userIndex] = {
+        ...usersList[userIndex],
+        ...profileData,
+        lastUpdated: new Date().toISOString()
+      };
+
+      await setDoc(docRef, { ...data, users: usersList, updatedAt: new Date() });
+      return { success: true };
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      return { success: false, error: error.message };
+    }
+  };
+
   return {
     user,
     loading,
@@ -1280,6 +1334,8 @@ export const useFirebase = () => {
     deleteUser,
     getUsers,
     updateUserPresence,
+    updateOwnAvatar,
+    updateOwnProfile,
     addActionReport,
     updateActionReport,
     deleteActionReport,

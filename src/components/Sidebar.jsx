@@ -24,14 +24,14 @@ const Sidebar = React.memo(({
   onShowHelp
 }) => {
   const { user } = useFirebase();
-  const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername } = useAuth();
+  const { isAdmin, userAccessLevel, userProfileName, userUsername, userAvatar } = useAuth();
   
   // Use Firebase user data or fallback to default
   const userInfo = user ? {
-    name: userFirstName && userLastName ? `${userFirstName} ${userLastName}` : (user.displayName || "Administrator"),
+    name: userProfileName || "Administrator",
     username: userUsername || "admin",
     email: user.email || "admin@ipatroller.gov.ph",
-    avatar: user.photoURL || null
+    avatar: userAvatar || user.photoURL || null
   } : {
     name: "Administrator",
     username: "admin",
@@ -273,6 +273,18 @@ const Sidebar = React.memo(({
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
+            </div>
+          )}
+
+          {/* System Version & Copyright */}
+          {(!isCollapsed || isMobile) && (
+            <div className="mt-12 px-2 text-center pb-2">
+              <p className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] leading-none mb-1.5">
+                v2.5.4-STABLE
+              </p>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">
+                EST. 2025 • UPDATED 2026
+              </p>
             </div>
           )}
         </div>

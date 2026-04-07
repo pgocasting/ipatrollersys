@@ -10,6 +10,7 @@ import {
 } from "firebase/auth";
 import { useFirebase } from "../hooks/useFirebase";
 import { toast } from "sonner";
+import { Separator } from "../components/ui/separator";
 
 import {
   Sun,
@@ -22,6 +23,9 @@ import {
   Palette,
   ChevronRight,
   Check,
+  User as UserIcon,
+  Camera,
+  Upload,
 } from "lucide-react";
 
 // ─── Small reusable sub-components ───────────────────────────────────────────
@@ -242,6 +246,122 @@ function ChangePasswordForm() {
   );
 }
 
+// ─── Profile Customization ───────────────────────────────────────────────────
+function ProfileCustomization() {
+  const { updateOwnAvatar, updateOwnProfile } = useFirebase();
+  const { userAvatar, userProfileName } = useAuth();
+  const [updating, setUpdating] = useState(false);
+  const [profileName, setProfileName] = useState(userProfileName || "");
+  const fileInputRef = React.useRef(null);
+
+  // Update local state when context changes
+  React.useEffect(() => {
+    setProfileName(userProfileName || "");
+  }, [userProfileName]);
+
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    if (!profileName) {
+      toast.error("Profile name is required.");
+      return;
+    }
+    setUpdating(true);
+    const res = await updateOwnProfile({ profileName });
+    if (res.success) {
+      toast.success("Profile name updated!");
+    } else {
+      toast.error(res.error || "Failed to update profile name");
+    }
+    setUpdating(false);
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("File is too large. Max 2MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadstart = () => setUpdating(true);
+    reader.onload = async (event) => {
+      const base64 = event.target.result;
+      const res = await updateOwnAvatar(base64);
+      if (res.success) {
+        toast.success("Profile photo uploaded!");
+      } else {
+        toast.error("Failed to save photo.");
+      }
+      setUpdating(false);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="profile-custom-container">
+      <div className="photo-upload-section">
+        <div className="main-avatar-wrapper">
+          <div className="avatar-preview-lg">
+            {userAvatar ? (
+              <img src={userAvatar} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <div className="avatar-placeholder-lg">{(profileName?.[0] || 'A')}</div>
+            )}
+            <button 
+              className="change-photo-badge"
+              onClick={() => fileInputRef.current?.click()}
+              title="Change Photo"
+            >
+              <Camera size={14} />
+            </button>
+          </div>
+          
+          <div className="upload-info">
+            <h3 className="upload-title">{profileName || "User Identity"}</h3>
+            <p className="upload-hint">JPG, PNG or GIF. Max 2MB.</p>
+            <button 
+              className="upload-trigger-btn"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={updating}
+            >
+              <Upload size={14} />
+              {updating ? 'Uploading...' : 'Change Identity Photo'}
+            </button>
+          </div>
+        </div>
+        
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          style={{ display: 'none' }} 
+          accept="image/*"
+        />
+      </div>
+
+      <Separator className="my-2 bg-slate-100 dark:bg-slate-800" />
+
+      <form onSubmit={handleUpdateProfile} className="profile-name-form">
+        <div className="settings-field">
+          <label className="field-label">Profile Identity Name</label>
+          <input 
+            type="text" 
+            value={profileName} 
+            onChange={e => setProfileName(e.target.value)} 
+            className="settings-input"
+            placeholder="Your profile display name"
+          />
+        </div>
+        <button type="submit" className="save-profile-btn" disabled={updating}>
+          Update Identity
+        </button>
+      </form>
+    </div>
+  );
+}
+
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
 export default function Settings({ onLogout, onNavigate, currentPage }) {
@@ -262,6 +382,16 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
 
         {/* Body */}
         <div className="settings-body">
+          {/* ── Profile Customization ─────────────────────── */}
+          <SectionCard
+            icon={UserIcon}
+            iconColor="#10b981"
+            title="Profile Identity"
+            description="Customize your administrative profile with a cartoon avatar."
+          >
+            <ProfileCustomization />
+          </SectionCard>
+
           {/* ── Appearance ────────────────────────────────────── */}
           <SectionCard
             icon={Palette}
@@ -350,10 +480,10 @@ const styles = `
 /* Body */
 .settings-body {
   padding: 28px 32px;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 24px;
-  max-width: 680px;
+  max-width: 1200px;
 }
 
 /* Card */
@@ -396,12 +526,20 @@ const styles = `
 }
 .settings-card-body {
   padding: 20px 22px;
+  height: 100%;
 }
 
-/* ── Theme Options ── */
+@media (max-width: 1200px) {
+  .settings-body { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 800px) {
+  .settings-body { grid-template-columns: 1fr; }
+}
+
 .theme-options {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 .theme-option-btn {
@@ -602,5 +740,300 @@ const styles = `
   .settings-body   { padding: 20px 16px; }
   .theme-options   { grid-template-columns: 1fr; }
   .pw-submit-btn   { width: 100%; }
+}
+
+/* ── Avatar Customization ── */
+.avatar-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.current-avatar-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px;
+  background: var(--active-bg, #f1f5f9);
+  border-radius: 12px;
+  gap: 10px;
+}
+:root.dark .current-avatar-preview { --active-bg: #1e293b; }
+.preview-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.preview-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  background: #fff;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.preview-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.avatar-placeholder {
+  font-size: 2rem;
+  font-weight: 900;
+  color: #3b82f6;
+}
+
+.avatar-selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  gap: 12px;
+}
+.avatar-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+:root.dark .avatar-choice-btn { background: #0f172a; }
+.avatar-choice-btn:hover {
+  background: #f0f9ff;
+  border-color: #7dd3fc;
+  transform: translateY(-2px);
+}
+.avatar-choice-btn.active {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 4px 12px rgba(59,130,246,0.15);
+}
+.avatar-choice-btn img {
+  width: 50px;
+  height: 50px;
+}
+.choice-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* ── Name Edit ── */
+.profile-custom-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.profile-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.name-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.settings-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #f8fafc;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s;
+}
+:root.dark .settings-input {
+  background: #0f172a;
+  border-color: #334155;
+  color: #f1f5f9;
+}
+.settings-input:focus {
+  border-color: #3b82f6;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+:root.dark .settings-input:focus { background: #0f172a; border-color: #3b82f6; }
+
+.save-profile-btn {
+  padding: 10px 18px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  align-self: flex-start;
+}
+.save-profile-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+.save-profile-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Photo Upload ── */
+.profile-custom-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.main-avatar-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.avatar-preview-lg {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  border-radius: 20px;
+  background: #f1f5f9;
+  border: 4px solid #fff;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+:root.dark .avatar-preview-lg { background: #0f172a; border-color: #1e293b; }
+.avatar-placeholder-lg {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: #3b82f6;
+}
+.change-photo-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #3b82f6;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px 0 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  box-shadow: -2px -2px 8px rgba(0,0,0,0.1);
+  transition: all 0.2s;
+}
+.change-photo-badge:hover { background: #2563eb; }
+
+.upload-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.upload-title {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0;
+}
+:root.dark .upload-title { color: #f1f5f9; }
+.upload-hint {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #94a3b8;
+  margin-bottom: 2px;
+}
+.upload-trigger-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+:root.dark .upload-trigger-btn { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+.upload-trigger-btn:hover:not(:disabled) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #f0f9ff;
+}
+:root.dark .upload-trigger-btn:hover { background: #1e293b; }
+
+.profile-name-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.settings-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: #f8fafc;
+  color: #0f172a;
+  outline: none;
+  transition: all 0.2s;
+}
+:root.dark .settings-input { background: #0f172a; border-color: #334155; color: #f1f5f9; }
+.settings-input:focus { border-color: #3b82f6; background: #fff; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
+
+.save-profile-btn {
+  padding: 11px 20px;
+  background: #3b82f6;
+  color: #fff;
+  border: none;
+  border-radius: 9px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  align-self: flex-start;
+  box-shadow: 0 2px 8px rgba(59,130,246,0.25);
+}
+.save-profile-btn:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59,130,246,0.35);
 }
 `;
