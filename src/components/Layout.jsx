@@ -108,7 +108,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
 
   if (!mounted) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-slate-50">
+      <div className="flex h-screen w-full items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="relative flex flex-col items-center">
           <div className="relative w-32 h-32 flex items-center justify-center mb-4">
             {/* White Theme Mini Atomic Core */}
@@ -142,7 +142,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
   }
 
   return (
-    <div className="flex h-screen w-full bg-white">
+    <div className="flex h-screen w-full bg-white dark:bg-slate-950">
       {/* Mobile Sidebar using Sheet */}
       <Sheet open={sidebarOpen} onOpenChange={closeSidebar}>
         <SheetTrigger asChild>
@@ -187,7 +187,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-auto bg-white">
+      <main className="flex-1 overflow-auto bg-white dark:bg-slate-900">
         <div className="h-full">
           {children}
         </div>

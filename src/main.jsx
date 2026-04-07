@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/index.css'
+import './styles/dark-theme.css'
 import App from './App.jsx'
 
 // Apply initial theme to prevent flash

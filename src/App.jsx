@@ -14,6 +14,7 @@ import Users from "./pages/Users";
 import { PatrolDataProvider } from "./contexts/PatrolDataContext";
 import { DataProvider } from "./contexts/DataContext";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
 import { useFirebase } from "./hooks/useFirebase";
 import { getCurrentPageFromURL, handleBrowserNavigation, syncURLWithPage } from "./utils/routeUtils";
 import { initializeUsers } from "./utils/initUsers";
@@ -460,8 +461,10 @@ function AppContent() {
 // Main App component that provides AuthContext
 export default function App() {
   return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

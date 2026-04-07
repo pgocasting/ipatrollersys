@@ -42,12 +42,12 @@ const Sidebar = React.memo(({
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   return (
     <TooltipProvider>
-      <aside className={`flex h-screen flex-col bg-white border-r border-slate-200 transition-all duration-300 ease-in-out flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
+      <aside className={`flex h-screen flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
         ${isCollapsed && !isMobile ? 'w-20' : 'w-72'}
         ${isMobile ? 'block' : 'hidden md:block'}`}>
         
         {/* Header Section - Modern White Theme */}
-        <div className="relative border-b border-slate-100">
+        <div className="relative border-b border-slate-100 dark:border-slate-700">
           <div className={`relative flex h-24 items-center ${
             isCollapsed && !isMobile ? 'justify-center px-4' : 'justify-between px-6'
           }`}>
@@ -80,10 +80,10 @@ const Sidebar = React.memo(({
                 </div>
                 <div className="flex flex-col">
                   <div className="flex flex-col">
-                    <h1 className="text-[11px] font-black text-slate-500 leading-none tracking-[0.2em] uppercase">
+                    <h1 className="text-[11px] font-black text-slate-500 dark:text-slate-400 leading-none tracking-[0.2em] uppercase">
                       1Bataan
                     </h1>
-                    <h2 className="text-xl font-black text-blue-600 leading-tight tracking-tight uppercase">
+                    <h2 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-tight tracking-tight uppercase">
                       I-Patroller
                     </h2>
                   </div>
@@ -98,7 +98,7 @@ const Sidebar = React.memo(({
           <nav className="px-4 space-y-1.5">
             {(!isCollapsed || isMobile) && (
               <div className="px-3 pb-4">
-                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-400 uppercase">
+                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-400 dark:text-slate-500 uppercase">
                   Main Hub
                 </h2>
               </div>
@@ -114,8 +114,8 @@ const Sidebar = React.memo(({
                   size={isCollapsed && !isMobile ? "icon" : "default"}
                   className={`relative w-full h-12 font-semibold transition-all duration-300 group ${
                     isActive 
-                      ? 'bg-blue-50 text-blue-700' 
-                      : 'hover:bg-slate-50 text-slate-600 hover:text-slate-900'
+                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' 
+                      : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
                   } ${
                     isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4 justify-start'
                   } rounded-xl overflow-hidden`}
@@ -128,7 +128,7 @@ const Sidebar = React.memo(({
 
                   {isCollapsed && !isMobile ? (
                     <div className={`p-2 rounded-lg transition-all duration-300 ${
-                      isActive ? 'bg-blue-100/50 text-blue-600' : 'text-slate-500 group-hover:text-slate-900'
+                      isActive ? 'bg-blue-100/50 dark:bg-blue-800/50 text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100'
                     }`}>
                       <Icon className="h-5 w-5" />
                     </div>
@@ -136,8 +136,8 @@ const Sidebar = React.memo(({
                     <div className="flex items-center gap-3.5 min-w-0">
                       <div className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
                         isActive 
-                          ? 'bg-white text-blue-600 shadow-sm border border-blue-100' 
-                          : 'bg-slate-100/50 text-slate-500 group-hover:bg-slate-100 group-hover:text-slate-900'
+                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm border border-blue-100 dark:border-blue-800' 
+                          : 'bg-slate-100/50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 group-hover:text-slate-900 dark:group-hover:text-slate-100'
                       }`}>
                         <Icon className="h-4.5 w-4.5" />
                       </div>
@@ -170,7 +170,7 @@ const Sidebar = React.memo(({
         </ScrollArea>
 
         {/* Footer Section - Integrated Profile */}
-        <div className="p-4 border-t border-slate-100">
+        <div className="p-4 border-t border-slate-100 dark:border-slate-700">
           <div className="space-y-1.5 mb-4">
             {/* View Instructions - for command-center users */}
             {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && !isCollapsed && (
@@ -188,19 +188,19 @@ const Sidebar = React.memo(({
               <>
                 <Button
                   variant="ghost"
-                  className="w-full h-10 font-bold hover:bg-slate-50 text-slate-600 hover:text-slate-900 px-4 justify-start rounded-xl transition-all duration-300"
+                  className="w-full h-10 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-4 justify-start rounded-xl transition-all duration-300"
                   onClick={() => handleNavigation('settings')}
                 >
-                  <Settings className="h-4 w-4 mr-3 text-slate-400 group-hover:text-slate-600" />
+                  <Settings className="h-4 w-4 mr-3 text-slate-400 dark:text-slate-500" />
                   <span className="text-xs">System Settings</span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="w-full h-10 font-bold hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-4 justify-start rounded-xl transition-all duration-300"
+                  className="w-full h-10 font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-4 justify-start rounded-xl transition-all duration-300"
                   onClick={onLogout}
                 >
-                  <LogOut className="h-4 w-4 mr-3 text-slate-400 group-hover:text-rose-500" />
+                  <LogOut className="h-4 w-4 mr-3 text-slate-400 dark:text-slate-500" />
                   <span className="text-xs">Sign Out</span>
                 </Button>
               </>
@@ -212,15 +212,15 @@ const Sidebar = React.memo(({
             <div className="flex flex-col items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl bg-slate-50 border border-slate-200 hover:border-blue-400 transition-all duration-300 p-0 overflow-hidden shadow-sm">
+                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-400 transition-all duration-300 p-0 overflow-hidden shadow-sm">
                     <Avatar className="h-full w-full rounded-none">
                       <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
                       <AvatarFallback className="text-xs font-black bg-blue-600 text-white rounded-none">{initials}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-2 bg-white rounded-2xl border-slate-200 shadow-2xl ml-2" align="end" side="right">
-                   <div className="flex items-center gap-4 p-4 mb-2 bg-slate-50 rounded-xl">
+                <DropdownMenuContent className="w-64 p-2 bg-white dark:bg-slate-800 rounded-2xl border-slate-200 dark:border-slate-700 shadow-2xl ml-2" align="end" side="right">
+                   <div className="flex items-center gap-4 p-4 mb-2 bg-slate-50 dark:bg-slate-700 rounded-xl">
                       <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm">
                         <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
                         <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
@@ -250,17 +250,17 @@ const Sidebar = React.memo(({
               </Tooltip>
             </div>
           ) : (
-            <div className="group relative overflow-hidden rounded-2xl border border-slate-100 bg-slate-50 px-4 py-4 transition-all duration-300 hover:shadow-md hover:border-blue-200">
+            <div className="group relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-4 transition-all duration-300 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700">
               <div className="flex items-center gap-4">
                 <Avatar className="h-12 w-12 border-2 border-white shadow-sm transition-transform duration-300 group-hover:scale-105">
                   <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
                   <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-slate-900 truncate leading-tight mb-1">{userInfo.name}</p>
+                  <p className="text-sm font-black text-slate-900 dark:text-slate-100 truncate leading-tight mb-1">{userInfo.name}</p>
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 border border-white"></span>
-                    <Badge variant="secondary" className="bg-blue-100/50 text-blue-700 border-none text-[9px] font-black uppercase tracking-widest px-1.5 py-0 h-4">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 border border-white dark:border-slate-800"></span>
+                    <Badge variant="secondary" className="bg-blue-100/50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-none text-[9px] font-black uppercase tracking-widest px-1.5 py-0 h-4">
                       {isAdmin ? 'SYSTEM ADMIN' : userAccessLevel}
                     </Badge>
                   </div>
@@ -269,7 +269,7 @@ const Sidebar = React.memo(({
               
               <button 
                 onClick={onToggleCollapsed}
-                className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white text-slate-400 hover:text-blue-500 shadow-sm"
+                className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500 shadow-sm"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>

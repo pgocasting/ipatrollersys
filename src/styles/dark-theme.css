@@ -1,0 +1,343 @@
+/*
+ * ═══════════════════════════════════════════════════════════
+ *  GLOBAL DARK THEME — IPatroller System
+ *  Applied when <html> has .dark class (set by ThemeContext)
+ * ═══════════════════════════════════════════════════════════
+ */
+
+/* ── 1. Base Body & Root ─────────────────────────────────── */
+:root.dark body,
+:root.dark #root {
+  background-color: #0f172a;
+  color: #e2e8f0;
+}
+
+/* ── 2. Common Background Overrides ─────────────────────── */
+:root.dark .bg-white { background-color: #1e293b !important; }
+:root.dark .bg-gray-50,
+:root.dark .bg-slate-50 { background-color: #0f172a !important; }
+:root.dark .bg-gray-100,
+:root.dark .bg-slate-100 { background-color: #1e293b !important; }
+:root.dark .bg-gray-200,
+:root.dark .bg-slate-200 { background-color: #334155 !important; }
+:root.dark .bg-gray-900,
+:root.dark .bg-slate-900,
+:root.dark .bg-slate-950 { background-color: #020617 !important; }
+
+/* Subtle backgrounds */
+:root.dark .bg-blue-50   { background-color: #172554 !important; }
+:root.dark .bg-blue-100  { background-color: #1e3a8a !important; }
+:root.dark .bg-emerald-50 { background-color: #052e16 !important; }
+:root.dark .bg-rose-50   { background-color: #4c0519 !important; }
+:root.dark .bg-amber-50  { background-color: #451a03 !important; }
+:root.dark .bg-purple-50 { background-color: #2e1065 !important; }
+:root.dark .bg-indigo-50 { background-color: #1e1b4b !important; }
+:root.dark .bg-green-50  { background-color: #052e16 !important; }
+:root.dark .bg-red-50    { background-color: #4c0519 !important; }
+:root.dark .bg-yellow-50 { background-color: #422006 !important; }
+:root.dark .bg-orange-50 { background-color: #431407 !important; }
+
+/* Backdrop / transparent whites */
+:root.dark .bg-white\/80,
+:root.dark .bg-white\/90,
+:root.dark .bg-white\/95 { background-color: rgba(30, 41, 59, 0.95) !important; }
+:root.dark .bg-slate-50\/50 { background-color: rgba(15, 23, 42, 0.5) !important; }
+
+/* ── 3. Text Color Overrides ─────────────────────────────── */
+:root.dark .text-gray-900,
+:root.dark .text-slate-900 { color: #f1f5f9 !important; }
+:root.dark .text-gray-800,
+:root.dark .text-slate-800 { color: #e2e8f0 !important; }
+:root.dark .text-gray-700,
+:root.dark .text-slate-700 { color: #cbd5e1 !important; }
+:root.dark .text-gray-600,
+:root.dark .text-slate-600 { color: #94a3b8 !important; }
+:root.dark .text-gray-500,
+:root.dark .text-slate-500 { color: #64748b !important; }
+:root.dark .text-gray-400,
+:root.dark .text-slate-400 { color: #475569 !important; }
+:root.dark .text-gray-300,
+:root.dark .text-slate-300 { color: #334155 !important; }
+
+/* ── 4. Border Overrides ─────────────────────────────────── */
+:root.dark .border-gray-100,
+:root.dark .border-slate-100 { border-color: #1e293b !important; }
+:root.dark .border-gray-200,
+:root.dark .border-slate-200 { border-color: #334155 !important; }
+:root.dark .border-gray-300,
+:root.dark .border-slate-300 { border-color: #475569 !important; }
+
+/* ── 5. Sidebar Specific ─────────────────────────────────── */
+:root.dark aside.flex.h-screen {
+  background-color: #1e293b !important;
+  border-right-color: #334155 !important;
+}
+
+/* Sidebar header section */
+:root.dark aside .border-b.border-slate-100 {
+  border-bottom-color: #334155 !important;
+}
+
+/* Sidebar "Main Hub" label */
+:root.dark aside h2.text-slate-400 {
+  color: #475569 !important;
+}
+
+/* Brand text in sidebar */
+:root.dark aside h1.text-slate-500 {
+  color: #64748b !important;
+}
+
+/* Nav items - default state */
+:root.dark aside button.text-slate-600,
+:root.dark aside a.text-slate-600 {
+  color: #94a3b8 !important;
+}
+
+/* Nav items - hover state */
+:root.dark aside button:hover:not(:disabled) {
+  background-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Nav items - active state */
+:root.dark aside button.bg-blue-50 {
+  background-color: #1e3a8a !important;
+  color: #93c5fd !important;
+}
+
+/* Icon containers in nav */
+:root.dark aside .bg-slate-100\/50 {
+  background-color: rgba(51, 65, 85, 0.5) !important;
+}
+
+/* Footer section */
+:root.dark aside .border-t.border-slate-100 {
+  border-top-color: #334155 !important;
+}
+
+/* User profile card in sidebar footer */
+:root.dark aside .rounded-2xl.border.border-slate-100.bg-slate-50 {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+:root.dark aside .rounded-2xl.border.border-slate-100.bg-slate-50:hover {
+  border-color: #3b82f6 !important;
+}
+
+:root.dark aside p.text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+/* Settings & Sign Out buttons */
+:root.dark aside button.hover\:bg-slate-50 {
+  color: #94a3b8 !important;
+}
+:root.dark aside button.hover\:bg-slate-50:hover {
+  background-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+:root.dark aside button.hover\:bg-rose-50:hover {
+  background-color: rgba(76, 5, 25, 0.5) !important;
+  color: #fda4af !important;
+}
+
+/* Collapsed user avatar button */
+:root.dark aside .bg-slate-50.border.border-slate-200 {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+/* ── 6. Card / Panel Overrides ───────────────────────────── */
+:root.dark .rounded-lg.border.bg-card,
+:root.dark [data-slot="card"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* General white rounded panels */
+:root.dark .rounded-xl.bg-white,
+:root.dark .rounded-2xl.bg-white,
+:root.dark .rounded-lg.bg-white,
+:root.dark .rounded-md.bg-white {
+  background-color: #1e293b !important;
+}
+
+/* Shadow cards (common pattern) */
+:root.dark .shadow-sm,
+:root.dark .shadow-md {
+  --tw-shadow-color: rgba(0, 0, 0, 0.4);
+}
+
+/* ── 7. Table Overrides ──────────────────────────────────── */
+:root.dark table thead tr,
+:root.dark table thead th {
+  background-color: #1e293b !important;
+  color: #cbd5e1 !important;
+  border-bottom-color: #334155 !important;
+}
+
+:root.dark table tbody tr {
+  background-color: #1e293b !important;
+  border-bottom-color: #334155 !important;
+}
+:root.dark table tbody tr:nth-child(even) {
+  background-color: #172033 !important;
+}
+:root.dark table tbody tr:hover {
+  background-color: #334155 !important;
+}
+:root.dark table tbody td {
+  color: #e2e8f0 !important;
+  border-bottom-color: #334155 !important;
+}
+
+/* Sticky header in tables */
+:root.dark .sticky.top-0.bg-white {
+  background-color: #1e293b !important;
+}
+:root.dark .sticky.top-0.z-40 {
+  background-color: #1e293b !important;
+}
+
+/* ── 8. Input & Form Overrides ───────────────────────────── */
+:root.dark input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+:root.dark textarea,
+:root.dark select {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+:root.dark input::placeholder,
+:root.dark textarea::placeholder {
+  color: #475569 !important;
+}
+
+:root.dark input:focus,
+:root.dark textarea:focus,
+:root.dark select:focus {
+  border-color: #3b82f6 !important;
+  outline-color: #3b82f6 !important;
+}
+
+/* ── 9. Modal / Dialog Overrides ─────────────────────────── */
+:root.dark [role="dialog"],
+:root.dark .modal-content,
+:root.dark [data-slot="dialog-content"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+/* Radix Dialog overlay */
+:root.dark [data-radix-dialog-overlay] {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Sheet (used for mobile sidebar) */
+:root.dark [data-radix-sheet-content] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+
+/* ── 10. Dropdown / Select Menu ──────────────────────────── */
+:root.dark [role="listbox"],
+:root.dark [role="menu"],
+:root.dark [data-radix-dropdown-menu-content],
+:root.dark [data-slot="dropdown-menu-content"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+  color: #e2e8f0 !important;
+}
+
+:root.dark [role="option"]:hover,
+:root.dark [role="menuitem"]:hover,
+:root.dark [data-highlighted] {
+  background-color: #334155 !important;
+}
+
+/* ── 11. Tabs Overrides ──────────────────────────────────── */
+:root.dark [data-slot="tabs-list"],
+:root.dark [role="tablist"] {
+  background-color: #0f172a !important;
+  border-color: #334155 !important;
+}
+
+:root.dark [data-slot="tabs-trigger"]:not([data-state="active"]),
+:root.dark [role="tab"]:not([aria-selected="true"]) {
+  color: #64748b !important;
+}
+
+:root.dark [data-slot="tabs-trigger"][data-state="active"],
+:root.dark [role="tab"][aria-selected="true"] {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* ── 12. Badge Overrides ─────────────────────────────────── */
+:root.dark .bg-blue-100\/50 {
+  background-color: rgba(30, 58, 138, 0.5) !important;
+}
+
+/* ── 13. Scrollbars ──────────────────────────────────────── */
+:root.dark ::-webkit-scrollbar-track {
+  background: #1e293b;
+}
+:root.dark ::-webkit-scrollbar-thumb {
+  background-color: #334155;
+}
+:root.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #475569;
+}
+
+/* ── 14. Page Headers (sticky) ───────────────────────────── */
+:root.dark .supports-\[backdrop-filter\]\:bg-white\/80 {
+  background-color: rgba(30, 41, 59, 0.95) !important;
+}
+
+/* ── 15. Specific UI Pattern Overrides ───────────────────── */
+
+/* Stat cards / summary blocks — gradient colors stay vibrant, no override needed */
+
+/* Status badge pill backgrounds */
+:root.dark .bg-green-100  { background-color: rgba(6, 78, 59, 0.4) !important; }
+:root.dark .bg-red-100    { background-color: rgba(127, 29, 29, 0.4) !important; }
+:root.dark .bg-yellow-100 { background-color: rgba(113, 63, 18, 0.4) !important; }
+:root.dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.4) !important; }
+:root.dark .bg-purple-100 { background-color: rgba(88, 28, 135, 0.4) !important; }
+:root.dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.4) !important; }
+:root.dark .bg-pink-100   { background-color: rgba(131, 24, 67, 0.4) !important; }
+:root.dark .bg-teal-100   { background-color: rgba(19, 78, 74, 0.4) !important; }
+:root.dark .bg-cyan-100   { background-color: rgba(22, 78, 99, 0.4) !important; }
+
+/* Dividers / separators */
+:root.dark [data-slot="separator"],
+:root.dark hr { border-color: #334155 !important; }
+
+/* Tooltip content */
+:root.dark [data-slot="tooltip-content"] {
+  background-color: #334155 !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Progress bar background */
+:root.dark .bg-gray-200.rounded-full,
+:root.dark .bg-slate-200.rounded-full { background-color: #334155 !important; }
+
+/* Loading spinner base */
+:root.dark .bg-slate-50.overflow-hidden {
+  background-color: #0f172a !important;
+}
+
+/* Sheet content (mobile nav drawer) */
+:root.dark [data-sheet-content="true"] {
+  background-color: #1e293b !important;
+}
+
+/* ── 16. Print — keep white ──────────────────────────────── */
+@media print {
+  :root.dark body,
+  :root.dark .bg-white { background-color: #ffffff !important; color: #000 !important; }
+}
