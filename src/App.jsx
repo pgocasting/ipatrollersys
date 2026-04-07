@@ -235,16 +235,28 @@ function AppContent() {
             toast.success(`User Connected`, {
               description: `User ${name} has logged into the system.`,
               duration: 5000,
+              action: {
+                label: 'Clear All',
+                onClick: () => toast.dismiss()
+              }
             });
           } else if (pStatus === 'online' && data.status === 'idle') {
             toast.warning(`User Idle Alert`, {
               description: `User ${name} has become idle and is no longer moving.`,
               duration: 5000,
+              action: {
+                label: 'Clear All',
+                onClick: () => toast.dismiss()
+              }
             });
           } else if (pStatus && pStatus !== 'offline' && data.status === 'offline') {
             toast.error(`User Disconnected`, {
               description: `User ${name} has securely logged out of the system.`,
               duration: 5000,
+              action: {
+                label: 'Clear All',
+                onClick: () => toast.dismiss()
+              }
             });
           }
         }
