@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+/* ── Tailwind v4: Use class-based dark mode (.dark on <html>) ── */
+/* Without this, dark: variants default to prefers-color-scheme  */
+@custom-variant dark (&:is(.dark *));
+
 input[data-slot="input"],
 textarea[data-slot="input"],
 select[data-slot="input"] {
