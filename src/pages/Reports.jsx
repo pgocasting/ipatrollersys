@@ -117,6 +117,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [showQuarterlyPreview, setShowQuarterlyPreview] = useState(false);
   const [quarterlyPreviewData, setQuarterlyPreviewData] = useState(null);
 
+  // Top Barangay modal state
+  const [showTopBarangay, setShowTopBarangay] = useState(false);
+  const [isLoadingTopBarangay, setIsLoadingTopBarangay] = useState(false);
+  const [topBarangayData, setTopBarangayData] = useState(null);
+  const [topBarangayTab, setTopBarangayTab] = useState('all');
+  const [topBarangayMonth, setTopBarangayMonth] = useState('all'); // 'all' or 0-11
+  const [topBarangayYear, setTopBarangayYear] = useState(new Date().getFullYear());
+
   // Municipalities by district mapping (matching I-Patroller structure)
   const municipalitiesByDistrict = {
     "1ST DISTRICT": ["Abucay", "Orani", "Samal", "Hermosa"],
@@ -1251,6 +1259,131 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const months = MONTH_NAMES;
 
   const districts = ["all", "1ST DISTRICT", "2ND DISTRICT", "3RD DISTRICT"];
+
+  // Shared Top Barangay loader — reads current filter state via args so it's never stale
+  const loadTopBarangayReport = useCallback(async (monthFilter, yearFilter) => {
+    setIsLoadingTopBarangay(true);
+    try {
+      const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
+      const allQueries = [];
+      const queryMap = [];
+      const monthsToQuery = monthFilter === 'all'
+        ? Array.from({ length: 12 }, (_, i) => i)
+        : [parseInt(monthFilter)];
+      for (const municipality of allMunicipalities) {
+        for (const monthIndex of monthsToQuery) {
+          const monthName = MONTH_NAMES[monthIndex];
+          const monthYear = `${monthName}_${yearFilter}`;
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+          allQueries.push(getDoc(docRef));
+          queryMap.push({ municipality, monthName });
+        }
+      }
+      const [queryResults, barangaysResult] = await Promise.all([
+        Promise.allSettled(allQueries),
+        getBarangays()
+      ]);
+      const normalizeMunicipality = (mun) => {
+        const s = (mun || '').trim();
+        const lower = s.toLowerCase();
+        if (lower === 'balanga' || lower === 'balanga city') return 'Balanga City';
+        if (lower === 'dinalupihan') return 'Dinalupihan';
+        if (lower === 'limay') return 'Limay';
+        if (lower === 'orion') return 'Orion';
+        if (lower === 'orani') return 'Orani';
+        if (lower === 'abucay') return 'Abucay';
+        if (lower === 'pilar') return 'Pilar';
+        if (lower === 'hermosa') return 'Hermosa';
+        if (lower === 'samal') return 'Samal';
+        if (lower === 'bagac') return 'Bagac';
+        if (lower === 'morong') return 'Morong';
+        if (lower === 'mariveles') return 'Mariveles';
+        return s;
+      };
+      const barangayTotals = {};
+      const rawRegistered = barangaysResult.success ? barangaysResult.data : [];
+      const seenRegistered = new Set();
+      const allRegistered = [];
+      rawRegistered.forEach(b => {
+        const canonMun = normalizeMunicipality(b.municipality);
+        const dedupeKey = `${b.name.trim().toLowerCase()}|||${canonMun.toLowerCase()}`;
+        if (!seenRegistered.has(dedupeKey)) {
+          seenRegistered.add(dedupeKey);
+          allRegistered.push({ ...b, municipality: canonMun });
+        }
+      });
+      const canonicalLookup = {};
+      allRegistered.forEach(b => {
+        const key = `${b.name}|||${b.municipality}`;
+        barangayTotals[key] = { name: b.name, municipality: b.municipality, total: 0, registered: true, actionTakenCount: 0 };
+        if (!canonicalLookup[b.municipality]) canonicalLookup[b.municipality] = {};
+        canonicalLookup[b.municipality][b.name.toLowerCase()] = key;
+      });
+      const parseBarangayName = (raw) => {
+        const s = (raw || '').trim();
+        if (!s) return '';
+        const commaIdx = s.indexOf(',');
+        return commaIdx > 0 ? s.substring(0, commaIdx).trim() : s;
+      };
+      queryResults.forEach((result, index) => {
+        if (result.status === 'fulfilled' && result.value.exists()) {
+          const canonMun = normalizeMunicipality(queryMap[index].municipality);
+          const weeklyData = result.value.data().weeklyReportData || {};
+          Object.values(weeklyData).forEach(dateEntries => {
+            if (!Array.isArray(dateEntries)) return;
+            dateEntries.forEach(entry => {
+              const rawBarangay = (entry.barangay || '').trim();
+              if (!rawBarangay) return;
+              const bname = parseBarangayName(rawBarangay);
+              
+              // Sum up the activity quantities for this entry across week1-week4
+              let activityCount = 0;
+              ['week1', 'week2', 'week3', 'week4'].forEach(w => {
+                const val = parseInt(entry[w], 10);
+                if (!isNaN(val)) activityCount += val;
+              });
+              // Fallback to 1 if user left them blank but there's an entry, or keep it strictly zero if they put zero?
+              // The user said "entries dapat tugma sa command center page na nilalagay nilang counts"
+              // So if counts sum to 0, it contributes 0. Except maybe they didn't input anything yet? 
+              // We will just strictly add the numeric values.
+
+              let hasAfterPhoto = false;
+              if (entry?.photos?.rows && Array.isArray(entry.photos.rows)) {
+                hasAfterPhoto = entry.photos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0);
+              } else if (entry?.photos?.after) {
+                const afterData = entry.photos.after;
+                hasAfterPhoto = Array.isArray(afterData) ? afterData.length > 0 : !!afterData;
+              }
+              const actionCount = hasAfterPhoto ? 1 : 0;
+
+              const munMap = canonicalLookup[canonMun] || {};
+              const canonicalKey = munMap[bname.toLowerCase()];
+              if (canonicalKey) {
+                barangayTotals[canonicalKey].total += activityCount;
+                barangayTotals[canonicalKey].actionTakenCount += actionCount;
+              } else {
+                const fallbackKey = `${bname}|||${canonMun}`;
+                if (!barangayTotals[fallbackKey]) {
+                  barangayTotals[fallbackKey] = { name: bname, municipality: canonMun, total: 0, actionTakenCount: 0 };
+                }
+                barangayTotals[fallbackKey].total += activityCount;
+                barangayTotals[fallbackKey].actionTakenCount += actionCount;
+              }
+            });
+          });
+        }
+      });
+      const ranked = Object.values(barangayTotals).sort((a, b) => b.actionTakenCount - a.actionTakenCount || b.total - a.total);
+      const rankedWithActivity = ranked.filter(b => b.total > 0 || b.actionTakenCount > 0);
+      setTopBarangayData({ ranked, rankedWithActivity, year: yearFilter, month: monthFilter });
+      setShowTopBarangay(true);
+    } catch (err) {
+      console.error('Error loading Top Barangay data:', err);
+      alert('Error loading Top Barangay data.');
+    } finally {
+      setIsLoadingTopBarangay(false);
+    }
+  }, [getBarangays, municipalitiesByDistrict]);
 
   // Paper size configuration
   const getPaperConfig = (size) => {
@@ -4272,6 +4405,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
               action: loadQuarterlyReportData,
               format: "PDF",
               priority: "high"
+            },
+            {
+              name: "Top Barangay",
+              action: async () => {
+                await loadTopBarangayReport(topBarangayMonth, topBarangayYear);
+              },
+              format: "Modal",
+              priority: "high"
             }
           ],
           formats: ["PDF", "Modal"],
@@ -4376,8 +4517,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
           {/* Quick Stats - Hidden as requested */}
 
-        {/* Quick Stats - Hidden as requested */}
-        {/* 
+          {/* Quick Stats - Hidden as requested */}
+          {/* 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           <Card className="bg-white shadow-sm border border-gray-200 h-36">
             <CardContent className="p-4">
@@ -4462,284 +4603,286 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         </div>
         */}
 
-        {/* Month and Year Filters */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardHeader className="pb-4 border-b border-gray-100">
-            <CardTitle className="text-lg font-semibold text-black flex items-center gap-2">
-              <Filter className="w-5 h-5" />
-              Report Filters
-            </CardTitle>
-            <p className="text-gray-700 font-medium">Select month and year for report generation</p>
-          </CardHeader>
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* From Date Section */}
-              <div className="space-y-4">
-                <Label className="text-sm font-semibold text-gray-900 block">From</Label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <Label htmlFor="from-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
-                      Month
-                    </Label>
-                    <Select
-                      value={fromMonth.toString()}
-                      onValueChange={(value) => setFromMonth(parseInt(value))}
-                    >
-                      <SelectTrigger id="from-month-filter" className="w-full bg-white border border-gray-300 !text-black">
-                        <span>{months[fromMonth]}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {months.map((month, index) => (
-                          <SelectItem key={index} value={index.toString()}>
-                            {month}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex-1">
-                    <Label htmlFor="from-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
-                      Year
-                    </Label>
-                    <Select
-                      value={fromYear.toString()}
-                      onValueChange={(value) => setFromYear(parseInt(value))}
-                    >
-                      <SelectTrigger id="from-year-filter" className="w-full bg-white border border-gray-300 !text-black">
-                        <span>{fromYear}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-
-              {/* To Date Section */}
-              <div className="space-y-4">
-                <Label className="text-sm font-semibold text-gray-900 block">To</Label>
-                <div className="flex gap-3">
-                  <div className="flex-1">
-                    <Label htmlFor="to-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
-                      Month
-                    </Label>
-                    <Select
-                      value={toMonth.toString()}
-                      onValueChange={(value) => setToMonth(parseInt(value))}
-                    >
-                      <SelectTrigger id="to-month-filter" className="w-full bg-white border border-gray-300 !text-black">
-                        <span>{months[toMonth]}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {months.map((month, index) => (
-                          <SelectItem key={index} value={index.toString()}>
-                            {month}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex-1">
-                    <Label htmlFor="to-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
-                      Year
-                    </Label>
-                    <Select
-                      value={toYear.toString()}
-                      onValueChange={(value) => setToYear(parseInt(value))}
-                    >
-                      <SelectTrigger id="to-year-filter" className="w-full bg-white border border-gray-300 !text-black">
-                        <span>{toYear}</span>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Current Selection Display */}
-            <div className="mt-6 pt-4 border-t border-gray-200">
-              <Label className="text-sm font-semibold text-gray-900 mb-2 block">
-                Current Selection
-              </Label>
-              <div className="bg-gray-50 border border-gray-200 rounded-md px-4 py-3 text-sm text-gray-900">
-                {fromMonth === toMonth && fromYear === toYear ? (
-                  <span className="font-medium">{months[fromMonth]} {fromYear}</span>
-                ) : (
-                  <span className="font-medium">{months[fromMonth]} {fromYear} - {months[toMonth]} {toYear}</span>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Reports Table */}
-        <Card className="bg-white shadow-sm border border-gray-200">
-          <CardHeader className="pb-4 border-b border-gray-100">
-            <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
-            <p className="text-gray-600">Generate individual reports or all reports at once</p>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b-2 border-gray-200 bg-gray-50">
-                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Report Type</TableHead>
-                  <TableHead className="font-bold text-black py-4 px-6 text-center w-2/5">Description</TableHead>
-                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/6">Formats</TableHead>
-                  <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reportSections.map((section) =>
-                  section.reports.map((report, index) => (
-                    <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
-                      <TableCell className="font-semibold py-4 px-6">
-                        <div className="flex items-center justify-start gap-3">
-                          <div className="p-2 bg-black rounded-lg">
-                            {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
-                          </div>
-                          <span className="text-black">{report.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-4 text-gray-700 text-sm">{report.description}</TableCell>
-                      <TableCell className="py-4 px-4 text-center">
-                        <div className="flex flex-wrap gap-2 justify-center">
-                          {report.formats.map((format) => (
-                            <Badge
-                              key={format}
-                              variant="outline"
-                              className={`text-xs px-3 py-1 font-semibold border-2 transition-colors ${getFormatColor(format)}`}
-                            >
-                              {format}
-                            </Badge>
+          {/* Month and Year Filters */}
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <CardTitle className="text-lg font-semibold text-black flex items-center gap-2">
+                <Filter className="w-5 h-5" />
+                Report Filters
+              </CardTitle>
+              <p className="text-gray-700 font-medium">Select month and year for report generation</p>
+            </CardHeader>
+            <CardContent className="p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* From Date Section */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-semibold text-gray-900 block">From</Label>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <Label htmlFor="from-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
+                        Month
+                      </Label>
+                      <Select
+                        value={fromMonth.toString()}
+                        onValueChange={(value) => setFromMonth(parseInt(value))}
+                      >
+                        <SelectTrigger id="from-month-filter" className="w-full bg-white border border-gray-300 !text-black">
+                          <span>{months[fromMonth]}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {months.map((month, index) => (
+                            <SelectItem key={index} value={index.toString()}>
+                              {month}
+                            </SelectItem>
                           ))}
-                        </div>
-                      </TableCell>
-                      <TableCell className="py-4 px-4 text-center">
-                        {report.actions ? (
-                          <div className="flex flex-wrap gap-1 justify-center">
-                            {report.actions.map((actionItem, actionIndex) => (
-                              <Button
-                                key={actionIndex}
-                                onClick={async () => {
-                                  if ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter") {
-                                    // Handle Command Center report generation with its own loading state
-                                    await actionItem.action();
-                                  } else {
-                                    setIsGenerating(true);
-                                    try {
-                                      await actionItem.action();
-                                    } finally {
-                                      setTimeout(() => setIsGenerating(false), 1000);
-                                    }
-                                  }
-                                }}
-                                disabled={isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))}
-                                size="sm"
-                                className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex-1">
+                      <Label htmlFor="from-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
+                        Year
+                      </Label>
+                      <Select
+                        value={fromYear.toString()}
+                        onValueChange={(value) => setFromYear(parseInt(value))}
+                      >
+                        <SelectTrigger id="from-year-filter" className="w-full bg-white border border-gray-300 !text-black">
+                          <span>{fromYear}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* To Date Section */}
+                <div className="space-y-4">
+                  <Label className="text-sm font-semibold text-gray-900 block">To</Label>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <Label htmlFor="to-month-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
+                        Month
+                      </Label>
+                      <Select
+                        value={toMonth.toString()}
+                        onValueChange={(value) => setToMonth(parseInt(value))}
+                      >
+                        <SelectTrigger id="to-month-filter" className="w-full bg-white border border-gray-300 !text-black">
+                          <span>{months[toMonth]}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {months.map((month, index) => (
+                            <SelectItem key={index} value={index.toString()}>
+                              {month}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex-1">
+                      <Label htmlFor="to-year-filter" className="text-sm font-semibold text-gray-900 mb-2 block">
+                        Year
+                      </Label>
+                      <Select
+                        value={toYear.toString()}
+                        onValueChange={(value) => setToYear(parseInt(value))}
+                      >
+                        <SelectTrigger id="to-year-filter" className="w-full bg-white border border-gray-300 !text-black">
+                          <span>{toYear}</span>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() - 5 + i).map((year) => (
+                            <SelectItem key={year} value={year.toString()}>
+                              {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Current Selection Display */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Label className="text-sm font-semibold text-gray-900 mb-2 block">
+                  Current Selection
+                </Label>
+                <div className="bg-gray-50 border border-gray-200 rounded-md px-4 py-3 text-sm text-gray-900">
+                  {fromMonth === toMonth && fromYear === toYear ? (
+                    <span className="font-medium">{months[fromMonth]} {fromYear}</span>
+                  ) : (
+                    <span className="font-medium">{months[fromMonth]} {fromYear} - {months[toMonth]} {toYear}</span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Reports Table */}
+          <Card className="bg-white shadow-sm border border-gray-200">
+            <CardHeader className="pb-4 border-b border-gray-100">
+              <CardTitle className="text-xl font-bold text-black">Available Reports</CardTitle>
+              <p className="text-gray-600">Generate individual reports or all reports at once</p>
+            </CardHeader>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b-2 border-gray-200 bg-gray-50">
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Report Type</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-2/5">Description</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/6">Formats</TableHead>
+                    <TableHead className="font-bold text-black py-4 px-6 text-center w-1/4">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportSections.map((section) =>
+                    section.reports.map((report, index) => (
+                      <TableRow key={`${section.id}-${index}`} className="border-b border-gray-200 hover:bg-gray-50 transition-colors">
+                        <TableCell className="font-semibold py-4 px-6">
+                          <div className="flex items-center justify-start gap-3">
+                            <div className="p-2 bg-black rounded-lg">
+                              {React.cloneElement(section.icon, { className: "w-5 h-5 text-white" })}
+                            </div>
+                            <span className="text-black">{report.name}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-gray-700 text-sm">{report.description}</TableCell>
+                        <TableCell className="py-4 px-4 text-center">
+                          <div className="flex flex-wrap gap-2 justify-center">
+                            {report.formats.map((format) => (
+                              <Badge
+                                key={format}
+                                variant="outline"
+                                className={`text-xs px-3 py-1 font-semibold border-2 transition-colors ${getFormatColor(format)}`}
                               >
-                                {(isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter))) ? (
-                                  <>
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                    <span>{isLoadingCommandCenter ? 'Loading...' : 'Gen...'}</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    {actionItem.name === "Generate Report" ? (
-                                      <FileText className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "Quarterly Report" ? (
-                                      <BarChart3 className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "Daily Summary" ? (
-                                      <Calendar className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "Preview Report" ? (
-                                      <Eye className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "Summary" ? (
-                                      <Activity className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "Generate PDF" ? (
-                                      <Download className="w-3 h-3 mr-1" />
-                                    ) : actionItem.name === "View Summary" ? (
-                                      <BarChart3 className="w-3 h-3 mr-1" />
-                                    ) : (
-                                      <Printer className="w-3 h-3 mr-1" />
-                                    )}
-                                    <span>{actionItem.name}</span>
-                                  </>
-                                )}
-                              </Button>
+                                {format}
+                              </Badge>
                             ))}
                           </div>
-                        ) : (
-                          <Button
-                            onClick={() => {
-                              setIsGenerating(true);
-                              try {
-                                report.action();
-                              } finally {
-                                setTimeout(() => setIsGenerating(false), 1000);
-                              }
-                            }}
-                            disabled={isGenerating}
-                            size="sm"
-                            className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
-                          >
-                            {isGenerating ? (
-                              <>
-                                <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                <span>Gen...</span>
-                              </>
-                            ) : (
-                              <>
-                                <Printer className="w-3 h-3 mr-1" />
-                                <span>Generate Report</span>
-                              </>
-                            )}
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                        </TableCell>
+                        <TableCell className="py-4 px-4 text-center">
+                          {report.actions ? (
+                            <div className="flex flex-wrap gap-1 justify-center">
+                              {report.actions.map((actionItem, actionIndex) => (
+                                <Button
+                                  key={actionIndex}
+                                  onClick={async () => {
+                                    if ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report" || actionItem.name === "Top Barangay") && section.id === "commandcenter") {
+                                      // Handle Command Center report generation with its own loading state
+                                      await actionItem.action();
+                                    } else {
+                                      setIsGenerating(true);
+                                      try {
+                                        await actionItem.action();
+                                      } finally {
+                                        setTimeout(() => setIsGenerating(false), 1000);
+                                      }
+                                    }
+                                  }}
+                                  disabled={isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter)) || (actionItem.name === "Top Barangay" && section.id === "commandcenter" && isLoadingTopBarangay)}
+                                  size="sm"
+                                  className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
+                                >
+                                  {(isGenerating || ((actionItem.name === "Generate Report" || actionItem.name === "Quarterly Report") && section.id === "commandcenter" && (isGeneratingCommandCenterReport || isLoadingCommandCenter)) || (actionItem.name === "Top Barangay" && section.id === "commandcenter" && isLoadingTopBarangay)) ? (
+                                    <>
+                                      <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                      <span>{isLoadingCommandCenter ? 'Loading...' : 'Gen...'}</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      {actionItem.name === "Generate Report" ? (
+                                        <FileText className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Quarterly Report" ? (
+                                        <BarChart3 className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Top Barangay" ? (
+                                        <MapPin className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Daily Summary" ? (
+                                        <Calendar className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Preview Report" ? (
+                                        <Eye className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Summary" ? (
+                                        <Activity className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "Generate PDF" ? (
+                                        <Download className="w-3 h-3 mr-1" />
+                                      ) : actionItem.name === "View Summary" ? (
+                                        <BarChart3 className="w-3 h-3 mr-1" />
+                                      ) : (
+                                        <Printer className="w-3 h-3 mr-1" />
+                                      )}
+                                      <span>{actionItem.name}</span>
+                                    </>
+                                  )}
+                                </Button>
+                              ))}
+                            </div>
+                          ) : (
+                            <Button
+                              onClick={() => {
+                                setIsGenerating(true);
+                                try {
+                                  report.action();
+                                } finally {
+                                  setTimeout(() => setIsGenerating(false), 1000);
+                                }
+                              }}
+                              disabled={isGenerating}
+                              size="sm"
+                              className="bg-black hover:bg-gray-800 text-white border border-black hover:border-gray-800 transition-all duration-200 px-3 py-2 text-xs font-medium w-[140px] h-8"
+                            >
+                              {isGenerating ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
+                                  <span>Gen...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Printer className="w-3 h-3 mr-1" />
+                                  <span>Generate Report</span>
+                                </>
+                              )}
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
 
-      </div>
+        </div>
 
-      {/* Summary Modal */}
-      {showSummaryModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
-                  <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
+        {/* Summary Modal */}
+        {showSummaryModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg transition-all duration-300 bg-blue-100 border border-blue-200">
+                    <BarChart3 className="w-6 h-6 transition-colors duration-300 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
+                      Summary
+                    </h3>
+                    <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-2xl font-bold transition-colors duration-300 text-gray-900">
-                    Summary
-                  </h3>
-                  <p className="text-sm transition-colors duration-300 text-gray-600">Comprehensive analysis of incident data</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const insights = generateSummaryInsights();
-                    alert(`Detection Test Results:
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const insights = generateSummaryInsights();
+                      alert(`Detection Test Results:
 Total Incidents: ${insights.totalIncidents}
 Active: ${insights.completedIncidents}
 Completed: ${insights.completedIncidents}
@@ -4748,1424 +4891,1663 @@ Completion Rate: ${insights.completionRate}%
 Top District: ${insights.mostActiveDistrict}
 Top Municipality: ${insights.topMunicipalities[0]?.municipality || 'N/A'}
 Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
-                  }}
-                  className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
-                  title="Test Detection"
-                >
-                  <Zap className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={exportSummaryToPDF}
-                  className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
-                  title="Generate PDF"
-                >
-                  <Download className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => setShowSummaryModal(false)}
-                  className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
-                >
-                  <X className="h-6 w-6" />
-                </button>
+                    }}
+                    className="p-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors duration-200"
+                    title="Test Detection"
+                  >
+                    <Zap className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={exportSummaryToPDF}
+                    className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors duration-200"
+                    title="Generate PDF"
+                  >
+                    <Download className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => setShowSummaryModal(false)}
+                    className="p-2 rounded-lg transition-all duration-300 hover:bg-gray-100 text-gray-500 hover:text-gray-700"
+                  >
+                    <X className="h-6 w-6" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="p-6 overflow-y-auto max-h-[75vh]">
-              {(() => {
-                const filteredIncidents = incidents.filter(incident => {
-                  // Filter by status if not "all"
-                  if (filterStatus !== "all" && incident.status !== filterStatus) {
-                    return false;
-                  }
-                  // Filter by month if not "all"
-                  if (selectedMonth !== "all") {
-                    const incidentMonth = new Date(incident.date).getMonth();
-                    if (incidentMonth !== selectedMonth) {
+              <div className="p-6 overflow-y-auto max-h-[75vh]">
+                {(() => {
+                  const filteredIncidents = incidents.filter(incident => {
+                    // Filter by status if not "all"
+                    if (filterStatus !== "all" && incident.status !== filterStatus) {
                       return false;
                     }
-                  }
-                  // Filter by search term
-                  if (searchTerm) {
-                    const searchLower = searchTerm.toLowerCase();
-                    return (
-                      incident.description?.toLowerCase().includes(searchLower) ||
-                      incident.location?.toLowerCase().includes(searchLower) ||
-                      incident.incidentType?.toLowerCase().includes(searchLower) ||
-                      incident.municipality?.toLowerCase().includes(searchLower)
-                    );
-                  }
-                  return true;
-                });
+                    // Filter by month if not "all"
+                    if (selectedMonth !== "all") {
+                      const incidentMonth = new Date(incident.date).getMonth();
+                      if (incidentMonth !== selectedMonth) {
+                        return false;
+                      }
+                    }
+                    // Filter by search term
+                    if (searchTerm) {
+                      const searchLower = searchTerm.toLowerCase();
+                      return (
+                        incident.description?.toLowerCase().includes(searchLower) ||
+                        incident.location?.toLowerCase().includes(searchLower) ||
+                        incident.incidentType?.toLowerCase().includes(searchLower) ||
+                        incident.municipality?.toLowerCase().includes(searchLower)
+                      );
+                    }
+                    return true;
+                  });
 
-                const insights = generateSummaryInsights(filteredIncidents);
-                return (
-                  <div className="space-y-6">
-                    {/* Summary Statistics Header */}
-                    <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="text-2xl font-bold">Incidents Summary Report</h3>
-                          <p className="text-blue-100 mt-1">
-                            {selectedMonth !== "all" ? `${months[selectedMonth]} ${selectedYear}` : `Full Year ${selectedYear}`} Analysis
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-3xl font-bold">{insights.totalIncidents}</div>
-                          <div className="text-blue-100 text-sm">Total Incidents</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Main Overview Cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="bg-white rounded-lg border border-red-200 p-4 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2 bg-red-100 rounded-lg">
-                            <Shield className="w-5 h-5 text-red-600" />
+                  const insights = generateSummaryInsights(filteredIncidents);
+                  return (
+                    <div className="space-y-6">
+                      {/* Summary Statistics Header */}
+                      <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-2xl font-bold">Incidents Summary Report</h3>
+                            <p className="text-blue-100 mt-1">
+                              {selectedMonth !== "all" ? `${months[selectedMonth]} ${selectedYear}` : `Full Year ${selectedYear}`} Analysis
+                            </p>
                           </div>
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</div>
-                            <div className="text-xs text-gray-500">
-                              {insights.totalIncidents > 0 ? Math.round((insights.drugsIncidents / insights.totalIncidents) * 100) : 0}%
-                            </div>
+                            <div className="text-3xl font-bold">{insights.totalIncidents}</div>
+                            <div className="text-blue-100 text-sm">Total Incidents</div>
                           </div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">Drug-Related</div>
-                        <div className="text-xs text-gray-600">Illegal drugs, substances</div>
                       </div>
 
-                      <div className="bg-white rounded-lg border border-orange-200 p-4 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2 bg-orange-100 rounded-lg">
-                            <Car className="w-5 h-5 text-orange-600" />
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</div>
-                            <div className="text-xs text-gray-500">
-                              {insights.totalIncidents > 0 ? Math.round((insights.accidentsIncidents / insights.totalIncidents) * 100) : 0}%
+                      {/* Main Overview Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="bg-white rounded-lg border border-red-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-red-100 rounded-lg">
+                              <Shield className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-red-600">{insights.drugsIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.drugsIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
                             </div>
                           </div>
+                          <div className="text-sm font-medium text-gray-900">Drug-Related</div>
+                          <div className="text-xs text-gray-600">Illegal drugs, substances</div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">Accidents</div>
-                        <div className="text-xs text-gray-600">Traffic: {insights.trafficAccidents} | Work: {insights.workAccidents} | Other: {insights.otherAccidents}</div>
-                      </div>
 
-                      <div className="bg-white rounded-lg border border-green-200 p-4 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2 bg-green-100 rounded-lg">
-                            <CheckCircle className="w-5 h-5 text-green-600" />
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-green-600">{insights.actionTakenIncidents}</div>
-                            <div className="text-xs text-gray-500">
-                              {insights.totalIncidents > 0 ? Math.round((insights.actionTakenIncidents / insights.totalIncidents) * 100) : 0}%
+                        <div className="bg-white rounded-lg border border-orange-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-orange-100 rounded-lg">
+                              <Car className="w-5 h-5 text-orange-600" />
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-orange-600">{insights.accidentsIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.accidentsIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
                             </div>
                           </div>
+                          <div className="text-sm font-medium text-gray-900">Accidents</div>
+                          <div className="text-xs text-gray-600">Traffic: {insights.trafficAccidents} | Work: {insights.workAccidents} | Other: {insights.otherAccidents}</div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">Action Taken</div>
-                        <div className="text-xs text-gray-600">Resolved, arrested, filed</div>
-                      </div>
 
-                      <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow">
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="p-2 bg-gray-100 rounded-lg">
-                            <MoreHorizontal className="w-5 h-5 text-gray-600" />
-                          </div>
-                          <div className="text-right">
-                            <div className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</div>
-                            <div className="text-xs text-gray-500">
-                              {insights.totalIncidents > 0 ? Math.round((insights.othersIncidents / insights.totalIncidents) * 100) : 0}%
+                        <div className="bg-white rounded-lg border border-green-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-green-100 rounded-lg">
+                              <CheckCircle className="w-5 h-5 text-green-600" />
+                            </div>
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-green-600">{insights.actionTakenIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.actionTakenIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
                             </div>
                           </div>
+                          <div className="text-sm font-medium text-gray-900">Action Taken</div>
+                          <div className="text-xs text-gray-600">Resolved, arrested, filed</div>
                         </div>
-                        <div className="text-sm font-medium text-gray-900">Other Types</div>
-                        <div className="text-xs text-gray-600">Theft, assault, etc.</div>
-                      </div>
-                    </div>
 
-                    {/* Status Overview */}
-                    <div className="bg-white rounded-xl border border-gray-200 p-6">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                        <Activity className="w-5 h-5 text-blue-600" />
-                        Status Overview
-                      </h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div className="text-center p-4 bg-blue-50 rounded-lg">
-                          <div className="text-2xl font-bold text-blue-600">{insights.completedIncidents}</div>
-                          <div className="text-sm text-gray-600">Completed/Resolved</div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            {insights.totalIncidents > 0 ? Math.round((insights.completedIncidents / insights.totalIncidents) * 100) : 0}% completion rate
-                          </div>
-                        </div>
-                        <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                          <div className="text-2xl font-bold text-yellow-600">{insights.underInvestigation}</div>
-                          <div className="text-sm text-gray-600">Under Investigation</div>
-                          <div className="text-xs text-gray-500 mt-1">Ongoing cases</div>
-                        </div>
-                        <div className="text-center p-4 bg-gray-50 rounded-lg">
-                          <div className="text-2xl font-bold text-gray-600">
-                            {insights.totalIncidents - insights.completedIncidents - insights.underInvestigation}
-                          </div>
-                          <div className="text-sm text-gray-600">Other Status</div>
-                          <div className="text-xs text-gray-500 mt-1">Pending, new, etc.</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Three Districts Analysis */}
-                    <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
-                      <div className="flex items-center gap-3 mb-6">
-                        <div className="p-2 rounded-lg bg-green-100">
-                          <MapPin className="w-6 h-6 text-green-600" />
-                        </div>
-                        <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        {/* 1ST DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-3 h-3 rounded-full bg-blue-600"></div>
-                            <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-blue-600">{insights.threeDistricts['1ST DISTRICT'].count}</p>
-                              <p className="text-sm text-gray-600">Total Incidents</p>
+                        <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-lg transition-shadow">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="p-2 bg-gray-100 rounded-lg">
+                              <MoreHorizontal className="w-5 h-5 text-gray-600" />
                             </div>
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {insights.threeDistricts['1ST DISTRICT'].municipalities.map(municipality => (
-                                  <span key={municipality} className="px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded-full">
-                                    {municipality}
-                                  </span>
-                                ))}
+                            <div className="text-right">
+                              <div className="text-2xl font-bold text-gray-600">{insights.othersIncidents}</div>
+                              <div className="text-xs text-gray-500">
+                                {insights.totalIncidents > 0 ? Math.round((insights.othersIncidents / insights.totalIncidents) * 100) : 0}%
+                              </div>
+                            </div>
+                          </div>
+                          <div className="text-sm font-medium text-gray-900">Other Types</div>
+                          <div className="text-xs text-gray-600">Theft, assault, etc.</div>
+                        </div>
+                      </div>
+
+                      {/* Status Overview */}
+                      <div className="bg-white rounded-xl border border-gray-200 p-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                          <Activity className="w-5 h-5 text-blue-600" />
+                          Status Overview
+                        </h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="text-center p-4 bg-blue-50 rounded-lg">
+                            <div className="text-2xl font-bold text-blue-600">{insights.completedIncidents}</div>
+                            <div className="text-sm text-gray-600">Completed/Resolved</div>
+                            <div className="text-xs text-gray-500 mt-1">
+                              {insights.totalIncidents > 0 ? Math.round((insights.completedIncidents / insights.totalIncidents) * 100) : 0}% completion rate
+                            </div>
+                          </div>
+                          <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                            <div className="text-2xl font-bold text-yellow-600">{insights.underInvestigation}</div>
+                            <div className="text-sm text-gray-600">Under Investigation</div>
+                            <div className="text-xs text-gray-500 mt-1">Ongoing cases</div>
+                          </div>
+                          <div className="text-center p-4 bg-gray-50 rounded-lg">
+                            <div className="text-2xl font-bold text-gray-600">
+                              {insights.totalIncidents - insights.completedIncidents - insights.underInvestigation}
+                            </div>
+                            <div className="text-sm text-gray-600">Other Status</div>
+                            <div className="text-xs text-gray-500 mt-1">Pending, new, etc.</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Three Districts Analysis */}
+                      <div className="p-6 rounded-xl border-2 bg-green-50 border-green-200">
+                        <div className="flex items-center gap-3 mb-6">
+                          <div className="p-2 rounded-lg bg-green-100">
+                            <MapPin className="w-6 h-6 text-green-600" />
+                          </div>
+                          <h3 className="text-xl font-bold text-gray-900">🗺️ Three Districts Analysis</h3>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          {/* 1ST DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-blue-100 border-blue-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-blue-600"></div>
+                              <h4 className="font-bold text-gray-900">1ST DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-blue-600">{insights.threeDistricts['1ST DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['1ST DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-blue-200 text-blue-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 2ND DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-green-600"></div>
+                              <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-green-600">{insights.threeDistricts['2ND DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['2ND DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* 3RD DISTRICT */}
+                          <div className="p-4 rounded-lg border-2 bg-red-100 border-red-200">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-3 h-3 rounded-full bg-red-600"></div>
+                              <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
+                            </div>
+                            <div className="space-y-3">
+                              <div className="text-center">
+                                <p className="text-3xl font-bold text-red-600">{insights.threeDistricts['3RD DISTRICT'].count}</p>
+                                <p className="text-sm text-gray-600">Total Incidents</p>
+                              </div>
+                              <div className="space-y-2">
+                                <p className="text-sm font-medium text-gray-700">Municipalities:</p>
+                                <div className="flex flex-wrap gap-1">
+                                  {insights.threeDistricts['3RD DISTRICT'].municipalities.map(municipality => (
+                                    <span key={municipality} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full">
+                                      {municipality}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-
-                        {/* 2ND DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 bg-green-100 border-green-200">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                            <h4 className="font-bold text-gray-900">2ND DISTRICT</h4>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-green-600">{insights.threeDistricts['2ND DISTRICT'].count}</p>
-                              <p className="text-sm text-gray-600">Total Incidents</p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {insights.threeDistricts['2ND DISTRICT'].municipalities.map(municipality => (
-                                  <span key={municipality} className="px-2 py-1 bg-green-200 text-green-800 text-xs rounded-full">
-                                    {municipality}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* 3RD DISTRICT */}
-                        <div className="p-4 rounded-lg border-2 bg-red-100 border-red-200">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="w-3 h-3 rounded-full bg-red-600"></div>
-                            <h4 className="font-bold text-gray-900">3RD DISTRICT</h4>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="text-center">
-                              <p className="text-3xl font-bold text-red-600">{insights.threeDistricts['3RD DISTRICT'].count}</p>
-                              <p className="text-sm text-gray-600">Total Incidents</p>
-                            </div>
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium text-gray-700">Municipalities:</p>
-                              <div className="flex flex-wrap gap-1">
-                                {insights.threeDistricts['3RD DISTRICT'].municipalities.map(municipality => (
-                                  <span key={municipality} className="px-2 py-1 bg-red-200 text-red-800 text-xs rounded-full">
-                                    {municipality}
-                                  </span>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
-              <button
-                onClick={() => setShowSummaryModal(false)}
-                className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {showActionCenterGenerateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
-                <p className="text-sm text-gray-500">
-                  {months[actionCenterFromMonth]} – {months[actionCenterToMonth]} {actionCenterReportYear}
-                </p>
+                  );
+                })()}
               </div>
-              <button
-                onClick={() => setShowActionCenterGenerateModal(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                disabled={isGeneratingActionCenterRangeReport}
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            {/* Year + Month selectors */}
-            <div className="px-6 pt-4 pb-2 grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
-                <select
-                  value={actionCenterReportYear}
-                  onChange={e => setActionCenterReportYear(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  disabled={isGeneratingActionCenterRangeReport}
-                >
-                  {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">From Month</label>
-                <select
-                  value={actionCenterFromMonth}
-                  onChange={e => setActionCenterFromMonth(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  disabled={isGeneratingActionCenterRangeReport}
-                >
-                  {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">To Month</label>
-                <select
-                  value={actionCenterToMonth}
-                  onChange={e => setActionCenterToMonth(Number(e.target.value))}
-                  className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                  disabled={isGeneratingActionCenterRangeReport}
-                >
-                  {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
-                </select>
-              </div>
-            </div>
-
-            <div className="px-6 pb-6 pt-2 space-y-3">
-              <Button
-                onClick={async () => {
-                  await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
-                  setShowActionCenterGenerateModal(false);
-                }}
-                disabled={isGeneratingActionCenterRangeReport}
-                className="w-full bg-green-600 hover:bg-green-700 text-white"
-              >
-                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'AGRICULTURE'}
-              </Button>
-              <Button
-                onClick={async () => {
-                  await generateActionCenterReportJanFebByDepartment('PG-ENRO');
-                  setShowActionCenterGenerateModal(false);
-                }}
-                disabled={isGeneratingActionCenterRangeReport}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PG-ENRO'}
-              </Button>
-              <Button
-                onClick={async () => {
-                  await generateActionCenterReportJanFebByDepartment('PNP');
-                  setShowActionCenterGenerateModal(false);
-                }}
-                disabled={isGeneratingActionCenterRangeReport}
-                className="w-full bg-red-600 hover:bg-red-700 text-white"
-              >
-                {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PNP'}
-              </Button>
-
-              <div className="pt-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowActionCenterGenerateModal(false)}
-                  disabled={isGeneratingActionCenterRangeReport}
-                  className="w-full"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Command Center Summary Modal */}
-      {showCommandCenterSummary && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-gray-200">
-            <div className="flex items-center justify-between p-8 border-b border-gray-100">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-sm"></div>
-                  <div className="relative p-3 bg-emerald-50 rounded-xl border border-emerald-200">
-                    <Command className="w-6 h-6 text-emerald-600" />
-                  </div>
-                </div>
-                <div>
-                  <h3 className="text-3xl font-semibold tracking-tight text-gray-900">
-                    {summaryViewType === "quarterly" ? "Quarterly Report" : "Weekly Report"}
-                  </h3>
-                  <p className="text-gray-500 mt-1">Command Center operational insights</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                {/* View Type Toggle */}
-                <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-200">
-                  <button
-                    onClick={() => setSummaryViewType("monthly")}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "monthly"
-                      ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
-                  >
-                    Monthly
-                  </button>
-                  <button
-                    onClick={() => setSummaryViewType("quarterly")}
-                    className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "quarterly"
-                      ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                      }`}
-                  >
-                    Quarterly
-                  </button>
-                </div>
+              <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
                 <button
-                  onClick={() => setShowCommandCenterSummary(false)}
-                  className="p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-gray-200"
+                  onClick={() => setShowSummaryModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 rounded-md transition-colors duration-200"
                 >
-                  <X className="h-5 w-5" />
+                  Close
                 </button>
               </div>
             </div>
-            <div className="p-8 overflow-y-auto max-h-[75vh] bg-gray-50/30">
-              {(() => {
-                const summary = summaryViewType === "quarterly"
-                  ? calculateQuarterlySummary()
-                  : calculateWeeklyReportSummary();
-                return (
-                  <div className="space-y-10">
-                    {/* Overview Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-blue-600/80 mb-2">Total Entries</p>
-                              <p className="text-3xl font-bold text-blue-900">{summary.totalEntries}</p>
+          </div>
+        )}
+
+        {showActionCenterGenerateModal && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Generate Action Center Report</h3>
+                  <p className="text-sm text-gray-500">
+                    {months[actionCenterFromMonth]} – {months[actionCenterToMonth]} {actionCenterReportYear}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowActionCenterGenerateModal(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  disabled={isGeneratingActionCenterRangeReport}
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Year + Month selectors */}
+              <div className="px-6 pt-4 pb-2 grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Year</label>
+                  <select
+                    value={actionCenterReportYear}
+                    onChange={e => setActionCenterReportYear(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={isGeneratingActionCenterRangeReport}
+                  >
+                    {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">From Month</label>
+                  <select
+                    value={actionCenterFromMonth}
+                    onChange={e => setActionCenterFromMonth(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={isGeneratingActionCenterRangeReport}
+                  >
+                    {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">To Month</label>
+                  <select
+                    value={actionCenterToMonth}
+                    onChange={e => setActionCenterToMonth(Number(e.target.value))}
+                    className="w-full border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                    disabled={isGeneratingActionCenterRangeReport}
+                  >
+                    {months.map((m, i) => <option key={i} value={i}>{m.slice(0, 3)}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="px-6 pb-6 pt-2 space-y-3">
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('AGRICULTURE');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'AGRICULTURE'}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('PG-ENRO');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PG-ENRO'}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    await generateActionCenterReportJanFebByDepartment('PNP');
+                    setShowActionCenterGenerateModal(false);
+                  }}
+                  disabled={isGeneratingActionCenterRangeReport}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {isGeneratingActionCenterRangeReport ? 'Generating...' : 'PNP'}
+                </Button>
+
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowActionCenterGenerateModal(false)}
+                    disabled={isGeneratingActionCenterRangeReport}
+                    className="w-full"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Command Center Summary Modal */}
+        {showCommandCenterSummary && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-gray-200">
+              <div className="flex items-center justify-between p-8 border-b border-gray-100">
+                <div className="flex items-center gap-4">
+                  <div className="relative">
+                    <div className="absolute inset-0 bg-emerald-500/20 rounded-xl blur-sm"></div>
+                    <div className="relative p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <Command className="w-6 h-6 text-emerald-600" />
+                    </div>
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-semibold tracking-tight text-gray-900">
+                      {summaryViewType === "quarterly" ? "Quarterly Report" : "Weekly Report"}
+                    </h3>
+                    <p className="text-gray-500 mt-1">Command Center operational insights</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  {/* View Type Toggle */}
+                  <div className="flex bg-gray-50 rounded-xl p-1 border border-gray-200">
+                    <button
+                      onClick={() => setSummaryViewType("monthly")}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "monthly"
+                        ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      Monthly
+                    </button>
+                    <button
+                      onClick={() => setSummaryViewType("quarterly")}
+                      className={`px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${summaryViewType === "quarterly"
+                        ? "bg-white text-emerald-600 shadow-sm border border-gray-200"
+                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        }`}
+                    >
+                      Quarterly
+                    </button>
+                  </div>
+                  <button
+                    onClick={() => setShowCommandCenterSummary(false)}
+                    className="p-2 rounded-xl transition-all duration-200 hover:bg-gray-100 text-gray-400 hover:text-gray-600 border border-gray-200"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              </div>
+              <div className="p-8 overflow-y-auto max-h-[75vh] bg-gray-50/30">
+                {(() => {
+                  const summary = summaryViewType === "quarterly"
+                    ? calculateQuarterlySummary()
+                    : calculateWeeklyReportSummary();
+                  return (
+                    <div className="space-y-10">
+                      {/* Overview Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-blue-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-blue-600/80 mb-2">Total Entries</p>
+                                <p className="text-3xl font-bold text-blue-900">{summary.totalEntries}</p>
+                              </div>
+                              <div className="p-3 bg-blue-100 rounded-xl">
+                                <FileText className="h-6 w-6 text-blue-600" />
+                              </div>
                             </div>
-                            <div className="p-3 bg-blue-100 rounded-xl">
-                              <FileText className="h-6 w-6 text-blue-600" />
+                          </div>
+                        </div>
+
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-emerald-600/80 mb-2">Total Weekly Sum</p>
+                                <p className="text-3xl font-bold text-emerald-900">{summary.totalWeeklySum}</p>
+                              </div>
+                              <div className="p-3 bg-emerald-100 rounded-xl">
+                                <BarChart3 className="h-6 w-6 text-emerald-600" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-violet-600/80 mb-2">Unique Barangays</p>
+                                <p className="text-3xl font-bold text-violet-900">{summary.uniqueBarangays}</p>
+                              </div>
+                              <div className="p-3 bg-violet-100 rounded-xl">
+                                <MapPin className="h-6 w-6 text-violet-600" />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-amber-600/80 mb-2">Concern Types</p>
+                                <p className="text-3xl font-bold text-amber-900">{summary.uniqueConcernTypes}</p>
+                              </div>
+                              <div className="p-3 bg-amber-100 rounded-xl">
+                                <AlertTriangle className="h-6 w-6 text-amber-600" />
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-emerald-600/80 mb-2">Total Weekly Sum</p>
-                              <p className="text-3xl font-bold text-emerald-900">{summary.totalWeeklySum}</p>
+                      {/* Breakdown Section */}
+                      <div className="bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-8 shadow-sm">
+                        <div className="flex items-center gap-3 mb-8">
+                          <div className="p-2 bg-gray-100 rounded-xl">
+                            <BarChart3 className="h-5 w-5 text-gray-600" />
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-900">
+                            {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
+                          </h3>
+                        </div>
+
+                        {summaryViewType === "quarterly" ? (
+                          // Quarterly View
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                            {summary.quarterlyStats && summary.quarterlyStats.map((quarter, index) => {
+                              const getQuarterStyles = (color) => {
+                                switch (color) {
+                                  case 'blue':
+                                    return {
+                                      bg: 'bg-blue-100',
+                                      border: 'border-blue-300',
+                                      textMedium: 'text-blue-800',
+                                      textBold: 'text-blue-900',
+                                      textSmall: 'text-blue-700',
+                                      textXs: 'text-blue-600'
+                                    };
+                                  case 'green':
+                                    return {
+                                      bg: 'bg-green-100',
+                                      border: 'border-green-300',
+                                      textMedium: 'text-green-800',
+                                      textBold: 'text-green-900',
+                                      textSmall: 'text-green-700',
+                                      textXs: 'text-green-600'
+                                    };
+                                  case 'orange':
+                                    return {
+                                      bg: 'bg-orange-100',
+                                      border: 'border-orange-300',
+                                      textMedium: 'text-orange-800',
+                                      textBold: 'text-orange-900',
+                                      textSmall: 'text-orange-700',
+                                      textXs: 'text-orange-600'
+                                    };
+                                  case 'purple':
+                                    return {
+                                      bg: 'bg-purple-100',
+                                      border: 'border-purple-300',
+                                      textMedium: 'text-purple-800',
+                                      textBold: 'text-purple-900',
+                                      textSmall: 'text-purple-700',
+                                      textXs: 'text-purple-600'
+                                    };
+                                  default:
+                                    return {
+                                      bg: 'bg-gray-100',
+                                      border: 'border-gray-300',
+                                      textMedium: 'text-gray-800',
+                                      textBold: 'text-gray-900',
+                                      textSmall: 'text-gray-700',
+                                      textXs: 'text-gray-600'
+                                    };
+                                }
+                              };
+                              const styles = getQuarterStyles(quarter.color);
+
+                              return (
+                                <div key={quarter.name} className="text-center">
+                                  <div className={`${styles.bg} border ${styles.border} rounded-lg p-4`}>
+                                    <p className={`text-sm font-medium ${styles.textMedium}`}>{quarter.name}</p>
+                                    <p className={`text-2xl font-bold ${styles.textBold} mb-2`}>{quarter.entries}</p>
+                                    <div className="space-y-1">
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Weekly Sum: <span className="font-semibold">{quarter.weeklySum}</span>
+                                      </p>
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Barangays: <span className="font-semibold">{quarter.barangays}</span>
+                                      </p>
+                                      <p className={`text-xs ${styles.textSmall}`}>
+                                        Concerns: <span className="font-semibold">{quarter.concernTypes}</span>
+                                      </p>
+                                    </div>
+                                    <p className={`text-xs ${styles.textXs} mt-2 font-medium`}>
+                                      {quarter.months.join(", ")}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          // Weekly View
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-yellow-700 mb-2">Week 1</p>
+                                <p className="text-2xl font-bold text-yellow-900 mb-1">{summary.totalWeek1}</p>
+                                <p className="text-xs text-yellow-600">{months[selectedMonth]} 1-7</p>
+                              </div>
                             </div>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 to-emerald-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-emerald-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-emerald-700 mb-2">Week 2</p>
+                                <p className="text-2xl font-bold text-emerald-900 mb-1">{summary.totalWeek2}</p>
+                                <p className="text-xs text-emerald-600">{months[selectedMonth]} 8-14</p>
+                              </div>
+                            </div>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-blue-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-blue-700 mb-2">Week 3</p>
+                                <p className="text-2xl font-bold text-blue-900 mb-1">{summary.totalWeek3}</p>
+                                <p className="text-xs text-blue-600">{months[selectedMonth]} 15-21</p>
+                              </div>
+                            </div>
+                            <div className="group relative">
+                              <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-violet-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                              <div className="relative bg-white/90 backdrop-blur-sm border border-violet-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
+                                <p className="text-sm font-semibold text-violet-700 mb-2">Week 4</p>
+                                <p className="text-2xl font-bold text-violet-900 mb-1">{summary.totalWeek4}</p>
+                                <p className="text-xs text-violet-600">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Completion Stats */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <CheckCircle className="h-5 w-5 text-green-600" />
+                            Completion Rate
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Entries with Action Taken</span>
+                              <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${summary.completionRate}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-white border border-gray-200 rounded-lg p-6">
+                          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                            <MessageSquare className="h-5 w-5 text-blue-600" />
+                            Remarks Rate
+                          </h3>
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-gray-600">Entries with Remarks</span>
+                              <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
+                            </div>
+                            <div className="w-full bg-gray-200 rounded-full h-2">
+                              <div
+                                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${summary.remarksRate}%` }}
+                              ></div>
+                            </div>
+                            <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top Lists */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-center gap-3 mb-6">
+                              <div className="p-2 bg-amber-100 rounded-xl">
+                                <AlertTriangle className="h-5 w-5 text-amber-600" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900">Top Concern Types</h3>
+                            </div>
+                            {summary.topConcernTypes.length > 0 ? (
+                              <div className="space-y-3">
+                                {summary.topConcernTypes.map((item, index) => (
+                                  <div key={item.type} className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100/50 rounded-xl border border-amber-200/30 hover:shadow-sm transition-all duration-200">
+                                    <span className="text-sm font-medium text-amber-900">{item.type}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-bold text-amber-700 bg-amber-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <AlertTriangle className="h-6 w-6 text-gray-400" />
+                                </div>
+                                <p className="text-sm text-gray-500">No concern types recorded</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="group relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
+                          <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
+                            <div className="flex items-center gap-3 mb-6">
+                              <div className="p-2 bg-violet-100 rounded-xl">
+                                <MapPin className="h-5 w-5 text-violet-600" />
+                              </div>
+                              <h3 className="text-lg font-semibold text-gray-900">Top Barangays</h3>
+                            </div>
+                            {summary.topBarangays.length > 0 ? (
+                              <div className="space-y-3">
+                                {summary.topBarangays.map((item, index) => (
+                                  <div key={item.barangay} className="flex justify-between items-center p-4 bg-gradient-to-r from-violet-50 to-violet-100/50 rounded-xl border border-violet-200/30 hover:shadow-sm transition-all duration-200">
+                                    <span className="text-sm font-medium text-violet-900">{item.barangay}</span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-bold text-violet-700 bg-violet-200/50 px-2 py-1 rounded-lg">{item.count}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <div className="text-center py-8">
+                                <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                  <MapPin className="h-6 w-6 text-gray-400" />
+                                </div>
+                                <p className="text-sm text-gray-500">No barangays recorded</p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Summary Info */}
+                      <div className="relative">
+                        <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm"></div>
+                        <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-8">
+                          <div className="flex items-start gap-4">
                             <div className="p-3 bg-emerald-100 rounded-xl">
                               <BarChart3 className="h-6 w-6 text-emerald-600" />
                             </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-violet-600/80 mb-2">Unique Barangays</p>
-                              <p className="text-3xl font-bold text-violet-900">{summary.uniqueBarangays}</p>
-                            </div>
-                            <div className="p-3 bg-violet-100 rounded-xl">
-                              <MapPin className="h-6 w-6 text-violet-600" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-6 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-amber-600/80 mb-2">Concern Types</p>
-                              <p className="text-3xl font-bold text-amber-900">{summary.uniqueConcernTypes}</p>
-                            </div>
-                            <div className="p-3 bg-amber-100 rounded-xl">
-                              <AlertTriangle className="h-6 w-6 text-amber-600" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Breakdown Section */}
-                    <div className="bg-white/60 backdrop-blur-sm border border-gray-200/50 rounded-2xl p-8 shadow-sm">
-                      <div className="flex items-center gap-3 mb-8">
-                        <div className="p-2 bg-gray-100 rounded-xl">
-                          <BarChart3 className="h-5 w-5 text-gray-600" />
-                        </div>
-                        <h3 className="text-xl font-semibold text-gray-900">
-                          {summaryViewType === "quarterly" ? "Quarterly Breakdown" : "Weekly Breakdown"}
-                        </h3>
-                      </div>
-
-                      {summaryViewType === "quarterly" ? (
-                        // Quarterly View
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {summary.quarterlyStats && summary.quarterlyStats.map((quarter, index) => {
-                            const getQuarterStyles = (color) => {
-                              switch (color) {
-                                case 'blue':
-                                  return {
-                                    bg: 'bg-blue-100',
-                                    border: 'border-blue-300',
-                                    textMedium: 'text-blue-800',
-                                    textBold: 'text-blue-900',
-                                    textSmall: 'text-blue-700',
-                                    textXs: 'text-blue-600'
-                                  };
-                                case 'green':
-                                  return {
-                                    bg: 'bg-green-100',
-                                    border: 'border-green-300',
-                                    textMedium: 'text-green-800',
-                                    textBold: 'text-green-900',
-                                    textSmall: 'text-green-700',
-                                    textXs: 'text-green-600'
-                                  };
-                                case 'orange':
-                                  return {
-                                    bg: 'bg-orange-100',
-                                    border: 'border-orange-300',
-                                    textMedium: 'text-orange-800',
-                                    textBold: 'text-orange-900',
-                                    textSmall: 'text-orange-700',
-                                    textXs: 'text-orange-600'
-                                  };
-                                case 'purple':
-                                  return {
-                                    bg: 'bg-purple-100',
-                                    border: 'border-purple-300',
-                                    textMedium: 'text-purple-800',
-                                    textBold: 'text-purple-900',
-                                    textSmall: 'text-purple-700',
-                                    textXs: 'text-purple-600'
-                                  };
-                                default:
-                                  return {
-                                    bg: 'bg-gray-100',
-                                    border: 'border-gray-300',
-                                    textMedium: 'text-gray-800',
-                                    textBold: 'text-gray-900',
-                                    textSmall: 'text-gray-700',
-                                    textXs: 'text-gray-600'
-                                  };
-                              }
-                            };
-                            const styles = getQuarterStyles(quarter.color);
-
-                            return (
-                              <div key={quarter.name} className="text-center">
-                                <div className={`${styles.bg} border ${styles.border} rounded-lg p-4`}>
-                                  <p className={`text-sm font-medium ${styles.textMedium}`}>{quarter.name}</p>
-                                  <p className={`text-2xl font-bold ${styles.textBold} mb-2`}>{quarter.entries}</p>
-                                  <div className="space-y-1">
-                                    <p className={`text-xs ${styles.textSmall}`}>
-                                      Weekly Sum: <span className="font-semibold">{quarter.weeklySum}</span>
-                                    </p>
-                                    <p className={`text-xs ${styles.textSmall}`}>
-                                      Barangays: <span className="font-semibold">{quarter.barangays}</span>
-                                    </p>
-                                    <p className={`text-xs ${styles.textSmall}`}>
-                                      Concerns: <span className="font-semibold">{quarter.concernTypes}</span>
-                                    </p>
-                                  </div>
-                                  <p className={`text-xs ${styles.textXs} mt-2 font-medium`}>
-                                    {quarter.months.join(", ")}
-                                  </p>
+                            <div className="flex-1">
+                              <h4 className="text-xl font-semibold text-gray-900 mb-3">
+                                {summaryViewType === "quarterly"
+                                  ? `Quarterly Summary for ${summary.year || selectedYear}`
+                                  : `Summary for ${months[selectedMonth]} ${selectedYear}`
+                                }
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                                <div className="space-y-2">
+                                  <p><span className="font-medium text-gray-900">Municipality:</span> {summary.municipality}</p>
+                                  <p><span className="font-medium text-gray-900">Total Entries:</span> {summary.totalEntries}</p>
+                                </div>
+                                <div className="space-y-2">
+                                  <p><span className="font-medium text-gray-900">Weekly Sum:</span> {summary.totalWeeklySum}</p>
+                                  <p><span className="font-medium text-gray-900">Completion Rate:</span> {summary.completionRate}%</p>
+                                  {summaryViewType === "quarterly" && summary.quarterlyStats && (
+                                    <p><span className="font-medium text-gray-900">Quarters Analyzed:</span> {summary.quarterlyStats.length}</p>
+                                  )}
                                 </div>
                               </div>
-                            );
-                          })}
-                        </div>
-                      ) : (
-                        // Weekly View
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                          <div className="group relative">
-                            <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-yellow-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                            <div className="relative bg-white/90 backdrop-blur-sm border border-yellow-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                              <p className="text-sm font-semibold text-yellow-700 mb-2">Week 1</p>
-                              <p className="text-2xl font-bold text-yellow-900 mb-1">{summary.totalWeek1}</p>
-                              <p className="text-xs text-yellow-600">{months[selectedMonth]} 1-7</p>
-                            </div>
-                          </div>
-                          <div className="group relative">
-                            <div className="absolute inset-0 bg-gradient-to-br from-emerald-400/20 to-emerald-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                            <div className="relative bg-white/90 backdrop-blur-sm border border-emerald-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                              <p className="text-sm font-semibold text-emerald-700 mb-2">Week 2</p>
-                              <p className="text-2xl font-bold text-emerald-900 mb-1">{summary.totalWeek2}</p>
-                              <p className="text-xs text-emerald-600">{months[selectedMonth]} 8-14</p>
-                            </div>
-                          </div>
-                          <div className="group relative">
-                            <div className="absolute inset-0 bg-gradient-to-br from-blue-400/20 to-blue-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                            <div className="relative bg-white/90 backdrop-blur-sm border border-blue-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                              <p className="text-sm font-semibold text-blue-700 mb-2">Week 3</p>
-                              <p className="text-2xl font-bold text-blue-900 mb-1">{summary.totalWeek3}</p>
-                              <p className="text-xs text-blue-600">{months[selectedMonth]} 15-21</p>
-                            </div>
-                          </div>
-                          <div className="group relative">
-                            <div className="absolute inset-0 bg-gradient-to-br from-violet-400/20 to-violet-500/10 rounded-xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                            <div className="relative bg-white/90 backdrop-blur-sm border border-violet-200/60 rounded-xl p-5 text-center hover:shadow-md transition-all duration-300">
-                              <p className="text-sm font-semibold text-violet-700 mb-2">Week 4</p>
-                              <p className="text-2xl font-bold text-violet-900 mb-1">{summary.totalWeek4}</p>
-                              <p className="text-xs text-violet-600">{months[selectedMonth]} 22-{new Date(selectedYear, selectedMonth + 1, 0).getDate()}</p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Completion Stats */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5 text-green-600" />
-                          Completion Rate
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Entries with Action Taken</span>
-                            <span className="font-semibold">{summary.entriesWithAction} / {summary.totalEntries}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${summary.completionRate}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-gray-600">{summary.completionRate}% completion rate</p>
-                        </div>
-                      </div>
-
-                      <div className="bg-white border border-gray-200 rounded-lg p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                          <MessageSquare className="h-5 w-5 text-blue-600" />
-                          Remarks Rate
-                        </h3>
-                        <div className="space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm text-gray-600">Entries with Remarks</span>
-                            <span className="font-semibold">{summary.entriesWithRemarks} / {summary.totalEntries}</span>
-                          </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
-                            <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${summary.remarksRate}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-gray-600">{summary.remarksRate}% remarks rate</p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Top Lists */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-amber-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-amber-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-amber-100 rounded-xl">
-                              <AlertTriangle className="h-5 w-5 text-amber-600" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Top Concern Types</h3>
-                          </div>
-                          {summary.topConcernTypes.length > 0 ? (
-                            <div className="space-y-3">
-                              {summary.topConcernTypes.map((item, index) => (
-                                <div key={item.type} className="flex justify-between items-center p-4 bg-gradient-to-r from-amber-50 to-amber-100/50 rounded-xl border border-amber-200/30 hover:shadow-sm transition-all duration-200">
-                                  <span className="text-sm font-medium text-amber-900">{item.type}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-amber-700 bg-amber-200/50 px-2 py-1 rounded-lg">{item.count}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8">
-                              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <AlertTriangle className="h-6 w-6 text-gray-400" />
-                              </div>
-                              <p className="text-sm text-gray-500">No concern types recorded</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="group relative">
-                        <div className="absolute inset-0 bg-gradient-to-br from-violet-500/10 to-violet-600/5 rounded-2xl blur-sm group-hover:blur-none transition-all duration-300"></div>
-                        <div className="relative bg-white/80 backdrop-blur-sm border border-violet-200/50 rounded-2xl p-8 hover:shadow-lg transition-all duration-300">
-                          <div className="flex items-center gap-3 mb-6">
-                            <div className="p-2 bg-violet-100 rounded-xl">
-                              <MapPin className="h-5 w-5 text-violet-600" />
-                            </div>
-                            <h3 className="text-lg font-semibold text-gray-900">Top Barangays</h3>
-                          </div>
-                          {summary.topBarangays.length > 0 ? (
-                            <div className="space-y-3">
-                              {summary.topBarangays.map((item, index) => (
-                                <div key={item.barangay} className="flex justify-between items-center p-4 bg-gradient-to-r from-violet-50 to-violet-100/50 rounded-xl border border-violet-200/30 hover:shadow-sm transition-all duration-200">
-                                  <span className="text-sm font-medium text-violet-900">{item.barangay}</span>
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-bold text-violet-700 bg-violet-200/50 px-2 py-1 rounded-lg">{item.count}</span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="text-center py-8">
-                              <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                                <MapPin className="h-6 w-6 text-gray-400" />
-                              </div>
-                              <p className="text-sm text-gray-500">No barangays recorded</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary Info */}
-                    <div className="relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 rounded-2xl blur-sm"></div>
-                      <div className="relative bg-white/80 backdrop-blur-sm border border-emerald-200/50 rounded-2xl p-8">
-                        <div className="flex items-start gap-4">
-                          <div className="p-3 bg-emerald-100 rounded-xl">
-                            <BarChart3 className="h-6 w-6 text-emerald-600" />
-                          </div>
-                          <div className="flex-1">
-                            <h4 className="text-xl font-semibold text-gray-900 mb-3">
-                              {summaryViewType === "quarterly"
-                                ? `Quarterly Summary for ${summary.year || selectedYear}`
-                                : `Summary for ${months[selectedMonth]} ${selectedYear}`
-                              }
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
-                              <div className="space-y-2">
-                                <p><span className="font-medium text-gray-900">Municipality:</span> {summary.municipality}</p>
-                                <p><span className="font-medium text-gray-900">Total Entries:</span> {summary.totalEntries}</p>
-                              </div>
-                              <div className="space-y-2">
-                                <p><span className="font-medium text-gray-900">Weekly Sum:</span> {summary.totalWeeklySum}</p>
-                                <p><span className="font-medium text-gray-900">Completion Rate:</span> {summary.completionRate}%</p>
-                                {summaryViewType === "quarterly" && summary.quarterlyStats && (
-                                  <p><span className="font-medium text-gray-900">Quarters Analyzed:</span> {summary.quarterlyStats.length}</p>
-                                )}
-                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="flex justify-end gap-4 p-8 border-t border-gray-100 bg-gray-50/50">
-              <button
-                onClick={() => setShowCommandCenterSummary(false)}
-                className="px-6 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Action Center Summary Modal */}
-      {showActionCenterSummary && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Activity className="w-5 h-5 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Action Center Summary</h3>
-                  <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
-                </div>
+                  );
+                })()}
               </div>
-              <button
-                onClick={() => setShowActionCenterSummary(false)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            {/* Content */}
-            <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
-              {/* Key Metrics Grid */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Target className="w-5 h-5 text-blue-600" />
-                    <h4 className="font-semibold text-blue-800">Total Actions</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-blue-600">{actionItems.length.toLocaleString()}</p>
-                </div>
-
-                <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Shield className="w-5 h-5 text-red-600" />
-                    <h4 className="font-semibold text-red-800">Arrested</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-red-600">
-                    {actionItems.filter(item => item.actionTaken === 'Arrested').length.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <Clock className="w-5 h-5 text-yellow-600" />
-                    <h4 className="font-semibold text-yellow-800">Pending</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {actionItems.filter(item => item.actionTaken !== 'Arrested').length.toLocaleString()}
-                  </p>
-                </div>
-
-                <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle className="w-5 h-5 text-purple-600" />
-                    <h4 className="font-semibold text-purple-800">Success Rate</h4>
-                  </div>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {actionItems.length > 0 ? Math.round((actionItems.filter(item => item.actionTaken === 'Arrested').length / actionItems.length) * 100) : 0}%
-                  </p>
-                </div>
-              </div>
-
-              {/* Department Breakdown */}
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <h4 className="font-semibold mb-3 flex items-center gap-2">
-                  <Database className="w-4 h-4" />
-                  Department Breakdown
-                </h4>
-                <div className="space-y-3">
-                  {['pnp', 'agriculture', 'pg-enro'].map(dept => {
-                    const deptActions = actionItems.filter(item => item.department === dept);
-                    const percentage = actionItems.length > 0 ? Math.round((deptActions.length / actionItems.length) * 100) : 0;
-                    return (
-                      <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
-                        <span className="font-medium capitalize flex items-center gap-2">
-                          {dept === 'pnp' && <Shield className="w-4 h-4 text-red-600" />}
-                          {dept === 'agriculture' && <Fish className="w-4 h-4 text-green-600" />}
-                          {dept === 'pg-enro' && <Trees className="w-4 h-4 text-emerald-600" />}
-                          {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm text-gray-600">{percentage}%</span>
-                          <span className="font-semibold">{deptActions.length} actions</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* District Breakdown */}
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-semibold mb-2 text-blue-800">District Distribution</h4>
-                <div className="space-y-2">
-                  {['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'].map(district => {
-                    const districtActions = actionItems.filter(item => item.district === district);
-                    const percentage = actionItems.length > 0 ? Math.round((districtActions.length / actionItems.length) * 100) : 0;
-                    return (
-                      <div key={district} className="flex items-center justify-between text-sm">
-                        <span className="text-blue-700 font-medium">{district}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-blue-600">{percentage}%</span>
-                          <span className="font-semibold text-blue-800">{districtActions.length}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="p-6 border-t border-gray-200">
-              <Button
-                onClick={() => setShowActionCenterSummary(false)}
-                className="w-full bg-purple-600 hover:bg-purple-700 text-white"
-              >
-                <X className="w-4 h-4 mr-2" />
-                Close Summary
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* IPatroller Daily Summary Modal */}
-      {showIPatrollerDailySummary && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
-                  <p className="text-sm text-gray-600">
-                    {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={generateDailySummaryPdf}
-                  variant="default"
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  size="sm"
+              <div className="flex justify-end gap-4 p-8 border-t border-gray-100 bg-gray-50/50">
+                <button
+                  onClick={() => setShowCommandCenterSummary(false)}
+                  className="px-6 py-3 border border-gray-200 text-gray-700 bg-white hover:bg-gray-50 rounded-xl transition-all duration-200 font-medium shadow-sm hover:shadow-md"
                 >
-                  <FileText className="w-4 h-4 mr-2" />
-                  PDF
-                </Button>
-                <Button
-                  onClick={() => setShowIPatrollerDailySummary(false)}
-                  variant="outline"
-                  size="sm"
-                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                >
-                  <X className="w-4 h-4 mr-2" />
                   Close
-                </Button>
+                </button>
               </div>
             </div>
+          </div>
+        )}
 
-            {/* Date Selector */}
-            <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Action Center Summary Modal */}
+        {showActionCenterSummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-auto transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Calendar className="w-5 h-5 text-blue-600" />
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Activity className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
+                    <h3 className="text-lg font-semibold text-gray-900">Action Center Summary</h3>
+                    <p className="text-sm text-gray-500">Comprehensive analytics and statistics for all action reports</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowActionCenterSummary(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="p-6 space-y-6 max-h-96 overflow-y-auto">
+                {/* Key Metrics Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Target className="w-5 h-5 text-blue-600" />
+                      <h4 className="font-semibold text-blue-800">Total Actions</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-blue-600">{actionItems.length.toLocaleString()}</p>
+                  </div>
+
+                  <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="w-5 h-5 text-red-600" />
+                      <h4 className="font-semibold text-red-800">Arrested</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-red-600">
+                      {actionItems.filter(item => item.actionTaken === 'Arrested').length.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Clock className="w-5 h-5 text-yellow-600" />
+                      <h4 className="font-semibold text-yellow-800">Pending</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-yellow-600">
+                      {actionItems.filter(item => item.actionTaken !== 'Arrested').length.toLocaleString()}
+                    </p>
+                  </div>
+
+                  <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-purple-600" />
+                      <h4 className="font-semibold text-purple-800">Success Rate</h4>
+                    </div>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {actionItems.length > 0 ? Math.round((actionItems.filter(item => item.actionTaken === 'Arrested').length / actionItems.length) * 100) : 0}%
                     </p>
                   </div>
                 </div>
-                <div className="relative">
-                  <select
-                    id="date-select"
-                    name="date-select"
-                    value={ipatrollerSelectedDayIndex}
-                    onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
-                    className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
-                      text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
-                      focus:border-blue-500 transition-all duration-200 min-w-[200px]"
-                  >
-                    {generateDates(selectedMonth, selectedYear).map((date, index) => (
-                      <option key={index} value={index} className="py-2">
-                        {date.fullDate}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <ChevronDown className="w-4 h-4 text-gray-500" />
+
+                {/* Department Breakdown */}
+                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold mb-3 flex items-center gap-2">
+                    <Database className="w-4 h-4" />
+                    Department Breakdown
+                  </h4>
+                  <div className="space-y-3">
+                    {['pnp', 'agriculture', 'pg-enro'].map(dept => {
+                      const deptActions = actionItems.filter(item => item.department === dept);
+                      const percentage = actionItems.length > 0 ? Math.round((deptActions.length / actionItems.length) * 100) : 0;
+                      return (
+                        <div key={dept} className="flex items-center justify-between p-2 bg-white rounded border">
+                          <span className="font-medium capitalize flex items-center gap-2">
+                            {dept === 'pnp' && <Shield className="w-4 h-4 text-red-600" />}
+                            {dept === 'agriculture' && <Fish className="w-4 h-4 text-green-600" />}
+                            {dept === 'pg-enro' && <Trees className="w-4 h-4 text-emerald-600" />}
+                            {dept === 'pg-enro' ? 'PG-ENRO' : dept === 'pnp' ? 'PNP' : 'Agriculture'}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-gray-600">{percentage}%</span>
+                            <span className="font-semibold">{deptActions.length} actions</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* District Breakdown */}
+                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                  <h4 className="font-semibold mb-2 text-blue-800">District Distribution</h4>
+                  <div className="space-y-2">
+                    {['1ST DISTRICT', '2ND DISTRICT', '3RD DISTRICT'].map(district => {
+                      const districtActions = actionItems.filter(item => item.district === district);
+                      const percentage = actionItems.length > 0 ? Math.round((districtActions.length / actionItems.length) * 100) : 0;
+                      return (
+                        <div key={district} className="flex items-center justify-between text-sm">
+                          <span className="text-blue-700 font-medium">{district}</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-blue-600">{percentage}%</span>
+                            <span className="font-semibold text-blue-800">{districtActions.length}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              {/* Legend */}
-              <div className="mb-4 text-xs text-gray-600 flex items-center gap-4">
-                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Active ≥ 14</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500" /> Warning = 13</span>
-                <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Inactive ≤ 12</span>
+              {/* Footer */}
+              <div className="p-6 border-t border-gray-200">
+                <Button
+                  onClick={() => setShowActionCenterSummary(false)}
+                  className="w-full bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Close Summary
+                </Button>
               </div>
-              <div className="space-y-6">
-                {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
-                  <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                      <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+            </div>
+          </div>
+        )}
+
+        {/* IPatroller Daily Summary Modal */}
+        {showIPatrollerDailySummary && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-orange-100 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Daily Summary</h3>
+                    <p className="text-sm text-gray-600">
+                      {new Date(selectedYear, selectedMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={generateDailySummaryPdf}
+                    variant="default"
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    PDF
+                  </Button>
+                  <Button
+                    onClick={() => setShowIPatrollerDailySummary(false)}
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Date Selector */}
+              <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-purple-50">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-blue-100 rounded-lg">
+                      <Calendar className="w-5 h-5 text-blue-600" />
                     </div>
+                    <div>
+                      <h3 className="text-sm font-medium text-gray-500">Selected Date</h3>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {generateDates(selectedMonth, selectedYear)[ipatrollerSelectedDayIndex]?.fullDate}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="relative">
+                    <select
+                      id="date-select"
+                      name="date-select"
+                      value={ipatrollerSelectedDayIndex}
+                      onChange={(e) => setIpatrollerSelectedDayIndex(parseInt(e.target.value))}
+                      className="appearance-none bg-white pl-4 pr-10 py-2.5 rounded-lg border border-gray-200 shadow-sm 
+                      text-gray-900 font-medium hover:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500 
+                      focus:border-blue-500 transition-all duration-200 min-w-[200px]"
+                    >
+                      {generateDates(selectedMonth, selectedYear).map((date, index) => (
+                        <option key={index} value={index} className="py-2">
+                          {date.fullDate}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                      <ChevronDown className="w-4 h-4 text-gray-500" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                {/* Legend */}
+                <div className="mb-4 text-xs text-gray-600 flex items-center gap-4">
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-green-500" /> Active ≥ 14</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-yellow-500" /> Warning = 13</span>
+                  <span className="flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" /> Inactive ≤ 12</span>
+                </div>
+                <div className="space-y-6">
+                  {Object.entries(getDailySummaryData(ipatrollerSelectedDayIndex)).map(([district, municipalities]) => (
+                    <div key={district} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                        <h2 className="text-lg font-semibold text-gray-900">{district}</h2>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="bg-gray-50">
+                              <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
+                              <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Daily Target)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {municipalities.map((data) => (
+                              <tr key={data.municipality}>
+                                <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
+                                <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
+                                <td className="px-4 py-2 text-center">
+                                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
+                                    ${data.status === 'Active' ? 'bg-green-100 text-green-800' : data.status === 'Warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
+                                    {data.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                  <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                                        <div
+                                          className={`h-full rounded-full ${data.status === 'Active' ? 'bg-green-500' :
+                                            data.status === 'Warning' ? 'bg-yellow-500' :
+                                              'bg-red-500'
+                                            }`}
+                                          style={{ width: `${data.percentage}%` }}
+                                        />
+                                      </div>
+                                      <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
+                                    </div>
+                                    <div className="text-xs text-gray-500 text-center">
+                                      {Math.min(data.dailyCount, data.totalTarget)} / {data.totalTarget} total
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* IPatroller Preview Report Modal */}
+        {showIPatrollerPreview && ipatrollerPreviewData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <Eye className="w-6 h-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Preview Report</h3>
+                    <p className="text-sm text-gray-600">
+                      {ipatrollerPreviewData.reportPeriod}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    onClick={() => {
+                      setShowIPatrollerPreview(false);
+                      setIpatrollerPreviewData(null);
+                      generateIPatrollerMonthlySummaryReport();
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    size="sm"
+                    disabled={isGeneratingIPatrollerReport}
+                  >
+                    {isGeneratingIPatrollerReport ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <FileText className="w-4 h-4 mr-2" />
+                    )}
+                    Generate PDF
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowIPatrollerPreview(false);
+                      setIpatrollerPreviewData(null);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+                <div className="space-y-6">
+                  {/* Report Header - Centered */}
+                  <div className="text-center space-y-1">
+                    <p className="text-sm text-gray-700">Generated: {ipatrollerPreviewData.generatedDate}</p>
+                    <p className="text-sm text-gray-700">Month: {ipatrollerPreviewData.month} {ipatrollerPreviewData.year}</p>
+                    <p className="text-sm text-gray-700">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
+                    <p className="text-sm text-gray-700">Data Source: {ipatrollerPreviewData.dataSource}</p>
+                  </div>
+
+                  {/* District Summary */}
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">District Summary</h2>
                     <div className="overflow-x-auto">
-                      <table className="w-full">
+                      <table className="w-full border border-gray-300">
                         <thead>
-                          <tr className="bg-gray-50">
-                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-600">Municipality</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Daily Count</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Status</th>
-                            <th className="px-4 py-2 text-center text-sm font-medium text-gray-600">Progress (Daily Target)</th>
+                          <tr className="bg-blue-500 text-white">
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipalities</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                            <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Avg Active %</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {municipalities.map((data) => (
-                            <tr key={data.municipality}>
-                              <td className="px-4 py-2 text-sm font-medium text-gray-900">{data.municipality}</td>
-                              <td className="px-4 py-2 text-sm text-center font-medium text-gray-900">{data.dailyCount}</td>
-                              <td className="px-4 py-2 text-center">
-                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium
-                                    ${data.status === 'Active' ? 'bg-green-100 text-green-800' : data.status === 'Warning' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}>
-                                  {data.status}
-                                </span>
-                              </td>
-                              <td className="px-4 py-2">
-                                <div className="flex flex-col gap-1">
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                      <div
-                                        className={`h-full rounded-full ${data.status === 'Active' ? 'bg-green-500' :
-                                          data.status === 'Warning' ? 'bg-yellow-500' :
-                                            'bg-red-500'
-                                          }`}
-                                        style={{ width: `${data.percentage}%` }}
-                                      />
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-900">{data.percentage}%</span>
-                                  </div>
-                                  <div className="text-xs text-gray-500 text-center">
-                                    {Math.min(data.dailyCount, data.totalTarget)} / {data.totalTarget} total
-                                  </div>
-                                </div>
-                              </td>
+                        <tbody>
+                          {ipatrollerPreviewData.districtSummary.map((district, index) => (
+                            <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.district}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.municipalityCount}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalPatrols.toLocaleString()}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalActive}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalInactive}</td>
+                              <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.avgActivePercentage}%</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
                   </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* IPatroller Preview Report Modal */}
-      {showIPatrollerPreview && ipatrollerPreviewData && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <Eye className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Preview Report</h3>
-                  <p className="text-sm text-gray-600">
-                    {ipatrollerPreviewData.reportPeriod}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  onClick={() => {
-                    setShowIPatrollerPreview(false);
-                    setIpatrollerPreviewData(null);
-                    generateIPatrollerMonthlySummaryReport();
-                  }}
-                  className="bg-blue-600 hover:bg-blue-700 text-white"
-                  size="sm"
-                  disabled={isGeneratingIPatrollerReport}
-                >
-                  {isGeneratingIPatrollerReport ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  ) : (
-                    <FileText className="w-4 h-4 mr-2" />
-                  )}
-                  Generate PDF
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowIPatrollerPreview(false);
-                    setIpatrollerPreviewData(null);
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Close
-                </Button>
-              </div>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-              <div className="space-y-6">
-                {/* Report Header - Centered */}
-                <div className="text-center space-y-1">
-                  <p className="text-sm text-gray-700">Generated: {ipatrollerPreviewData.generatedDate}</p>
-                  <p className="text-sm text-gray-700">Month: {ipatrollerPreviewData.month} {ipatrollerPreviewData.year}</p>
-                  <p className="text-sm text-gray-700">Report Period: {ipatrollerPreviewData.reportPeriod}</p>
-                  <p className="text-sm text-gray-700">Data Source: {ipatrollerPreviewData.dataSource}</p>
-                </div>
-
-                {/* District Summary */}
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">District Summary</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-300">
-                      <thead>
-                        <tr className="bg-blue-500 text-white">
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">District</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Municipalities</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Active Days</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
-                          <th className="px-4 py-3 text-center text-sm font-semibold border border-gray-300">Avg Active %</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {ipatrollerPreviewData.districtSummary.map((district, index) => (
-                          <tr key={district.district} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.district}</td>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.municipalityCount}</td>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalPatrols.toLocaleString()}</td>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalActive}</td>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.totalInactive}</td>
-                            <td className="px-4 py-2 text-sm text-center border border-gray-300">{district.avgActivePercentage}%</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
 
 
-                {/* Overall Summary Statistics */}
-                <div>
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
-                  <div className="overflow-x-auto">
-                    <table className="w-full border border-gray-300">
-                      <tbody>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
-                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
-                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
-                          <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
-                        </tr>
-                        <tr className="bg-white">
-                          <td className="px-4 py-2 text-sm border border-gray-300">Total Patrols</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">Average Active Percentage</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="px-4 py-2 text-sm border border-gray-300">Total Active Days</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalActive}</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">Total Municipalities</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.municipalityCount}</td>
-                        </tr>
-                        <tr className="bg-white">
-                          <td className="px-4 py-2 text-sm border border-gray-300">Total Inactive Days</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalInactive}</td>
-                          <td className="px-4 py-2 text-sm border border-gray-300"></td>
-                          <td className="px-4 py-2 text-sm border border-gray-300"></td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Monthly Breakdown - always shown */}
-                {ipatrollerPreviewData.monthlyBreakdown && ipatrollerPreviewData.monthlyBreakdown.length > 0 && (
+                  {/* Overall Summary Statistics */}
                   <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Monthly Breakdown</h2>
-                    <div className="space-y-6">
-                      {ipatrollerPreviewData.monthlyBreakdown.map((monthEntry) => (
-                        <div key={monthEntry.label} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <div className="bg-blue-500 px-4 py-3">
-                            <h3 className="text-md font-bold text-white">{monthEntry.label}</h3>
-                          </div>
-                          {monthEntry.municipalities.length > 0 ? (
-                            <div className="overflow-x-auto">
-                              <table className="w-full border border-gray-300">
-                                <thead>
-                                  <tr className="bg-gray-100">
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Municipality</th>
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">District</th>
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active Days</th>
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
-                                    <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active %</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {monthEntry.municipalities.map((mun, idx) => (
-                                    <tr key={mun.municipality} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300 font-medium">{mun.municipality}</td>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.district}</td>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.totalPatrols.toLocaleString()}</td>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.activeDays}</td>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.inactiveDays}</td>
-                                      <td className="px-4 py-2 text-sm text-center border border-gray-300 font-semibold">{mun.activePercentage}%</td>
-                                    </tr>
-                                  ))}
-                                  {/* Totals row */}
-                                  <tr className="bg-blue-50 font-bold border-t-2 border-blue-300">
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">TOTAL</td>
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">—</td>
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.totalPatrols.toLocaleString()}</td>
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activeDays}</td>
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.inactiveDays}</td>
-                                    <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activePercentage}%</td>
-                                  </tr>
-                                </tbody>
-                              </table>
-                            </div>
-                          ) : (
-                            <div className="p-4 text-center text-sm text-gray-500">No data available for this month.</div>
-                          )}
-                        </div>
-                      ))}
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">Overall Summary Statistics</h2>
+                    <div className="overflow-x-auto">
+                      <table className="w-full border border-gray-300">
+                        <tbody>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Metric</td>
+                            <td className="px-4 py-2 text-sm font-semibold border border-gray-300">Value</td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Patrols</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalPatrols.toLocaleString()}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">Average Active Percentage</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.avgActivePercentage}%</td>
+                          </tr>
+                          <tr className="bg-gray-50">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Active Days</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalActive}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Municipalities</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.municipalityCount}</td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="px-4 py-2 text-sm border border-gray-300">Total Inactive Days</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300">{ipatrollerPreviewData.overallSummary.totalInactive}</td>
+                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                            <td className="px-4 py-2 text-sm border border-gray-300"></td>
+                          </tr>
+                        </tbody>
+                      </table>
                     </div>
                   </div>
-                )}
+
+                  {/* Monthly Breakdown - always shown */}
+                  {ipatrollerPreviewData.monthlyBreakdown && ipatrollerPreviewData.monthlyBreakdown.length > 0 && (
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900 mb-4">Monthly Breakdown</h2>
+                      <div className="space-y-6">
+                        {ipatrollerPreviewData.monthlyBreakdown.map((monthEntry) => (
+                          <div key={monthEntry.label} className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div className="bg-blue-500 px-4 py-3">
+                              <h3 className="text-md font-bold text-white">{monthEntry.label}</h3>
+                            </div>
+                            {monthEntry.municipalities.length > 0 ? (
+                              <div className="overflow-x-auto">
+                                <table className="w-full border border-gray-300">
+                                  <thead>
+                                    <tr className="bg-gray-100">
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Municipality</th>
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">District</th>
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Total Patrols</th>
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active Days</th>
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Inactive Days</th>
+                                      <th className="px-4 py-2 text-center text-sm font-semibold border border-gray-300">Active %</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {monthEntry.municipalities.map((mun, idx) => (
+                                      <tr key={mun.municipality} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300 font-medium">{mun.municipality}</td>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.district}</td>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.totalPatrols.toLocaleString()}</td>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.activeDays}</td>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300">{mun.inactiveDays}</td>
+                                        <td className="px-4 py-2 text-sm text-center border border-gray-300 font-semibold">{mun.activePercentage}%</td>
+                                      </tr>
+                                    ))}
+                                    {/* Totals row */}
+                                    <tr className="bg-blue-50 font-bold border-t-2 border-blue-300">
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">TOTAL</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">—</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.totalPatrols.toLocaleString()}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activeDays}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.inactiveDays}</td>
+                                      <td className="px-4 py-2 text-sm text-center border border-gray-300">{monthEntry.totals.activePercentage}%</td>
+                                    </tr>
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              <div className="p-4 text-center text-sm text-gray-500">No data available for this month.</div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Quarterly Report Preview Modal */}
-      {showQuarterlyPreview && quarterlyPreviewData && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 rounded-lg">
-                  <BarChart3 className="w-6 h-6 text-green-600" />
+        {/* Quarterly Report Preview Modal */}
+        {showQuarterlyPreview && quarterlyPreviewData && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-7xl mx-auto max-h-[90vh] overflow-hidden transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b border-gray-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-100 rounded-lg">
+                    <BarChart3 className="w-6 h-6 text-green-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Quarterly Report Preview</h3>
+                    <p className="text-sm text-gray-600">
+                      Year: {quarterlyPreviewData.year} | District: {quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900">Quarterly Report Preview</h3>
-                  <p className="text-sm text-gray-600">
-                    Year: {quarterlyPreviewData.year} | District: {quarterlyPreviewData.district === 'all' ? 'All Districts' : quarterlyPreviewData.district}
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                {/* Year selector */}
-                <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
-                  <Calendar className="w-4 h-4 text-gray-500" />
-                  <select
-                    value={fromYear}
-                    onChange={(e) => {
-                      setFromYear(Number(e.target.value));
+                <div className="flex items-center gap-2">
+                  {/* Year selector */}
+                  <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+                    <Calendar className="w-4 h-4 text-gray-500" />
+                    <select
+                      value={fromYear}
+                      onChange={(e) => {
+                        setFromYear(Number(e.target.value));
+                        setShowQuarterlyPreview(false);
+                        setQuarterlyPreviewData(null);
+                        setTimeout(() => loadQuarterlyReportData(), 100);
+                      }}
+                      className="text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+                    >
+                      {[2025, 2026, 2027].map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {/* Export Excel */}
+                  <Button
+                    onClick={exportQuarterlyToExcel}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    size="sm"
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Export Excel
+                  </Button>
+                  {/* Generate PDF */}
+                  <Button
+                    onClick={generateQuarterlyCommandCenterReport}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                    size="sm"
+                    disabled={isGeneratingCommandCenterReport}
+                  >
+                    {isGeneratingCommandCenterReport ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate PDF
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    onClick={() => {
                       setShowQuarterlyPreview(false);
                       setQuarterlyPreviewData(null);
-                      setTimeout(() => loadQuarterlyReportData(), 100);
                     }}
-                    className="text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+                    variant="outline"
+                    size="sm"
+                    className="text-gray-600 border-gray-200 hover:bg-gray-50"
                   >
-                    {[2025, 2026, 2027].map(y => (
-                      <option key={y} value={y}>{y}</option>
-                    ))}
-                  </select>
+                    <X className="w-4 h-4 mr-2" />
+                    Close
+                  </Button>
                 </div>
-                {/* Export Excel */}
-                <Button
-                  onClick={exportQuarterlyToExcel}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
-                  size="sm"
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Excel
-                </Button>
-                {/* Generate PDF */}
-                <Button
-                  onClick={generateQuarterlyCommandCenterReport}
-                  className="bg-green-600 hover:bg-green-700 text-white"
-                  size="sm"
-                  disabled={isGeneratingCommandCenterReport}
-                >
-                  {isGeneratingCommandCenterReport ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate PDF
-                    </>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => {
-                    setShowQuarterlyPreview(false);
-                    setQuarterlyPreviewData(null);
-                  }}
-                  variant="outline"
-                  size="sm"
-                  className="text-gray-600 border-gray-200 hover:bg-gray-50"
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Close
-                </Button>
               </div>
-            </div>
 
 
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
-              <div className="space-y-6">
-                {(() => {
-                  // Filter municipalities by selected district
-                  let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
-                  if (quarterlyPreviewData.district !== 'all') {
-                    const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
-                    municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
-                  }
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)] bg-gray-50">
+                <div className="space-y-6">
+                  {(() => {
+                    // Filter municipalities by selected district
+                    let municipalitiesToShow = Object.keys(quarterlyPreviewData.municipalityData);
+                    if (quarterlyPreviewData.district !== 'all') {
+                      const districtMunicipalities = municipalitiesByDistrict[quarterlyPreviewData.district] || [];
+                      municipalitiesToShow = municipalitiesToShow.filter(m => districtMunicipalities.includes(m));
+                    }
 
-                  return municipalitiesToShow.map((municipality) => {
-                    const munEntry = quarterlyPreviewData.municipalityData[municipality];
-                    // Support both old shape (plain object) and new shape ({concernTypeData, barangayData})
-                    const barangayData = munEntry.barangayData || {};
-                    const barangayEntries = Object.entries(barangayData).filter(([, brgyData]) =>
-                      Object.values(brgyData).some(q => (q.total || 0) > 0)
-                    );
+                    return municipalitiesToShow.map((municipality) => {
+                      const munEntry = quarterlyPreviewData.municipalityData[municipality];
+                      // Support both old shape (plain object) and new shape ({concernTypeData, barangayData})
+                      const barangayData = munEntry.barangayData || {};
+                      const barangayEntries = Object.entries(barangayData).filter(([, brgyData]) =>
+                        Object.values(brgyData).some(q => (q.total || 0) > 0)
+                      );
 
-                    const renderBrgyTable = (brgyData, rowKey) => {
-                      const getTrend = (cur, prev) => {
-                        if (cur > prev) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
-                        if (cur < prev) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
-                        return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
+                      const renderBrgyTable = (brgyData, rowKey) => {
+                        const getTrend = (cur, prev) => {
+                          if (cur > prev) return { label: 'Increased', color: 'text-red-700', bg: 'bg-red-200' };
+                          if (cur < prev) return { label: 'Decreased', color: 'text-green-700', bg: 'bg-green-200' };
+                          return { label: 'Unchanged', color: 'text-yellow-700', bg: 'bg-yellow-200' };
+                        };
+
+                        return (
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="bg-gray-100 border-b-2 border-gray-300">
+                                  <th className="px-3 py-2 text-left font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q1<br /><span className="text-xs font-normal">(Jan-Mar)</span></th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q2<br /><span className="text-xs font-normal">(Apr-Jun)</span></th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q3<br /><span className="text-xs font-normal">(Jul-Sep)</span></th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q4<br /><span className="text-xs font-normal">(Oct-Dec)</span></th>
+                                  <th className="px-3 py-2 text-center font-semibold text-gray-700 bg-green-50">Total</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {Object.entries(brgyData).map(([concernType, q], idx) => {
+                                  const q2t = getTrend(q.Q2 || 0, q.Q1 || 0);
+                                  const q3t = getTrend(q.Q3 || 0, q.Q2 || 0);
+                                  const q4t = getTrend(q.Q4 || 0, q.Q3 || 0);
+                                  return (
+                                    <tr key={`${rowKey}-${concernType}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
+                                      <td className="px-3 py-2 text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
+                                      <td className="px-3 py-2 text-center text-gray-700 border-r border-gray-200 font-semibold">{q.Q1 || 0}</td>
+                                      <td className={`px-3 py-2 text-center border-r border-gray-200 ${q2t.bg}`}>
+                                        <div className="font-semibold text-gray-900">{q.Q2 || 0}</div>
+                                        <div className={`text-xs font-medium mt-0.5 ${q2t.color}`}>{q2t.label}</div>
+                                      </td>
+                                      <td className={`px-3 py-2 text-center border-r border-gray-200 ${q3t.bg}`}>
+                                        <div className="font-semibold text-gray-900">{q.Q3 || 0}</div>
+                                        <div className={`text-xs font-medium mt-0.5 ${q3t.color}`}>{q3t.label}</div>
+                                      </td>
+                                      <td className={`px-3 py-2 text-center border-r border-gray-200 ${q4t.bg}`}>
+                                        <div className="font-semibold text-gray-900">{q.Q4 || 0}</div>
+                                        <div className={`text-xs font-medium mt-0.5 ${q4t.color}`}>{q4t.label}</div>
+                                      </td>
+                                      <td className="px-3 py-2 text-center font-bold text-green-700 bg-green-50">{q.total || 0}</td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        );
                       };
 
                       return (
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-sm">
-                            <thead>
-                              <tr className="bg-gray-100 border-b-2 border-gray-300">
-                                <th className="px-3 py-2 text-left font-semibold text-gray-700 border-r border-gray-300">Concern Type</th>
-                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q1<br /><span className="text-xs font-normal">(Jan-Mar)</span></th>
-                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q2<br /><span className="text-xs font-normal">(Apr-Jun)</span></th>
-                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q3<br /><span className="text-xs font-normal">(Jul-Sep)</span></th>
-                                <th className="px-3 py-2 text-center font-semibold text-gray-700 border-r border-gray-300">Q4<br /><span className="text-xs font-normal">(Oct-Dec)</span></th>
-                                <th className="px-3 py-2 text-center font-semibold text-gray-700 bg-green-50">Total</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {Object.entries(brgyData).map(([concernType, q], idx) => {
-                                const q2t = getTrend(q.Q2 || 0, q.Q1 || 0);
-                                const q3t = getTrend(q.Q3 || 0, q.Q2 || 0);
-                                const q4t = getTrend(q.Q4 || 0, q.Q3 || 0);
-                                return (
-                                  <tr key={`${rowKey}-${concernType}`} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} border-b border-gray-200 hover:bg-blue-50 transition-colors`}>
-                                    <td className="px-3 py-2 text-gray-900 font-medium border-r border-gray-200">{concernType}</td>
-                                    <td className="px-3 py-2 text-center text-gray-700 border-r border-gray-200 font-semibold">{q.Q1 || 0}</td>
-                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q2t.bg}`}>
-                                      <div className="font-semibold text-gray-900">{q.Q2 || 0}</div>
-                                      <div className={`text-xs font-medium mt-0.5 ${q2t.color}`}>{q2t.label}</div>
-                                    </td>
-                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q3t.bg}`}>
-                                      <div className="font-semibold text-gray-900">{q.Q3 || 0}</div>
-                                      <div className={`text-xs font-medium mt-0.5 ${q3t.color}`}>{q3t.label}</div>
-                                    </td>
-                                    <td className={`px-3 py-2 text-center border-r border-gray-200 ${q4t.bg}`}>
-                                      <div className="font-semibold text-gray-900">{q.Q4 || 0}</div>
-                                      <div className={`text-xs font-medium mt-0.5 ${q4t.color}`}>{q4t.label}</div>
-                                    </td>
-                                    <td className="px-3 py-2 text-center font-bold text-green-700 bg-green-50">{q.total || 0}</td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      );
-                    };
+                        <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                          {/* Municipality Header */}
+                          <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-3">
+                            <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
+                            {barangayCounts[municipality] && (
+                              <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-green-700 text-sm font-extrabold shadow">
+                                {barangayCounts[municipality]}
+                              </span>
+                            )}
+                          </div>
 
-                    return (
-                      <div key={municipality} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                        {/* Municipality Header */}
-                        <div className="bg-gradient-to-r from-green-500 to-emerald-500 px-4 py-3 flex items-center gap-3">
-                          <h3 className="text-lg font-bold text-white">{municipality.toUpperCase()}</h3>
-                          {barangayCounts[municipality] && (
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-white text-green-700 text-sm font-extrabold shadow">
-                              {barangayCounts[municipality]}
-                            </span>
+                          {/* Per-Barangay sub-tables */}
+                          {barangayEntries.length > 0 ? (
+                            <div className="divide-y divide-gray-200">
+                              {barangayEntries.map(([barangayName, brgyData]) => (
+                                <div key={barangayName} className="p-0">
+                                  {/* Barangay Sub-Header */}
+                                  <div className="bg-green-50 border-b border-green-200 px-4 py-2 flex items-center gap-2">
+                                    <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
+                                    <span className="text-sm font-semibold text-green-800">
+                                      {barangayName}
+                                    </span>
+                                  </div>
+                                  {renderBrgyTable(brgyData, `${municipality}-${barangayName}`)}
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="p-4 text-center text-gray-500 text-sm italic">No barangay data available</div>
                           )}
                         </div>
-
-                        {/* Per-Barangay sub-tables */}
-                        {barangayEntries.length > 0 ? (
-                          <div className="divide-y divide-gray-200">
-                            {barangayEntries.map(([barangayName, brgyData]) => (
-                              <div key={barangayName} className="p-0">
-                                {/* Barangay Sub-Header */}
-                                <div className="bg-green-50 border-b border-green-200 px-4 py-2 flex items-center gap-2">
-                                  <span className="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-                                  <span className="text-sm font-semibold text-green-800">
-                                    {barangayName}
-                                  </span>
-                                </div>
-                                {renderBrgyTable(brgyData, `${municipality}-${barangayName}`)}
-                              </div>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="p-4 text-center text-gray-500 text-sm italic">No barangay data available</div>
-                        )}
-                      </div>
-                    );
-                  });
-                })()}
+                      );
+                    });
+                  })()}
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Top Barangay Modal */}
+        {showTopBarangay && topBarangayData && (() => {
+          const allRanked = topBarangayData.ranked;           // all barangays incl. 0-entry
+          const activityRanked = topBarangayData.rankedWithActivity; // only barangays with entries
+
+          // Build deduplicated municipality list using case-insensitive keys
+          // canonicalMunMap: lowercase-trimmed name → canonical display name (first seen wins)
+          const canonicalMunMap = {};   // lowercase → canonical name
+          const municipalityTotalsMap = {}; // canonical name → total
+          // Only registered barangays drive the municipality tabs/order
+          const registeredRanked = allRanked.filter(b => b.registered === true);
+          registeredRanked.forEach(b => {
+            const norm = (b.municipality || '').trim().toLowerCase();
+            if (!norm) return;
+            if (!canonicalMunMap[norm]) {
+              canonicalMunMap[norm] = b.municipality.trim();
+              municipalityTotalsMap[b.municipality.trim()] = 0;
+            }
+            const canonical = canonicalMunMap[norm];
+            municipalityTotalsMap[canonical] = (municipalityTotalsMap[canonical] || 0) + (b.actionTakenCount || 0);
+          });
+          // Unique canonical municipality names sorted by total action taken descending
+          const municipalityOrder = Object.values(canonicalMunMap)
+            .filter((v, i, arr) => arr.indexOf(v) === i)
+            .sort((a, b) => (municipalityTotalsMap[b] || 0) - (municipalityTotalsMap[a] || 0));
+
+          // Barangays for the active tab — only registered, case-insensitive filter, alphabetical
+          const activeTabNorm = topBarangayTab.trim().toLowerCase();
+          const activeRanked = topBarangayTab === 'all'
+            ? activityRanked   // All tab: global leaderboard (only active barangays)
+            : registeredRanked // Municipality tab: only registered barangays, sorted by actionTakenCount descending
+              .filter(b => (b.municipality || '').trim().toLowerCase() === activeTabNorm)
+              .sort((a, b) => b.actionTakenCount - a.actionTakenCount || b.total - a.total);
+
+          // Max for activity bar — use the highest entry based on actionTakenCount, or 1
+          const maxEntry = [...activeRanked].sort((a, b) => b.actionTakenCount - a.actionTakenCount).find(b => b.actionTakenCount > 0);
+          const maxForTab = maxEntry ? maxEntry.actionTakenCount : 1;
+
+          return (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50 flex-shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <MapPin className="w-6 h-6 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Top Barangay Report</h3>
+                      <p className="text-sm text-gray-500">
+                        {topBarangayData.month === 'all'
+                          ? `Year: ${topBarangayData.year} — All Months`
+                          : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
+                        } — Ranked by total activity
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                    {/* Month Filter */}
+                    <select
+                      value={topBarangayMonth}
+                      onChange={e => setTopBarangayMonth(e.target.value)}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    >
+                      <option value="all">All Months</option>
+                      {MONTH_NAMES.map((m, i) => (
+                        <option key={i} value={i}>{m}</option>
+                      ))}
+                    </select>
+                    {/* Year Filter */}
+                    <select
+                      value={topBarangayYear}
+                      onChange={e => setTopBarangayYear(parseInt(e.target.value))}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    >
+                      {Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i).map(y => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                    {/* Apply Button */}
+                    <button
+                      onClick={() => loadTopBarangayReport(topBarangayMonth, topBarangayYear)}
+                      disabled={isLoadingTopBarangay}
+                      className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
+                    >
+                      {isLoadingTopBarangay ? (
+                        <><div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1 inline-block"></div>Loading…</>
+                      ) : 'Apply'}
+                    </button>
+                    <button
+                      onClick={() => { setShowTopBarangay(false); setTopBarangayData(null); setTopBarangayTab('all'); }}
+                      className="p-2 rounded-lg hover:bg-gray-100 transition-colors text-gray-500 hover:text-gray-700"
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Summary Chips */}
+                <div className="flex flex-wrap gap-2 px-5 py-3 border-b border-gray-100 bg-white flex-shrink-0">
+                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <MapPin className="w-3 h-3" />
+                    {activityRanked.length} Barangays with Activity
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 bg-gray-50 border border-gray-200 text-gray-600 text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <MapPin className="w-3 h-3" />
+                    {registeredRanked.length} Total Registered Barangays
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                    <BarChart3 className="w-3 h-3" />
+                    Total: {activityRanked.reduce((s, b) => s + (b.actionTakenCount || 0), 0).toLocaleString()} Actions
+                  </span>
+                  {topBarangayTab !== 'all' && (
+                    <span className="inline-flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 text-xs font-semibold px-3 py-1.5 rounded-full">
+                      <BarChart3 className="w-3 h-3" />
+                      {topBarangayTab}: {(municipalityTotalsMap[Object.values(canonicalMunMap).find(v => v.trim().toLowerCase() === topBarangayTab.trim().toLowerCase()) || topBarangayTab] || 0).toLocaleString()} Actions
+                    </span>
+                  )}
+                </div>
+
+                {/* Municipality Tabs */}
+                <div className="flex-shrink-0 border-b border-gray-200 bg-white overflow-x-auto">
+                  <div className="flex min-w-max">
+                    {/* All tab */}
+                    <button
+                      onClick={() => setTopBarangayTab('all')}
+                      className={`px-4 py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap ${topBarangayTab === 'all'
+                        ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                    >
+                      All Municipalities
+                    </button>
+                    {municipalityOrder.map(mun => (
+                      <button
+                        key={mun}
+                        onClick={() => setTopBarangayTab(mun)}
+                        className={`px-4 py-3 text-xs font-bold uppercase tracking-wide border-b-2 transition-colors whitespace-nowrap flex items-center gap-1.5 ${topBarangayTab.trim().toLowerCase() === mun.trim().toLowerCase()
+                          ? 'border-emerald-500 text-emerald-700 bg-emerald-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                          }`}
+                      >
+                        {mun}
+                        <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-full ${topBarangayTab.trim().toLowerCase() === mun.trim().toLowerCase() ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'
+                          }`}>
+                          {registeredRanked.filter(b => (b.municipality || '').trim().toLowerCase() === mun.trim().toLowerCase()).length}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Table Body */}
+                <div className="overflow-y-auto flex-1">
+                  {activeRanked.length === 0 ? (
+                    <div className="text-center py-16 text-gray-400">
+                      <MapPin className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                      <p className="text-lg font-medium">No barangay data found</p>
+                      <p className="text-sm">No records available for {topBarangayData.month === 'all' ? topBarangayData.year : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`}</p>
+                    </div>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <th className="py-3 px-4 text-left font-bold text-gray-700 w-14">Rank</th>
+                          <th className="py-3 px-4 text-left font-bold text-gray-700">Barangay</th>
+                          {topBarangayTab === 'all' && (
+                            <th className="py-3 px-4 text-left font-bold text-gray-700">Municipality</th>
+                          )}
+                          <th className="py-3 px-4 text-center font-bold text-gray-700">Entries</th>
+                          <th className="py-3 px-4 text-left font-bold text-gray-700">Action Taken</th>
+                          <th className="py-3 px-4 text-left font-bold text-gray-700 w-48">Activity Bar</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {activeRanked.map((brgy, idx) => {
+                          const actionCount = brgy.actionTakenCount || 0;
+                          const pct = maxForTab > 0 ? Math.round((actionCount / maxForTab) * 100) : 0;
+                          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : null;
+                          const rowBg =
+                            idx === 0 ? 'bg-amber-50' :
+                              idx === 1 ? 'bg-gray-50' :
+                                idx === 2 ? 'bg-orange-50' : 'bg-white';
+                          return (
+                            <tr key={`${brgy.name}-${brgy.municipality}`} className={`${rowBg} hover:bg-emerald-50/40 transition-colors`}>
+                              <td className="py-3 px-4">
+                                <span className="text-sm font-bold text-gray-500">
+                                  {medal ? <span className="text-base">{medal}</span> : `#${idx + 1}`}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 font-semibold text-gray-900">{brgy.name}</td>
+                              {topBarangayTab === 'all' && (
+                                <td className="py-3 px-4 text-gray-500 text-xs font-medium">{brgy.municipality}</td>
+                              )}
+                              <td className="py-3 px-4 text-center">
+                                <span className={`inline-flex items-center justify-center min-w-[2.5rem] px-2.5 py-0.5 rounded-full text-xs font-bold ${idx === 0 ? 'bg-amber-100 text-amber-800' :
+                                  idx === 1 ? 'bg-gray-200 text-gray-700' :
+                                    idx === 2 ? 'bg-orange-100 text-orange-700' :
+                                      'bg-emerald-50 text-emerald-700'
+                                  }`}>
+                                  {brgy.total.toLocaleString()}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-center">
+                                <span className={`inline-flex items-center justify-center min-w-[2.5rem] px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                                  (brgy.actionTakenCount || 0) > 0 ? 'bg-blue-50 text-blue-700' : 'bg-gray-100 text-gray-500'
+                                }`}>
+                                  {(brgy.actionTakenCount || 0).toLocaleString()}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                                    <div
+                                      className={`h-full rounded-full transition-all duration-500 ${idx === 0 ? 'bg-amber-400' :
+                                        idx === 1 ? 'bg-gray-400' :
+                                          idx === 2 ? 'bg-orange-400' :
+                                            'bg-emerald-400'
+                                        }`}
+                                      style={{ width: `${pct}%` }}
+                                    />
+                                  </div>
+                                  <span className="text-xs text-gray-400 w-8 text-right">{pct}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </Layout>
   );
