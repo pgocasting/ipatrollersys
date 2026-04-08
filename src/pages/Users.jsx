@@ -13,7 +13,7 @@ import { useFirebase } from "../hooks/useFirebase";
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2, Activity, Zap, WifiOff } from "lucide-react";
+import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2, Activity, Zap, WifiOff, ChevronDown, ChevronRight } from "lucide-react";
 import { logUserManagementAction, logAdminAccess } from '../utils/adminLogger';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -34,6 +34,14 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   const [filterAccessLevel, setFilterAccessLevel] = useState("all");
   const [presenceMap, setPresenceMap] = useState({});
   const [currentTime, setCurrentTime] = useState(Date.now());
+  const [expandedAccessLevels, setExpandedAccessLevels] = useState({});
+
+  const toggleAccessLevel = (accessLevel) => {
+    setExpandedAccessLevels((prev) => ({
+      ...prev,
+      [accessLevel]: !prev[accessLevel],
+    }));
+  };
 
   // Heartbeat for calculating live idle times
   useEffect(() => {
@@ -403,18 +411,30 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
       }
     } catch (err) {
       toast.error(err.message);
-    } finally {
       setDeleteLoading(false);
     }
   };
 
-  const onlineUsers = users.filter(u => u.role !== "Admin" && presenceMap[u.email]?.status === 'online').length;
-  const idleUsers = users.filter(u => u.role !== "Admin" && presenceMap[u.email]?.status === 'idle').length;
-  const offlineUsers = users.filter(u => u.role !== "Admin" && (!presenceMap[u.email] || presenceMap[u.email]?.status === 'offline')).length;
+  const activeUsersList = users.filter(
+    (u) => u.role !== "Admin" && presenceMap[u.email]?.status === 'online'
+  );
+  const idleUsers = users.filter(
+    (u) => u.role !== "Admin" && presenceMap[u.email]?.status === 'idle'
+  ).length;
+  const offlineUsersList = users.filter(
+    (u) => u.role !== "Admin" && (!presenceMap[u.email] || presenceMap[u.email]?.status === 'offline')
+  );
+
+  const onlineUsers = activeUsersList.length;
+  const offlineUsers = offlineUsersList.length;
+
+  const getAccessLevelCount = (list, accessLevel) =>
+    list.filter((u) => u.accessLevel === accessLevel).length;
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-[#0f172a]">
+        
         {!isAdmin ? (
           <div className="flex flex-col items-center justify-center h-screen">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Access Restricted</h2>
@@ -867,6 +887,24 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <p className="text-2xl sm:text-3xl font-black text-emerald-950 dark:text-white leading-none">{onlineUsers}</p>
                       <span className="text-[10px] font-bold text-emerald-600/70 dark:text-emerald-500 uppercase">Profiles</span>
                     </div>
+                    <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] font-bold text-emerald-800/80 dark:text-emerald-300/80">
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Command Center</span>
+                        <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "command-center")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Action Center</span>
+                        <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "action-center")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">IPatroller</span>
+                        <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "ipatroller")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Viewing</span>
+                        <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "viewing")}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardContent>
@@ -883,6 +921,24 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <div className="flex items-baseline gap-2">
                       <p className="text-2xl sm:text-3xl font-black text-rose-950 dark:text-white leading-none">{offlineUsers}</p>
                       <span className="text-[10px] font-bold text-rose-600/70 dark:text-emerald-500 uppercase">Users</span>
+                    </div>
+                    <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-1 text-[10px] font-bold text-rose-800/80 dark:text-rose-300/80">
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Command Center</span>
+                        <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "command-center")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Action Center</span>
+                        <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "action-center")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">IPatroller</span>
+                        <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "ipatroller")}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="uppercase tracking-widest">Viewing</span>
+                        <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "viewing")}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -960,13 +1016,13 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
               return groups;
             }, {});
 
-            const accessLevelOrder = ['command-center', 'action-center', 'ipatroller', 'quarry-monitoring', 'incidents'];
             const accessLevelLabels = {
               'command-center': 'Command Center',
               'action-center': 'Action Center',
               'ipatroller': 'IPatroller',
               'quarry-monitoring': 'Quarry Site Monitoring',
-              'incidents': 'Incidents'
+              'incidents': 'Incidents',
+              'viewing': 'Viewing',
             };
 
             if (nonAdminUsers.length === 0) {
@@ -977,7 +1033,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <User className="mx-auto h-16 w-16 text-gray-400 mb-4" />
                       <p className="text-lg font-semibold text-gray-900 mb-2">No users found</p>
                       <p className="text-sm text-gray-500">
-                        {searchQuery || filterAccessLevel !== "all" 
+                        {searchQuery || filterAccessLevel !== "all"
                           ? "Try adjusting your search or filter criteria"
                           : "Create your first user to get started"}
                       </p>
@@ -988,14 +1044,22 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
             }
 
             return (
-              <div className="space-y-6">
-                {accessLevelOrder.map(accessLevel => {
-                  const usersInGroup = groupedUsers[accessLevel] || [];
-                  if (usersInGroup.length === 0) return null;
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Object.keys(groupedUsers).map((accessLevel) => {
+                  const usersInGroup = groupedUsers[accessLevel];
+                  if (!usersInGroup || usersInGroup.length === 0) return null;
+
+                  const isOpen = !!expandedAccessLevels[accessLevel];
 
                   return (
-                    <Card key={accessLevel} className="bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden mb-6">
-                      <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+                    <Card
+                      key={accessLevel}
+                      className={`bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden ${isOpen ? 'sm:col-span-2 lg:col-span-4' : ''}`}
+                    >
+                      <CardHeader
+                        className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none"
+                        onClick={() => toggleAccessLevel(accessLevel)}
+                      >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
                             <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
@@ -1003,277 +1067,145 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                             </div>
                             <div>
                               <CardTitle className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                                {accessLevelLabels[accessLevel]}
+                                {accessLevelLabels[accessLevel] || accessLevel}
                               </CardTitle>
                               <CardDescription className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">
                                 {usersInGroup.length} authenticated profile{usersInGroup.length !== 1 ? 's' : ''}
                               </CardDescription>
                             </div>
                           </div>
-                          <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-transparent px-3 py-1 text-sm font-black shadow-sm">
-                            {usersInGroup.length}
-                          </Badge>
+                          <div className="flex items-center gap-3">
+                            <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-transparent px-3 py-1 text-sm font-black shadow-sm">
+                              {usersInGroup.length}
+                            </Badge>
+                            {isOpen ? (
+                              <ChevronDown className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-slate-500 dark:text-slate-400" />
+                            )}
+                          </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-slate-50 dark:bg-slate-900/80 border-b-2 border-slate-200 dark:border-slate-800">
-                                <TableHead className="w-[260px] font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">User Identity</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">System Tag</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 min-w-[200px]">Linkages</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Protocol</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Division</TableHead>
-                                <TableHead className="text-center font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {usersInGroup.map((u, index) => (
-                                <TableRow 
-                                  key={u.id} 
-                                  className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all duration-300 border-b border-slate-100 dark:border-slate-800/60 ${
-                                    index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-800/30'
-                                  }`}
-                                >
-                                  <TableCell className="py-4">
-                                    <div className="flex items-center gap-4">
-                                      <div className="relative">
-                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/30 ring-2 ring-white dark:ring-slate-800 overflow-hidden group-hover:scale-105 transition-transform">
-                                          {(u.firstName?.[0] || '') + (u.lastName?.[0] || '')}
-                                          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                      {isOpen && (
+                        <CardContent className="p-0">
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-slate-50 dark:bg-slate-900/80 border-b-2 border-slate-200 dark:border-slate-800">
+                                  <TableHead className="w-[260px] font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">User Identity</TableHead>
+                                  <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">System Tag</TableHead>
+                                  <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 min-w-[200px]">Linkages</TableHead>
+                                  <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Protocol</TableHead>
+                                  <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Division</TableHead>
+                                  <TableHead className="text-center font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {usersInGroup.map((u, index) => (
+                                  <TableRow
+                                    key={u.id}
+                                    className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all duration-300 border-b border-slate-100 dark:border-slate-800/60 ${
+                                      index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-800/30'
+                                    }`}
+                                  >
+                                    <TableCell className="py-4">
+                                      <div className="flex items-center gap-4">
+                                        <div className="relative">
+                                          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-blue-500/30 ring-2 ring-white dark:ring-slate-800 overflow-hidden group-hover:scale-105 transition-transform">
+                                            {(u.firstName?.[0] || '') + (u.lastName?.[0] || '')}
+                                            <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                          </div>
+                                          <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 shadow-sm overflow-hidden z-10 flex items-center justify-center bg-slate-200">
+                                            {(() => {
+                                              const status = presenceMap[u.email]?.status || 'offline';
+                                              if (status === 'online') return <div className="w-full h-full bg-emerald-500 rounded-full animate-pulse" title="Online & Processing" />;
+                                              if (status === 'idle') return <div className="w-full h-full bg-amber-400 rounded-full" title="Logged In but Idle" />;
+                                              return <div className="w-full h-full bg-red-500 rounded-full" title="Offline" />;
+                                            })()}
+                                          </div>
                                         </div>
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 shadow-sm overflow-hidden z-10 flex items-center justify-center bg-slate-200">
-                                          {(() => {
-                                            const status = presenceMap[u.email]?.status || 'offline';
-                                            if (status === 'online') return <div className="w-full h-full bg-emerald-500 rounded-full animate-pulse" title="Online & Processing" />;
-                                            if (status === 'idle') return <div className="w-full h-full bg-amber-400 rounded-full" title="Logged In but Idle" />;
-                                            return <div className="w-full h-full bg-red-500 rounded-full" title="Offline" />;
-                                          })()}
+                                        <div className="flex flex-col">
+                                          <div className="flex items-center gap-2">
+                                            <p className="font-bold text-slate-900 dark:text-white text-base leading-tight">
+                                              {`${u.firstName || ""} ${u.lastName || ""}`.trim()}
+                                            </p>
+                                            {presenceMap[u.email]?.status === 'idle' && (
+                                              <div className="text-[10px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-lg animate-pulse border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
+                                                <Zap className="w-3 h-3" />
+                                                <span>{Math.floor((currentTime - (presenceMap[u.email]?.lastActive || currentTime)) / 60000)}m Idle</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                          <div className="flex items-center gap-1.5 mt-1.5">
+                                            <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
+                                            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{u.municipality || 'Unspecified'}</p>
+                                          </div>
                                         </div>
                                       </div>
-                                      <div className="flex flex-col">
-                                        <div className="flex items-center gap-2">
-                                          <p className="font-bold text-slate-900 dark:text-white text-base leading-tight">
-                                            {`${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                                          </p>
-                                          {presenceMap[u.email]?.status === 'idle' && (
-                                            <div className="text-[10px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-lg animate-pulse border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
-                                              <Zap className="w-3 h-3" />
-                                              <span>{Math.floor((currentTime - (presenceMap[u.email]?.lastActive || currentTime)) / 60000)}m Idle</span>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 ring-1 ring-slate-200 dark:ring-slate-700 px-3 py-2 rounded-xl w-fit shadow-sm">
+                                        <User className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
+                                        <span className="text-slate-900 dark:text-slate-300 font-bold text-sm tracking-wide">{u.username}</span>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4">
+                                      <div className="space-y-2.5 flex flex-col">
+                                        <div className="flex items-center gap-2.5 group/link">
+                                          <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center ring-1 ring-blue-100 dark:ring-blue-500/20 group-hover/link:bg-blue-100 dark:group-hover/link:bg-blue-500/30 transition-colors">
+                                            <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                          </div>
+                                          <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.email}</span>
+                                        </div>
+                                        {u.phoneNumber && (
+                                          <div className="flex items-center gap-2.5 group/link">
+                                            <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center ring-1 ring-emerald-100 dark:ring-emerald-500/20 group-hover/link:bg-emerald-100 dark:group-hover/link:bg-emerald-500/30 transition-colors">
+                                              <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                                             </div>
-                                          )}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 mt-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{u.municipality || 'Unspecified'}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4">
-                                    <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 ring-1 ring-slate-200 dark:ring-slate-700 px-3 py-2 rounded-xl w-fit shadow-sm">
-                                      <User className="w-4 h-4 text-indigo-500 dark:text-indigo-400" />
-                                      <span className="text-slate-900 dark:text-slate-300 font-bold text-sm tracking-wide">{u.username}</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4">
-                                    <div className="space-y-2.5 flex flex-col">
-                                      <div className="flex items-center gap-2.5 group/link">
-                                        <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center ring-1 ring-blue-100 dark:ring-blue-500/20 group-hover/link:bg-blue-100 dark:group-hover/link:bg-blue-500/30 transition-colors">
-                                          <Mail className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                                        </div>
-                                        <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.email}</span>
-                                      </div>
-                                      {u.phoneNumber && (
-                                        <div className="flex items-center gap-2.5 group/link">
-                                          <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center ring-1 ring-emerald-100 dark:ring-emerald-500/20 group-hover/link:bg-emerald-100 dark:group-hover/link:bg-emerald-500/30 transition-colors">
-                                            <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                                            <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.phoneNumber}</span>
                                           </div>
-                                          <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.phoneNumber}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4 text-center">
-                                    <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-500/20 dark:to-indigo-500/20 text-blue-800 dark:text-blue-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
-                                      {u.role}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="py-4 text-center">
-                                    <Badge className="bg-gradient-to-r from-purple-100 to-fuchsia-100 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-800 dark:text-purple-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
-                                      {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-center py-4">
-                                    <div className="flex gap-2 justify-center opacity-70 hover:opacity-100 transition-opacity">
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => handleEditUser(u)}
-                                        className="h-9 px-3 hover:bg-blue-600 hover:text-white dark:border-slate-700 dark:text-slate-300 transition-all duration-300 shadow-sm rounded-xl font-bold"
-                                      >
-                                        <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" />
-                                        <span className="hidden sm:inline">Modify</span>
-                                      </Button>
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => handleDeleteUser(u)}
-                                        className="h-9 px-3 text-red-600 dark:text-red-400 hover:bg-red-600 dark:hover:bg-red-600 hover:text-white dark:hover:text-white dark:border-red-900/50 transition-all duration-300 shadow-sm rounded-xl font-bold"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5 sm:mr-1.5" />
-                                        <span className="hidden sm:inline">Terminate</span>
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-
-                {/* Other Access Levels */}
-                {Object.keys(groupedUsers).filter(level => !accessLevelOrder.includes(level)).map(accessLevel => {
-                  const usersInGroup = groupedUsers[accessLevel];
-                  if (usersInGroup.length === 0) return null;
-
-                  return (
-                    <Card key={accessLevel} className="bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden mb-6">
-                      <CardHeader className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-4">
-                            <div className="p-3 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700">
-                              <User className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-                            </div>
-                            <div>
-                              <CardTitle className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">
-                                {accessLevel.charAt(0).toUpperCase() + accessLevel.slice(1).replace('-', ' ')}
-                              </CardTitle>
-                              <CardDescription className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">
-                                {usersInGroup.length} authenticated profile{usersInGroup.length !== 1 ? 's' : ''}
-                              </CardDescription>
-                            </div>
+                                        )}
+                                      </div>
+                                    </TableCell>
+                                    <TableCell className="py-4 text-center">
+                                      <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-transparent px-3 py-1 text-sm font-black shadow-sm">
+                                        {u.role}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="py-4 text-center">
+                                      <Badge className="bg-gradient-to-r from-purple-100 to-fuchsia-100 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-800 dark:text-purple-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
+                                        {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
+                                      </Badge>
+                                    </TableCell>
+                                    <TableCell className="text-center py-4">
+                                      <div className="flex gap-2 justify-center opacity-70 hover:opacity-100 transition-opacity">
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleEditUser(u)}
+                                          className="h-9 px-3 hover:bg-blue-600 hover:text-white dark:border-slate-700 dark:text-slate-300 transition-all duration-300 shadow-sm rounded-xl font-bold"
+                                        >
+                                          <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" />
+                                          <span className="hidden sm:inline">Modify</span>
+                                        </Button>
+                                        <Button
+                                          variant="outline"
+                                          size="sm"
+                                          onClick={() => handleDeleteUser(u)}
+                                          className="h-9 px-3 text-red-600 dark:text-red-400 hover:bg-red-600 dark:hover:bg-red-600 hover:text-white dark:hover:text-white dark:border-red-900/50 transition-all duration-300 shadow-sm rounded-xl font-bold"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5 sm:mr-1.5" />
+                                          <span className="hidden sm:inline">Terminate</span>
+                                        </Button>
+                                      </div>
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                            </Table>
                           </div>
-                          <Badge className="bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-300 border-transparent px-3 py-1 text-sm font-black shadow-sm">
-                            {usersInGroup.length}
-                          </Badge>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="p-0">
-                        <div className="overflow-x-auto">
-                          <Table>
-                            <TableHeader>
-                              <TableRow className="bg-slate-50 dark:bg-slate-900/80 border-b-2 border-slate-200 dark:border-slate-800">
-                                <TableHead className="w-[260px] font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">User Identity</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">System Tag</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 min-w-[200px]">Linkages</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Protocol</TableHead>
-                                <TableHead className="font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4 text-center">Division</TableHead>
-                                <TableHead className="text-center font-black uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 py-4">Actions</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {usersInGroup.map((u, index) => (
-                                <TableRow 
-                                  key={u.id} 
-                                  className={`hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-all duration-300 border-b border-slate-100 dark:border-slate-800/60 ${
-                                    index % 2 === 0 ? 'bg-white dark:bg-slate-900' : 'bg-slate-50/30 dark:bg-slate-800/30'
-                                  }`}
-                                >
-                                  <TableCell className="py-4">
-                                    <div className="flex items-center gap-4">
-                                      <div className="relative">
-                                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-slate-400 via-slate-500 to-slate-600 dark:from-slate-700 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center text-white font-black text-lg shadow-lg shadow-slate-500/30 ring-2 ring-white dark:ring-slate-800 overflow-hidden group-hover:scale-105 transition-transform">
-                                          {(u.firstName?.[0] || '') + (u.lastName?.[0] || '')}
-                                          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                        </div>
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-white dark:border-slate-800 shadow-sm overflow-hidden z-10 flex items-center justify-center bg-slate-200">
-                                          {(() => {
-                                            const status = presenceMap[u.email]?.status || 'offline';
-                                            if (status === 'online') return <div className="w-full h-full bg-emerald-500 rounded-full" />;
-                                            if (status === 'idle') return <div className="w-full h-full bg-amber-400 rounded-full" />;
-                                            return <div className="w-full h-full bg-red-500 rounded-full" />;
-                                          })()}
-                                        </div>
-                                      </div>
-                                      <div className="flex flex-col">
-                                        <p className="font-bold text-slate-900 dark:text-white text-base leading-tight">
-                                          {`${u.firstName || ""} ${u.lastName || ""}`.trim()}
-                                        </p>
-                                        <div className="flex items-center gap-1.5 mt-1.5">
-                                          <MapPin className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" />
-                                          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{u.municipality || 'Unspecified'}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4">
-                                    <div className="flex items-center gap-2.5 bg-slate-50 dark:bg-slate-800/80 ring-1 ring-slate-200 dark:ring-slate-700 px-3 py-2 rounded-xl w-fit shadow-sm">
-                                      <User className="w-4 h-4 text-slate-500 dark:text-slate-400" />
-                                      <span className="text-slate-900 dark:text-slate-300 font-bold text-sm tracking-wide">{u.username}</span>
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4">
-                                    <div className="space-y-2.5 flex flex-col">
-                                      <div className="flex items-center gap-2.5 group/link">
-                                        <div className="w-8 h-8 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center ring-1 ring-slate-200 dark:ring-slate-700 group-hover/link:bg-slate-200 dark:group-hover/link:bg-slate-700 transition-colors">
-                                          <Mail className="w-4 h-4 text-slate-600 dark:text-slate-400" />
-                                        </div>
-                                        <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.email}</span>
-                                      </div>
-                                      {u.phoneNumber && (
-                                        <div className="flex items-center gap-2.5 group/link">
-                                          <div className="w-8 h-8 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center ring-1 ring-emerald-100 dark:ring-emerald-500/20 group-hover/link:bg-emerald-100 dark:group-hover/link:bg-emerald-500/30 transition-colors">
-                                            <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                                          </div>
-                                          <span className="text-slate-700 dark:text-slate-300 font-medium text-sm truncate max-w-[150px]">{u.phoneNumber}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </TableCell>
-                                  <TableCell className="py-4 text-center">
-                                    <Badge className="bg-gradient-to-r from-slate-100 to-gray-200 dark:from-slate-800 dark:to-slate-700 text-slate-700 dark:text-slate-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
-                                      {u.role}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="py-4 text-center">
-                                    <Badge className="bg-gradient-to-r from-purple-100 to-fuchsia-100 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-800 dark:text-purple-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
-                                      {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell className="text-center py-4">
-                                    <div className="flex gap-2 justify-center opacity-70 hover:opacity-100 transition-opacity">
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => handleEditUser(u)}
-                                        className="h-9 px-3 hover:bg-blue-600 hover:text-white dark:border-slate-700 dark:text-slate-300 transition-all duration-300 shadow-sm rounded-xl font-bold"
-                                      >
-                                        <Edit2 className="w-3.5 h-3.5 sm:mr-1.5" />
-                                        <span className="hidden sm:inline">Modify</span>
-                                      </Button>
-                                      <Button 
-                                        variant="outline" 
-                                        size="sm"
-                                        onClick={() => handleDeleteUser(u)}
-                                        className="h-9 px-3 text-red-600 dark:text-red-400 hover:bg-red-600 dark:hover:bg-red-600 hover:text-white dark:hover:text-white dark:border-red-900/50 transition-all duration-300 shadow-sm rounded-xl font-bold"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5 sm:mr-1.5" />
-                                        <span className="hidden sm:inline">Terminate</span>
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </div>
-                      </CardContent>
+                        </CardContent>
+                      )}
                     </Card>
                   );
                 })}
