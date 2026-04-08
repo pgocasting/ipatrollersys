@@ -6348,6 +6348,50 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
           const maxEntry = [...activeRanked].sort((a, b) => b.actionTakenCount - a.actionTakenCount).find(b => b.actionTakenCount > 0);
           const maxForTab = maxEntry ? maxEntry.actionTakenCount : 1;
 
+          const exportTopBarangayToPDF = () => {
+            const doc = new jsPDF();
+            const reportLabel = topBarangayData.month === 'all'
+              ? `Year: ${topBarangayData.year} — All Months`
+              : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`;
+
+            doc.setFontSize(14);
+            doc.setFont('helvetica', 'bold');
+            doc.text('Top Barangay Report', 14, 18);
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`${reportLabel} — Ranked by total activity`, 14, 24);
+
+            const head = topBarangayTab === 'all'
+              ? [['Rank', 'Barangay', 'Municipality', 'Entries', 'Action Taken']]
+              : [['Rank', 'Barangay', 'Entries', 'Action Taken']];
+
+            const body = activeRanked.map((b, idx) => {
+              const rankLabel = `#${idx + 1}`;
+              const entries = (b.total ?? 0).toLocaleString();
+              const actionTaken = (b.actionTakenCount ?? 0).toLocaleString();
+              if (topBarangayTab === 'all') {
+                return [rankLabel, b.name || '', b.municipality || '', entries, actionTaken];
+              }
+              return [rankLabel, b.name || '', entries, actionTaken];
+            });
+
+            autoTable(doc, {
+              head,
+              body,
+              startY: 32,
+              theme: 'grid',
+              styles: { fontSize: 9, cellPadding: 3 },
+              headStyles: { fillColor: [16, 185, 129], textColor: 255, fontStyle: 'bold' },
+              columnStyles: {
+                0: { cellWidth: 16 }
+              }
+            });
+
+            const tabLabel = topBarangayTab === 'all' ? 'All_Municipalities' : String(topBarangayTab).replace(/\s+/g, '_');
+            const monthPart = topBarangayData.month === 'all' ? 'All_Months' : MONTH_NAMES[parseInt(topBarangayData.month)].replace(/\s+/g, '_');
+            doc.save(`Top_Barangay_Report_${tabLabel}_${monthPart}_${topBarangayData.year}.pdf`);
+          };
+
           return (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
               <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
@@ -6369,6 +6413,14 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={exportTopBarangayToPDF}
+                      disabled={isLoadingTopBarangay || activeRanked.length === 0}
+                      title="Export to PDF"
+                      className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
+                    >
+                      <FileText className="w-5 h-5" />
+                    </button>
                     {/* Month Filter */}
                     <select
                       value={topBarangayMonth}
