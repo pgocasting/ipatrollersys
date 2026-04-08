@@ -202,7 +202,7 @@ function AppContent() {
   useEffect(() => {
     const handleUnload = () => {
       if (user && user.email) {
-        updateUserPresence(user.email, 'offline');
+        updateUserPresence(user.email, 'offline', { presenceReason: 'unload' });
       }
     };
     window.addEventListener('beforeunload', handleUnload);
@@ -245,7 +245,7 @@ function AppContent() {
               </div>,
               { duration: 5000 }
             );
-          } else if (pStatus && pStatus !== 'offline' && data.status === 'offline') {
+          } else if (pStatus && pStatus !== 'offline' && data.status === 'offline' && data.presenceReason === 'logout') {
             toast.error(
               <div className="flex flex-col gap-1 w-full">
                 <p className="font-bold text-rose-800">User Disconnected</p>

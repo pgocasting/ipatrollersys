@@ -155,7 +155,7 @@ export const useFirebase = () => {
     try {
       setLoading(true);
       if (user) {
-        await updateUserPresence(user.email, 'offline');
+        await updateUserPresence(user.email, 'offline', { presenceReason: 'logout' });
       }
       await signOut(auth);
       return { success: true };
