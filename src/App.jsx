@@ -394,9 +394,10 @@ function AppContent() {
               <h2 className="text-3xl font-black tracking-tight text-slate-800 mb-3 uppercase drop-shadow-sm">
                 Verifying <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">Access</span>
               </h2>
-              <div className="flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-white shadow-sm border border-slate-200/60 transition-transform hover:scale-105 duration-300">
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-                <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-[0.25em]">Atomic Sync Protocol</p>
+              <div className="flex items-center justify-center w-56 mx-auto px-6 py-3 rounded-full bg-white shadow-sm border border-slate-200/60 transition-transform hover:scale-105 duration-300">
+                <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden relative">
+                  <div className="absolute inset-y-0 bg-blue-500 rounded-full animate-loading-bar"></div>
+                </div>
               </div>
             </div>
             
@@ -420,6 +421,12 @@ function AppContent() {
             .animate-orbit-1 { animation: orbit-1 3.5s infinite linear; }
             .animate-orbit-2 { animation: orbit-2 4.5s infinite linear; }
             .animate-orbit-3 { animation: orbit-3 5.5s infinite linear; }
+            @keyframes loading-bar {
+              0% { left: -30%; width: 30%; }
+              50% { width: 40%; }
+              100% { left: 100%; width: 30%; }
+            }
+            .animate-loading-bar { animation: loading-bar 1.5s infinite ease-in-out; }
           `}} />
         </div>
       );
@@ -570,9 +577,10 @@ function AppContent() {
             <h2 className="text-3xl font-black tracking-tight text-slate-800 mb-3 uppercase drop-shadow-sm">
               Initializing <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-blue-400">System</span>
             </h2>
-            <div className="flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-full bg-white shadow-sm border border-slate-200/60 transition-transform hover:scale-105 duration-300">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-ping"></span>
-              <p className="text-[10px] text-slate-500 font-extrabold uppercase tracking-[0.25em]">Atomic Sync Protocol</p>
+            <div className="flex items-center justify-center w-56 mx-auto px-6 py-3 rounded-full bg-white shadow-sm border border-slate-200/60 transition-transform hover:scale-105 duration-300">
+              <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden relative">
+                <div className="absolute inset-y-0 bg-blue-500 rounded-full animate-loading-bar"></div>
+              </div>
             </div>
           </div>
           
@@ -596,6 +604,12 @@ function AppContent() {
           .animate-orbit-1 { animation: orbit-1 3.5s infinite linear; }
           .animate-orbit-2 { animation: orbit-2 4.5s infinite linear; }
           .animate-orbit-3 { animation: orbit-3 5.5s infinite linear; }
+          @keyframes loading-bar {
+            0% { left: -30%; width: 30%; }
+            50% { width: 40%; }
+            100% { left: 100%; width: 30%; }
+          }
+          .animate-loading-bar { animation: loading-bar 1.5s infinite ease-in-out; }
         `}} />
       </div>
     );
