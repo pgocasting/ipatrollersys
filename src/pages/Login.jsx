@@ -3,8 +3,7 @@ import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../components/ui/dialog";
-import { Loader2, Lock, Eye, EyeOff, Mail, Shield, Brain, User } from "lucide-react";
+import { Loader2, Lock, Eye, EyeOff, Mail, Shield, AlertTriangle, User } from "lucide-react";
 import { useFirebase } from "../hooks/useFirebase";
 
 // Import logo images
@@ -18,7 +17,7 @@ export default function Login({ onLogin }) {
     keepLoggedIn: false,
   });
   const [error, setError] = useState("");
-  const [showErrorModal, setShowErrorModal] = useState(false);
+
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const { signIn } = useFirebase();
@@ -26,7 +25,6 @@ export default function Login({ onLogin }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
-    setShowErrorModal(false);
     setIsLoading(true);
 
     try {
@@ -35,26 +33,20 @@ export default function Login({ onLogin }) {
       if (result.success) {
         onLogin();
       } else {
-        setError(result.error || "Invalid email or password");
-        setShowErrorModal(true);
+        setError(result.error || "Invalid email or password.");
       }
     } catch (error) {
       console.error('❌ Login error:', error);
       if (error.code === 'auth/user-not-found') {
-        setError("User not found. Please check your email or contact administrator.");
-        setShowErrorModal(true);
+        setError("User not found. Please contact administrator.");
       } else if (error.code === 'auth/wrong-password') {
         setError("Incorrect password. Please try again.");
-        setShowErrorModal(true);
       } else if (error.code === 'auth/too-many-requests') {
-        setError("Too many failed attempts. Please try again later.");
-        setShowErrorModal(true);
+        setError("Too many failed attempts. Try again later.");
       } else if (error.code === 'auth/network-request-failed') {
-        setError("Network error. Please check your connection and try again.");
-        setShowErrorModal(true);
+        setError("Network error. Check your connection.");
       } else {
-        setError(`Login error: ${error.message}`);
-        setShowErrorModal(true);
+        setError("Login failed. Please try again.");
       }
     } finally {
       setIsLoading(false);
@@ -75,28 +67,7 @@ export default function Login({ onLogin }) {
       <div className="absolute -top-24 -left-24 w-96 h-96 bg-blue-100 rounded-full blur-3xl opacity-50"></div>
       <div className="absolute -bottom-24 -right-24 w-96 h-96 bg-purple-100 rounded-full blur-3xl opacity-50"></div>
 
-      <Dialog open={showErrorModal} onOpenChange={setShowErrorModal}>
-        <DialogContent className="sm:max-w-md rounded-2xl border-none shadow-2xl" showCloseButton={false}>
-          <DialogHeader className="items-center text-center">
-            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mb-4">
-              <Shield className="w-6 h-6 text-rose-500" />
-            </div>
-            <DialogTitle className="text-xl font-black text-slate-900">Authentication Failed</DialogTitle>
-            <DialogDescription className="text-slate-500 font-medium">
-              {error || "Invalid credentials provided. Please try again."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="sm:justify-center mt-2">
-            <Button 
-               type="button" 
-               onClick={() => setShowErrorModal(false)}
-               className="bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl px-8"
-            >
-              Acknowledge
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+
       
       {/* Login Card Container */}
       <div className="relative z-10 w-full max-w-[420px] flex flex-col items-center">
@@ -220,6 +191,14 @@ export default function Login({ onLogin }) {
                   <span>Login</span>
                 )}
               </Button>
+
+              {/* Inline Error Message */}
+              {error && (
+                <div className="flex items-start gap-2.5 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl px-4 py-3 mt-1">
+                  <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0 text-rose-500" />
+                  <p className="text-xs font-semibold leading-snug">{error}</p>
+                </div>
+              )}
             </form>
           </CardContent>
         </Card>
