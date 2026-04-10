@@ -293,16 +293,30 @@ export const DataProvider = ({ children }) => {
     };
 
     // Load Action Reports
+    // useFirebase writes month-based docs: actionReports/{mm-yyyy} → { data: [...reports] }
+    // We need to unpack each month document's inner data[] array
     const loadActionReports = async () => {
       try {
-        const actionsQuery = query(collection(db, 'actionReports'), orderBy('when', 'desc'));
-        const unsubscribe = onSnapshot(actionsQuery, (snapshot) => {
+        const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
           const actionReports = [];
           snapshot.forEach((doc) => {
-            actionReports.push({
-              id: doc.id,
-              ...doc.data()
-            });
+            const docData = doc.data();
+            // Month-based structure: data is an array inside each month doc
+            if (docData.data && Array.isArray(docData.data)) {
+              docData.data.forEach(report => {
+                actionReports.push({ ...report, _monthDoc: doc.id });
+              });
+            } else {
+              // Fallback: individual document structure
+              actionReports.push({ id: doc.id, ...docData });
+            }
+          });
+
+          // Sort by report date descending
+          actionReports.sort((a, b) => {
+            const tA = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
+            const tB = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
+            return tB - tA;
           });
 
           setDashboardData(prev => ({
