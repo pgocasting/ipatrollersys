@@ -18,6 +18,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import ExcelJS from 'exceljs';
+import * as htmlToImage from 'html-to-image';
 import {
   Shield,
   AlertTriangle,
@@ -47,7 +48,8 @@ import {
   Mountain,
   Calendar,
   ChevronDown,
-  Eye
+  Eye,
+  Image as ImageIcon
 } from "lucide-react";
 
 const MONTH_NAMES = [
@@ -6392,9 +6394,55 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
             doc.save(`Top_Barangay_Report_${tabLabel}_${monthPart}_${topBarangayData.year}.pdf`);
           };
 
+          const exportTopBarangayToJPEG = async () => {
+            const exportContainer = document.getElementById('top-barangay-jpeg-export');
+            
+            if (exportContainer) {
+              const originalParent = exportContainer.parentNode;
+              const originalStyle = exportContainer.getAttribute('style') || '';
+              
+              // Move to body and make it explicitly visible behind the modal for capturing
+              document.body.appendChild(exportContainer);
+              exportContainer.style.position = 'fixed';
+              exportContainer.style.left = '0';
+              exportContainer.style.top = '0';
+              exportContainer.style.zIndex = '-9999';
+              exportContainer.style.opacity = '1';
+              exportContainer.style.display = 'block';
+
+              try {
+                // Wait a tiny bit for browser to apply layout
+                await new Promise(r => setTimeout(r, 100));
+
+                const dataUrl = await htmlToImage.toJpeg(exportContainer, {
+                  quality: 0.9,
+                  backgroundColor: '#ffffff',
+                  pixelRatio: 2
+                });
+
+                const tabLabel = topBarangayTab === 'all' ? 'All_Municipalities' : String(topBarangayTab).replace(/\s+/g, '_');
+                const monthPart = topBarangayData.month === 'all' ? 'All_Months' : MONTH_NAMES[parseInt(topBarangayData.month)].replace(/\s+/g, '_');
+                const filename = `Top_Barangay_Report_${tabLabel}_${monthPart}_${topBarangayData.year}.jpg`;
+
+                const link = document.createElement('a');
+                link.download = filename;
+                link.href = dataUrl;
+                link.click();
+              } catch (error) {
+                console.error("Error exporting to JPEG:", error);
+              } finally {
+                // Revert completely
+                if (originalParent) {
+                  originalParent.appendChild(exportContainer);
+                }
+                exportContainer.setAttribute('style', originalStyle);
+              }
+            }
+          };
+
           return (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
+              <div id="top-barangay-modal-window" className="bg-white rounded-xl shadow-2xl w-full max-w-4xl mx-auto max-h-[90vh] overflow-hidden flex flex-col">
 
                 {/* Header */}
                 <div className="flex items-center justify-between p-5 border-b border-gray-200 bg-gradient-to-r from-emerald-50 to-teal-50 flex-shrink-0">
@@ -6412,7 +6460,15 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-wrap justify-end">
+                  <div id="top-barangay-controls" className="flex items-center gap-2 flex-wrap justify-end">
+                    <button
+                      onClick={exportTopBarangayToJPEG}
+                      disabled={isLoadingTopBarangay || activeRanked.length === 0}
+                      title="Export to JPEG"
+                      className="p-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 transition-colors text-gray-700 disabled:opacity-50"
+                    >
+                      <ImageIcon className="w-5 h-5" />
+                    </button>
                     <button
                       onClick={exportTopBarangayToPDF}
                       disabled={isLoadingTopBarangay || activeRanked.length === 0}
@@ -6516,7 +6572,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 </div>
 
                 {/* Table Body */}
-                <div className="overflow-y-auto flex-1">
+                <div id="top-barangay-table-container" className="overflow-y-auto flex-1">
                   {activeRanked.length === 0 ? (
                     <div className="text-center py-16 text-gray-400">
                       <MapPin className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -6594,6 +6650,53 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                       </tbody>
                     </table>
                   )}
+                </div>
+
+                {/* Hidden container for JPEG export to exactly match PDF */}
+                <div 
+                  id="top-barangay-jpeg-export" 
+                  style={{
+                    display: 'none',
+                    width: '800px',
+                    backgroundColor: '#ffffff',
+                    padding: '40px',
+                    fontFamily: 'helvetica, arial, sans-serif',
+                    color: '#000'
+                  }}
+                >
+                  <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>Top Barangay Report</h1>
+                  <p style={{ fontSize: '14px', margin: '0 0 24px 0' }}>
+                    {topBarangayData.month === 'all'
+                      ? `Year: ${topBarangayData.year} — All Months`
+                      : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
+                    } — Ranked by total activity
+                  </p>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr>
+                        <th style={{ backgroundColor: '#10B981', color: '#ffffff', padding: '8px', border: '1px solid #e5e7eb', textAlign: 'left', width: '40px', fontWeight: 'bold' }}>Rank</th>
+                        <th style={{ backgroundColor: '#10B981', color: '#ffffff', padding: '8px', border: '1px solid #e5e7eb', textAlign: 'left', fontWeight: 'bold' }}>Barangay</th>
+                        {topBarangayTab === 'all' && (
+                          <th style={{ backgroundColor: '#10B981', color: '#ffffff', padding: '8px', border: '1px solid #e5e7eb', textAlign: 'left', fontWeight: 'bold' }}>Municipality</th>
+                        )}
+                        <th style={{ backgroundColor: '#10B981', color: '#ffffff', padding: '8px', border: '1px solid #e5e7eb', textAlign: 'left', fontWeight: 'bold' }}>Entries</th>
+                        <th style={{ backgroundColor: '#10B981', color: '#ffffff', padding: '8px', border: '1px solid #e5e7eb', textAlign: 'left', fontWeight: 'bold' }}>Action Taken</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activeRanked.map((b, idx) => (
+                        <tr key={idx}>
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>#{idx + 1}</td>
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{b.name || ''}</td>
+                          {topBarangayTab === 'all' && (
+                            <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{b.municipality || ''}</td>
+                          )}
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{(b.total ?? 0).toLocaleString()}</td>
+                          <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{(b.actionTakenCount ?? 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
 
               </div>
