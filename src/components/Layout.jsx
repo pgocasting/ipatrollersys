@@ -72,7 +72,7 @@ export default function Layout({ children, onNavigate, currentPage, onLogout, on
     { id: 'commandcenter', label: 'Command Center', icon: Command, showFor: ['command-center', 'ipatroller'] },
     { id: 'actioncenter', label: 'Action Center', icon: Activity, showFor: ['action-center', 'ipatroller'] },
     { id: 'incidents', label: 'Incidents', icon: AlertTriangle, showFor: ['admin', 'incidents'] },
-    { id: 'reports', label: 'Reports', icon: BarChart3, showFor: 'admin' },
+    { id: 'reports', label: 'Reports', icon: BarChart3, showFor: ['admin', 'ipatroller'] },
     { id: 'users', label: 'Users', icon: User, showFor: 'admin' },
     { id: 'logs', label: 'Logs', icon: ScrollText, showFor: 'admin' },
   ], []);
