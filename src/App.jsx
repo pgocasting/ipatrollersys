@@ -471,17 +471,14 @@ function AppContent() {
       }
     }
 
-    // Access control for settings - all non-admin users cannot access settings
-    if (currentPage === 'settings' && !isAdmin) {
+    // Access control for settings - only admin and ipatroller users can access settings
+    if (currentPage === 'settings' && !isAdmin && userAccessLevel !== 'ipatroller') {
       if (userAccessLevel === 'command-center') {
         setCurrentPage('commandcenter');
         return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       } else if (userAccessLevel === 'action-center') {
         setCurrentPage('actioncenter');
         return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      } else if (userAccessLevel === 'ipatroller') {
-        setCurrentPage('ipatroller');
-        return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;

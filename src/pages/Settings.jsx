@@ -365,7 +365,7 @@ function ProfileCustomization() {
 // ─── Main Settings Page ───────────────────────────────────────────────────────
 
 export default function Settings({ onLogout, onNavigate, currentPage }) {
-  const { isAdmin } = useAuth();
+  const { isAdmin, userAccessLevel } = useAuth();
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
@@ -402,13 +402,13 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
             <ThemeSelector />
           </SectionCard>
 
-          {/* ── Change Password (admin only) ───────────────────── */}
-          {isAdmin && (
+          {/* ── Change Password (admin and ipatroller) ───────────────────── */}
+          {(isAdmin || userAccessLevel === 'ipatroller') && (
             <SectionCard
               icon={Lock}
               iconColor="#3b82f6"
               title="Change Password"
-              description="Update your administrator account password. You'll need your current password to make changes."
+              description="Update your account password. You'll need your current password to make changes."
             >
               <ChangePasswordForm />
             </SectionCard>
