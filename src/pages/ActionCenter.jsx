@@ -582,6 +582,16 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
     }
 
     if (typeof item.when === 'string') {
+      // First try to extract year directly from string using regex (e.g., "April 25, 2025" or "2025-04-25")
+      const yearMatch = item.when.match(/\b(20\d{2}|19\d{2})\b/);
+      if (yearMatch) {
+        const year = Number(yearMatch[1]);
+        if (year > 1900 && year < 3000) {
+          return year;
+        }
+      }
+
+      // If no direct year match, try parsing as date
       try {
         const parsedDate = new Date(item.when);
         if (!isNaN(parsedDate.getTime())) {
