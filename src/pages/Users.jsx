@@ -538,6 +538,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectContent className="bg-white border border-slate-200">
                             <SelectItem value="agriculture">Agriculture</SelectItem>
                             <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                            <SelectItem value="pnp">PNP</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -708,6 +709,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectContent className="bg-white border border-slate-200">
                             <SelectItem value="agriculture">Agriculture</SelectItem>
                             <SelectItem value="pg-enro">PG-ENRO</SelectItem>
+                            <SelectItem value="pnp">PNP</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -1174,7 +1176,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                     </TableCell>
                                     <TableCell className="py-4 text-center">
                                       <Badge className="bg-gradient-to-r from-purple-100 to-fuchsia-100 dark:from-purple-500/20 dark:to-fuchsia-500/20 text-purple-800 dark:text-purple-300 border-none shadow-sm px-4 py-1.5 text-xs font-black uppercase tracking-wider">
-                                        {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : 'N/A'}
+                                        {u.department === 'agriculture' ? 'Agriculture' : u.department === 'pg-enro' ? 'PG-ENRO' : u.department === 'pnp' ? 'PNP' : 'N/A'}
                                       </Badge>
                                     </TableCell>
                                     <TableCell className="text-center py-4">
