@@ -57,6 +57,28 @@ const MONTH_NAMES = [
   "July", "August", "September", "October", "November", "December"
 ];
 
+const DEFAULT_CONCERN_TYPES = [
+  'Public Consumption of Alcoholic Beverages',
+  'Curfew Violations',
+  'Stray Dogs',
+  'Smoking in Public Area',
+  'No Barangay Tanod on Duty',
+  'Improper Garbage Disposal',
+  'Busted Street Lights',
+  'Road Obstructions',
+  'Half Naked',
+  // Common variations/aliases
+  'SMOKING IN PUBLIC AREA',
+  'HALF NAKED',
+  'ROAD OBSTRUCTIONS',
+  'BUSTED STREET LIGHTS',
+  'IMPROPER GARBAGE DISPOSAL',
+  'PUBLIC CONSUMPTION OF ALCOHOLIC BEVERAGES',
+  'CURFEW VIOLATIONS',
+  'STRAY DOGS',
+  'NO BARANGAY TANOD ON DUTY'
+];
+
 export default function Reports({ onLogout, onNavigate, currentPage }) {
   const {
     actionReports,
@@ -118,6 +140,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   // Quarterly Report Preview modal state
   const [showQuarterlyPreview, setShowQuarterlyPreview] = useState(false);
   const [quarterlyPreviewData, setQuarterlyPreviewData] = useState(null);
+  const [concernTypeFilter, setConcernTypeFilter] = useState('all'); // 'all' or 'default'
 
   // Top Barangay modal state
   const [showTopBarangay, setShowTopBarangay] = useState(false);
@@ -2776,15 +2799,29 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             currentY += 15;
 
             // CONCERN TYPES TABLE with Total and Action Taken columns
-            const concernTableData = barangayData.concernTypes.map(concern => [
-              concern.type,
-              concern.total.toString(),
-              concern.actionTaken.toString()
-            ]);
+            const concernTableData = barangayData.concernTypes
+              .filter(concern => {
+                // Filter based on concern type filter
+                if (concernTypeFilter === 'default' && !DEFAULT_CONCERN_TYPES.includes(concern.type)) {
+                  return false;
+                }
+                return true;
+              })
+              .map(concern => [
+                concern.type,
+                concern.total.toString(),
+                concern.actionTaken.toString()
+              ]);
 
             // Add totals row
-            const totalConcerns = barangayData.concernTypes.reduce((sum, c) => sum + c.total, 0);
-            const totalActions = barangayData.concernTypes.reduce((sum, c) => sum + c.actionTaken, 0);
+            const filteredConcerns = barangayData.concernTypes.filter(concern => {
+              if (concernTypeFilter === 'default' && !DEFAULT_CONCERN_TYPES.includes(concern.type)) {
+                return false;
+              }
+              return true;
+            });
+            const totalConcerns = filteredConcerns.reduce((sum, c) => sum + c.total, 0);
+            const totalActions = filteredConcerns.reduce((sum, c) => sum + c.actionTaken, 0);
             concernTableData.push(['TOTAL', totalConcerns.toString(), totalActions.toString()]);
 
             // Calculate optimal column widths - better proportions
@@ -3309,15 +3346,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         colHeaderRow.height = 18;
 
         // Concern type data rows
-        allConcernEntries.forEach(([concernType, q]) => {
-          const dataRow = ws.addRow([concernType, '', q.Q1 || 0, q.Q2 || 0, q.Q3 || 0, q.Q4 || 0, q.total || 0]);
-          [1, 3, 4, 5, 6, 7].forEach(c => {
-            const cell = dataRow.getCell(c);
-            cell.border = allBorders;
-            cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
-            if (c === 7) cell.font = { bold: true, color: { argb: 'FF065F46' } }; // Total col bold green
+        allConcernEntries
+          .filter(([concernType]) => {
+            // Filter based on concern type filter
+            if (concernTypeFilter === 'default' && !DEFAULT_CONCERN_TYPES.includes(concernType)) {
+              return false;
+            }
+            return true;
+          })
+          .forEach(([concernType, q]) => {
+            const dataRow = ws.addRow([concernType, '', q.Q1 || 0, q.Q2 || 0, q.Q3 || 0, q.Q4 || 0, q.total || 0]);
+            [1, 3, 4, 5, 6, 7].forEach(c => {
+              const cell = dataRow.getCell(c);
+              cell.border = allBorders;
+              cell.alignment = { horizontal: c === 1 ? 'left' : 'center', vertical: 'middle' };
+              if (c === 7) cell.font = { bold: true, color: { argb: 'FF065F46' } }; // Total col bold green
+            });
           });
-        });
 
         // Subtotal row
         const totals = allConcernEntries.reduce((acc, [, q]) => ({
@@ -6139,6 +6184,18 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
+                  {/* Concern Type Filter */}
+                  <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+                    <Filter className="w-4 h-4 text-gray-500" />
+                    <select
+                      value={concernTypeFilter}
+                      onChange={(e) => setConcernTypeFilter(e.target.value)}
+                      className="text-sm font-medium text-gray-700 bg-transparent outline-none cursor-pointer pr-1"
+                    >
+                      <option value="all">All Concern Types</option>
+                      <option value="default">Default Only</option>
+                    </select>
+                  </div>
                   {/* Year selector */}
                   <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
                     <Calendar className="w-4 h-4 text-gray-500" />
@@ -6242,6 +6299,11 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                               </thead>
                               <tbody>
                                 {Object.entries(brgyData).map(([concernType, q], idx) => {
+                                  // Filter based on concern type filter
+                                  if (concernTypeFilter === 'default' && !DEFAULT_CONCERN_TYPES.includes(concernType)) {
+                                    return null;
+                                  }
+                                  
                                   const q2t = getTrend(q.Q2 || 0, q.Q1 || 0);
                                   const q3t = getTrend(q.Q3 || 0, q.Q2 || 0);
                                   const q4t = getTrend(q.Q4 || 0, q.Q3 || 0);
@@ -6264,7 +6326,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                                       <td className="px-3 py-2 text-center font-bold text-green-700 bg-green-50">{q.total || 0}</td>
                                     </tr>
                                   );
-                                })}
+                                }).filter(Boolean)}
                               </tbody>
                             </table>
                           </div>
