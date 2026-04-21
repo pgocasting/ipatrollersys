@@ -148,7 +148,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [topBarangayData, setTopBarangayData] = useState(null);
   const [topBarangayTab, setTopBarangayTab] = useState('all');
   const [topBarangayMonth, setTopBarangayMonth] = useState('all'); // 'all' or 0-11
-  const [topBarangayQuarter, setTopBarangayQuarter] = useState('all'); // 'all', 'Q1', 'Q2', 'Q3', 'Q4'
+  const [topBarangayQuarter, setTopBarangayQuarter] = useState(() => {
+    // Default to current quarter
+    const currentMonth = new Date().getMonth();
+    if (currentMonth >= 0 && currentMonth <= 2) return 'Q1';
+    if (currentMonth >= 3 && currentMonth <= 5) return 'Q2';
+    if (currentMonth >= 6 && currentMonth <= 8) return 'Q3';
+    return 'Q4';
+  });
   const [topBarangayYear, setTopBarangayYear] = useState(new Date().getFullYear());
 
   // Municipalities by district mapping (matching I-Patroller structure)
@@ -6702,7 +6709,13 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     <div className="text-center py-16 text-gray-400">
                       <MapPin className="w-12 h-12 mx-auto mb-3 opacity-30" />
                       <p className="text-lg font-medium">No barangay data found</p>
-                      <p className="text-sm">No records available for {topBarangayData.month === 'all' ? topBarangayData.year : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`}</p>
+                      <p className="text-sm">No records available for {
+                        topBarangayData.quarter && topBarangayData.quarter !== 'all'
+                          ? `${topBarangayData.quarter} ${topBarangayData.year}`
+                          : topBarangayData.month === 'all' 
+                            ? topBarangayData.year 
+                            : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
+                      }</p>
                     </div>
                   ) : (
                     <table className="w-full text-sm">
@@ -6791,9 +6804,15 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                 >
                   <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: '0 0 8px 0' }}>Top Barangay Report</h1>
                   <p style={{ fontSize: '14px', margin: '0 0 24px 0' }}>
-                    {topBarangayData.month === 'all'
-                      ? `Year: ${topBarangayData.year} — All Months`
-                      : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
+                    {topBarangayData.quarter && topBarangayData.quarter !== 'all'
+                      ? `${topBarangayData.quarter} ${topBarangayData.year} (${
+                          topBarangayData.quarter === 'Q1' ? 'Jan-Mar' :
+                          topBarangayData.quarter === 'Q2' ? 'Apr-Jun' :
+                          topBarangayData.quarter === 'Q3' ? 'Jul-Sep' : 'Oct-Dec'
+                        })`
+                      : topBarangayData.month === 'all'
+                        ? `Year: ${topBarangayData.year} — All Months`
+                        : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
                     } — Ranked by total activity
                   </p>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
