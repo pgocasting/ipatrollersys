@@ -148,6 +148,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const [topBarangayData, setTopBarangayData] = useState(null);
   const [topBarangayTab, setTopBarangayTab] = useState('all');
   const [topBarangayMonth, setTopBarangayMonth] = useState('all'); // 'all' or 0-11
+  const [topBarangayQuarter, setTopBarangayQuarter] = useState('all'); // 'all', 'Q1', 'Q2', 'Q3', 'Q4'
   const [topBarangayYear, setTopBarangayYear] = useState(new Date().getFullYear());
 
   // Municipalities by district mapping (matching I-Patroller structure)
@@ -1286,15 +1287,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
   const districts = ["all", "1ST DISTRICT", "2ND DISTRICT", "3RD DISTRICT"];
 
   // Shared Top Barangay loader — reads current filter state via args so it's never stale
-  const loadTopBarangayReport = useCallback(async (monthFilter, yearFilter) => {
+  const loadTopBarangayReport = useCallback(async (monthFilter, yearFilter, quarterFilter = 'all') => {
     setIsLoadingTopBarangay(true);
     try {
       const allMunicipalities = Object.values(municipalitiesByDistrict).flat();
       const allQueries = [];
       const queryMap = [];
-      const monthsToQuery = monthFilter === 'all'
-        ? Array.from({ length: 12 }, (_, i) => i)
-        : [parseInt(monthFilter)];
+      
+      // Determine which months to query based on quarter or month filter
+      let monthsToQuery;
+      if (quarterFilter !== 'all') {
+        // Quarter filter takes precedence
+        switch (quarterFilter) {
+          case 'Q1':
+            monthsToQuery = [0, 1, 2]; // Jan, Feb, Mar
+            break;
+          case 'Q2':
+            monthsToQuery = [3, 4, 5]; // Apr, May, Jun
+            break;
+          case 'Q3':
+            monthsToQuery = [6, 7, 8]; // Jul, Aug, Sep
+            break;
+          case 'Q4':
+            monthsToQuery = [9, 10, 11]; // Oct, Nov, Dec
+            break;
+          default:
+            monthsToQuery = Array.from({ length: 12 }, (_, i) => i);
+        }
+      } else if (monthFilter === 'all') {
+        monthsToQuery = Array.from({ length: 12 }, (_, i) => i);
+      } else {
+        monthsToQuery = [parseInt(monthFilter)];
+      }
+      
       for (const municipality of allMunicipalities) {
         for (const monthIndex of monthsToQuery) {
           const monthName = MONTH_NAMES[monthIndex];
@@ -1400,7 +1425,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       });
       const ranked = Object.values(barangayTotals).sort((a, b) => b.actionTakenCount - a.actionTakenCount || b.total - a.total);
       const rankedWithActivity = ranked.filter(b => b.total > 0 || b.actionTakenCount > 0);
-      setTopBarangayData({ ranked, rankedWithActivity, year: yearFilter, month: monthFilter });
+      setTopBarangayData({ ranked, rankedWithActivity, year: yearFilter, month: monthFilter, quarter: quarterFilter });
       setShowTopBarangay(true);
     } catch (err) {
       console.error('Error loading Top Barangay data:', err);
@@ -4456,7 +4481,7 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
             {
               name: "Top Barangay",
               action: async () => {
-                await loadTopBarangayReport(topBarangayMonth, topBarangayYear);
+                await loadTopBarangayReport(topBarangayMonth, topBarangayYear, topBarangayQuarter);
               },
               format: "Modal",
               priority: "high"
@@ -6414,9 +6439,15 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
 
           const exportTopBarangayToPDF = () => {
             const doc = new jsPDF();
-            const reportLabel = topBarangayData.month === 'all'
-              ? `Year: ${topBarangayData.year} — All Months`
-              : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`;
+            const reportLabel = topBarangayData.quarter && topBarangayData.quarter !== 'all'
+              ? `${topBarangayData.quarter} ${topBarangayData.year} (${
+                  topBarangayData.quarter === 'Q1' ? 'Jan-Mar' :
+                  topBarangayData.quarter === 'Q2' ? 'Apr-Jun' :
+                  topBarangayData.quarter === 'Q3' ? 'Jul-Sep' : 'Oct-Dec'
+                })`
+              : topBarangayData.month === 'all'
+                ? `Year: ${topBarangayData.year} — All Months`
+                : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`;
 
             doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
@@ -6515,9 +6546,15 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     <div>
                       <h3 className="text-xl font-bold text-gray-900">Top Barangay Report</h3>
                       <p className="text-sm text-gray-500">
-                        {topBarangayData.month === 'all'
-                          ? `Year: ${topBarangayData.year} — All Months`
-                          : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
+                        {topBarangayData.quarter && topBarangayData.quarter !== 'all'
+                          ? `${topBarangayData.quarter} ${topBarangayData.year} (${
+                              topBarangayData.quarter === 'Q1' ? 'Jan-Mar' :
+                              topBarangayData.quarter === 'Q2' ? 'Apr-Jun' :
+                              topBarangayData.quarter === 'Q3' ? 'Jul-Sep' : 'Oct-Dec'
+                            })`
+                          : topBarangayData.month === 'all'
+                            ? `Year: ${topBarangayData.year} — All Months`
+                            : `${MONTH_NAMES[parseInt(topBarangayData.month)]} ${topBarangayData.year}`
                         } — Ranked by total activity
                       </p>
                     </div>
@@ -6539,11 +6576,37 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     >
                       <FileText className="w-5 h-5" />
                     </button>
+                    {/* Quarter Filter */}
+                    <select
+                      value={topBarangayQuarter}
+                      onChange={e => {
+                        const quarter = e.target.value;
+                        setTopBarangayQuarter(quarter);
+                        // Auto-set month to 'all' when quarter is selected
+                        if (quarter !== 'all') {
+                          setTopBarangayMonth('all');
+                        }
+                      }}
+                      className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                    >
+                      <option value="all">All Quarters</option>
+                      <option value="Q1">Q1 (Jan-Mar)</option>
+                      <option value="Q2">Q2 (Apr-Jun)</option>
+                      <option value="Q3">Q3 (Jul-Sep)</option>
+                      <option value="Q4">Q4 (Oct-Dec)</option>
+                    </select>
                     {/* Month Filter */}
                     <select
                       value={topBarangayMonth}
-                      onChange={e => setTopBarangayMonth(e.target.value)}
+                      onChange={e => {
+                        setTopBarangayMonth(e.target.value);
+                        // Auto-set quarter to 'all' when specific month is selected
+                        if (e.target.value !== 'all') {
+                          setTopBarangayQuarter('all');
+                        }
+                      }}
                       className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-300"
+                      disabled={topBarangayQuarter !== 'all'}
                     >
                       <option value="all">All Months</option>
                       {MONTH_NAMES.map((m, i) => (
@@ -6562,7 +6625,7 @@ Top Location: ${insights.topLocations[0]?.location || 'N/A'}`);
                     </select>
                     {/* Apply Button */}
                     <button
-                      onClick={() => loadTopBarangayReport(topBarangayMonth, topBarangayYear)}
+                      onClick={() => loadTopBarangayReport(topBarangayMonth, topBarangayYear, topBarangayQuarter)}
                       disabled={isLoadingTopBarangay}
                       className="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 rounded-lg font-semibold transition-colors disabled:opacity-50 flex items-center gap-1"
                     >
