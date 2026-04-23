@@ -220,7 +220,13 @@ function AppContent() {
   }, [user, loading, authLoading, userAccessLevel, isAdmin, hasLoggedLogin, userFirstName, userLastName, userUsername, userMunicipality, userDepartment]);
 
   // Track global user presence (online/idle) based on window activity
+  // DISABLED TO SAVE FIRESTORE QUOTA - This was causing excessive writes
   useEffect(() => {
+    // DISABLED: Presence tracking to save Firestore quota
+    // This feature updates user status every minute which consumes writes
+    // To re-enable, uncomment the code below
+    
+    /*
     if (!user || loading) return;
     
     const fullName = `${userFirstName || ''} ${userLastName || ''}`.trim() || userUsername || user.email;
@@ -272,6 +278,7 @@ function AppContent() {
       clearTimeout(idleTimer);
       clearTimeout(throttleTimer);
     };
+    */
   }, [user, loading, localPresence, updateUserPresence]);
 
   // Set offline strictly if browser unloads
@@ -286,10 +293,16 @@ function AppContent() {
   }, [user, updateUserPresence]);
 
   // Admin Notification: Watch for login, idle, and logout events
+  // DISABLED TO SAVE FIRESTORE QUOTA - This was causing excessive reads
   const prevPresenceRef = React.useRef({});
   const isInitialLoadRef = React.useRef(true);
 
   useEffect(() => {
+    // DISABLED: Admin notifications for user presence changes
+    // This feature was consuming too many Firestore reads
+    // To re-enable, uncomment the code below
+    
+    /*
     if (!isAdmin) return;
     
     const presenceRef = collection(db, 'userPresence');
@@ -347,6 +360,7 @@ function AppContent() {
       unsubscribe();
       isInitialLoadRef.current = true; // reset barrier when unmounted
     };
+    */
   }, [isAdmin]);
 
   const handleLogout = async () => {
