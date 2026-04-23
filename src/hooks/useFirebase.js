@@ -155,7 +155,16 @@ export const useFirebase = () => {
     try {
       setLoading(true);
       if (user) {
-        await updateUserPresence(user.email, 'offline', { presenceReason: 'logout' });
+        try {
+          // Set offline with a timeout to prevent hanging
+          await Promise.race([
+            updateUserPresence(user.email, 'offline', { presenceReason: 'logout' }),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Presence update timeout')), 2000))
+          ]);
+        } catch (presenceError) {
+          console.warn('⚠️ Presence update failed or timed out:', presenceError);
+          // Continue with logout even if presence update fails
+        }
       }
       await signOut(auth);
       return { success: true };

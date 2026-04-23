@@ -52,10 +52,14 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
     actionReports,
     incidents,
     loading: dataLoading,
-    refreshIPatrollerData,
-    createSampleData
+    loadDashboardData
   } = useData();
   const { userAccessLevel, userMunicipality, isAdmin } = useAuth();
+
+  // Load dashboard data on mount
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const currentMonthYearLabel = new Date().toLocaleString('en-US', {
     month: 'long',

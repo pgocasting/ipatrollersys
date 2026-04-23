@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import Layout from "../components/Layout";
 import { usersLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import { Button } from "../components/ui/button";
@@ -13,9 +13,10 @@ import { useFirebase } from "../hooks/useFirebase";
 import { doc, getDoc, collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2, Activity, Zap, WifiOff, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertTriangle, Loader2, User, UserPlus, Users as UsersIcon, Shield, Search, Mail, Phone, Building2, MapPin, Edit2, Trash2, Activity, Zap, WifiOff, ChevronDown, ChevronRight, Download, Image as ImageIcon } from "lucide-react";
 import { logUserManagementAction, logAdminAccess } from '../utils/adminLogger';
 import { useAuth } from '../contexts/AuthContext';
+import * as htmlToImage from 'html-to-image';
 
 export default function Users({ onLogout, onNavigate, currentPage }) {
   const { user, getUsers, createUserByAdmin, updateUser, deleteUser } = useFirebase();
@@ -35,12 +36,90 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   const [presenceMap, setPresenceMap] = useState({});
   const [currentTime, setCurrentTime] = useState(Date.now());
   const [expandedAccessLevels, setExpandedAccessLevels] = useState({});
+  const [isExporting, setIsExporting] = useState(false);
+  const [showCommandCenterSummary, setShowCommandCenterSummary] = useState(false);
+  const commandCenterSummaryRef = useRef(null);
 
   const toggleAccessLevel = (accessLevel) => {
     setExpandedAccessLevels((prev) => ({
       ...prev,
       [accessLevel]: !prev[accessLevel],
     }));
+  };
+
+  // Get Command Center users summary by status
+  const getCommandCenterSummary = () => {
+    const commandCenterUsers = users.filter(u => u.accessLevel === 'command-center');
+    
+    const active = [];
+    const idle = [];
+    const offline = [];
+    
+    commandCenterUsers.forEach(user => {
+      const presence = presenceMap[user.email];
+      const status = presence?.status || 'offline';
+      const municipality = user.municipality || 'N/A';
+      const fullName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || user.email;
+      
+      const userInfo = { fullName, municipality };
+      
+      if (status === 'online') {
+        active.push(userInfo);
+      } else if (status === 'idle') {
+        // Calculate idle duration
+        const lastActive = presence?.lastActive;
+        let idleDuration = '';
+        
+        if (lastActive) {
+          const lastActiveTime = lastActive.toDate ? lastActive.toDate() : new Date(lastActive);
+          const now = Date.now();
+          const diffMs = now - lastActiveTime.getTime();
+          const diffMins = Math.floor(diffMs / 60000);
+          const diffHours = Math.floor(diffMins / 60);
+          
+          if (diffHours > 0) {
+            const remainingMins = diffMins % 60;
+            idleDuration = remainingMins > 0 
+              ? `${diffHours}h ${remainingMins}m`
+              : `${diffHours}h`;
+          } else {
+            idleDuration = `${diffMins}m`;
+          }
+        } else {
+          idleDuration = 'Unknown';
+        }
+        
+        idle.push({ ...userInfo, idleDuration });
+      } else {
+        offline.push(userInfo);
+      }
+    });
+    
+    return { active, idle, offline, total: commandCenterUsers.length };
+  };
+
+  // Export Command Center summary as PNG/JPEG
+  const exportCommandCenterSummary = async (format = 'png') => {
+    if (!commandCenterSummaryRef.current) return;
+    
+    setIsExporting(true);
+    try {
+      const dataUrl = format === 'png' 
+        ? await htmlToImage.toPng(commandCenterSummaryRef.current, { quality: 1.0, pixelRatio: 2 })
+        : await htmlToImage.toJpeg(commandCenterSummaryRef.current, { quality: 0.95, pixelRatio: 2 });
+      
+      const link = document.createElement('a');
+      link.download = `command-center-summary-${new Date().toISOString().split('T')[0]}.${format}`;
+      link.href = dataUrl;
+      link.click();
+      
+      toast.success(`Command Center summary exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Failed to export summary');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Heartbeat for calculating live idle times
@@ -1052,6 +1131,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   if (!usersInGroup || usersInGroup.length === 0) return null;
 
                   const isOpen = !!expandedAccessLevels[accessLevel];
+                  const isCommandCenter = accessLevel === 'command-center';
 
                   return (
                     <Card
@@ -1060,7 +1140,11 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     >
                       <CardHeader
                         className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none"
-                        onClick={() => toggleAccessLevel(accessLevel)}
+                        onClick={(e) => {
+                          // Don't toggle if clicking on export buttons
+                          if (e.target.closest('.export-buttons')) return;
+                          toggleAccessLevel(accessLevel);
+                        }}
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-4">
@@ -1077,6 +1161,36 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
+                            {isCommandCenter && (
+                              <div className="export-buttons flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setShowCommandCenterSummary(true)}
+                                  className="h-9 w-9 p-0 bg-gradient-to-r from-blue-50 to-emerald-50 hover:from-blue-100 hover:to-emerald-100 border-2 border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-sm hover:shadow-md group"
+                                  title="Generate Summary Report"
+                                >
+                                  <div className="relative">
+                                    <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-emerald-500 rounded-full blur-sm opacity-50 group-hover:opacity-75 transition-opacity"></div>
+                                    <div className="relative bg-gradient-to-br from-blue-600 to-emerald-600 p-1.5 rounded-full">
+                                      <svg 
+                                        className="w-3.5 h-3.5 text-white" 
+                                        fill="none" 
+                                        stroke="currentColor" 
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path 
+                                          strokeLinecap="round" 
+                                          strokeLinejoin="round" 
+                                          strokeWidth={2.5} 
+                                          d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" 
+                                        />
+                                      </svg>
+                                    </div>
+                                  </div>
+                                </Button>
+                              </div>
+                            )}
                             <Badge className="bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300 border-transparent px-3 py-1 text-sm font-black shadow-sm">
                               {usersInGroup.length}
                             </Badge>
@@ -1218,6 +1332,180 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
           </>
         )}
       </div>
+
+      {/* Command Center Summary Modal */}
+      <Dialog open={showCommandCenterSummary} onOpenChange={setShowCommandCenterSummary}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black uppercase">Command Center Summary Report</DialogTitle>
+            <DialogDescription>
+              Status breakdown of all Command Center users by municipality
+            </DialogDescription>
+          </DialogHeader>
+
+          <div ref={commandCenterSummaryRef} className="bg-white p-8">
+            {/* Header */}
+            <div className="text-center mb-8 border-b-4 border-emerald-600 pb-4">
+              <h1 className="text-3xl font-black uppercase text-slate-900 mb-2">Command Center Summary</h1>
+              <p className="text-sm font-bold text-slate-600">
+                Generated on {new Date().toLocaleDateString('en-US', { 
+                  month: 'long', 
+                  day: 'numeric', 
+                  year: 'numeric',
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: true
+                })}
+              </p>
+              <p className="text-xs font-bold text-slate-500 mt-1 uppercase tracking-widest">
+                Provincial Government of Bataan
+              </p>
+            </div>
+
+            {(() => {
+              const summary = getCommandCenterSummary();
+              
+              return (
+                <>
+                  {/* Overview Stats */}
+                  <div className="grid grid-cols-4 gap-4 mb-8">
+                    <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-4 text-center">
+                      <p className="text-xs font-black text-slate-500 uppercase tracking-wider mb-1">Total Users</p>
+                      <p className="text-4xl font-black text-slate-900">{summary.total}</p>
+                    </div>
+                    <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 text-center">
+                      <p className="text-xs font-black text-emerald-700 uppercase tracking-wider mb-1">Active</p>
+                      <p className="text-4xl font-black text-emerald-600">{summary.active.length}</p>
+                    </div>
+                    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-4 text-center">
+                      <p className="text-xs font-black text-amber-700 uppercase tracking-wider mb-1">Idle</p>
+                      <p className="text-4xl font-black text-amber-600">{summary.idle.length}</p>
+                    </div>
+                    <div className="bg-rose-50 border-2 border-rose-200 rounded-xl p-4 text-center">
+                      <p className="text-xs font-black text-rose-700 uppercase tracking-wider mb-1">Offline</p>
+                      <p className="text-4xl font-black text-rose-600">{summary.offline.length}</p>
+                    </div>
+                  </div>
+
+                  {/* Active Users */}
+                  {summary.active.length > 0 && (
+                    <div className="mb-6">
+                      <div className="bg-emerald-600 text-white px-4 py-2 rounded-t-lg">
+                        <h3 className="text-sm font-black uppercase tracking-wider">
+                          Active Users ({summary.active.length})
+                        </h3>
+                      </div>
+                      <div className="border-2 border-emerald-200 rounded-b-lg p-4 bg-emerald-50/30">
+                        <div className="grid grid-cols-2 gap-3">
+                          {summary.active.map((user, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white border border-emerald-200 rounded-lg px-3 py-2">
+                              <span className="font-bold text-sm text-slate-900">{user.fullName}</span>
+                              <span className="text-xs font-bold text-emerald-700 uppercase">{user.municipality}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Idle Users */}
+                  {summary.idle.length > 0 && (
+                    <div className="mb-6">
+                      <div className="bg-amber-600 text-white px-4 py-2 rounded-t-lg">
+                        <h3 className="text-sm font-black uppercase tracking-wider">
+                          Idle Users ({summary.idle.length})
+                        </h3>
+                      </div>
+                      <div className="border-2 border-amber-200 rounded-b-lg p-4 bg-amber-50/30">
+                        <div className="grid grid-cols-1 gap-3">
+                          {summary.idle.map((user, idx) => (
+                            <div key={idx} className="bg-white border border-amber-200 rounded-lg px-4 py-3">
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-bold text-sm text-slate-900">{user.fullName}</span>
+                                <span className="text-xs font-bold text-amber-700 uppercase">{user.municipality}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-slate-500">Idle for:</span>
+                                <span className="text-xs font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded">
+                                  {user.idleDuration}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Offline Users */}
+                  {summary.offline.length > 0 && (
+                    <div className="mb-6">
+                      <div className="bg-rose-600 text-white px-4 py-2 rounded-t-lg">
+                        <h3 className="text-sm font-black uppercase tracking-wider">
+                          Offline Users ({summary.offline.length})
+                        </h3>
+                      </div>
+                      <div className="border-2 border-rose-200 rounded-b-lg p-4 bg-rose-50/30">
+                        <div className="grid grid-cols-2 gap-3">
+                          {summary.offline.map((user, idx) => (
+                            <div key={idx} className="flex items-center justify-between bg-white border border-rose-200 rounded-lg px-3 py-2">
+                              <span className="font-bold text-sm text-slate-900">{user.fullName}</span>
+                              <span className="text-xs font-bold text-rose-700 uppercase">{user.municipality}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowCommandCenterSummary(false)}
+            >
+              Close
+            </Button>
+            <Button
+              onClick={() => exportCommandCenterSummary('png')}
+              disabled={isExporting}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  Export as PNG
+                </>
+              )}
+            </Button>
+            <Button
+              onClick={() => exportCommandCenterSummary('jpeg')}
+              disabled={isExporting}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Exporting...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4 mr-2" />
+                  Export as JPEG
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Layout>
   );
 }

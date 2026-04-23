@@ -36,6 +36,82 @@ function AppContent() {
   const { user, loading, logout, updateUserPresence } = useFirebase();
   const { isAdmin, userAccessLevel, userViewingPage, userFirstName, userLastName, userUsername, userMunicipality, userDepartment, loading: authLoading } = useAuth();
 
+  // Monitor Firestore quota errors (Admin only)
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const handleFirestoreError = (event) => {
+      // Check if it's a Firestore quota error
+      if (event.message && event.message.includes('resource-exhausted')) {
+        // Calculate next reset time (midnight Pacific Time)
+        const now = new Date();
+        const pacificTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
+        const tomorrow = new Date(pacificTime);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        tomorrow.setHours(0, 0, 0, 0);
+        
+        // Convert to Philippine Time for display
+        const resetTimePHT = new Date(tomorrow.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+        const resetDateStr = resetTimePHT.toLocaleDateString('en-US', { 
+          month: 'long', 
+          day: 'numeric', 
+          year: 'numeric',
+          timeZone: 'Asia/Manila'
+        });
+        const resetTimeStr = resetTimePHT.toLocaleTimeString('en-US', { 
+          hour: 'numeric', 
+          minute: '2-digit',
+          hour12: true,
+          timeZone: 'Asia/Manila'
+        });
+        
+        // Show toast notification
+        toast.error(
+          <div className="flex flex-col gap-2 w-full">
+            <p className="font-bold text-red-800">⚠️ Firestore Quota Exceeded</p>
+            <p className="text-xs text-red-700">
+              Your Firestore daily quota has been exceeded. Some features may not work until the quota resets.
+            </p>
+            <div className="flex flex-col gap-1 text-xs text-red-600 mt-1">
+              <p className="font-semibold">Quota resets at:</p>
+              <p className="font-bold text-red-700">{resetDateStr} at {resetTimeStr}</p>
+              <p className="mt-1 opacity-80">(Philippine Time - Midnight Pacific Time)</p>
+            </div>
+            <div className="flex flex-col gap-1 text-xs text-red-600 mt-2">
+              <p>• Real-time updates are paused</p>
+              <p>• Data writes may fail</p>
+              <p>• Consider upgrading to Blaze plan</p>
+            </div>
+            <button 
+              onClick={() => toast.dismiss()}
+              className="mt-2 text-[10px] uppercase font-black tracking-widest bg-red-600 text-white py-1.5 px-3 rounded-lg hover:bg-red-700 transition-colors self-start"
+            >
+              Dismiss
+            </button>
+          </div>,
+          { 
+            duration: Infinity, // Keep it visible
+            id: 'quota-exceeded' // Prevent duplicates
+          }
+        );
+      }
+    };
+
+    // Listen for console errors
+    const originalError = console.error;
+    console.error = function(...args) {
+      const message = args.join(' ');
+      if (message.includes('resource-exhausted') || message.includes('Quota exceeded')) {
+        handleFirestoreError({ message });
+      }
+      originalError.apply(console, args);
+    };
+
+    return () => {
+      console.error = originalError;
+    };
+  }, [isAdmin]);
+
   // Set initial page after auth is determined; force all non-admin users to their respective pages
   useEffect(() => {
     if (!loading && !authLoading && user) {
@@ -290,13 +366,24 @@ function AppContent() {
       };
       
       // Log logout event before calling logout
-      if (isAdmin || userAccessLevel === 'admin') {
-        await logAdminLogout(userInfo);
-      } else {
-        await logUserLogout(userInfo);
+      try {
+        if (isAdmin || userAccessLevel === 'admin') {
+          await Promise.race([
+            logAdminLogout(userInfo),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Logout logging timeout')), 2000))
+          ]);
+        } else {
+          await Promise.race([
+            logUserLogout(userInfo),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('Logout logging timeout')), 2000))
+          ]);
+        }
+      } catch (logError) {
+        console.warn('⚠️ Logout logging failed or timed out:', logError);
+        // Continue with logout even if logging fails
       }
       
-      // First, call Firebase logout to clear authentication
+      // Call Firebase logout (this handles presence update internally)
       await logout();
       console.log('✅ Firebase logout completed');
       

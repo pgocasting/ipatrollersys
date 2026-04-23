@@ -85,11 +85,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
     incidents,
     ipatrollerData,
     summaryStats,
-    loading: dataLoading
+    loading: dataLoading,
+    loadReportsData
   } = useData();
 
   const { user, getWeeklyReport, getBarangays, getConcernTypes } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
+
+  // Load reports data on mount
+  useEffect(() => {
+    loadReportsData();
+  }, [loadReportsData]);
 
   const [fromMonth, setFromMonth] = useState(new Date().getMonth());
   const [fromYear, setFromYear] = useState(new Date().getFullYear());

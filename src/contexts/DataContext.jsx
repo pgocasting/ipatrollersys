@@ -5,11 +5,7 @@ import {
   query,
   onSnapshot,
   orderBy,
-  limit,
-  where,
-  getDocs,
-  doc,
-  getDoc
+  getDocs
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 
@@ -25,12 +21,14 @@ export const useData = () => {
 
 export const DataProvider = ({ children }) => {
   const { user } = useFirebase();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [loadedPages, setLoadedPages] = useState(new Set());
+  
   const [dashboardData, setDashboardData] = useState({
     patrolData: [],
     actionReports: [],
     incidents: [],
-    ipatrollerData: [], // Add IPatroller data
+    ipatrollerData: [],
     summaryStats: {
       totalPatrols: 0,
       totalActions: 0,
@@ -38,7 +36,6 @@ export const DataProvider = ({ children }) => {
       activeMunicipalities: 0,
       inactiveMunicipalities: 0,
       recentActivity: [],
-      // Add IPatroller specific stats
       totalDailyPatrols: 0,
       totalYesterdayPatrols: 0,
       totalPhotosUploaded: 0,
@@ -48,91 +45,25 @@ export const DataProvider = ({ children }) => {
     }
   });
 
-  // Load all data when user changes
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
+  // Store unsubscribe functions per page
+  const unsubscribeFunctionsRef = React.useRef({});
 
-    // OPTIMIZED: Set loading to false immediately, load data in background
-    setLoading(false);
-    const unsubscribeFunctions = [];
+  // Function to load Dashboard data only
+  const loadDashboardData = React.useCallback(async () => {
+    if (loadedPages.has('dashboard') || !user) return;
+    
+    console.log('📊 Loading Dashboard data with real-time updates...');
+    setLoading(true);
+    
+    try {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
 
-    // Load essential data first (in background)
-    const loadEssentialData = async () => {
-      try {
-        // Load minimal data needed for initial render
-        const essentialDataQuery = query(
-          collection(db, 'patrolData'),
-          orderBy('timestamp', 'desc'),
-          limit(10) // Only load 10 most recent items for faster initial load
-        );
-        const snapshot = await getDocs(essentialDataQuery);
-        const essentialData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }));
-
-        // Update state with essential data
-        setDashboardData(prev => ({
-          ...prev,
-          patrolData: essentialData,
-          summaryStats: {
-            ...prev.summaryStats,
-            totalPatrols: essentialData.length
-          }
-        }));
-      } catch (error) {
-        console.error('Error loading essential data:', error);
-      }
-    };
-
-    // Load remaining data in the background
-    const loadPatrolData = async () => {
-      try {
-        const patrolQuery = query(collection(db, 'patrolData'), orderBy('updatedAt', 'desc'));
-        const unsubscribe = onSnapshot(patrolQuery, (snapshot) => {
-          const patrolData = [];
-          snapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data.data && Array.isArray(data.data)) {
-              patrolData.push({
-                id: doc.id,
-                ...data,
-                data: data.data
-              });
-            }
-          });
-
-          setDashboardData(prev => ({
-            ...prev,
-            patrolData,
-            summaryStats: {
-              ...prev.summaryStats,
-              totalPatrols: patrolData.reduce((total, row) =>
-                total + (row.data ? row.data.reduce((sum, val) => sum + (val || 0), 0) : 0), 0
-              )
-              // activeMunicipalities and inactiveMunicipalities will be set by loadIPatrollerData
-            }
-          }));
-        });
-        unsubscribeFunctions.push(unsubscribe);
-      } catch (error) {
-        console.error('Error loading patrol data:', error);
-      }
-    };
-
-    // Load IPatroller Data
-    const loadIPatrollerData = async () => {
-      try {
-        const currentMonth = new Date().getMonth();
-        const currentYear = new Date().getFullYear();
-        const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
-
-        // Load from the same structure that iPatroller uses
-        const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
-        const querySnapshot = await getDocs(municipalitiesRef);
+      const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+      
+      // Use onSnapshot for real-time updates
+      const unsubscribe = onSnapshot(municipalitiesRef, (querySnapshot) => {
         const ipatrollerData = [];
 
         querySnapshot.forEach((doc) => {
@@ -141,28 +72,6 @@ export const DataProvider = ({ children }) => {
             ipatrollerData.push({ id: doc.id, ...data });
           }
         });
-
-        // If no data found for current month, try the most recent available month
-        if (ipatrollerData.length === 0) {
-          const allMonthsSnapshot = await getDocs(collection(db, 'patrolData'));
-          const months = [];
-          allMonthsSnapshot.forEach((doc) => {
-            const data = doc.data();
-            if (data && data.updatedAt) months.push({ id: doc.id, updatedAt: data.updatedAt });
-          });
-          months.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
-          if (months[0]) {
-            const recentSnapshot = await getDocs(collection(db, 'patrolData', months[0].id, 'municipalities'));
-            recentSnapshot.forEach((doc) => {
-              const data = doc.data();
-              if (data) ipatrollerData.push({ id: doc.id, ...data });
-            });
-          }
-        }
-
-        // Calculate statistics from the actual data
-        const totalDailyPatrols = ipatrollerData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
-        const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
 
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
@@ -180,9 +89,8 @@ export const DataProvider = ({ children }) => {
           else inactiveCount++;
         });
 
-        const monthlyPatrolTrend = Array.from({ length: 12 }, (_, i) => ({
-          month: i, year: currentYear, count: Math.floor(Math.random() * 100) + 20
-        }));
+        const totalDailyPatrols = ipatrollerData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
+        const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
 
         const totalYesterdayPatrols = ipatrollerData.reduce((total, item) => {
           if (item.data && Array.isArray(item.data) && yesterdayIndex >= 0 && yesterdayIndex < item.data.length) {
@@ -201,184 +109,211 @@ export const DataProvider = ({ children }) => {
             activeDistricts,
             activeMunicipalities: activeCount,
             inactiveMunicipalities: inactiveCount,
-            monthlyPatrolTrend,
             yesterdayDate: yesterday.toDateString()
           }
         }));
-      } catch (error) {
-        console.error('❌ Error loading IPatroller data:', error);
+        
+        setLoading(false);
+      });
+
+      unsubscribeFunctionsRef.current.dashboard = unsubscribe;
+      setLoadedPages(prev => new Set([...prev, 'dashboard']));
+      console.log('✅ Dashboard data loaded with real-time listener');
+    } catch (error) {
+      console.error('❌ Error loading dashboard data:', error);
+      setLoading(false);
+    }
+  }, [loadedPages, user]);
+
+  // Function to load Action Center data only
+  const loadActionCenterData = React.useCallback(async () => {
+    if (loadedPages.has('actioncenter') || !user) return;
+    
+    console.log('📋 Loading Action Center data...');
+    setLoading(true);
+
+    try {
+      const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
+        const actionReports = [];
+        snapshot.forEach((doc) => {
+          const docData = doc.data();
+          if (docData.data && Array.isArray(docData.data)) {
+            docData.data.forEach(report => {
+              actionReports.push({ ...report, _monthDoc: doc.id });
+            });
+          } else {
+            actionReports.push({ id: doc.id, ...docData });
+          }
+        });
+
+        actionReports.sort((a, b) => {
+          const tA = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
+          const tB = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
+          return tB - tA;
+        });
+
         setDashboardData(prev => ({
           ...prev,
-          ipatrollerData: [],
+          actionReports,
           summaryStats: {
             ...prev.summaryStats,
-            totalDailyPatrols: 0,
-            activeDistricts: 0,
-            activeMunicipalities: 0,
-            inactiveMunicipalities: 0
+            totalActions: actionReports.length
           }
         }));
-      }
-    };
-
-    // Function to create sample data for testing
-    const createSampleData = () => {
-      console.log('🧪 Creating sample data for testing...');
-
-      const sampleData = [
-        {
-          id: '1ST DISTRICT-Abucay',
-          municipality: 'Abucay',
-          district: '1ST DISTRICT',
-          data: [8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9, 6, 8, 7, 9, 8, 7, 9],
-          totalPatrols: 240,
-          activeDays: 31,
-          inactiveDays: 0,
-          activePercentage: 100
-        },
-        {
-          id: '1ST DISTRICT-Orani',
-          municipality: 'Orani',
-          district: '1ST DISTRICT',
-          data: [5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5, 7, 5, 6, 5],
-          totalPatrols: 186,
-          activeDays: 31,
-          inactiveDays: 0,
-          activePercentage: 100
-        },
-        {
-          id: '2ND DISTRICT-Balanga City',
-          municipality: 'Balanga City',
-          district: '2ND DISTRICT',
-          data: [3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3, 2, 4, 3],
-          totalPatrols: 93,
-          activeDays: 31,
-          inactiveDays: 0,
-          activePercentage: 100
-        }
-      ];
-
-      // Calculate stats from sample data
-      const totalDailyPatrols = sampleData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
-      const activeDistricts = new Set(sampleData.map(item => item.district)).size;
-      const activeMunicipalities = sampleData.filter(item => {
-        if (!item.data || !Array.isArray(item.data)) return false;
-        const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-        return avgPatrols >= 5;
-      });
-      const inactiveMunicipalities = sampleData.filter(item => {
-        if (!item.data || !Array.isArray(item.data)) return true;
-        const avgPatrols = item.data.reduce((a, b) => a + (b || 0), 0) / item.data.length;
-        return avgPatrols < 5;
+        
+        setLoading(false);
       });
 
-      setDashboardData(prev => ({
-        ...prev,
-        ipatrollerData: sampleData,
-        summaryStats: {
-          ...prev.summaryStats,
-          totalDailyPatrols,
-          activeDistricts,
-          activeMunicipalities: activeMunicipalities.length,
-          inactiveMunicipalities: inactiveMunicipalities.length
-        }
-      }));
+      unsubscribeFunctionsRef.current.actioncenter = unsubscribe;
+      setLoadedPages(prev => new Set([...prev, 'actioncenter']));
+      console.log('✅ Action Center data loaded');
+    } catch (error) {
+      console.error('❌ Error loading action center data:', error);
+      setLoading(false);
+    }
+  }, [loadedPages, user]);
 
-      console.log('✅ Sample data created:', {
-        totalDailyPatrols,
-        activeDistricts,
-        activeMunicipalities: activeMunicipalities.length,
-        inactiveMunicipalities: inactiveMunicipalities.length
-      });
-    };
+  // Function to load Incidents data only
+  const loadIncidentsData = React.useCallback(async () => {
+    if (loadedPages.has('incidents') || !user) return;
+    
+    console.log('🚨 Loading Incidents data...');
+    setLoading(true);
 
-    // Load Action Reports
-    // useFirebase writes month-based docs: actionReports/{mm-yyyy} → { data: [...reports] }
-    // We need to unpack each month document's inner data[] array
-    const loadActionReports = async () => {
-      try {
-        const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
-          const actionReports = [];
-          snapshot.forEach((doc) => {
-            const docData = doc.data();
-            // Month-based structure: data is an array inside each month doc
-            if (docData.data && Array.isArray(docData.data)) {
-              docData.data.forEach(report => {
-                actionReports.push({ ...report, _monthDoc: doc.id });
-              });
-            } else {
-              // Fallback: individual document structure
-              actionReports.push({ id: doc.id, ...docData });
-            }
+    try {
+      const incidentsQuery = query(collection(db, 'incidents'), orderBy('date', 'desc'));
+      const unsubscribe = onSnapshot(incidentsQuery, (snapshot) => {
+        const incidents = [];
+        snapshot.forEach((doc) => {
+          incidents.push({
+            id: doc.id,
+            ...doc.data()
           });
-
-          // Sort by report date descending
-          actionReports.sort((a, b) => {
-            const tA = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
-            const tB = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
-            return tB - tA;
-          });
-
-          setDashboardData(prev => ({
-            ...prev,
-            actionReports,
-            summaryStats: {
-              ...prev.summaryStats,
-              totalActions: actionReports.length
-            }
-          }));
         });
-        unsubscribeFunctions.push(unsubscribe);
-      } catch (error) {
-        console.error('Error loading action reports:', error);
-      }
-    };
 
-    // Load Incidents
-    const loadIncidents = async () => {
-      try {
-        const incidentsQuery = query(collection(db, 'incidents'), orderBy('date', 'desc'));
-        const unsubscribe = onSnapshot(incidentsQuery, (snapshot) => {
-          const incidents = [];
-          snapshot.forEach((doc) => {
-            incidents.push({
-              id: doc.id,
-              ...doc.data()
+        setDashboardData(prev => ({
+          ...prev,
+          incidents,
+          summaryStats: {
+            ...prev.summaryStats,
+            totalIncidents: incidents.length
+          }
+        }));
+        
+        setLoading(false);
+      });
+
+      unsubscribeFunctionsRef.current.incidents = unsubscribe;
+      setLoadedPages(prev => new Set([...prev, 'incidents']));
+      console.log('✅ Incidents data loaded');
+    } catch (error) {
+      console.error('❌ Error loading incidents data:', error);
+      setLoading(false);
+    }
+  }, [loadedPages, user]);
+
+  // Function to load IPatroller data only
+  const loadIPatrollerData = React.useCallback(async () => {
+    if (loadedPages.has('ipatroller') || !user) return;
+    
+    console.log('🚗 Loading IPatroller data with real-time updates...');
+    setLoading(true);
+
+    try {
+      const currentMonth = new Date().getMonth();
+      const currentYear = new Date().getFullYear();
+      const monthYearId = `${String(currentMonth + 1).padStart(2, "0")}-${currentYear}`;
+
+      const municipalitiesRef = collection(db, 'patrolData', monthYearId, 'municipalities');
+      
+      // Use onSnapshot for real-time updates
+      const unsubscribe = onSnapshot(municipalitiesRef, (querySnapshot) => {
+        const ipatrollerData = [];
+
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data) {
+            ipatrollerData.push({ id: doc.id, ...data });
+          }
+        });
+
+        const totalDailyPatrols = ipatrollerData.reduce((total, item) => total + (item.totalPatrols || 0), 0);
+        const activeDistricts = new Set(ipatrollerData.map(item => item.district)).size;
+
+        setDashboardData(prev => ({
+          ...prev,
+          ipatrollerData,
+          patrolData: ipatrollerData,
+          summaryStats: {
+            ...prev.summaryStats,
+            totalDailyPatrols,
+            activeDistricts
+          }
+        }));
+        
+        setLoading(false);
+      });
+
+      unsubscribeFunctionsRef.current.ipatroller = unsubscribe;
+      setLoadedPages(prev => new Set([...prev, 'ipatroller']));
+      console.log('✅ IPatroller data loaded with real-time listener');
+    } catch (error) {
+      console.error('❌ Error loading ipatroller data:', error);
+      setLoading(false);
+    }
+  }, [loadedPages, user]);
+
+  // Function to load Reports data (for Reports page)
+  const loadReportsData = React.useCallback(async () => {
+    if (loadedPages.has('reports') || !user) return;
+    
+    console.log('📊 Loading Reports data...');
+    setLoading(true);
+
+    try {
+      // Load action reports for reports page
+      const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
+        const actionReports = [];
+        snapshot.forEach((doc) => {
+          const docData = doc.data();
+          if (docData.data && Array.isArray(docData.data)) {
+            docData.data.forEach(report => {
+              actionReports.push({ ...report, _monthDoc: doc.id });
             });
-          });
-
-          setDashboardData(prev => ({
-            ...prev,
-            incidents,
-            summaryStats: {
-              ...prev.summaryStats,
-              totalIncidents: incidents.length
-            }
-          }));
+          } else {
+            actionReports.push({ id: doc.id, ...docData });
+          }
         });
-        unsubscribeFunctions.push(unsubscribe);
-      } catch (error) {
-        console.error('Error loading incidents:', error);
-      }
-    };
 
-    // OPTIMIZED: Load ALL data simultaneously in parallel (no sequential waterfall)
-    Promise.all([
-      loadEssentialData(),
-      loadIPatrollerData(),
-      loadActionReports(),
-      loadIncidents()
-    ]);
-    // loadPatrolData uses onSnapshot (real-time listener), start it separately
-    loadPatrolData();
+        setDashboardData(prev => ({
+          ...prev,
+          actionReports
+        }));
+        
+        setLoading(false);
+      });
 
-    // Cleanup function
+      unsubscribeFunctionsRef.current.reports = unsubscribe;
+      setLoadedPages(prev => new Set([...prev, 'reports']));
+      console.log('✅ Reports data loaded');
+    } catch (error) {
+      console.error('❌ Error loading reports data:', error);
+      setLoading(false);
+    }
+  }, [loadedPages, user]);
+
+  // Cleanup on unmount
+  useEffect(() => {
     return () => {
-      unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
+      Object.values(unsubscribeFunctionsRef.current).forEach(unsubscribe => {
+        if (typeof unsubscribe === 'function') {
+          unsubscribe();
+        }
+      });
     };
-  }, [user]);
+  }, []);
 
-  // Generate recent activity
+  // Generate recent activity when data changes
   useEffect(() => {
     if (dashboardData.patrolData.length > 0 || dashboardData.actionReports.length > 0 || dashboardData.incidents.length > 0) {
       const recentActivity = [];
@@ -442,15 +377,14 @@ export const DataProvider = ({ children }) => {
   const value = {
     ...dashboardData,
     loading,
+    loadDashboardData,
+    loadActionCenterData,
+    loadIncidentsData,
+    loadIPatrollerData,
+    loadReportsData,
     refreshData: () => {
-      setLoading(true);
-      // This will trigger the useEffect to reload all data
-    },
-    refreshIPatrollerData: () => {
-      // No-op: data is loaded once on mount; refresh by toggling user state
-    },
-    createSampleData: () => {
-      // No-op: sample data generation removed
+      // Clear loaded pages to force reload
+      setLoadedPages(new Set());
     }
   };
 
