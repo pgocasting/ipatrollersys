@@ -1062,14 +1062,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Use the pre-calculated activePercentage from Criteria tab logic
         const activePercentage = performer.activePercentage;
 
-        const getStatusText = () => {
-          if (activePercentage >= 90) return 'Outstanding';
-          if (activePercentage >= 75) return 'Very Satisfactory';
-          if (activePercentage >= 60) return 'Satisfactory';
-          if (activePercentage >= 50) return 'Good';
-          return 'Needs Improvement';
-        };
-
         return [
           index + 1,
           performer.municipality,
@@ -1077,14 +1069,13 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           performer.activeDays,
           performer.totalPatrols,
           performer.overallActionPercentage || 0,
-          `${activePercentage}%`,
-          getStatusText()
+          `${activePercentage}%`
         ];
       });
 
       // Add table using autoTable with auto-fit columns
       autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', `Active\nDays\n(${activeDaysWeight}%)`, 'Total\nPatrols', `Action\nTaken\n(${actionTakenWeight}%)`, `Performa\nnce\n(${activeDaysWeight}/${actionTakenWeight})`, 'Status']],
+        head: [['Rank', 'Municipality', 'District', `Active\nDays\n(${activeDaysWeight}%)`, 'Total\nPatrols', `Action\nTaken\n(${actionTakenWeight}%)`, `Performa\nnce\n(${activeDaysWeight}/${actionTakenWeight})`]],
         body: tableData,
         startY: 105,
         margin: { left: 30, right: 30 },
@@ -1112,8 +1103,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           3: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Active Days
           4: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Total Patrols
           5: { halign: 'center', cellWidth: 'auto', minCellWidth: 40 },  // Action Taken
-          6: { halign: 'center', cellWidth: 'auto', minCellWidth: 50 },  // Performance
-          7: { halign: 'center', cellWidth: 'auto', minCellWidth: 80 }   // Status
+          6: { halign: 'center', cellWidth: 'auto', minCellWidth: 50 }   // Performance
         },
         alternateRowStyles: {
           fillColor: [248, 250, 252]
@@ -1138,27 +1128,6 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               data.cell.styles.fillColor = [156, 163, 175]; // Gray
               data.cell.styles.textColor = [255, 255, 255];
               data.cell.styles.fontStyle = 'bold';
-            }
-          }
-
-          // Color coding for status column
-          if (data.column.index === 7 && data.section === 'body') {
-            const status = data.cell.text[0];
-            if (status === 'Outstanding') {
-              data.cell.styles.fillColor = [59, 130, 246]; // Blue
-              data.cell.styles.textColor = [255, 255, 255];
-            } else if (status === 'Very Satisfactory') {
-              data.cell.styles.fillColor = [16, 185, 129]; // Emerald
-              data.cell.styles.textColor = [255, 255, 255];
-            } else if (status === 'Satisfactory') {
-              data.cell.styles.fillColor = [34, 197, 94]; // Green
-              data.cell.styles.textColor = [255, 255, 255];
-            } else if (status === 'Good') {
-              data.cell.styles.fillColor = [245, 158, 11]; // Yellow
-              data.cell.styles.textColor = [0, 0, 0];
-            } else if (status === 'Needs Improvement') {
-              data.cell.styles.fillColor = [239, 68, 68]; // Red
-              data.cell.styles.textColor = [255, 255, 255];
             }
           }
 
