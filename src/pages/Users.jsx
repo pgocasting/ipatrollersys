@@ -1248,7 +1248,16 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                             {presenceMap[u.email]?.status === 'idle' && (
                                               <div className="text-[10px] font-black bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded-lg animate-pulse border border-amber-200 dark:border-amber-900/50 flex items-center gap-1">
                                                 <Zap className="w-3 h-3" />
-                                                <span>{Math.floor((currentTime - (presenceMap[u.email]?.lastActive || currentTime)) / 60000)}m Idle</span>
+                                                <span>
+                                                  {(() => {
+                                                    const lastActive = presenceMap[u.email]?.lastActive;
+                                                    if (!lastActive) return 'Idle';
+                                                    const lastActiveTime = lastActive.toDate ? lastActive.toDate() : new Date(lastActive);
+                                                    const diffMs = currentTime - lastActiveTime.getTime();
+                                                    const diffMins = Math.floor(diffMs / 60000);
+                                                    return diffMins > 0 ? `${diffMins}m Idle` : 'Idle';
+                                                  })()}
+                                                </span>
                                               </div>
                                             )}
                                           </div>

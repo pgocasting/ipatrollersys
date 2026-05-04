@@ -19,7 +19,9 @@ import {
   query, 
   where, 
   deleteDoc, 
-  updateDoc 
+  updateDoc,
+  serverTimestamp,
+  Timestamp
 } from 'firebase/firestore';
 import { auth, db } from '../lib/firebase';
 
@@ -1256,7 +1258,7 @@ export const useFirebase = () => {
       const docRef = doc(db, 'userPresence', email);
       await setDoc(docRef, {
         status: status, // "online" | "idle" | "offline"
-        lastActive: new Date().toISOString(),
+        lastActive: serverTimestamp(),
         ...extraData
       }, { merge: true });
     } catch (error) {

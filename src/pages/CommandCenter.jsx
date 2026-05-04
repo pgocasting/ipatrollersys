@@ -3877,13 +3877,30 @@ const handleSaveAllMonths = async () => {
               </div>
             )}
 
-            <div className="relative w-full sm:w-auto">
+            <div className="relative w-full sm:w-auto flex items-center gap-3">
+              {/* Save Data Button - Top Right */}
+              {(isAdmin || userAccessLevel === 'command-center') && !isReadOnly && (
+                <button
+                  onClick={handleSaveWeeklyReport}
+                  disabled={isLoadingWeeklyReports}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
+                  title="Save Data"
+                >
+                  {isLoadingWeeklyReports ? (
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                  ) : (
+                    <Save className="w-5 h-5" />
+                  )}
+                  <span className="text-sm font-medium">Save Data</span>
+                </button>
+              )}
+
               {userAccessLevel !== 'viewing' && (
                 <>
                   <button
                     id="commandcenter-menu-button"
                     onClick={() => setShowMenuDropdown(!showMenuDropdown)}
-                    className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full"
+                    className="bg-black hover:bg-gray-800 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto"
                   >
                     <Menu className="w-5 h-5" />
                     <span className="text-sm font-medium">View Options</span>
@@ -4489,22 +4506,6 @@ const handleSaveAllMonths = async () => {
                     )}
 
                     <div className="flex flex-wrap gap-2 sm:gap-3 w-full lg:w-auto lg:justify-end">
-                      {(isAdmin || userAccessLevel === 'command-center') && !isReadOnly && (
-                        <button
-                          onClick={handleSaveWeeklyReport}
-                          disabled={isLoadingWeeklyReports}
-                          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                          title="Save Data"
-                        >
-                          {isLoadingWeeklyReports ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <CheckCircle className="h-4 w-4" />
-                          )}
-                          <span className="text-sm font-medium">Save Data</span>
-                        </button>
-                      )}
-                      
                       {isAdmin && (
                         <button 
                           onClick={() => document.getElementById('excel-file-input').click()}

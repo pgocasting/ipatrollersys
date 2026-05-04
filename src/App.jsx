@@ -220,52 +220,56 @@ function AppContent() {
   }, [user, loading, authLoading, userAccessLevel, isAdmin, hasLoggedLogin, userFirstName, userLastName, userUsername, userMunicipality, userDepartment]);
 
   // Track global user presence (online/idle) based on window activity
-  // DISABLED TO SAVE FIRESTORE QUOTA - This was causing excessive writes
+  // OPTIMIZED: Reduced writes to save Firestore quota
   useEffect(() => {
-    // DISABLED: Presence tracking to save Firestore quota
-    // This feature updates user status every minute which consumes writes
-    // To re-enable, uncomment the code below
-    
-    /*
     if (!user || loading) return;
     
     const fullName = `${userFirstName || ''} ${userLastName || ''}`.trim() || userUsername || user.email;
 
-    // Initial connection
+    // Initial connection - only write once on mount
     updateUserPresence(user.email, 'online', { fullName });
     setLocalPresence('online');
 
     let idleTimer;
-    let throttleTimer;
-    const idleTimeout = 1 * 60 * 1000; // 1 minute timeout for idle status
+    let lastActivityTime = Date.now();
+    let lastWriteTime = Date.now();
+    const idleTimeout = 5 * 60 * 1000; // 5 minutes timeout for idle status
+    const writeThrottle = 3 * 60 * 1000; // Only write every 3 minutes max
     
     const setIdle = () => {
-      setLocalPresence('idle');
-      updateUserPresence(user.email, 'idle', { fullName });
+      if (localPresence !== 'idle') {
+        setLocalPresence('idle');
+        updateUserPresence(user.email, 'idle', { fullName });
+        lastWriteTime = Date.now();
+      }
     };
 
     const resetActivity = () => {
+      const now = Date.now();
+      lastActivityTime = now;
+      
+      // Only update if transitioning from idle/offline to online
       if (localPresence === 'idle' || localPresence === 'offline') {
         setLocalPresence('online');
         updateUserPresence(user.email, 'online', { fullName });
+        lastWriteTime = now;
+      } 
+      // Or if enough time has passed since last write (heartbeat)
+      else if (now - lastWriteTime > writeThrottle) {
+        updateUserPresence(user.email, 'online', { fullName });
+        lastWriteTime = now;
       }
       
       clearTimeout(idleTimer);
       idleTimer = setTimeout(setIdle, idleTimeout);
-      
-      // Throttle pings to avoid hammering DB
-      if (!throttleTimer) {
-        throttleTimer = setTimeout(() => {
-          updateUserPresence(user.email, 'online', { fullName });
-          throttleTimer = null;
-        }, 60000); // Max 1 active ping per minute
-      }
     };
 
-    window.addEventListener('mousemove', resetActivity);
-    window.addEventListener('keydown', resetActivity);
-    window.addEventListener('click', resetActivity);
-    window.addEventListener('scroll', resetActivity);
+    // Use passive listeners for better performance
+    const options = { passive: true };
+    window.addEventListener('mousemove', resetActivity, options);
+    window.addEventListener('keydown', resetActivity, options);
+    window.addEventListener('click', resetActivity, options);
+    window.addEventListener('scroll', resetActivity, options);
     
     // Initial start
     idleTimer = setTimeout(setIdle, idleTimeout);
@@ -276,10 +280,8 @@ function AppContent() {
       window.removeEventListener('click', resetActivity);
       window.removeEventListener('scroll', resetActivity);
       clearTimeout(idleTimer);
-      clearTimeout(throttleTimer);
     };
-    */
-  }, [user, loading, localPresence, updateUserPresence]);
+  }, [user, loading, localPresence, updateUserPresence, userFirstName, userLastName, userUsername]);
 
   // Set offline strictly if browser unloads
   useEffect(() => {
