@@ -112,8 +112,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(true);
   const topPerformersPreviewRef = useRef(null);
   // Weight sliders for Top Performers ranking formula
-  const [activeDaysWeight, setActiveDaysWeight] = useState(30);
-  const [actionTakenWeight, setActionTakenWeight] = useState(70);
+
 
   // Date Range PDF Modal state variables
   const [showDateRangeModal, setShowDateRangeModal] = useState(false);
@@ -925,14 +924,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             }
           }
           const actionTakenScore = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
-          // Calculate average action efficiency (max 100) for weighting
+          // Calculate average action efficiency (max 100)
           const avgActionEfficiency = actionTakenScore / 4;
 
           // Active Days score: (activeDays / totalDays) * 100, capped at 100
           const computedActiveDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
 
-          // Weighted combined score using dynamic state variables
-          rawPercentage = Math.round((computedActiveDaysScore * (activeDaysWeight / 100)) + (avgActionEfficiency * (actionTakenWeight / 100)));
+          // Use average action efficiency as the performance score (no weighting)
+          rawPercentage = Math.round(avgActionEfficiency);
 
         } else if (isNovDec2025) {
           // Nov–Dec 2025: average of 4 weekly efficiencies (each capped per week at 100)
@@ -1075,7 +1074,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
       // Add table using autoTable with auto-fit columns
       autoTable(doc, {
-        head: [['Rank', 'Municipality', 'District', `Active\nDays\n(${activeDaysWeight}%)`, 'Total\nPatrols', `Action\nTaken\n(${actionTakenWeight}%)`, `Performa\nnce\n(${activeDaysWeight}/${actionTakenWeight})`]],
+        head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Action\nTaken', 'Performance']],
         body: tableData,
         startY: 105,
         margin: { left: 30, right: 30 },
@@ -1235,10 +1234,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'normal');
       doc.setTextColor(80, 80, 80);
 
-      const formulaText = `Performance % is a weighted score derived from two primary indicators:
-• Active Days (${activeDaysWeight}%): Percentage of days with 14 or more patrols logged.
-• Action Taken (${actionTakenWeight}%): Average weekly efficiency based on patrols with resolved incidents.
-Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTakenWeight}%) = Final Performance %`;
+      const formulaText = `Performance % is based on action efficiency:
+• Action Taken: Average weekly efficiency based on patrols with resolved incidents.
+• Formula: Average of weekly action efficiency percentages from Criteria tab.`;
 
       const splitFormulaText = doc.splitTextToSize(formulaText, pageWidth - 60);
       doc.text(splitFormulaText, 30, formGuideY);
@@ -1438,7 +1436,7 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
 
           // Add table using autoTable
           autoTable(doc, {
-            head: [['Rank', 'Municipality', 'District', 'Active\nDays\n(30%)', 'Total\nPatrols', 'Action\nTaken\n(70%)', 'Performa\nnce\n(30/70)', 'Status']],
+            head: [['Rank', 'Municipality', 'District', 'Active\nDays', 'Total\nPatrols', 'Action\nTaken', 'Performance', 'Status']],
             body: tableData,
             startY: 105,
             margin: { left: 30, right: 30 },
@@ -2640,7 +2638,7 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
                             </div>
                           </th>
                           <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 border-l-2 border-gray-300 min-w-[100px] align-top">
-                            <div className="leading-tight">Overall<br />Percentage</div>
+                            <div className="leading-tight">Overall<br />Average</div>
                           </th>
                         </>
                       )}
@@ -2796,8 +2794,14 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
                                     Math.floor((attended / WEEKLY_MIN) * 100)
                                   );
 
-                                  // Calculate overall percentage: Total of Week 1-4 efficiency percentages
-                                  const overallPercentage = weeklyEfficiency.reduce((sum, efficiency) => sum + efficiency, 0);
+                                  // Calculate overall percentage based on the efficiency formula:
+                                  // Overall % = (Total Attended / Total Minimum) * 100
+                                  // Total Attended = sum of all weeks attended
+                                  // Total Minimum = WEEKLY_MIN * 4 weeks
+                                  // Cap at 100% maximum
+                                  const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+                                  const totalMinimum = WEEKLY_MIN * 4; // 4 weeks
+                                  const overallPercentage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
                                   return (
                                     <>
                                       <td className="px-3 py-4 text-center text-sm text-gray-700">{idx + 1}</td>
@@ -2839,7 +2843,7 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
                                           {efficiency}%
                                         </td>
                                       ))}
-                                      {/* Overall Percentage */}
+                                      {/* Overall Average */}
                                       <td className="px-6 py-4 text-center text-sm font-semibold text-green-600 border-l-2 border-gray-300">{overallPercentage}%</td>
                                     </>
                                   );
@@ -3367,69 +3371,13 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
                           <p><strong>Total Patrols:</strong> Sum of Week 1-4 actual reports (from Criteria tab)</p>
                         </div>
                         <div className="space-y-2">
-                          <p><strong>Performance % (Jan 2026+):</strong> Weighted score = (Active Days % × {activeDaysWeight}%) + (Action Taken % × {actionTakenWeight}%)</p>
+                          <p><strong>Performance % (Jan 2026+):</strong> Average action efficiency from Criteria tab weekly reports</p>
                           <p><strong>Status Levels:</strong> Outstanding (≥90%), Very Satisfactory (75–89%), Satisfactory (60–74%), Good (50–59%), Needs Improvement (&lt;50%)</p>
                           <p><strong>Top 12 Display:</strong> Shows the best performing municipalities for the selected month</p>
                         </div>
                       </div>
 
-                      {/* Weight Controls */}
-                      {selectedTopPerformersYear >= 2026 && (
-                        <div className="mt-4 pt-4 border-t border-gray-200">
-                          <p className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <Zap className="w-4 h-4 text-emerald-500" />
-                            Performance Formula Weights (Jan 2026+)
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Active Days Weight */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs font-medium text-gray-700">Active Days Weight</label>
-                                <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">{activeDaysWeight}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={activeDaysWeight}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value);
-                                  setActiveDaysWeight(val);
-                                  setActionTakenWeight(100 - val);
-                                }}
-                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-emerald-500"
-                              />
-                              <p className="text-xs text-gray-500">Active Days % (days ≥14 patrols / total days) × 100</p>
-                            </div>
-                            {/* Action Taken Weight */}
-                            <div className="space-y-1">
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs font-medium text-gray-700">Action Taken Weight</label>
-                                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{actionTakenWeight}%</span>
-                              </div>
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                step="5"
-                                value={actionTakenWeight}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value);
-                                  setActionTakenWeight(val);
-                                  setActiveDaysWeight(100 - val);
-                                }}
-                                className="w-full h-2 rounded-lg appearance-none cursor-pointer accent-blue-500"
-                              />
-                              <p className="text-xs text-gray-500">Action Taken efficiency from Criteria tab weekly reports</p>
-                            </div>
-                          </div>
-                          <div className="mt-2 text-xs text-gray-500 flex items-center gap-1">
-                            <span className="inline-block w-2 h-2 rounded-full bg-emerald-400"></span>
-                            <span>Weights always sum to 100% — adjusting one automatically updates the other.</span>
-                          </div>
-                        </div>
-                      )}
+
                     </div>
                   </div>
 
@@ -3538,25 +3486,19 @@ Formula: (Active Days % × ${activeDaysWeight}%) + (Action Taken % × ${actionTa
                                     District
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                    <div className="flex flex-col items-center">
-                                      <span>Active Days</span>
-                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">({activeDaysWeight}%)</span>
-                                    </div>
+                                    Active Days
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     Total Patrols
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
-                                    <div className="flex flex-col items-center">
-                                      <span>Overall Action Taken</span>
-                                      <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">({actionTakenWeight}%)</span>
-                                    </div>
+                                    Overall Action Taken
                                   </th>
                                   <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     <div className="flex flex-col items-center">
                                       <span>Performance</span>
                                       <span className="text-[9px] font-normal text-gray-400 normal-case mt-0.5">
-                                        ({activeDaysWeight}% Active Days + {actionTakenWeight}% Action Taken)
+                                        (Action Efficiency Average)
                                       </span>
                                     </div>
                                   </th>

@@ -50,7 +50,7 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const { isAdmin, userDepartment, userMunicipality } = useAuth();
   
   // State management
-  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedMonth, setSelectedMonth] = useState("all"); // Changed to "all" by default
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [selectedDistrict, setSelectedDistrict] = useState("all");
   const [selectedWhat, setSelectedWhat] = useState("all");
@@ -79,6 +79,9 @@ export default function ActionCenter({ onLogout, onNavigate, currentPage }) {
   const [showMonthlyBreakdownModal, setShowMonthlyBreakdownModal] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [selectedImportDepartment, setSelectedImportDepartment] = useState('');
+  const [showDeleteMonthDialog, setShowDeleteMonthDialog] = useState(false);
+  const [deleteMonthSelection, setDeleteMonthSelection] = useState('');
+  const [deleteYearSelection, setDeleteYearSelection] = useState(new Date().getFullYear().toString());
   
   // Helper: extract one or more URLs from a cell string (e.g., Google Drive links)
   const extractLinksFromCell = (text) => {
@@ -760,16 +763,20 @@ item?.otherInformation,
       const matchesMunicipality = activeMunicipality === "all" || normalizeText(item.municipality) === normalizeText(activeMunicipality);
 
       const matchesMonth = (() => {
+        // If "all" is selected, show all months
+        if (selectedMonth === "all") return true;
+        
+        const monthNum = parseInt(selectedMonth);
         if (item.when instanceof Date) {
-          return item.when.getMonth() === selectedMonth;
+          return item.when.getMonth() === monthNum;
         } else if (typeof item.when === 'string') {
           try {
             const parsedDate = new Date(item.when);
             if (!isNaN(parsedDate.getTime())) {
-              return parsedDate.getMonth() === selectedMonth;
+              return parsedDate.getMonth() === monthNum;
             }
           } catch (e) { /* fall through */ }
-          return detectMonthFromText(item.when) === selectedMonth;
+          return detectMonthFromText(item.when) === monthNum;
         }
         return false;
       })();
@@ -1129,6 +1136,47 @@ item?.otherInformation,
     return mapping;
   };
 
+  // Helper function to detect department from sheet name
+  const detectDepartmentFromSheetName = (sheetName) => {
+    if (!sheetName) return null;
+    
+    const nameLower = sheetName.toLowerCase().trim();
+    
+    // PNP-related keywords
+    const pnpKeywords = [
+      'gambling', 'pusher', 'beer house', 'patulo', 'drugs', 'illegal drugs',
+      'pnp', 'police', 'arrest', 'suspect', 'crime', 'violation'
+    ];
+    
+    // Agriculture-related keywords
+    const agricultureKeywords = [
+      'agriculture', 'agri', 'farming', 'crops', 'livestock', 'fishery',
+      'illegal fishing', 'cutting', 'trees', 'forest', 'timber'
+    ];
+    
+    // PG-ENRO-related keywords
+    const pgenroKeywords = [
+      'pg-enro', 'pgenro', 'environment', 'enro', 'environmental',
+      'quarrying', 'mining', 'pollution', 'waste'
+    ];
+    
+    // Check for matches
+    if (pgenroKeywords.some(keyword => nameLower.includes(keyword))) {
+      return 'pg-enro';
+    }
+    
+    if (agricultureKeywords.some(keyword => nameLower.includes(keyword))) {
+      return 'agriculture';
+    }
+    
+    if (pnpKeywords.some(keyword => nameLower.includes(keyword))) {
+      return 'pnp';
+    }
+    
+    // Default to PNP if no match (since most sheets are PNP-related)
+    return 'pnp';
+  };
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -1314,25 +1362,78 @@ item?.otherInformation,
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: 'array' });
           const importedActions = [];
+          
+          // Auto-detect number of sheets
+          const sheetCount = workbook.SheetNames.length;
+          actionCenterLog(`📊 Excel file contains ${sheetCount} sheet(s): ${workbook.SheetNames.join(', ')}`);
+          
+          // Show info to user about detected sheets
+          if (sheetCount > 1) {
+            const sheetInfo = workbook.SheetNames.map(name => {
+              const detectedDept = detectDepartmentFromSheetName(name);
+              return `  • ${name} → ${detectedDept.toUpperCase()}`;
+            }).join('\n');
+            
+            const proceed = confirm(
+              `Detected ${sheetCount} sheets in the Excel file:\n\n${sheetInfo}\n\n` +
+              `Each sheet will be imported to its corresponding department.\n\n` +
+              `Continue with import?`
+            );
+            
+            if (!proceed) {
+              event.target.value = ''; // Reset file input
+              return;
+            }
+          } else {
+            actionCenterLog(`📄 Single sheet detected: ${workbook.SheetNames[0]}`);
+          }
 
           // Process each sheet in the workbook
           workbook.SheetNames.forEach(sheetName => {
             const worksheet = workbook.Sheets[sheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            if (jsonData.length === 0) return;
+            if (jsonData.length === 0) {
+              actionCenterLog(`⚠️ Sheet "${sheetName}" is empty, skipping...`);
+              return;
+            }
 
-            // Get headers from first row
-            const headers = jsonData[0].map(header => header ? header.toString().trim() : '');
+            // Auto-detect department from sheet name
+            const detectedDepartment = detectDepartmentFromSheetName(sheetName);
+            actionCenterLog(`🔍 Processing sheet "${sheetName}" as ${detectedDepartment.toUpperCase()} department`);
 
-            // Process data rows
-            for (let i = 1; i < jsonData.length; i++) {
+            // Get headers from first row (flexible - find first non-empty row)
+            let headerRowIndex = 0;
+            let headers = [];
+            
+            for (let i = 0; i < Math.min(5, jsonData.length); i++) {
               const row = jsonData[i];
-              if (!row || row.length === 0) continue;
+              if (row && row.length > 0 && row.some(cell => cell && cell.toString().trim())) {
+                headers = row.map(header => header ? header.toString().trim() : '');
+                headerRowIndex = i;
+                break;
+              }
+            }
+            
+            if (headers.length === 0) {
+              actionCenterLog(`⚠️ No valid headers found in sheet "${sheetName}", skipping...`);
+              return;
+            }
+            
+            actionCenterLog(`📋 Headers found in sheet "${sheetName}":`, headers);
+            actionCenterLog(`📊 Total data rows to process: ${jsonData.length - headerRowIndex - 1}`);
+
+            // Process data rows (start after header row)
+            for (let i = headerRowIndex + 1; i < jsonData.length; i++) {
+              const row = jsonData[i];
+              if (!row || row.length === 0 || !row.some(cell => cell && cell.toString().trim())) {
+                continue; // Skip empty rows
+              }
+              
               const values = row.map(value => value ? value.toString().trim() : '');
 
               let action;
               
-              if (selectedImportDepartment === 'agriculture') {
+              if (detectedDepartment === 'agriculture') {
                 // Use Agriculture Department specific mapping
                 const agriMapping = getAgricultureFieldMapping(headers, values);
                 const locationInfo = detectMunicipalityAndDistrict(
@@ -1354,10 +1455,11 @@ item?.otherInformation,
                   gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
                   source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
                   otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
-                  photos: extractLinksFromCell(agriMapping.documents)
+                  photos: extractLinksFromCell(agriMapping.documents),
+                  sheetName: sheetName // Track which sheet this came from
                 };
-              } else if (selectedImportDepartment === 'pg-enro') {
-                // Use PG-ENRO Department specific mapping (same structure as Agriculture)
+              } else if (detectedDepartment === 'pg-enro') {
+                // Use PG-ENRO Department specific mapping
                 const pgenroMapping = getPGENROFieldMapping(headers, values);
                 const locationInfo = detectMunicipalityAndDistrict(
                   pgenroMapping.where, 
@@ -1378,54 +1480,256 @@ item?.otherInformation,
                   gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
                   source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
                   otherInformation: values[headers.indexOf('Other Information')] || values[headers.indexOf('OTHER_INFORMATION')] || '',
-                  photos: extractLinksFromCell(pgenroMapping.documents)
+                  photos: extractLinksFromCell(pgenroMapping.documents),
+                  sheetName: sheetName // Track which sheet this came from
                 };
               } else {
-                // Use standard mapping for other departments
-                action = {
-                  department: selectedImportDepartment || values[headers.indexOf('Department')] || values[headers.indexOf('DEPARTMENT')] || userDepartment || 'pnp',
-                  municipality: values[headers.indexOf('Municipality')] || values[headers.indexOf('MUNICIPALITY')] || '',
-                  district: values[headers.indexOf('District')] || values[headers.indexOf('DISTRICT')] || '',
-                  what: values[headers.indexOf('What')] || values[headers.indexOf('WHAT')] || '',
-                  when: values[headers.indexOf('When')] || values[headers.indexOf('WHEN')] || new Date().toISOString().split('T')[0],
-                  where: values[headers.indexOf('Where')] || values[headers.indexOf('WHERE')] || '',
-                  actionTaken: values[headers.indexOf('Action Taken')] || values[headers.indexOf('ACTION_TAKEN')] || 'Pending',
-                  who: values[headers.indexOf('Who')] || values[headers.indexOf('WHO')] || '',
-                  why: values[headers.indexOf('Why')] || values[headers.indexOf('WHY')] || '',
-                  how: values[headers.indexOf('How')] || values[headers.indexOf('HOW')] || '',
-                  gender: values[headers.indexOf('Gender')] || values[headers.indexOf('GENDER')] || '',
-                  source: values[headers.indexOf('Source')] || values[headers.indexOf('SOURCE')] || '',
-                  otherInformation: 
-                    values[headers.indexOf('Other Information')] ||
-                    values[headers.indexOf('OTHER_INFORMATION')] ||
-                    values[headers.indexOf('Observation / Findings')] ||
-                    values[headers.indexOf('OBSERVATION / FINDINGS')] ||
-                    '',
-                  photos: extractLinksFromCell(
-                    values[headers.indexOf('Documents')] ||
-                    values[headers.indexOf('DOCUMENTS')] ||
-                    values[headers.indexOf('Document Links')] ||
-                    values[headers.indexOf('DOCUMENT LINKS')] ||
-                    ''
-                  )
+                // Use standard mapping for PNP and other departments
+                // Try to find columns flexibly (case-insensitive, with variations)
+                const findColumnValue = (possibleNames) => {
+                  for (const name of possibleNames) {
+                    // Try exact match first (case-insensitive)
+                    let index = headers.findIndex(h => 
+                      h && h.toLowerCase() === name.toLowerCase()
+                    );
+                    
+                    // If not found, try partial match
+                    if (index === -1) {
+                      index = headers.findIndex(h => 
+                        h && (
+                          h.toLowerCase().includes(name.toLowerCase()) ||
+                          name.toLowerCase().includes(h.toLowerCase())
+                        )
+                      );
+                    }
+                    
+                    // Check if value exists and is not empty
+                    if (index !== -1 && values[index] !== undefined && values[index] !== null) {
+                      const strValue = values[index].toString().trim();
+                      if (strValue !== '' && strValue !== 'undefined' && strValue !== 'null') {
+                        return strValue;
+                      }
+                    }
+                  }
+                  return ''; // Return empty string if nothing found
                 };
+                
+                // Helper to extract municipality from location string
+                const extractMunicipalityFromLocation = (locationStr) => {
+                  if (!locationStr) return '';
+                  // Pattern: "Brgy X, Municipality, Province" or "Brgy X Municipality, Province"
+                  const match = locationStr.match(/(?:brgy\.?\s+[^,]+,?\s+)?([^,]+),?\s+bataan/i);
+                  if (match) {
+                    return match[1].trim();
+                  }
+                  // Try simpler pattern
+                  const parts = locationStr.split(',');
+                  if (parts.length >= 2) {
+                    return parts[parts.length - 2].trim();
+                  }
+                  return '';
+                };
+                
+                // Log first row for debugging
+                if (i === headerRowIndex + 1) {
+                  actionCenterLog(`🔍 First data row sample:`, {
+                    headers: headers,
+                    values: values.slice(0, 8),
+                    reportTitle: reportTitle || '(not found)',
+                    dateReported: dateReported || '(not found)',
+                    location: location || '(not found)'
+                  });
+                }
+                
+                // Extract values with support for your Excel format
+                const reportTitle = findColumnValue(['Report Title', 'REPORT TITLE', 'What', 'WHAT', 'Action', 'Activity', 'Description', 'Incident', 'Ano', 'Type', 'Category']);
+                
+                // Try to find date column - be very flexible
+                let dateReported = findColumnValue([
+                  'Date Reported', 'DATE REPORTED', 'Date', 'DATE', 'When', 'WHEN', 
+                  'Time', 'Kailan', 'Date/Time', 'DATE/TIME', 'Date Reported', 'DATE_REPORTED'
+                ]);
+                
+                // If still no date found, try to find ANY column with "date" in the name
+                if (!dateReported) {
+                  const dateColumnIndex = headers.findIndex(h => 
+                    h && h.toLowerCase().includes('date')
+                  );
+                  if (dateColumnIndex !== -1 && values[dateColumnIndex]) {
+                    dateReported = values[dateColumnIndex].toString().trim();
+                    actionCenterLog(`📅 Found date in column "${headers[dateColumnIndex]}": ${dateReported}`);
+                  }
+                }
+                
+                // If STILL no date, use current date as last resort
+                if (!dateReported) {
+                  dateReported = new Date().toISOString().split('T')[0];
+                  actionCenterLog(`⚠️ No date column found, using current date: ${dateReported}`);
+                }
+                
+                const location = findColumnValue(['Location', 'LOCATION', 'Where', 'WHERE', 'Place', 'Venue', 'Saan', 'Address']);
+                const actionTakenValue = findColumnValue(['Action Taken', 'ACTION TAKEN', 'ACTION_TAKEN', 'Status', 'Result', 'Aksyon', 'Action']) || 'Pending';
+                const remarks = findColumnValue(['Remarks', 'REMARKS', 'Other Information', 'OTHER_INFORMATION', 'Observation', 'Findings', 'Notes', 'Details']);
+                
+                // Parse date to ensure it's in a consistent format
+                let parsedDate = dateReported;
+                let detectedMonth = null;
+                let detectedYear = null;
+                
+                try {
+                  // Try to parse the date string
+                  const dateObj = new Date(dateReported);
+                  if (!isNaN(dateObj.getTime())) {
+                    // Store as ISO string for consistency
+                    parsedDate = dateObj.toISOString();
+                    detectedMonth = dateObj.getMonth();
+                    detectedYear = dateObj.getFullYear();
+                  } else {
+                    // If parsing fails, try to extract month/year from text
+                    detectedMonth = detectMonthFromText(dateReported);
+                    
+                    // Try to extract year from text
+                    const yearMatch = dateReported.match(/\b(20\d{2}|19\d{2})\b/);
+                    if (yearMatch) {
+                      detectedYear = parseInt(yearMatch[1]);
+                    }
+                    
+                    // Keep original string if we can't parse
+                    parsedDate = dateReported;
+                  }
+                } catch (e) {
+                  // If error, try text extraction
+                  detectedMonth = detectMonthFromText(dateReported);
+                  const yearMatch = dateReported.match(/\b(20\d{2}|19\d{2})\b/);
+                  if (yearMatch) {
+                    detectedYear = parseInt(yearMatch[1]);
+                  }
+                  parsedDate = dateReported;
+                  actionCenterLog(`⚠️ Could not parse date: ${dateReported}, extracted month: ${detectedMonth}, year: ${detectedYear}`);
+                }
+                
+                // Log detection for first row
+                if (i === headerRowIndex + 1) {
+                  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                     'July', 'August', 'September', 'October', 'November', 'December'];
+                  actionCenterLog(`📅 Date detection for first row:`, {
+                    originalDate: dateReported,
+                    parsedDate: parsedDate,
+                    detectedMonth: detectedMonth !== null ? monthNames[detectedMonth] : 'unknown',
+                    detectedYear: detectedYear || 'unknown'
+                  });
+                }
+                
+                // Extract municipality from location string
+                const extractedMunicipality = extractMunicipalityFromLocation(location);
+                
+                // Try to find explicit municipality column, fallback to extracted
+                let municipality = findColumnValue(['Municipality', 'MUNICIPALITY', 'City', 'CITY', 'Bayan', 'Munisipyo']);
+                if (!municipality && extractedMunicipality) {
+                  municipality = extractedMunicipality;
+                }
+                
+                // Auto-detect district from municipality
+                const district = findColumnValue(['District', 'DISTRICT', 'Distrito']) || getDistrictByMunicipality(municipality);
+                
+                // Fallback: if no columns matched, try to use values by index
+                const useFallback = !reportTitle && !location && !municipality;
+                
+                action = {
+                  department: detectedDepartment,
+                  municipality: municipality || (useFallback && values[0] ? values[0].toString().trim() : ''),
+                  district: district || (useFallback && values[1] ? values[1].toString().trim() : ''),
+                  what: reportTitle || (useFallback && values[2] ? values[2].toString().trim() : ''),
+                  when: parsedDate, // Use parsed date
+                  where: location || (useFallback && values[4] ? values[4].toString().trim() : ''),
+                  actionTaken: actionTakenValue,
+                  who: findColumnValue(['Who', 'WHO', 'Suspect', 'Person', 'Name', 'Sino', 'Subject']),
+                  why: findColumnValue(['Why', 'WHY', 'Reason', 'Cause', 'Bakit']),
+                  how: findColumnValue(['How', 'HOW', 'Method', 'Manner', 'Paano']),
+                  gender: findColumnValue(['Gender', 'GENDER', 'Sex', 'Kasarian']),
+                  source: findColumnValue(['Source', 'SOURCE', 'Informant', 'Reporter']),
+                  otherInformation: remarks,
+                  photos: extractLinksFromCell(
+                    findColumnValue(['Photo', 'PHOTO', 'Photos', 'PHOTOS', 'Documents', 'DOCUMENTS', 'Document Links', 'DOCUMENT LINKS', 'Links'])
+                  ),
+                  sheetName: sheetName, // Track which sheet this came from
+                  // Add metadata for better filtering
+                  importedMonth: detectedMonth !== null ? detectedMonth : null,
+                  importedYear: detectedYear || null,
+                  importedDate: new Date().toISOString(),
+                  originalDateString: dateReported
+                };
+                
+                if (useFallback && i === headerRowIndex + 1) {
+                  actionCenterLog(`⚠️ Using fallback column mapping (no headers matched)`);
+                }
               }
 
               // Only add actions that have at least some basic data
-              // For agriculture and pg-enro departments, prioritize complaint/report and location
-              if (selectedImportDepartment === 'agriculture' || selectedImportDepartment === 'pg-enro') {
-                if (action.what || action.where) {
-                  importedActions.push(action);
+              // More lenient validation - check if row has ANY non-empty values
+              const hasAnyData = Object.values(action).some(value => {
+                if (typeof value === 'string' && value.trim() !== '') return true;
+                if (Array.isArray(value) && value.length > 0) return true;
+                return false;
+              });
+              
+              if (hasAnyData) {
+                importedActions.push(action);
+                
+                // Log month/year detection for first few rows
+                if (importedActions.length <= 3) {
+                  const dateObj = new Date(action.when);
+                  const detectedMonth = isNaN(dateObj.getTime()) ? 'unknown' : dateObj.toLocaleString('default', { month: 'long' });
+                  const detectedYear = isNaN(dateObj.getTime()) ? 'unknown' : dateObj.getFullYear();
+                  
+                  actionCenterLog(`✅ Row ${i} added:`, {
+                    what: action.what || '(empty)',
+                    where: action.where || '(empty)',
+                    municipality: action.municipality || '(empty)',
+                    when: action.when,
+                    detectedMonth: detectedMonth,
+                    detectedYear: detectedYear
+                  });
                 }
               } else {
-                if (action.what || action.where || action.who) {
-                  importedActions.push(action);
-                }
+                actionCenterLog(`⚠️ Row ${i} skipped - no valid data`);
               }
             }
+            
+            actionCenterLog(`✅ Processed ${importedActions.length} records from sheet "${sheetName}"`);
           });
 
           if (importedActions.length > 0) {
+            // Group by department for summary
+            const byDepartment = importedActions.reduce((acc, action) => {
+              acc[action.department] = (acc[action.department] || 0) + 1;
+              return acc;
+            }, {});
+            
+            // Group by month/year for summary
+            const byMonthYear = importedActions.reduce((acc, action) => {
+              if (action.importedMonth !== null && action.importedYear) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+                                   'July', 'August', 'September', 'October', 'November', 'December'];
+                const key = `${monthNames[action.importedMonth]} ${action.importedYear}`;
+                acc[key] = (acc[key] || 0) + 1;
+              }
+              return acc;
+            }, {});
+            
+            const summaryText = Object.entries(byDepartment)
+              .map(([dept, count]) => `  • ${dept.toUpperCase()}: ${count} records`)
+              .join('\n');
+            
+            const monthYearSummary = Object.entries(byMonthYear)
+              .map(([monthYear, count]) => `  • ${monthYear}: ${count} records`)
+              .join('\n');
+            
+            actionCenterLog(`📊 Import Summary by Department:\n${summaryText}`);
+            if (Object.keys(byMonthYear).length > 0) {
+              actionCenterLog(`📅 Import Summary by Month/Year:\n${monthYearSummary}`);
+            }
+            
             // Check for duplicates against existing data
             const duplicateCheck = importedActions.filter(newAction => {
               return !actionItems.some(existingAction => 
@@ -1438,13 +1742,20 @@ item?.otherInformation,
 
             if (duplicateCheck.length === 0) {
               alert('All data in the file already exists in the system. No new records were imported.');
+              event.target.value = ''; // Reset file input
               return;
             }
 
             const duplicateCount = importedActions.length - duplicateCheck.length;
             if (duplicateCount > 0) {
-              const proceed = confirm(`Found ${duplicateCount} duplicate record(s) that will be skipped. Continue importing ${duplicateCheck.length} new record(s)?`);
-              if (!proceed) return;
+              const proceed = confirm(
+                `Found ${duplicateCount} duplicate record(s) that will be skipped.\n\n` +
+                `Continue importing ${duplicateCheck.length} new record(s)?`
+              );
+              if (!proceed) {
+                event.target.value = ''; // Reset file input
+                return;
+              }
             }
 
             // Save non-duplicate actions to Firestore
@@ -1463,11 +1774,44 @@ item?.otherInformation,
               await batch.commit();
               await fetchAllActionData(); // Reload from Firestore
               
-              let successMessage = `Successfully imported ${duplicateCheck.length} action reports!`;
-              if (duplicateCount > 0) {
-                successMessage += ` (${duplicateCount} duplicates were skipped)`;
+              // Create detailed success message
+              const deptSummary = Object.entries(
+                duplicateCheck.reduce((acc, action) => {
+                  acc[action.department] = (acc[action.department] || 0) + 1;
+                  return acc;
+                }, {})
+              ).map(([dept, count]) => `${dept.toUpperCase()}: ${count}`).join(', ');
+              
+              // Create month/year summary
+              const monthYearSummary = Object.entries(
+                duplicateCheck.reduce((acc, action) => {
+                  if (action.importedMonth !== null && action.importedYear) {
+                    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                    const key = `${monthNames[action.importedMonth]} ${action.importedYear}`;
+                    acc[key] = (acc[key] || 0) + 1;
+                  }
+                  return acc;
+                }, {})
+              );
+              
+              let successMessage = `Successfully imported ${duplicateCheck.length} action reports!\n\n`;
+              successMessage += `By Department: ${deptSummary}`;
+              
+              if (Object.keys(monthYearSummary).length > 0) {
+                const monthYearText = Object.entries(monthYearSummary)
+                  .map(([my, count]) => `${my}: ${count}`)
+                  .join(', ');
+                successMessage += `\n\nBy Month: ${monthYearText}`;
               }
+              
+              if (duplicateCount > 0) {
+                successMessage += `\n\n${duplicateCount} duplicates were skipped.`;
+              }
+              
               showSuccess(successMessage);
+              
+              event.target.value = ''; // Reset file input
             } catch (error) {
               actionCenterLog('Error saving imported actions:', error, 'error');
               alert('Error saving imported actions to database. Please try again.');
@@ -1476,10 +1820,12 @@ item?.otherInformation,
             }
           } else {
             alert('No valid data found in the Excel file.');
+            event.target.value = ''; // Reset file input
           }
         } catch (error) {
           actionCenterLog('Error reading Excel file:', error, 'error');
           alert('Error reading Excel file. Please make sure it\'s a valid Excel file with the correct format.');
+          event.target.value = ''; // Reset file input
         }
       };
       reader.readAsArrayBuffer(file);
@@ -2061,6 +2407,162 @@ item?.otherInformation,
     }
   };
 
+  // Delete month function
+  const handleDeleteMonth = async () => {
+    if (!deleteMonthSelection || deleteMonthSelection === 'all') {
+      alert('Please select a specific month to delete.');
+      return;
+    }
+
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const monthName = monthNames[parseInt(deleteMonthSelection)];
+    const year = deleteYearSelection;
+
+    const confirmDelete = window.confirm(
+      `⚠️ WARNING: This will permanently delete ALL action reports from ${monthName} ${year}!\n\n` +
+      `This action cannot be undone.\n\n` +
+      `Are you absolutely sure you want to proceed?`
+    );
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    const actionCenterGroup = createSectionGroup(CONSOLE_GROUPS.ACTION_CENTER, false);
+    
+    try {
+      setLoading(true);
+      actionCenterGroup.log(`🗑️ Starting deletion of ${monthName} ${year} data`);
+
+      // Filter items to delete
+      const itemsToDelete = actionItems.filter(item => {
+        const monthNum = parseInt(deleteMonthSelection);
+        let itemMonth = -1;
+        let itemYear = null;
+
+        // Extract month
+        if (item.when instanceof Date) {
+          itemMonth = item.when.getMonth();
+          itemYear = item.when.getFullYear();
+        } else if (typeof item.when === 'string') {
+          try {
+            const parsedDate = new Date(item.when);
+            if (!isNaN(parsedDate.getTime())) {
+              itemMonth = parsedDate.getMonth();
+              itemYear = parsedDate.getFullYear();
+            }
+          } catch (e) {
+            itemMonth = detectMonthFromText(item.when);
+          }
+        }
+
+        // Extract year
+        if (!itemYear) {
+          itemYear = detectYearFromItem(item);
+        }
+
+        return itemMonth === monthNum && String(itemYear) === year;
+      });
+
+      if (itemsToDelete.length === 0) {
+        actionCenterGroup.log(`⚠️ No items found for ${monthName} ${year}`);
+        showSuccess(`No action reports found for ${monthName} ${year}.`);
+        setShowDeleteMonthDialog(false);
+        actionCenterGroup.end();
+        return;
+      }
+
+      actionCenterGroup.log(`📊 Found ${itemsToDelete.length} items to delete`);
+
+      let deletedCount = 0;
+      let failedCount = 0;
+
+      // Delete each item
+      for (const item of itemsToDelete) {
+        try {
+          let deleteResult = { success: false, error: 'Unknown error' };
+
+          if (item.sourceType === 'month-based' && item.sourceCollection === 'actionReports') {
+            const monthKey = item.sourceDocument;
+            deleteResult = await deleteActionReport(item.id, monthKey);
+          } else if (item.sourceType === 'individual' && item.sourceCollection === 'actionReports') {
+            deleteResult = await deleteActionReport(item.id, null);
+          } else {
+            // Handle other data structures
+            if (item.sourceType === 'actions-array' || item.sourceType === 'reports-array') {
+              const docRef = doc(db, item.sourceCollection, item.sourceDocument);
+              const docSnap = await getDoc(docRef);
+              
+              if (docSnap.exists()) {
+                const docData = docSnap.data();
+                let arrayField = null;
+                let updatedArray = null;
+                
+                if (item.sourceType === 'actions-array' && docData.actions) {
+                  arrayField = 'actions';
+                  updatedArray = docData.actions.filter((_, index) => index !== item.reportIndex);
+                } else if (item.sourceType === 'reports-array' && docData.reports) {
+                  arrayField = 'reports';
+                  updatedArray = docData.reports.filter((_, index) => index !== item.reportIndex);
+                } else if (docData.data && Array.isArray(docData.data)) {
+                  arrayField = 'data';
+                  updatedArray = docData.data.filter((_, index) => index !== item.reportIndex);
+                }
+                
+                if (arrayField && updatedArray !== null) {
+                  await updateDoc(docRef, {
+                    [arrayField]: updatedArray,
+                    lastUpdated: new Date().toISOString(),
+                    updatedBy: user?.email || 'system'
+                  });
+                  deleteResult = { success: true };
+                }
+              }
+            } else {
+              const docRef = doc(db, item.sourceCollection, item.id);
+              await deleteDoc(docRef);
+              deleteResult = { success: true };
+            }
+          }
+
+          if (deleteResult.success) {
+            deletedCount++;
+          } else {
+            failedCount++;
+            actionCenterGroup.error(`❌ Failed to delete: ${item.id}`, deleteResult.error);
+          }
+        } catch (error) {
+          failedCount++;
+          actionCenterGroup.error(`❌ Error deleting: ${item.id}`, error);
+        }
+      }
+
+      // Refresh data
+      await fetchAllActionData();
+
+      actionCenterGroup.log(`✅ Deletion completed: ${deletedCount} deleted, ${failedCount} failed`);
+      
+      if (deletedCount > 0) {
+        showSuccess(`Successfully deleted ${deletedCount} action reports from ${monthName} ${year}!${failedCount > 0 ? ` (${failedCount} failed)` : ''}`);
+      } else {
+        showSuccess('No reports were deleted. Please try again.');
+      }
+
+      setShowDeleteMonthDialog(false);
+      setDeleteMonthSelection('');
+
+    } catch (error) {
+      actionCenterGroup.error('❌ Error during month deletion:', error);
+      alert('Error deleting month data: ' + error.message);
+    } finally {
+      setLoading(false);
+      actionCenterGroup.end();
+    }
+  };
+
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="h-full flex flex-col overflow-hidden">
@@ -2142,6 +2644,13 @@ item?.otherInformation,
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Data Cleanup</DropdownMenuLabel>
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteMonthDialog(true)}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
+                >
+                  <Trash2 className="w-4 h-4 text-red-600" />
+                  <span>Delete Month</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleClearDuplicates}
                   className="flex items-center gap-3 cursor-pointer hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
@@ -2288,7 +2797,7 @@ item?.otherInformation,
                         type="button"
                         onClick={() => {
                           const now = new Date();
-                          setSelectedMonth(now.getMonth());
+                          setSelectedMonth(now.getMonth().toString());
                           setSelectedYear(String(now.getFullYear()));
                         }}
                         className="px-2 py-1 border border-gray-300 text-black bg-white hover:bg-gray-50 rounded-md transition-colors duration-200 text-xs"
@@ -2301,7 +2810,7 @@ item?.otherInformation,
                           setSearchTerm("");
                           setSelectedDistrict("all");
                           setSelectedWhat("all");
-                          setSelectedMonth(new Date().getMonth());
+                          setSelectedMonth("all");
                           setSelectedYear(new Date().getFullYear().toString());
                           setActiveMunicipality("all");
                           setActiveTab(userDepartment === 'agriculture' || userDepartment === 'pg-enro' ? userDepartment : "all");
@@ -2329,7 +2838,7 @@ item?.otherInformation,
 
                     <div className="flex flex-col gap-1.5">
                       <Label htmlFor="month-filter" className="text-xs font-medium text-black">Month</Label>
-                      <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(parseInt(value))}>
+                      <Select value={selectedMonth.toString()} onValueChange={(value) => setSelectedMonth(value)}>
                         <SelectTrigger
                           id="month-filter"
                           name="month-filter"
@@ -2338,6 +2847,7 @@ item?.otherInformation,
                           <SelectValue placeholder="Month" />
                         </SelectTrigger>
                         <SelectContent className="bg-white text-black [&_[data-slot=select-item]]:!text-black [&_[data-slot=select-item]]:!opacity-100 [&_[data-slot=select-item-text]]:!text-black">
+                          <SelectItem value="all" className="text-black font-medium">All Months</SelectItem>
                           {[
                             'January', 'February', 'March', 'April', 'May', 'June',
                             'July', 'August', 'September', 'October', 'November', 'December'
@@ -3928,6 +4438,105 @@ item?.otherInformation,
       )}
 
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
+      
+      {/* Delete Month Dialog */}
+      <Dialog open={showDeleteMonthDialog} onOpenChange={setShowDeleteMonthDialog}>
+        <DialogContent className="max-w-md bg-white border shadow-lg">
+          <DialogHeader className="pb-4 border-b">
+            <DialogTitle className="text-xl font-bold text-red-600">Delete Month Data</DialogTitle>
+            <DialogDescription className="text-gray-600">
+              ⚠️ This will permanently delete all action reports from the selected month. This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="delete-month-select" className="text-sm font-medium text-black">
+                Select Month to Delete
+              </Label>
+              <Select value={deleteMonthSelection} onValueChange={setDeleteMonthSelection}>
+                <SelectTrigger id="delete-month-select" className="w-full">
+                  <SelectValue placeholder="Select a month..." />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {[
+                    'January', 'February', 'March', 'April', 'May', 'June',
+                    'July', 'August', 'September', 'October', 'November', 'December'
+                  ].map((month, index) => (
+                    <SelectItem key={month} value={index.toString()}>
+                      {month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="delete-year-select" className="text-sm font-medium text-black">
+                Select Year
+              </Label>
+              <Select value={deleteYearSelection} onValueChange={setDeleteYearSelection}>
+                <SelectTrigger id="delete-year-select" className="w-full">
+                  <SelectValue placeholder="Select a year..." />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={year}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {deleteMonthSelection && deleteMonthSelection !== 'all' && (
+              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                <p className="text-sm text-red-800 font-medium">
+                  You are about to delete all data from{' '}
+                  <span className="font-bold">
+                    {['January', 'February', 'March', 'April', 'May', 'June',
+                      'July', 'August', 'September', 'October', 'November', 'December'
+                    ][parseInt(deleteMonthSelection)]} {deleteYearSelection}
+                  </span>
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  This action is permanent and cannot be undone!
+                </p>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              onClick={() => {
+                setShowDeleteMonthDialog(false);
+                setDeleteMonthSelection('');
+              }}
+              variant="outline"
+              className="flex-1"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleDeleteMonth}
+              disabled={!deleteMonthSelection || deleteMonthSelection === 'all' || loading}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {loading ? (
+                <>
+                  <RotateCcw className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Month
+                </>
+              )}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Hidden file input for Excel import */}
       <input
