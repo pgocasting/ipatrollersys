@@ -1079,7 +1079,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   return (
                     <Card
                       key={accessLevel}
-                      className={`bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden ${isOpen ? 'sm:col-span-2 lg:col-span-3' : ''}`}
+                      className={`bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden ${isOpen ? 'sm:col-span-2 lg:col-span-4' : ''}`}
                     >
                       <CardHeader
                         className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none"
