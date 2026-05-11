@@ -7,6 +7,7 @@ import { Badge } from "../components/ui/badge";
 import { Label } from "../components/ui/label";
 import { toast } from "sonner";
 import { useNotification, NotificationContainer } from '../components/ui/notification';
+import '../styles/ipatroller-mobile.css';
 import {
   collection,
   query,
@@ -2403,7 +2404,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
+        <div className="ipatroller-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
           <div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">I-Patroller Management</h1>
             <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
@@ -2454,10 +2455,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
           {/* Patrol Data Table */}
           <Card className="bg-white shadow-sm border border-gray-200 rounded-xl mt-4">
-            <CardHeader className="p-3 sm:p-4">
+            <CardHeader className="ipatroller-card-header p-3 sm:p-4">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-2 w-full">
                 <div className="flex flex-col gap-1">
-                  <CardTitle className="text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
+                  <CardTitle className="ipatroller-card-title text-base sm:text-lg font-semibold transition-colors duration-300 text-gray-900">
                     {new Date(selectedYear, selectedMonth).toLocaleDateString(
                       "en-US",
                       { month: "long", year: "numeric" },
@@ -2465,7 +2466,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   </CardTitle>
 
                   <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
+                    <div className="ipatroller-tabs flex flex-wrap items-center gap-1 sm:gap-2">
                       <button
                         onClick={() => setActiveTab("daily")}
                         className={`flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-300 ${activeTab === "daily"
@@ -2511,7 +2512,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </div>
 
                     {/* Month/Year Filter - visible on all tabs */}
-                    <div className="flex items-center gap-2">
+                    <div className="ipatroller-filters flex items-center gap-2">
                       <select
                         value={selectedMonth}
                         onChange={(e) => setSelectedMonth(parseInt(e.target.value))}
@@ -2535,9 +2536,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       </select>
                     </div>
 
-                    <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="ipatroller-legend flex items-center gap-2 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg">
                       <BarChart3 className="w-4 h-4 text-blue-700" />
-                      <span className="text-xs font-medium text-blue-800 whitespace-nowrap">Required Counts per Daily:</span>
+                      <span className="ipatroller-legend-text text-xs font-medium text-blue-800 whitespace-nowrap">Required Counts per Daily:</span>
                       <span className="px-2 py-1 bg-green-600 text-white rounded-md text-xs font-medium whitespace-nowrap">14 = Active</span>
                       <span className="px-2 py-1 bg-yellow-500 text-white rounded-md text-xs font-medium whitespace-nowrap">13 = Warning</span>
                       <span className="px-2 py-1 bg-red-600 text-white rounded-md text-xs font-medium whitespace-nowrap">12 = Inactive</span>
@@ -2566,8 +2567,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             </CardHeader>
 
             <CardContent>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
+              <div className="ipatroller-table-container overflow-x-auto">
+                <table className="ipatroller-table min-w-full">
                   <thead>
                     <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
                       {activeTab === "daily" ? (
@@ -2653,7 +2654,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                             colSpan={
                               activeTab === "daily" ? selectedDates.length + 2 : 21
                             }
-                            className="px-6 py-3"
+                            className="ipatroller-district-header px-6 py-3"
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-3">
@@ -2691,7 +2692,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                               {activeTab === "daily" ? (
                                 <>
                                   <td className="px-6 py-4">
-                                    <div className="flex items-center gap-3">
+                                    <div className="ipatroller-municipality-info flex items-center gap-3">
                                       <MapPin className="w-4 h-4 text-gray-600" />
                                       <div>
                                         <span className="font-medium transition-colors duration-300 text-gray-900">
@@ -2862,8 +2863,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
         {showDailyCountsExportModal && (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+            <div className="daily-counts-export-modal ipatroller-modal bg-white rounded-xl shadow-2xl w-full max-w-md mx-auto overflow-hidden">
+              <div className="ipatroller-modal-header flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-emerald-100 rounded-lg">
                     <FileSpreadsheet className="w-6 h-6 text-emerald-600" />
@@ -2885,7 +2886,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                 </Button>
               </div>
 
-              <div className="p-6 space-y-4">
+              <div className="ipatroller-modal-content p-6 space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="block text-sm font-medium text-gray-700 mb-1">Month</Label>
@@ -2945,9 +2946,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         {/* Print Preview Modal */}
         {showPrintPreview && previewData && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+            <div className="print-preview-modal ipatroller-modal bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
               {/* Modal Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="ipatroller-modal-header flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                   <div className="p-2 bg-blue-100 rounded-lg">
                     <Eye className="w-6 h-6 text-blue-600" />
@@ -3261,9 +3262,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         {/* Top Performers Modal */}
         {showTopPerformersModal && (
           <div className="fixed inset-0 flex items-center justify-center z-40 p-4">
-            <div className="rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
+            <div className="ipatroller-modal rounded-2xl shadow-2xl max-w-7xl w-full max-h-[95vh] overflow-hidden bg-white">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <div className="ipatroller-modal-header flex items-center justify-between p-6 border-b border-gray-200">
                 <div className="flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full flex items-center justify-center bg-emerald-100">
                     <Target className="h-7 w-7 text-emerald-600" />
@@ -3279,7 +3280,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="top-performers-filters flex items-center gap-3">
                   {/* Month Selector */}
                   <div className="flex items-center gap-2">
                     <label htmlFor="top-performers-month" className="text-sm font-medium text-gray-700">Month:</label>
@@ -3472,8 +3473,8 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <div className="overflow-x-auto">
-                            <table className="min-w-full">
+                          <div className="top-performers-table-container overflow-x-auto">
+                            <table className="top-performers-table min-w-full">
                               <thead>
                                 <tr className="border-b transition-all duration-300 border-gray-200 bg-gray-50">
                                   <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
