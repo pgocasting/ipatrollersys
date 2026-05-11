@@ -125,54 +125,6 @@ export const DataProvider = ({ children }) => {
     }
   }, [loadedPages, user]);
 
-  // Function to load Action Center data only
-  const loadActionCenterData = React.useCallback(async () => {
-    if (loadedPages.has('actioncenter') || !user) return;
-    
-    console.log('📋 Loading Action Center data...');
-    setLoading(true);
-
-    try {
-      const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
-        const actionReports = [];
-        snapshot.forEach((doc) => {
-          const docData = doc.data();
-          if (docData.data && Array.isArray(docData.data)) {
-            docData.data.forEach(report => {
-              actionReports.push({ ...report, _monthDoc: doc.id });
-            });
-          } else {
-            actionReports.push({ id: doc.id, ...docData });
-          }
-        });
-
-        actionReports.sort((a, b) => {
-          const tA = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
-          const tB = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
-          return tB - tA;
-        });
-
-        setDashboardData(prev => ({
-          ...prev,
-          actionReports,
-          summaryStats: {
-            ...prev.summaryStats,
-            totalActions: actionReports.length
-          }
-        }));
-        
-        setLoading(false);
-      });
-
-      unsubscribeFunctionsRef.current.actioncenter = unsubscribe;
-      setLoadedPages(prev => new Set([...prev, 'actioncenter']));
-      console.log('✅ Action Center data loaded');
-    } catch (error) {
-      console.error('❌ Error loading action center data:', error);
-      setLoading(false);
-    }
-  }, [loadedPages, user]);
-
   // Function to load Incidents data only
   const loadIncidentsData = React.useCallback(async () => {
     if (loadedPages.has('incidents') || !user) return;
@@ -378,7 +330,6 @@ export const DataProvider = ({ children }) => {
     ...dashboardData,
     loading,
     loadDashboardData,
-    loadActionCenterData,
     loadIncidentsData,
     loadIPatrollerData,
     loadReportsData,

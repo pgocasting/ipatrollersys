@@ -4,7 +4,6 @@ import Dashboard from "./pages/Dashboard";
 import IPatroller from "./pages/IPatroller";
 import Reports from "./pages/Reports";
 import IncidentsReports from "./pages/IncidentsReports";
-import ActionCenter from "./pages/ActionCenter";
 import CommandCenter from "./pages/CommandCenter";
 import Settings from "./pages/Settings";
 import FirestoreTest from "./tests/FirestoreTest";
@@ -121,9 +120,6 @@ function AppContent() {
         if (userAccessLevel === 'command-center') {
           setCurrentPage('commandcenter');
           window.history.replaceState({}, '', '/commandcenter');
-        } else if (userAccessLevel === 'action-center') {
-          setCurrentPage('actioncenter');
-          window.history.replaceState({}, '', '/actioncenter');
         } else if (userAccessLevel === 'ipatroller') {
           setCurrentPage('ipatroller');
           window.history.replaceState({}, '', '/ipatroller');
@@ -175,9 +171,6 @@ function AppContent() {
       if (userAccessLevel === 'command-center') {
         setCurrentPage('commandcenter');
         window.history.replaceState({}, '', '/commandcenter');
-      } else if (userAccessLevel === 'action-center') {
-        setCurrentPage('actioncenter');
-        window.history.replaceState({}, '', '/actioncenter');
       } else if (userAccessLevel === 'ipatroller') {
         setCurrentPage('ipatroller');
         window.history.replaceState({}, '', '/ipatroller');
@@ -546,8 +539,6 @@ function AppContent() {
           return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
         case 'commandcenter':
           return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-        case 'actioncenter':
-          return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
         case 'incidents':
           return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
         case 'dashboard':
@@ -562,9 +553,6 @@ function AppContent() {
       if (userAccessLevel === 'command-center') {
         setCurrentPage('commandcenter');
         return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      } else if (userAccessLevel === 'action-center') {
-        setCurrentPage('actioncenter');
-        return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       } else if (userAccessLevel === 'ipatroller') {
         setCurrentPage('ipatroller');
         return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -579,9 +567,6 @@ function AppContent() {
       if (userAccessLevel === 'command-center') {
         setCurrentPage('commandcenter');
         return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      } else if (userAccessLevel === 'action-center') {
-        setCurrentPage('actioncenter');
-        return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       } else if (userAccessLevel === 'incidents') {
         setCurrentPage('incidents');
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
@@ -602,8 +587,6 @@ function AppContent() {
         return <Reports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'incidents':
         return <IncidentsReports onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-      case 'actioncenter':
-        return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'settings':
         return <Settings onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
       case 'users':
@@ -619,9 +602,6 @@ function AppContent() {
           if (userAccessLevel === 'command-center') {
             setCurrentPage('commandcenter');
             return <CommandCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
-          } else if (userAccessLevel === 'action-center') {
-            setCurrentPage('actioncenter');
-            return <ActionCenter onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;
           } else if (userAccessLevel === 'ipatroller') {
             setCurrentPage('ipatroller');
             return <IPatroller onLogout={handleLogout} onNavigate={handleNavigate} currentPage={currentPage} />;

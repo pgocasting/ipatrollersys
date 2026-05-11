@@ -164,7 +164,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     { value: "dashboard", label: "Dashboard" },
     { value: "ipatroller", label: "I-Patroller" },
     { value: "commandcenter", label: "Command Center" },
-    { value: "actioncenter", label: "Action Center" },
     { value: "incidents", label: "Incidents" },
   ];
 
@@ -179,7 +178,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     viewingPage: "",
     phoneNumber: "",
     role: "User",
-    accessLevel: "action-center",
+    accessLevel: "command-center",
     department: "",
   });
 
@@ -190,7 +189,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     municipality: "",
     viewingPage: "",
     phoneNumber: "",
-    accessLevel: "action-center",
+    accessLevel: "command-center",
     department: "",
   });
 
@@ -309,7 +308,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         viewingPage: "",
         phoneNumber: "",
         role: "User",
-        accessLevel: "action-center",
+        accessLevel: "command-center",
         department: "",
       });
       
@@ -334,7 +333,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
       municipality: user.municipality || "",
       viewingPage: user.viewingPage || "",
       phoneNumber: user.phoneNumber || "",
-      accessLevel: user.accessLevel || "action-center",
+      accessLevel: user.accessLevel || "command-center",
       department: user.department || "",
     });
     setIsEditDialogOpen(true);
@@ -422,7 +421,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
         municipality: "",
         viewingPage: "",
         phoneNumber: "",
-        accessLevel: "action-center",
+        accessLevel: "command-center",
         department: "",
       });
       
@@ -581,7 +580,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
-                          <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
                           <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
@@ -603,21 +601,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                 {opt.label}
                               </SelectItem>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {newUser.accessLevel === "action-center" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="department">Department</Label>
-                        <Select value={newUser.department} onValueChange={(value) => setNewUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="department" name="department" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-slate-200">
-                            <SelectItem value="agriculture">Agriculture</SelectItem>
-                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                            <SelectItem value="pnp">PNP</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -752,7 +735,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                           <SelectValue placeholder="Select access level" />
                         </SelectTrigger>
                         <SelectContent className="bg-white border border-slate-200">
-                          <SelectItem value="action-center">Action Center</SelectItem>
                           <SelectItem value="command-center">Command Center</SelectItem>
                           <SelectItem value="ipatroller">IPatroller</SelectItem>
                           <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
@@ -774,21 +756,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                                 {opt.label}
                               </SelectItem>
                             ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
-                    {editUser.accessLevel === "action-center" && (
-                      <div className="space-y-2">
-                        <Label htmlFor="editDepartment">Department</Label>
-                        <Select value={editUser.department} onValueChange={(value) => setEditUser((prev) => ({ ...prev, department: value }))}>
-                          <SelectTrigger id="editDepartment" name="department" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
-                            <SelectValue placeholder="Select department" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-slate-200">
-                            <SelectItem value="agriculture">Agriculture</SelectItem>
-                            <SelectItem value="pg-enro">PG-ENRO</SelectItem>
-                            <SelectItem value="pnp">PNP</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -888,7 +855,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
             <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Card className="bg-white dark:bg-slate-900/50 backdrop-blur border-none shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group">
               <CardContent className="p-4 sm:p-5">
                 <div className="flex items-center justify-between">
@@ -925,25 +892,9 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
               <CardContent className="p-4 sm:p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-black text-slate-400 dark:text-slate-500 mb-1 uppercase tracking-wider truncate">Action Center</p>
-                    <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white transition-transform group-hover:scale-105 origin-left">
-                      {users.filter(u => u.accessLevel === "action-center").length}
-                    </p>
-                  </div>
-                  <div className="p-3 sm:p-3.5 bg-gradient-to-br from-purple-500/20 to-purple-600/20 rounded-xl flex-shrink-0 group-hover:rotate-12 transition-transform duration-500 border border-purple-500/10">
-                    <Building2 className="w-5 h-5 sm:w-6 sm:h-6 text-purple-600 dark:text-purple-400" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white dark:bg-slate-900/50 backdrop-blur border-none shadow-sm dark:shadow-none ring-1 ring-slate-200 dark:ring-slate-800 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 group">
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
                     <p className="text-xs font-black text-slate-400 dark:text-slate-500 mb-1 uppercase tracking-wider truncate">Other Access</p>
                     <p className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white transition-transform group-hover:scale-105 origin-left">
-                      {users.filter(u => !['command-center', 'action-center', 'Admin'].includes(u.accessLevel) && u.role !== "Admin").length}
+                      {users.filter(u => !['command-center', 'Admin'].includes(u.accessLevel) && u.role !== "Admin").length}
                     </p>
                   </div>
                   <div className="p-3 sm:p-3.5 bg-gradient-to-br from-amber-500/20 to-amber-600/20 rounded-xl flex-shrink-0 group-hover:rotate-12 transition-transform duration-500 border border-amber-500/10">
@@ -972,10 +923,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="flex items-center justify-between">
                         <span className="uppercase tracking-widest">Command Center</span>
                         <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "command-center")}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="uppercase tracking-widest">Action Center</span>
-                        <span className="tabular-nums">{getAccessLevelCount(activeUsersList, "action-center")}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="uppercase tracking-widest">IPatroller</span>
@@ -1007,10 +954,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                       <div className="flex items-center justify-between">
                         <span className="uppercase tracking-widest">Command Center</span>
                         <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "command-center")}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="uppercase tracking-widest">Action Center</span>
-                        <span className="tabular-nums">{getAccessLevelCount(offlineUsersList, "action-center")}</span>
                       </div>
                       <div className="flex items-center justify-between">
                         <span className="uppercase tracking-widest">IPatroller</span>
@@ -1057,7 +1000,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     <SelectContent className="bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 rounded-xl shadow-xl">
                       <SelectItem value="all">Global (All Clearances)</SelectItem>
                       <SelectItem value="command-center">Command Center</SelectItem>
-                      <SelectItem value="action-center">Action Center</SelectItem>
                       <SelectItem value="ipatroller">IPatroller</SelectItem>
                       <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
                       <SelectItem value="incidents">Incidents</SelectItem>
@@ -1099,7 +1041,6 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
             const accessLevelLabels = {
               'command-center': 'Command Center',
-              'action-center': 'Action Center',
               'ipatroller': 'IPatroller',
               'quarry-monitoring': 'Quarry Site Monitoring',
               'incidents': 'Incidents',
@@ -1125,8 +1066,10 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
             }
 
             return (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {Object.keys(groupedUsers).map((accessLevel) => {
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {Object.keys(groupedUsers)
+                  .filter(accessLevel => accessLevel !== 'action-center') // Filter out action-center
+                  .map((accessLevel) => {
                   const usersInGroup = groupedUsers[accessLevel];
                   if (!usersInGroup || usersInGroup.length === 0) return null;
 
@@ -1136,7 +1079,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                   return (
                     <Card
                       key={accessLevel}
-                      className={`bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden ${isOpen ? 'sm:col-span-2 lg:col-span-4' : ''}`}
+                      className={`bg-white dark:bg-slate-900 border-none ring-1 ring-slate-200 dark:ring-slate-800 shadow-sm rounded-2xl overflow-hidden ${isOpen ? 'sm:col-span-2 lg:col-span-3' : ''}`}
                     >
                       <CardHeader
                         className="bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 cursor-pointer select-none"

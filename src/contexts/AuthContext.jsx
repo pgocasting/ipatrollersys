@@ -33,7 +33,6 @@ export function AuthProvider({ children }) {
       dashboard: "dashboard",
       ipatroller: "ipatroller",
       commandcenter: "commandcenter",
-      actioncenter: "actioncenter",
       incidents: "incidents",
     };
 

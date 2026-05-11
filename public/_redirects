@@ -6,7 +6,6 @@
 /ipatroller   /index.html   200
 /reports      /index.html   200
 /incidents    /index.html   200
-/actioncenter /index.html   200
 /settings     /index.html   200
 
 # Handle trailing slashes
