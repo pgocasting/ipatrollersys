@@ -21,6 +21,9 @@ import * as htmlToImage from 'html-to-image';
 export default function Users({ onLogout, onNavigate, currentPage }) {
   const { user, getUsers, createUserByAdmin, updateUser, deleteUser } = useFirebase();
   const { isAdmin, userAccessLevel, userFirstName, userLastName, userUsername, userMunicipality, userDepartment } = useAuth();
+  
+  // Allow both admin and ipatroller users to access this page
+  const canAccessUsers = isAdmin || userAccessLevel === 'ipatroller';
   const [tableLoading, setTableLoading] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [updateLoading, setUpdateLoading] = useState(false);
@@ -129,7 +132,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canAccessUsers) return;
     const presenceRef = collection(db, 'userPresence');
     const unsubscribe = onSnapshot(presenceRef, (snapshot) => {
       const pMap = {};
@@ -142,7 +145,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     });
 
     return () => unsubscribe();
-  }, [isAdmin]);
+  }, [canAccessUsers]);
 
   const municipalities = [
     "Abucay",
@@ -196,7 +199,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     let isMounted = true;
     const load = async () => {
-      if (!isAdmin) return;
+      if (!canAccessUsers) return;
       setTableLoading(true);
       const result = await getUsers();
       if (isMounted) {
@@ -212,7 +215,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     return () => {
       isMounted = false;
     };
-  }, [isAdmin, getUsers]);
+  }, [canAccessUsers, getUsers]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -224,7 +227,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
-    if (!isAdmin) return;
+    if (!canAccessUsers) return;
     
     // Validate form
     if (!newUser.municipality && newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && newUser.accessLevel !== "viewing") {
@@ -349,7 +352,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
-    if (!isAdmin || !selectedUser) return;
+    if (!canAccessUsers || !selectedUser) return;
     
     // Validate form
     if (!editUser.municipality && editUser.accessLevel !== "ipatroller" && editUser.accessLevel !== "quarry-monitoring" && editUser.accessLevel !== "incidents" && editUser.accessLevel !== "viewing") {
@@ -443,7 +446,7 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   };
 
   const confirmDeleteUser = async () => {
-    if (!isAdmin || !userToDelete) return;
+    if (!canAccessUsers || !userToDelete) return;
 
     setDeleteLoading(true);
     try {
@@ -513,10 +516,10 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
       <div className="h-full flex flex-col overflow-hidden bg-slate-50 dark:bg-[#0f172a]">
         
-        {!isAdmin ? (
+        {!canAccessUsers ? (
           <div className="flex flex-col items-center justify-center h-screen">
             <h2 className="text-xl font-bold text-slate-900 dark:text-white">Access Restricted</h2>
-            <p className="text-slate-500 dark:text-slate-400">Admin access required.</p>
+            <p className="text-slate-500 dark:text-slate-400">Admin or IPatroller access required.</p>
           </div>
         ) : (
           <>
