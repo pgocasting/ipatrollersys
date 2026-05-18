@@ -790,6 +790,297 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
     return "Inactive";
   };
 
+  // Generate PDF for Criteria tab
+  const generateCriteriaPdf = () => {
+    try {
+      setIsGeneratingPdf(true);
+
+      const doc = new jsPDF('l', 'mm', 'a4'); // Landscape orientation for wide table
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+
+      // Month names
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+
+      // Header
+      doc.setFontSize(16);
+      doc.setFont('helvetica', 'bold');
+      const title = `I-Patroller Criteria Report - ${monthNames[selectedMonth]} ${selectedYear}`;
+      doc.text(title, pageWidth / 2, 15, { align: 'center' });
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Generated on: ${new Date().toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}`, pageWidth / 2, 22, { align: 'center' });
+
+      // Prepare table data
+      const DAILY_MIN = 14;
+      const WEEKLY_MIN = DAILY_MIN * 7; // 98
+      const tableData = [];
+
+      // Group data by district
+      const groupedData = patrolData.reduce((acc, item) => {
+        if (!acc[item.district]) {
+          acc[item.district] = [];
+        }
+        acc[item.district].push(item);
+        return acc;
+      }, {});
+
+      let rowNumber = 1;
+
+      // Process each district
+      Object.keys(groupedData).sort().forEach((district) => {
+        // Add district header row
+        tableData.push([
+          { content: district, colSpan: 21, styles: { fillColor: [200, 200, 200], fontStyle: 'bold', halign: 'left' } }
+        ]);
+
+        // Add municipality rows
+        groupedData[district].forEach((item) => {
+          const brgy = barangayCounts[item.municipality] || 0;
+          const daysToComplete = daysToCompleteCM[item.municipality] || 1;
+          const frequencyPerWeek = weeklyVisitFrequency[item.municipality] || 1;
+          const totalDays = selectedDates.length;
+
+          // Calculate weekly data
+          const weeklyActual = [];
+          const weeklyAttended = [];
+          const municipalityActionCounts = commandCenterActionData[item.municipality] || [0, 0, 0, 0];
+
+          for (let week = 0; week < 4; week++) {
+            const weekStart = week * 7;
+            const weekEnd = Math.min(weekStart + 7, totalDays);
+
+            if (weekStart < totalDays) {
+              const weekData = item.data.slice(weekStart, weekEnd);
+              const weekSum = weekData.reduce((sum, v) => sum + (v || 0), 0);
+              weeklyActual.push(weekSum);
+              weeklyAttended.push(municipalityActionCounts[week] || 0);
+            } else {
+              weeklyActual.push(0);
+              weeklyAttended.push(0);
+            }
+          }
+
+          // Calculate efficiency for each week
+          const weeklyEfficiency = weeklyAttended.map(attended =>
+            Math.floor((attended / WEEKLY_MIN) * 100)
+          );
+
+          // Calculate overall percentage
+          const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+          const totalMinimum = WEEKLY_MIN * 4;
+          const overallPercentage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
+
+          // Add row data
+          tableData.push([
+            rowNumber++,
+            item.municipality,
+            brgy,
+            DAILY_MIN,
+            7,
+            daysToComplete,
+            frequencyPerWeek,
+            WEEKLY_MIN,
+            weeklyActual[0],
+            weeklyActual[1],
+            weeklyActual[2],
+            weeklyActual[3],
+            weeklyAttended[0],
+            weeklyAttended[1],
+            weeklyAttended[2],
+            weeklyAttended[3],
+            `${weeklyEfficiency[0]}%`,
+            `${weeklyEfficiency[1]}%`,
+            `${weeklyEfficiency[2]}%`,
+            `${weeklyEfficiency[3]}%`,
+            `${overallPercentage}%`
+          ]);
+        });
+      });
+
+      // Generate table with adjusted settings to fit page
+      autoTable(doc, {
+        startY: 28,
+        head: [[
+          '#',
+          'Municipality/City',
+          'No. of\nBarangay',
+          'Min No.\nRpts/Day',
+          'Target\nBrgys/Day',
+          'Days to\nComplete\nC/M',
+          'Freq\nVisit\n/Week',
+          'Min No.\nRpts/Week',
+          'W1',
+          'W2',
+          'W3',
+          'W4',
+          'W1',
+          'W2',
+          'W3',
+          'W4',
+          'W1',
+          'W2',
+          'W3',
+          'W4',
+          'Overall\nAverage'
+        ]],
+        body: tableData,
+        theme: 'grid',
+        styles: {
+          fontSize: 6,
+          cellPadding: 1.5,
+          halign: 'center',
+          valign: 'middle',
+          lineWidth: 0.1
+        },
+        headStyles: {
+          fillColor: [66, 139, 202],
+          textColor: 255,
+          fontStyle: 'bold',
+          fontSize: 5.5,
+          halign: 'center',
+          cellPadding: 1.5
+        },
+        columnStyles: {
+          0: { cellWidth: 7 },   // #
+          1: { cellWidth: 22, halign: 'left' },  // Municipality
+          2: { cellWidth: 10 },  // Barangay
+          3: { cellWidth: 10 },  // Min Reports/Day
+          4: { cellWidth: 10 },  // Target Brgys
+          5: { cellWidth: 10 },  // Days C/M
+          6: { cellWidth: 9 },   // Frequency
+          7: { cellWidth: 10 },  // Min Reports/Week
+          8: { cellWidth: 9 },   // W1 Actual
+          9: { cellWidth: 9 },   // W2 Actual
+          10: { cellWidth: 9 },  // W3 Actual
+          11: { cellWidth: 9 },  // W4 Actual
+          12: { cellWidth: 9 },  // W1 Attended
+          13: { cellWidth: 9 },  // W2 Attended
+          14: { cellWidth: 9 },  // W3 Attended
+          15: { cellWidth: 9 },  // W4 Attended
+          16: { cellWidth: 9 },  // W1 Efficiency
+          17: { cellWidth: 9 },  // W2 Efficiency
+          18: { cellWidth: 9 },  // W3 Efficiency
+          19: { cellWidth: 9 },  // W4 Efficiency
+          20: { cellWidth: 11 }  // Overall
+        },
+        didParseCell: function(data) {
+          // Style district header rows
+          if (data.row.section === 'body' && data.cell.raw && typeof data.cell.raw === 'object' && data.cell.raw.colSpan) {
+            data.cell.styles.fillColor = [220, 220, 220];
+            data.cell.styles.fontStyle = 'bold';
+          }
+          // Highlight overall percentage column
+          if (data.column.index === 20 && data.row.section === 'body') {
+            const value = parseInt(data.cell.text[0]);
+            if (!isNaN(value)) {
+              if (value >= 90) {
+                data.cell.styles.fillColor = [76, 175, 80]; // Green
+                data.cell.styles.textColor = 255;
+                data.cell.styles.fontStyle = 'bold';
+              } else if (value >= 75) {
+                data.cell.styles.fillColor = [139, 195, 74]; // Light green
+                data.cell.styles.fontStyle = 'bold';
+              } else if (value >= 60) {
+                data.cell.styles.fillColor = [255, 235, 59]; // Yellow
+                data.cell.styles.fontStyle = 'bold';
+              } else if (value >= 50) {
+                data.cell.styles.fillColor = [255, 193, 7]; // Orange
+                data.cell.styles.fontStyle = 'bold';
+              } else {
+                data.cell.styles.fillColor = [244, 67, 54]; // Red
+                data.cell.styles.textColor = 255;
+                data.cell.styles.fontStyle = 'bold';
+              }
+            }
+          }
+        },
+        margin: { top: 28, left: 5, right: 5, bottom: 70 },
+        tableWidth: 'auto'
+      });
+
+      // Add computation formulas at the bottom
+      const finalY = doc.lastAutoTable.finalY + 8;
+      let currentY = finalY;
+      
+      // Check if we need a new page
+      if (currentY > pageHeight - 75) {
+        doc.addPage();
+        currentY = 15;
+      }
+      
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Computation Formulas:', 10, currentY);
+      
+      doc.setFontSize(6.5);
+      doc.setFont('helvetica', 'normal');
+      
+      // Formula 1: Actual No. of Report/Week
+      doc.setFont('helvetica', 'bold');
+      doc.text('1. Actual No. of Report/Week:', 10, currentY + 5);
+      doc.setFont('helvetica', 'normal');
+      doc.text('   Sum of daily patrol counts for 7 days (Day 1 to Day 7 for Week 1, Day 8 to Day 14 for Week 2, etc.)', 10, currentY + 9);
+      doc.text('   Formula: Week Total = Day1 + Day2 + Day3 + Day4 + Day5 + Day6 + Day7', 10, currentY + 13);
+      
+      // Formula 2: Minimum Number of Reports/Week
+      doc.setFont('helvetica', 'bold');
+      doc.text('2. Minimum Number of Reports/Week:', 10, currentY + 18);
+      doc.setFont('helvetica', 'normal');
+      doc.text('   Formula: Minimum Reports/Week = Minimum Reports/Day x 7 days', 10, currentY + 22);
+      doc.text('   Example: 14 reports/day x 7 days = 98 reports/week', 10, currentY + 26);
+      
+      // Formula 3: % of Efficiency per Week
+      doc.setFont('helvetica', 'bold');
+      doc.text('3. % of Efficiency per Week:', 10, currentY + 31);
+      doc.setFont('helvetica', 'normal');
+      doc.text('   Formula: Efficiency % = (No. of Report Attended / Minimum Number of Reports per Week) x 100', 10, currentY + 35);
+      doc.text('   Example: (85 attended / 98 minimum) x 100 = 86.73% (rounded down to 86%)', 10, currentY + 39);
+      
+      // Formula 4: Overall Average
+      doc.setFont('helvetica', 'bold');
+      doc.text('4. Overall Average:', 10, currentY + 44);
+      doc.setFont('helvetica', 'normal');
+      doc.text('   Formula: Overall % = (Total Reports Attended in All Weeks / Total Minimum Reports for All Weeks) x 100', 10, currentY + 48);
+      doc.text('   Total Minimum = 98 reports/week x 4 weeks = 392 reports', 10, currentY + 52);
+      doc.text('   Example: (350 total attended / 392 total minimum) x 100 = 89.28% (rounded down to 89%, capped at 100%)', 10, currentY + 56);
+
+      // Save PDF
+      const fileName = `IPatroller_Criteria_${monthNames[selectedMonth]}_${selectedYear}.pdf`;
+      doc.save(fileName);
+
+      toast.success('PDF Generated Successfully', {
+        description: `${fileName} has been downloaded`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showSuccess('PDF generated successfully!');
+
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      toast.error('Failed to generate PDF', {
+        description: error.message || 'An error occurred while generating the PDF',
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showError('Failed to generate PDF');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
   // Top Performers functions
   const loadTopPerformersData = async (month, year) => {
     try {
@@ -2500,6 +2791,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                         >
                           <FileSpreadsheet className="w-4 h-4 mr-2" />
                           Export Excel
+                        </Button>
+                      )}
+                      {activeTab === "criteria" && (
+                        <Button
+                          onClick={generateCriteriaPdf}
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          disabled={isGeneratingPdf}
+                        >
+                          {isGeneratingPdf ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Generate PDF
+                            </>
+                          )}
                         </Button>
                       )}
                       <button

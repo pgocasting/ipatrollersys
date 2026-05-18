@@ -224,7 +224,7 @@ export const DataProvider = ({ children }) => {
 
     try {
       // Load action reports for reports page
-      const unsubscribe = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
+      const unsubscribeActionReports = onSnapshot(collection(db, 'actionReports'), (snapshot) => {
         const actionReports = [];
         snapshot.forEach((doc) => {
           const docData = doc.data();
@@ -245,9 +245,31 @@ export const DataProvider = ({ children }) => {
         setLoading(false);
       });
 
-      unsubscribeFunctionsRef.current.reports = unsubscribe;
+      // Load incidents data for reports page
+      const incidentsQuery = query(collection(db, 'incidents'), orderBy('date', 'desc'));
+      const unsubscribeIncidents = onSnapshot(incidentsQuery, (snapshot) => {
+        const incidents = [];
+        snapshot.forEach((doc) => {
+          incidents.push({
+            id: doc.id,
+            ...doc.data()
+          });
+        });
+
+        setDashboardData(prev => ({
+          ...prev,
+          incidents,
+          summaryStats: {
+            ...prev.summaryStats,
+            totalIncidents: incidents.length
+          }
+        }));
+      });
+
+      unsubscribeFunctionsRef.current.reports = unsubscribeActionReports;
+      unsubscribeFunctionsRef.current.reportsIncidents = unsubscribeIncidents;
       setLoadedPages(prev => new Set([...prev, 'reports']));
-      console.log('✅ Reports data loaded');
+      console.log('✅ Reports data loaded (including incidents)');
     } catch (error) {
       console.error('❌ Error loading reports data:', error);
       setLoading(false);

@@ -3752,6 +3752,39 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         columnStyles: { 0: { fontStyle: 'bold', fillColor: [240, 240, 240] } }
       });
 
+      // Calculate municipality counts FIRST (needed for multiple sections)
+      const municipalityCounts = {};
+      const allMunicipalities = ['Limay', 'Abucay', 'Morong', 'Pilar', 'Bagac', 'Orani', 'Samal', 'Hermosa', 'Balanga City', 'Orion', 'Dinalupihan', 'Mariveles'];
+
+      // Initialize all municipalities
+      allMunicipalities.forEach(municipality => {
+        municipalityCounts[municipality] = 0;
+      });
+
+      // Count actual incidents
+      console.log('📊 Counting incidents for municipality breakdown. Total filtered incidents:', filteredIncidents.length);
+      filteredIncidents.forEach(incident => {
+        const municipality = incident.municipality || 'Unknown';
+        if (municipalityCounts.hasOwnProperty(municipality)) {
+          municipalityCounts[municipality]++;
+        } else {
+          console.warn('⚠️ Municipality not in list:', municipality, 'from incident:', incident.id);
+        }
+      });
+      console.log('📊 Municipality counts:', municipalityCounts);
+
+      // Get top municipality
+      const sortedMunicipalities = Object.entries(municipalityCounts)
+        .filter(([, count]) => count > 0)
+        .sort(([, a], [, b]) => b - a);
+
+      // Calculate incident type counts (needed for multiple sections)
+      const incidentTypeCounts = {};
+      filteredIncidents.forEach(incident => {
+        const type = incident.incidentType || 'Other';
+        incidentTypeCounts[type] = (incidentTypeCounts[type] || 0) + 1;
+      });
+
       // 1. Data Cleaning & Categorization
       let yPos = doc.lastAutoTable.finalY + 12;
       doc.setFontSize(14);
@@ -3763,7 +3796,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFont('helvetica', 'normal');
 
       // Use justified text for better formatting
-      const reportText = `This report provides a comprehensive analysis of ${filteredIncidents.length} incidents recorded in the Province of Bataan for ${monthName} ${selectedYear}. The data has been processed from 5 out of 12 municipalities and categorized into 6 distinct incident types. All entries have been reviewed for completeness.`;
+      const municipalitiesWithData = Object.entries(municipalityCounts).filter(([, count]) => count > 0).length;
+      const totalIncidentTypes = new Set(filteredIncidents.map(inc => inc.incidentType || 'Other')).size;
+      
+      const reportText = `This report provides a comprehensive analysis of ${filteredIncidents.length} incidents recorded in the Province of Bataan for ${monthName} ${selectedYear}. The data has been processed from ${municipalitiesWithData} out of 12 municipalities and categorized into ${totalIncidentTypes} distinct incident types. All entries have been reviewed for completeness.`;
 
       // Split text into lines and justify
       const maxWidth = 182; // Page width minus margins
@@ -3825,30 +3861,8 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
 
-      // Get municipality counts
-      const municipalityCounts = {};
-      const allMunicipalities = ['Limay', 'Abucay', 'Morong', 'Pilar', 'Bagac', 'Orani', 'Samal', 'Hermosa', 'Balanga City', 'Orion', 'Dinalupihan', 'Mariveles'];
-
-      // Initialize all municipalities
-      allMunicipalities.forEach(municipality => {
-        municipalityCounts[municipality] = 0;
-      });
-
-      // Count actual incidents
-      filteredIncidents.forEach(incident => {
-        const municipality = incident.municipality || 'Unknown';
-        if (municipalityCounts.hasOwnProperty(municipality)) {
-          municipalityCounts[municipality]++;
-        }
-      });
-
-      // Get top municipality
-      const sortedMunicipalities = Object.entries(municipalityCounts)
-        .filter(([, count]) => count > 0)
-        .sort(([, a], [, b]) => b - a);
-
       // Create justified text for municipality analysis
-      let municipalityText = `A total of ${filteredIncidents.length} incidents were recorded across 5 municipalities. `;
+      let municipalityText = `A total of ${filteredIncidents.length} incidents were recorded across ${municipalitiesWithData} municipalities. `;
 
       if (sortedMunicipalities.length > 0) {
         const topMunicipality = sortedMunicipalities[0];
@@ -3938,7 +3952,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         const percentage = ((topMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
 
         // Create justified text for hotspots analysis
-        const hotspotsText = `Municipal Hotspot: ${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing approximately ${percentage}% of the total for the province. City Hotspot: Balanga City follows with 0 incidents.`;
+        let hotspotsText = `Municipal Hotspot: ${topMunicipality[0]} recorded the highest number of incidents (${topMunicipality[1]}), representing approximately ${percentage}% of the total for the province.`;
+        
+        // Add second municipality if exists
+        if (sortedMunicipalities.length > 1) {
+          const secondMunicipality = sortedMunicipalities[1];
+          const secondPercentage = ((secondMunicipality[1] / filteredIncidents.length) * 100).toFixed(1);
+          hotspotsText += ` ${secondMunicipality[0]} follows with ${secondMunicipality[1]} incidents (${secondPercentage}%).`;
+        }
 
         // Split and justify hotspots text
         const hotspotsLines = doc.splitTextToSize(hotspotsText, maxWidth);
@@ -3961,15 +3982,30 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.setFont('helvetica', 'bold');
         doc.text('• Dominant Crime Type:', 14, yPos3);
 
-        const mostCommonType = insights.mostCommonType;
-        const mostCommonCount = insights.incidentTypeCounts[mostCommonType] || 0;
         yPos3 += 8;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
 
-        // Create justified text for dominant crime type
-        const dominantCrimeText = `Illegal Gambling and Warrant Arrest are the most prevalent issues, with 6 and 3 incidents respectively. Together, they account for 50.0% of all recorded events.`;
-        const dominantCrimeLines = doc.splitTextToSize(dominantCrimeText, maxWidth - 6); // Indent for bullet point
+        // Get top incident types dynamically (already calculated above)
+        const sortedTypes = Object.entries(incidentTypeCounts)
+          .sort(([, a], [, b]) => b - a)
+          .slice(0, 2); // Get top 2 types
+
+        let dominantCrimeText = '';
+        if (sortedTypes.length >= 2) {
+          const [type1, count1] = sortedTypes[0];
+          const [type2, count2] = sortedTypes[1];
+          const totalPercentage = (((count1 + count2) / filteredIncidents.length) * 100).toFixed(1);
+          dominantCrimeText = `${type1} and ${type2} are the most prevalent issues, with ${count1} and ${count2} incidents respectively. Together, they account for ${totalPercentage}% of all recorded events.`;
+        } else if (sortedTypes.length === 1) {
+          const [type1, count1] = sortedTypes[0];
+          const percentage = ((count1 / filteredIncidents.length) * 100).toFixed(1);
+          dominantCrimeText = `${type1} is the most prevalent issue, with ${count1} incidents, accounting for ${percentage}% of all recorded events.`;
+        } else {
+          dominantCrimeText = 'No significant incident patterns identified in the current dataset.';
+        }
+
+        const dominantCrimeLines = doc.splitTextToSize(dominantCrimeText, maxWidth - 6);
         dominantCrimeLines.forEach((line, index) => {
           doc.text(line, 20, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
         });
@@ -3984,8 +4020,29 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
 
-        // Create justified text for modus operandi
-        const modusText = `Analysis of incident patterns reveals the following operational methods: Theft (2 incidents recorded, indicating a need for vigilance in commercial spaces) and Drug Operations (2 drug-related incidents, primarily proactive buy-bust operations).`;
+        // Create dynamic modus operandi text based on actual incident types
+        let modusText = 'Analysis of incident patterns reveals the following operational methods: ';
+        const modusDetails = [];
+        
+        if (incidentTypeCounts['Theft'] > 0) {
+          modusDetails.push(`Theft (${incidentTypeCounts['Theft']} incidents recorded, indicating a need for vigilance in commercial spaces)`);
+        }
+        if (incidentTypeCounts['Drug-related'] > 0) {
+          modusDetails.push(`Drug Operations (${incidentTypeCounts['Drug-related']} drug-related incidents, primarily proactive buy-bust operations)`);
+        }
+        if (incidentTypeCounts['Illegal Gambling'] > 0) {
+          modusDetails.push(`Illegal Gambling (${incidentTypeCounts['Illegal Gambling']} incidents, requiring enhanced monitoring of gambling hotspots)`);
+        }
+        if (incidentTypeCounts['Warrant Arrest'] > 0) {
+          modusDetails.push(`Warrant Arrests (${incidentTypeCounts['Warrant Arrest']} arrests executed, demonstrating active law enforcement)`);
+        }
+        
+        if (modusDetails.length > 0) {
+          modusText += modusDetails.join(' and ') + '.';
+        } else {
+          modusText += 'No specific operational patterns identified in the current dataset.';
+        }
+
         const modusLines = doc.splitTextToSize(modusText, maxWidth - 6);
         modusLines.forEach((line, index) => {
           doc.text(line, 20, yPos3 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
@@ -4015,8 +4072,17 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
 
-      // Create justified text for socioeconomic factors
-      const socioText = `Analysis of 4 incidents (Theft, Robbery, Drug Offenses) suggests potential links between economic factors and criminal activities.`;
+      // Create dynamic socioeconomic factors text
+      const economicCrimes = ['Theft', 'Robbery', 'Drug-related', 'Drug Offenses'].filter(type => incidentTypeCounts[type] > 0);
+      const economicCrimeCount = economicCrimes.reduce((sum, type) => sum + (incidentTypeCounts[type] || 0), 0);
+      
+      let socioText = '';
+      if (economicCrimeCount > 0) {
+        socioText = `Analysis of ${economicCrimeCount} incidents (${economicCrimes.join(', ')}) suggests potential links between economic factors and criminal activities.`;
+      } else {
+        socioText = 'No significant economic-related incidents were recorded during this period.';
+      }
+
       const socioLines = doc.splitTextToSize(socioText, maxWidth - 6);
       socioLines.forEach((line, index) => {
         doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
@@ -4031,8 +4097,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
 
-      // Create justified text for firearms control
-      const firearmsText = `1 incident involving illegal firearms was recorded, primarily linked to drug trade operations.`;
+      // Create dynamic firearms control text
+      const firearmsCount = incidentTypeCounts['Illegal Firearms'] || 0;
+      let firearmsText = '';
+      if (firearmsCount > 0) {
+        firearmsText = `${firearmsCount} incident${firearmsCount > 1 ? 's' : ''} involving illegal firearms ${firearmsCount > 1 ? 'were' : 'was'} recorded, primarily linked to drug trade operations.`;
+      } else {
+        firearmsText = 'No incidents involving illegal firearms were recorded during this period.';
+      }
+
       const firearmsLines = doc.splitTextToSize(firearmsText, maxWidth - 6);
       firearmsLines.forEach((line, index) => {
         doc.text(line, 20, yPos4 + (index * 5), { align: 'justify', maxWidth: maxWidth - 6 });
@@ -4052,7 +4125,14 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('• Limay, Abucay, Morong: Allocate additional patrol resources to these municipalities.', 20, yPos4);
+      
+      // Get top 3 municipalities dynamically
+      const topMunicipalities = sortedMunicipalities.slice(0, 3).map(([name]) => name);
+      if (topMunicipalities.length > 0) {
+        doc.text(`• ${topMunicipalities.join(', ')}: Allocate additional patrol resources to these municipalities.`, 20, yPos4);
+      } else {
+        doc.text('• Maintain current patrol levels across all municipalities.', 20, yPos4);
+      }
       yPos4 += 5;
       doc.text('• Focus on key hotspots identified in the analysis.', 20, yPos4);
       yPos4 += 5;
@@ -4066,9 +4146,23 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('• Continue proactive anti-drug operations in areas with 2 drug-related incidents.', 20, yPos4);
-      yPos4 += 5;
-      doc.text('• Strengthen anti-theft measures with 2 theft incidents reported.', 20, yPos4);
+      
+      // Dynamic recommendations based on incident types
+      const drugCount = (incidentTypeCounts['Drug-related'] || 0) + (incidentTypeCounts['Drug Offenses'] || 0);
+      const theftCount = incidentTypeCounts['Theft'] || 0;
+      
+      if (drugCount > 0) {
+        doc.text(`• Continue proactive anti-drug operations in areas with ${drugCount} drug-related incidents.`, 20, yPos4);
+        yPos4 += 5;
+      }
+      if (theftCount > 0) {
+        doc.text(`• Strengthen anti-theft measures with ${theftCount} theft incidents reported.`, 20, yPos4);
+        yPos4 += 5;
+      }
+      if (drugCount === 0 && theftCount === 0) {
+        doc.text('• Maintain current law enforcement operations and monitoring.', 20, yPos4);
+        yPos4 += 5;
+      }
 
       // Technology and Infrastructure
       yPos4 += 10;
@@ -4093,7 +4187,15 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('Based on recent incident density: Limay (8), Abucay (4), Morong (3).', 25, yPos4);
+      
+      // Get top 3 municipalities with their counts
+      const top3Municipalities = sortedMunicipalities.slice(0, 3);
+      if (top3Municipalities.length > 0) {
+        const riskText = top3Municipalities.map(([name, count]) => `${name} (${count})`).join(', ');
+        doc.text(`Based on recent incident density: ${riskText}.`, 25, yPos4);
+      } else {
+        doc.text('No significant risk patterns identified based on current data.', 25, yPos4);
+      }
 
       yPos4 += 10;
       doc.setFontSize(12);
@@ -4102,7 +4204,18 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       yPos4 += 8;
       doc.setFontSize(10);
       doc.setFont('helvetica', 'normal');
-      doc.text('Elevated patterns: Illegal Gambling (6), Warrant Arrest (3), Theft (2).', 25, yPos4);
+      
+      // Get top 3 incident types
+      const top3Types = Object.entries(incidentTypeCounts)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 3);
+      
+      if (top3Types.length > 0) {
+        const typesText = top3Types.map(([type, count]) => `${type} (${count})`).join(', ');
+        doc.text(`Elevated patterns: ${typesText}.`, 25, yPos4);
+      } else {
+        doc.text('No significant incident type patterns identified.', 25, yPos4);
+      }
 
       // Add page number
       doc.setFontSize(10);
