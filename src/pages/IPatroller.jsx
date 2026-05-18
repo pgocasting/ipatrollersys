@@ -1203,27 +1203,27 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         let rawPercentage; // Uncapped value — used for sorting
 
         if (isJan2026OrLater) {
-          // Jan 2026 onwards: weighted formula
-          // Action Taken score: sum of each week's floor(attended / 98 * 100), capped at 100 per week
-          const weeklyEfficiency = [];
+          // Jan 2026 onwards: Use Overall Average from Criteria tab
+          // Calculate weekly attended counts
+          const weeklyAttended = [];
           for (let week = 0; week < 4; week++) {
             const weekStart = week * 7;
             if (weekStart < totalDays) {
               const attended = municipalityActionCounts[week] || 0;
-              weeklyEfficiency.push(Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100));
+              weeklyAttended.push(attended);
             } else {
-              weeklyEfficiency.push(0);
+              weeklyAttended.push(0);
             }
           }
-          const actionTakenScore = weeklyEfficiency.reduce((sum, e) => sum + e, 0);
-          // Calculate average action efficiency (max 100)
-          const avgActionEfficiency = actionTakenScore / 4;
+          
+          // Calculate Overall Average using Criteria tab formula:
+          // Overall % = (Total Attended / Total Minimum) × 100, capped at 100%
+          const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+          const totalMinimum = WEEKLY_MIN * 4; // 98 × 4 = 392
+          rawPercentage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
 
           // Active Days score: (activeDays / totalDays) * 100, capped at 100
           const computedActiveDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
-
-          // Use average action efficiency as the performance score (no weighting)
-          rawPercentage = Math.round(avgActionEfficiency);
 
         } else if (isNovDec2025) {
           // Nov–Dec 2025: average of 4 weekly efficiencies (each capped per week at 100)
