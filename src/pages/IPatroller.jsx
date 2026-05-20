@@ -1262,18 +1262,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Always compute it so we can show it to the user.
         const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
 
-        let overallActionPercentage = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
-          // Cap weekly attendance at 100 before summing
-          return sum + Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100);
+        // Calculate total weekly attendance (sum of Week 1 + Week 2 + Week 3 + Week 4)
+        const totalWeeklyAttendance = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
+          return sum + (attended || 0);
         }, 0);
-        
-        // Calculate total attended reports (sum of all weeks)
-        const totalAttendedReports = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => sum + attended, 0);
-        
-        // If the formula divides by 4 to get the average (Nov 2025+), we average the UI display too.
-        if (isJan2026OrLater || isNovDec2025) {
-          overallActionPercentage = Math.round(overallActionPercentage / 4);
-        }
 
         return {
           ...item,
@@ -1284,8 +1276,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           activePercentage,   // capped at 100 — for display
           rawPercentage,      // uncapped — for sorting
           totalPatrols,
-          overallActionPercentage,
-          totalAttendedReports  // Add total attended reports for display
+          totalWeeklyAttendance
         };
       })
       .sort((a, b) => {
@@ -3144,27 +3135,17 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                           {value}
                                         </td>
                                       ))}
-                                      {/* No. of report attended / week - Week 1-4 with totals */}
-                                      {weeklyAttended.map((value, weekIndex) => {
-                                        // Calculate total for all weeks
-                                        const totalAttendedAllWeeks = weeklyAttended.reduce((sum, weekValue) => sum + weekValue, 0);
-                                        
-                                        return (
-                                          <td key={`attended-${weekIndex}`} className={`px-3 py-4 text-center text-sm font-semibold text-red-600 ${weekIndex === 0 ? 'border-l-2 border-gray-300' : ''}`}>
-                                            <div className="flex flex-col items-center">
-                                              <span className="text-sm font-semibold">{value}</span>
-                                              <div className="text-xs text-blue-600 mt-1 font-medium">
-                                                Total: {totalAttendedAllWeeks}
-                                              </div>
-                                              {value > 0 && (
-                                                <div className="text-xs text-green-600 mt-1" title="Data from Command Center Action Taken">
-                                                  ✓
-                                                </div>
-                                              )}
+                                      {/* No. of report attended / week - Week 1-4 */}
+                                      {weeklyAttended.map((value, weekIndex) => (
+                                        <td key={`attended-${weekIndex}`} className={`px-3 py-4 text-center text-sm font-semibold text-red-600 ${weekIndex === 0 ? 'border-l-2 border-gray-300' : ''}`}>
+                                          {value}
+                                          {value > 0 && (
+                                            <div className="text-xs text-green-600 mt-1" title="Data from Command Center Action Taken">
+                                              ✓
                                             </div>
-                                          </td>
-                                        );
-                                      })}
+                                          )}
+                                        </td>
+                                      ))}
                                       {/* % of Efficiency / week - Week 1-4 */}
                                       {weeklyEfficiency.map((efficiency, weekIndex) => (
                                         <td key={`efficiency-${weekIndex}`} className={`px-3 py-4 text-center text-sm font-semibold text-purple-600 ${weekIndex === 0 ? 'border-l-2 border-gray-300' : ''}`}>
@@ -3900,7 +3881,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       </td>
                                       <td className="px-6 py-4 text-center">
                                         <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
-                                          {performer.totalAttendedReports || 0}
+                                          {performer.totalWeeklyAttendance || 0}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 text-center">
