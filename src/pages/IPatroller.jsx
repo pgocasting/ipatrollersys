@@ -1262,14 +1262,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         // Always compute it so we can show it to the user.
         const activeDaysScore = totalDays > 0 ? Math.min(Math.round((activeDays / totalDays) * 100), 100) : 0;
 
-        let overallActionPercentage = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
-          // Cap weekly attendance at 100 before summing
-          return sum + Math.min(Math.floor((attended / WEEKLY_MIN) * 100), 100);
+        // Overall Action Taken = Total sum of reports attended across all weeks (Week 1 + Week 2 + Week 3 + Week 4)
+        const overallActionTaken = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => {
+          return sum + (attended || 0);
         }, 0);
-        // If the formula divides by 4 to get the average (Nov 2025+), we average the UI display too.
-        if (isJan2026OrLater || isNovDec2025) {
-          overallActionPercentage = Math.round(overallActionPercentage / 4);
-        }
 
         return {
           ...item,
@@ -1280,7 +1276,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           activePercentage,   // capped at 100 — for display
           rawPercentage,      // uncapped — for sorting
           totalPatrols,
-          overallActionPercentage
+          overallActionTaken  // Total count of reports attended across all weeks
         };
       })
       .sort((a, b) => {
@@ -1359,7 +1355,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           performer.district,
           performer.activeDays,
           performer.totalPatrols,
-          performer.overallActionPercentage || 0,
+          performer.overallActionTaken || 0,
           `${activePercentage}%`
         ];
       });
@@ -3885,7 +3881,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       </td>
                                       <td className="px-6 py-4 text-center">
                                         <span className="text-lg font-semibold transition-colors duration-300 text-emerald-600">
-                                          {performer.overallActionPercentage || 0}
+                                          {performer.overallActionTaken || 0}
                                         </span>
                                       </td>
                                       <td className="px-6 py-4 text-center">
