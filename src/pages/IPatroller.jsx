@@ -110,7 +110,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [filteredTopPerformersData, setFilteredTopPerformersData] = useState([]);
   const [loadingTopPerformers, setLoadingTopPerformers] = useState(false);
   const [topPerformersActionData, setTopPerformersActionData] = useState({});
-  const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(true);
+  const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(false);
   const topPerformersPreviewRef = useRef(null);
   // Weight sliders for Top Performers ranking formula
 
