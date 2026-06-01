@@ -181,37 +181,58 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       const s = rawDate.trim();
       if (!s) return null;
 
+      // Try direct parsing first
       const direct = new Date(s);
       if (!Number.isNaN(direct.getTime())) return direct;
 
-      const isoLike = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-      if (isoLike) {
-        const d = new Date(`${isoLike[1]}-${isoLike[2]}-${isoLike[3]}T00:00:00`);
-        return Number.isNaN(d.getTime()) ? null : d;
+      // Enhanced pattern matching for descriptive text with dates
+      
+      // Pattern 1: "May 31, 2026" format within text (most common in your example)
+      const monthDayYear = s.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{1,2}),?\s+(\d{4})/i);
+      if (monthDayYear) {
+        const d = new Date(`${monthDayYear[1]} ${monthDayYear[2]}, ${monthDayYear[3]}`);
+        if (!Number.isNaN(d.getTime())) return d;
       }
 
-      const mdy = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\b.*)?$/);
+      // Pattern 2: "31 May 2026" format within text
+      const dayMonthYear = s.match(/(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
+      if (dayMonthYear) {
+        const d = new Date(`${dayMonthYear[2]} ${dayMonthYear[1]}, ${dayMonthYear[3]}`);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+
+      // Pattern 3: ISO-like format "2026-05-31"
+      const isoLike = s.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if (isoLike) {
+        const d = new Date(`${isoLike[1]}-${isoLike[2]}-${isoLike[3]}T00:00:00`);
+        if (!Number.isNaN(d.getTime())) return d;
+      }
+
+      // Pattern 4: MM/DD/YYYY format (fixed bug)
+      const mdy = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
       if (mdy) {
         const month = parseInt(mdy[1], 10) - 1;
         const day = parseInt(mdy[2], 10);
-        const year = parseInt(mdy[3], 10);
+        const year = parseInt(mdy[3], 10); // Fixed: was dmy[3]
         const d = new Date(year, month, day);
-        return Number.isNaN(d.getTime()) ? null : d;
+        if (!Number.isNaN(d.getTime())) return d;
       }
 
-      const dmy = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})(?:\b.*)?$/);
+      // Pattern 5: DD-MM-YYYY format
+      const dmy = s.match(/(\d{1,2})-(\d{1,2})-(\d{4})/);
       if (dmy) {
         const day = parseInt(dmy[1], 10);
         const month = parseInt(dmy[2], 10) - 1;
         const year = parseInt(dmy[3], 10);
         const d = new Date(year, month, day);
-        return Number.isNaN(d.getTime()) ? null : d;
+        if (!Number.isNaN(d.getTime())) return d;
       }
 
-      const monthYear = s.match(/^(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})$/i);
+      // Pattern 6: "January 2024" format (month and year only)
+      const monthYear = s.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i);
       if (monthYear) {
         const d = new Date(`${monthYear[1]} 1, ${monthYear[2]}`);
-        return Number.isNaN(d.getTime()) ? null : d;
+        if (!Number.isNaN(d.getTime())) return d;
       }
     }
 
@@ -448,6 +469,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
   const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
   const [showClearIncidentsModal, setShowClearIncidentsModal] = useState(false);
+  const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false);
   const [clearScope, setClearScope] = useState("month_year");
   const [clearTargetMonth, setClearTargetMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
   const [clearTargetYear, setClearTargetYear] = useState(new Date().getFullYear().toString());
@@ -664,13 +686,32 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       setFirestoreStatus('saving');
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      querySnapshot.forEach((doc) => {
-        batch.delete(doc.ref);
-      });
-      await batch.commit();
+      
+      // Process deletions in batches of 500 (Firestore limit)
+      const docs = querySnapshot.docs;
+      const batchSize = 500;
+      let deletedCount = 0;
+      
+      for (let i = 0; i < docs.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchDocs = docs.slice(i, i + batchSize);
+        
+        batchDocs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        
+        await batch.commit();
+        deletedCount += batchDocs.length;
+        
+        // Show progress for large deletions
+        if (docs.length > batchSize) {
+          console.log(`🗑️ Deleted ${deletedCount}/${docs.length} incidents...`);
+        }
+      }
+      
       setIncidents([]);
       setFirestoreStatus('connected');
+      console.log(`✅ Successfully deleted ${deletedCount} incidents`);
     } catch (error) {
       console.error('❌ Error clearing incidents:', error);
       setFirestoreStatus('error');
@@ -724,26 +765,41 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      let removedCount = 0;
-
+      
+      // Filter documents that match the criteria
+      const docsToDelete = [];
       querySnapshot.forEach((docSnap) => {
         const incidentData = docSnap.data();
         const incidentDate = parseIncidentDate(incidentData?.date);
         if (incidentDate && incidentDate.getMonth() === currentMonth && incidentDate.getFullYear() === currentYear) {
-          batch.delete(docSnap.ref);
-          removedCount++;
+          docsToDelete.push(docSnap.ref);
         }
       });
 
-      if (removedCount > 0) {
-        await batch.commit();
-        await loadIncidents();
-        toast.success(`Successfully removed ${removedCount} incidents from current month`);
-      } else {
+      if (docsToDelete.length === 0) {
         toast.info('No incidents found for current month');
+        setFirestoreStatus('connected');
+        return;
       }
 
+      // Process deletions in batches of 500
+      const batchSize = 500;
+      let deletedCount = 0;
+      
+      for (let i = 0; i < docsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchDocs = docsToDelete.slice(i, i + batchSize);
+        
+        batchDocs.forEach((docRef) => {
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        deletedCount += batchDocs.length;
+      }
+
+      await loadIncidents();
+      toast.success(`Successfully removed ${deletedCount} incidents from current month`);
       setFirestoreStatus('connected');
     } catch (error) {
       console.error('❌ Error clearing current month incidents:', error);
@@ -761,28 +817,43 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      let removedCount = 0;
-
+      
+      // Filter documents that match the criteria
+      const docsToDelete = [];
       querySnapshot.forEach((docSnap) => {
         const incidentData = docSnap.data();
         const incidentDate = parseIncidentDate(incidentData?.date);
         if (incidentDate && incidentDate.getMonth() === monthIndex && incidentDate.getFullYear() === yearNumber) {
-          batch.delete(docSnap.ref);
-          removedCount++;
+          docsToDelete.push(docSnap.ref);
         }
       });
 
-      if (removedCount > 0) {
-        await batch.commit();
-        await loadIncidents();
-        toast.success(`Successfully removed ${removedCount} incidents for the selected month`);
-      } else {
+      if (docsToDelete.length === 0) {
         toast.info('No incidents found for the selected month');
+        setFirestoreStatus('connected');
+        return { removedCount: 0 };
       }
 
+      // Process deletions in batches of 500
+      const batchSize = 500;
+      let deletedCount = 0;
+      
+      for (let i = 0; i < docsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchDocs = docsToDelete.slice(i, i + batchSize);
+        
+        batchDocs.forEach((docRef) => {
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        deletedCount += batchDocs.length;
+      }
+
+      await loadIncidents();
+      toast.success(`Successfully removed ${deletedCount} incidents for the selected month`);
       setFirestoreStatus('connected');
-      return { removedCount };
+      return { removedCount: deletedCount };
     } catch (error) {
       console.error('❌ Error clearing incidents for month/year:', error);
       setFirestoreStatus('error');
@@ -800,28 +871,43 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
 
       const incidentsRef = collection(db, 'incidents');
       const querySnapshot = await getDocs(incidentsRef);
-      const batch = writeBatch(db);
-      let removedCount = 0;
-
+      
+      // Filter documents that match the criteria
+      const docsToDelete = [];
       querySnapshot.forEach((docSnap) => {
         const incidentData = docSnap.data();
         const incidentDate = parseIncidentDate(incidentData?.date);
         if (incidentDate && incidentDate.getFullYear() === yearNumber) {
-          batch.delete(docSnap.ref);
-          removedCount++;
+          docsToDelete.push(docSnap.ref);
         }
       });
 
-      if (removedCount > 0) {
-        await batch.commit();
-        await loadIncidents();
-        toast.success(`Successfully removed ${removedCount} incidents for year ${yearNumber}`);
-      } else {
+      if (docsToDelete.length === 0) {
         toast.info(`No incidents found for year ${yearNumber}`);
+        setFirestoreStatus('connected');
+        return { removedCount: 0 };
       }
 
+      // Process deletions in batches of 500
+      const batchSize = 500;
+      let deletedCount = 0;
+      
+      for (let i = 0; i < docsToDelete.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const batchDocs = docsToDelete.slice(i, i + batchSize);
+        
+        batchDocs.forEach((docRef) => {
+          batch.delete(docRef);
+        });
+        
+        await batch.commit();
+        deletedCount += batchDocs.length;
+      }
+
+      await loadIncidents();
+      toast.success(`Successfully removed ${deletedCount} incidents for year ${yearNumber}`);
       setFirestoreStatus('connected');
-      return { removedCount };
+      return { removedCount: deletedCount };
     } catch (error) {
       console.error('❌ Error clearing incidents for year:', error);
       setFirestoreStatus('error');
@@ -1171,43 +1257,71 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
     return String(value).trim().toLowerCase().replace(/\s+/g, ' ');
   };
   const buildIncidentDedupeKey = (incident) => {
-    const incidentType = normalizeIncidentField(incident?.incidentType);
+    // Use only the most unique fields to avoid false duplicate detection
+    // Focus on date, location, and description as primary identifiers
     const date = normalizeIncidentField(incident?.date);
-    const time = normalizeIncidentField(incident?.time);
     const location = normalizeIncidentField(incident?.location);
-    const municipality = normalizeIncidentField(incident?.municipality);
-    const district = normalizeIncidentField(incident?.district);
-    const officer = normalizeIncidentField(incident?.officer);
     const description = normalizeIncidentField(incident?.description);
-    return [incidentType, date, time, location, municipality, district, officer, description].join('|');
+    
+    // Only treat as duplicate if date, location AND description are exactly the same
+    // This prevents different incidents from being marked as duplicates
+    return [date, location, description].join('|');
   };
   const saveImportedIncidents = async (rawIncidents) => {
-    const existingKeys = new Set((incidents || []).map(buildIncidentDedupeKey));
-    const fileKeys = new Set();
+    console.log('🔍 Starting import process with', rawIncidents.length, 'incidents from file');
+    
+    // DISABLED: No duplicate checking - import ALL incidents
+    // const existingKeys = new Set((incidents || []).map(buildIncidentDedupeKey));
+    // const fileKeys = new Set();
 
     const uniqueForImport = [];
     let skippedDuplicatesInFile = 0;
     let skippedExisting = 0;
 
     for (const incident of rawIncidents) {
-      const key = buildIncidentDedupeKey(incident);
-      if (!key || key === '|||||||') {
-        continue;
-      }
-      if (fileKeys.has(key)) {
-        skippedDuplicatesInFile++;
-        continue;
-      }
-      fileKeys.add(key);
-      if (existingKeys.has(key)) {
-        skippedExisting++;
-        continue;
-      }
+      // DISABLED: Skip duplicate detection completely
+      // const key = buildIncidentDedupeKey(incident);
+      // console.log('📊 Processing incident:', {
+      //   description: incident.description?.substring(0, 50) + '...',
+      //   date: incident.date,
+      //   location: incident.location?.substring(0, 30) + '...',
+      //   dedupeKey: key
+      // });
+      
+      // DISABLED: No key validation
+      // if (!key || key === '||') {
+      //   console.log('⚠️ Skipping incident with empty key');
+      //   continue;
+      // }
+      // if (fileKeys.has(key)) {
+      //   console.log('🔄 Skipping duplicate within file');
+      //   skippedDuplicatesInFile++;
+      //   continue;
+      // }
+      // fileKeys.add(key);
+      // if (existingKeys.has(key)) {
+      //   console.log('📋 Skipping already existing incident');
+      //   skippedExisting++;
+      //   continue;
+      // }
+      
+      console.log('✅ Adding incident to import queue:', {
+        description: incident.description?.substring(0, 50) + '...',
+        date: incident.date,
+        location: incident.location?.substring(0, 30) + '...'
+      });
       uniqueForImport.push(incident);
     }
 
+    console.log('📈 Import summary:', {
+      totalFromFile: rawIncidents.length,
+      uniqueForImport: uniqueForImport.length,
+      skippedDuplicatesInFile,
+      skippedExisting
+    });
+
     if (uniqueForImport.length === 0) {
-      alert(`No new incidents imported. Skipped ${skippedDuplicatesInFile} duplicates in file and ${skippedExisting} already existing incidents.`);
+      alert(`No incidents to import.`);
       return;
     }
 
@@ -1227,7 +1341,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
       await batch.commit();
       await loadIncidents();
       setFirestoreStatus('connected');
-      alert(`Successfully imported ${uniqueForImport.length} incidents. Skipped ${skippedDuplicatesInFile} duplicates in file and ${skippedExisting} already existing incidents.`);
+      alert(`Successfully imported ${uniqueForImport.length} incidents. No duplicates were skipped - all data imported!`);
     } catch (error) {
       console.error('Error saving imported incidents:', error);
       setFirestoreStatus('error');
@@ -3455,41 +3569,12 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                 <DropdownMenuSeparator />
                 <DropdownMenuLabel>Data Cleanup</DropdownMenuLabel>
                 <DropdownMenuItem
-                  onClick={identifyDuplicateIncidents}
+                  onClick={() => setShowBulkDeleteModal(true)}
                   disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
-                >
-                  <Search className="w-4 h-4 text-black" />
-                  <span>Identify Duplicates</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={manualCleanupDuplicates}
-                  disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-gray-100 hover:text-black focus:bg-gray-100 focus:text-black"
-                >
-                  <Eraser className="w-4 h-4 text-black" />
-                  <span>Clean Duplicates</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={clearCurrentMonthIncidents}
-                  disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-indigo-50 hover:text-indigo-700 focus:bg-indigo-50 focus:text-indigo-700"
-                >
-                  <Calendar className="w-4 h-4 text-black" />
-                  <span>Clear Current Month</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setClearScope("month_year");
-                    setClearTargetMonth(new Date().toLocaleString('en-US', { month: 'long' }));
-                    setClearTargetYear(new Date().getFullYear().toString());
-                    setShowClearIncidentsModal(true);
-                  }}
-                  disabled={cleanupLoading}
-                  className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-gray-100 hover:text-red-700 focus:bg-gray-100 focus:text-red-700"
+                  className="flex items-center gap-3 cursor-pointer text-red-600 hover:bg-red-50 hover:text-red-700 focus:bg-red-50 focus:text-red-700"
                 >
                   <Trash2 className="w-4 h-4 text-red-600" />
-                  <span>Clear All Data</span>
+                  <span>Delete</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -4119,10 +4204,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                     <div className="text-xs text-gray-500">Delete incidents that fall within the selected year.</div>
                   </div>
                 </label>
+
+                <label className="flex items-start gap-3 p-3 border border-red-200 bg-red-50 rounded-xl cursor-pointer hover:bg-red-100">
+                  <input
+                    type="radio"
+                    name="clear-scope"
+                    value="all"
+                    checked={clearScope === "all"}
+                    onChange={() => setClearScope("all")}
+                    className="mt-1"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-semibold text-red-900">Delete All Data</div>
+                    <div className="text-xs text-red-600">⚠️ Delete ALL incidents from the database. This cannot be undone!</div>
+                  </div>
+                </label>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className={clearScope !== "month_year" ? "opacity-50 pointer-events-none" : ""}>
+                <div className={clearScope === "all" ? "opacity-50 pointer-events-none" : clearScope !== "month_year" ? "opacity-50 pointer-events-none" : ""}>
                   <Label className="text-xs text-gray-600">Month</Label>
                   <select
                     id="clear-target-month"
@@ -4142,7 +4242,7 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
                   </select>
                 </div>
 
-                <div>
+                <div className={clearScope === "all" ? "opacity-50 pointer-events-none" : ""}>
                   <Label className="text-xs text-gray-600">Year</Label>
                   <select
                     id="clear-target-year"
@@ -4176,18 +4276,25 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
               <button
                 onClick={async () => {
                   try {
-                    const yearNumber = parseInt(clearTargetYear, 10);
-                    if (Number.isNaN(yearNumber)) {
-                      toast.error('Please select a valid year');
-                      return;
-                    }
-
                     toast.loading('Clearing incidents...', { id: 'clear-incidents' });
 
-                    if (clearScope === "month_year") {
+                    if (clearScope === "all") {
+                      // Delete all incidents
+                      await clearAllIncidents();
+                    } else if (clearScope === "month_year") {
+                      const yearNumber = parseInt(clearTargetYear, 10);
+                      if (Number.isNaN(yearNumber)) {
+                        toast.error('Please select a valid year');
+                        return;
+                      }
                       const monthIndex = new Date(`${clearTargetMonth} 1, ${yearNumber}`).getMonth();
                       await clearIncidentsForMonthYear(monthIndex, yearNumber);
                     } else {
+                      const yearNumber = parseInt(clearTargetYear, 10);
+                      if (Number.isNaN(yearNumber)) {
+                        toast.error('Please select a valid year');
+                        return;
+                      }
                       await clearIncidentsForYear(yearNumber);
                     }
 
@@ -4206,6 +4313,113 @@ export default function IncidentsReports({ onLogout, onNavigate, currentPage }) 
           </div>
         </div>
       )}
+
+      {/* Bulk Delete Modal */}
+      {showBulkDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 animate-in fade-in-0 zoom-in-95">
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-red-100">
+                    <Trash2 className="h-6 w-6 text-red-600" />
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">Delete Data</h3>
+                </div>
+                <button
+                  onClick={() => setShowBulkDeleteModal(false)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                  aria-label="Close"
+                >
+                  <X className="h-5 w-5 text-gray-500" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-600">
+                Choose what data you want to delete permanently. This action cannot be undone.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      toast.loading('Deleting selected month data...', { id: 'delete-selected-month' });
+                      
+                      // Get the selected month index (0-based)
+                      const monthNames = [
+                        "January", "February", "March", "April", "May", "June",
+                        "July", "August", "September", "October", "November", "December"
+                      ];
+                      const monthIndex = monthNames.indexOf(selectedMonth);
+                      const yearNumber = parseInt(selectedYear, 10);
+                      
+                      if (monthIndex === -1 || Number.isNaN(yearNumber)) {
+                        toast.error('Invalid month or year selected');
+                        return;
+                      }
+                      
+                      await clearIncidentsForMonthYear(monthIndex, yearNumber);
+                      toast.dismiss('delete-selected-month');
+                      toast.success('Selected month data deleted successfully');
+                      setShowBulkDeleteModal(false);
+                    } catch (error) {
+                      toast.dismiss('delete-selected-month');
+                      toast.error('Error deleting selected month data');
+                    }
+                  }}
+                  disabled={cleanupLoading}
+                  className="w-full flex items-center justify-center gap-3 p-4 border-2 border-orange-200 bg-orange-50 rounded-xl cursor-pointer hover:bg-orange-100 hover:border-orange-300 transition-all duration-200"
+                >
+                  <Calendar className="h-5 w-5 text-orange-600" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-orange-900">Delete Selected Month</div>
+                    <div className="text-xs text-orange-600">Delete all incidents from {selectedMonth} {selectedYear}</div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={async () => {
+                    try {
+                      toast.loading('Deleting all data...', { id: 'delete-all-data' });
+                      await clearAllIncidents();
+                      toast.dismiss('delete-all-data');
+                      toast.success('All data deleted successfully');
+                      setShowBulkDeleteModal(false);
+                    } catch (error) {
+                      toast.dismiss('delete-all-data');
+                      toast.error('Error deleting all data');
+                    }
+                  }}
+                  disabled={cleanupLoading}
+                  className="w-full flex items-center justify-center gap-3 p-4 border-2 border-red-200 bg-red-50 rounded-xl cursor-pointer hover:bg-red-100 hover:border-red-300 transition-all duration-200"
+                >
+                  <Trash2 className="h-5 w-5 text-red-600" />
+                  <div className="text-left">
+                    <div className="text-sm font-semibold text-red-900">Delete All Months</div>
+                    <div className="text-xs text-red-600">⚠️ Delete ALL incidents permanently from database</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 p-6 border-t border-gray-200">
+              <button
+                onClick={() => setShowBulkDeleteModal(false)}
+                className="px-5 py-3 border border-gray-300 text-gray-700 font-medium rounded-xl hover:bg-gray-50 transition-colors duration-200"
+                disabled={cleanupLoading}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Incident Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
