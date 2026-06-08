@@ -497,13 +497,15 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
   };
 
   const activeUsersList = users.filter(
-    (u) => u.role !== "Admin" && presenceMap[u.email]?.status === 'online'
+    (u) => u.role !== "Admin" && presenceMap[u.email]?.status === 'online' && 
+    ['command-center', 'ipatroller', 'viewing'].includes(u.accessLevel)
   );
   const idleUsers = users.filter(
     (u) => u.role !== "Admin" && presenceMap[u.email]?.status === 'idle'
   ).length;
   const offlineUsersList = users.filter(
-    (u) => u.role !== "Admin" && (!presenceMap[u.email] || presenceMap[u.email]?.status === 'offline')
+    (u) => u.role !== "Admin" && (!presenceMap[u.email] || presenceMap[u.email]?.status === 'offline') &&
+    ['command-center', 'ipatroller', 'viewing'].includes(u.accessLevel)
   );
 
   const onlineUsers = activeUsersList.length;
