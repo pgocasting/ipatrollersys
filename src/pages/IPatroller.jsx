@@ -1355,7 +1355,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
           performer.district,
           performer.activeDays,
           performer.totalPatrols,
-          performer.overallActionPercentage || 0,
+          performer.totalWeeklyAttendance || 0,
           `${activePercentage}%`
         ];
       });
@@ -1716,7 +1716,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
               performer.district,
               performer.activeDays,
               performer.totalPatrols,
-              performer.overallActionPercentage || 0,
+              performer.totalWeeklyAttendance || 0,
               `${activePercentage}%`,
               getStatusText()
             ];
