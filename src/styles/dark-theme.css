@@ -1141,3 +1141,150 @@
 :root.dark .text-center.py-8 p {
   color: #94a3b8 !important;
 }
+
+
+/* ── 23. Loading/Verification Screen Fixes ────────────── */
+
+/* Loading screen background */
+:root.dark .min-h-screen.flex.items-center.justify-center {
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+/* "VERIFYING ACCESS" title */
+:root.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+/* Loading bar container */
+:root.dark .bg-white.shadow-sm {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+/* Loading bar track */
+:root.dark .bg-slate-100 {
+  background-color: #334155 !important;
+}
+
+/* Loading bar progress */
+:root.dark .bg-blue-500 {
+  background-color: #3b82f6 !important;
+  box-shadow: 0 0 20px #3b82f6 !important;
+}
+
+/* Provincial Government text at bottom */
+:root.dark .text-slate-400 {
+  color: #94a3b8 !important;
+}
+
+/* Orbit circles - increase visibility */
+:root.dark .border-blue-500\/20 {
+  border-color: rgba(59, 130, 246, 0.4) !important;
+}
+
+:root.dark .border-purple-500\/20 {
+  border-color: rgba(168, 85, 247, 0.4) !important;
+}
+
+:root.dark .border-emerald-500\/20 {
+  border-color: rgba(16, 185, 129, 0.4) !important;
+}
+
+/* Orbit dots - make brighter */
+:root.dark .bg-blue-500 {
+  filter: brightness(1.2);
+}
+
+:root.dark .bg-purple-500 {
+  filter: brightness(1.2);
+}
+
+:root.dark .bg-emerald-500 {
+  filter: brightness(1.2);
+}
+
+/* Central logo/image container */
+:root.dark .w-32.h-32.rounded-full {
+  background-color: #334155 !important;
+  border-color: #475569 !important;
+}
+
+/* Gradient text "Access" */
+:root.dark .text-transparent.bg-clip-text {
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* Ensure gradient is visible in dark mode */
+:root.dark .bg-gradient-to-r.from-blue-600.to-blue-400 {
+  background-image: linear-gradient(to right, #60a5fa, #93c5fd) !important;
+}
+
+
+/* ── 24. Loading Spinners & States ────────────────────── */
+
+/* Generic loading spinners */
+:root.dark .animate-spin {
+  filter: brightness(1.3);
+}
+
+/* Loading text */
+:root.dark .text-slate-400,
+:root.dark .text-gray-400 {
+  color: #cbd5e1 !important;
+}
+
+/* Spinner containers */
+:root.dark .logs-spinner,
+:root.dark .pw-spinner,
+:root.dark [class*="spinner"] {
+  border-color: #475569 !important;
+  border-top-color: #60a5fa !important;
+}
+
+/* Loading messages */
+:root.dark .logs-empty p,
+:root.dark .text-center p {
+  color: #cbd5e1 !important;
+}
+
+/* Disabled buttons during loading */
+:root.dark button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+:root.dark button:disabled span {
+  color: #94a3b8 !important;
+}
+
+/* Loading bar animations */
+:root.dark .animate-loading-bar {
+  background: linear-gradient(90deg, #3b82f6, #60a5fa, #3b82f6) !important;
+  background-size: 200% 100% !important;
+  animation: loading-bar 1.5s infinite ease-in-out !important;
+}
+
+/* Skeleton loaders */
+:root.dark .animate-pulse {
+  background-color: #334155 !important;
+}
+
+/* Loading overlay */
+:root.dark .bg-white\/80,
+:root.dark .bg-slate-50\/80 {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+}
+
+/* Progress indicators */
+:root.dark .bg-blue-600 {
+  background-color: #3b82f6 !important;
+}
+
+:root.dark .bg-emerald-600 {
+  background-color: #10b981 !important;
+}
+
+/* Loading dots animation */
+:root.dark .loading-dots span {
+  background-color: #60a5fa !important;
+}
