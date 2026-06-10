@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import Layout from "../components/Layout";
 import { useAuth } from "../contexts/AuthContext";
-import { useTheme } from "../contexts/ThemeContext";
 import { auth } from "../lib/firebase";
 import {
   reauthenticateWithCredential,
@@ -13,16 +12,10 @@ import { toast } from "sonner";
 import { Separator } from "../components/ui/separator";
 
 import {
-  Sun,
-  Moon,
-  Monitor,
   Lock,
   Eye,
   EyeOff,
   ShieldCheck,
-  Palette,
-  ChevronRight,
-  Check,
   User as UserIcon,
   Camera,
   Upload,
@@ -72,46 +65,6 @@ function PasswordInput({ id, label, value, onChange, placeholder }) {
           {show ? <EyeOff size={16} /> : <Eye size={16} />}
         </button>
       </div>
-    </div>
-  );
-}
-
-// ─── Theme Selector ───────────────────────────────────────────────────────────
-
-function ThemeSelector() {
-  const { theme, setLight, setDark } = useTheme();
-
-  const options = [
-    { key: "light", label: "Light", icon: Sun, desc: "Classic bright interface" },
-    { key: "dark",  label: "Dark",  icon: Moon, desc: "Easy on the eyes at night" },
-  ];
-
-  return (
-    <div className="theme-options">
-      {options.map(({ key, label, icon: Icon, desc }) => {
-        const active = theme === key;
-        return (
-          <button
-            key={key}
-            onClick={key === "light" ? setLight : setDark}
-            className={`theme-option-btn ${active ? "theme-option-active" : ""}`}
-            aria-pressed={active}
-          >
-            <div className={`theme-option-icon ${key === "dark" ? "dark-icon" : "light-icon"}`}>
-              <Icon size={22} />
-            </div>
-            <div className="theme-option-text">
-              <span className="theme-option-label">{label}</span>
-              <span className="theme-option-desc">{desc}</span>
-            </div>
-            {active && (
-              <span className="theme-option-check">
-                <Check size={14} />
-              </span>
-            )}
-          </button>
-        );
-      })}
     </div>
   );
 }
@@ -392,16 +345,6 @@ export default function Settings({ onLogout, onNavigate, currentPage }) {
             <ProfileCustomization />
           </SectionCard>
 
-          {/* ── Appearance ────────────────────────────────────── */}
-          <SectionCard
-            icon={Palette}
-            iconColor="#6366f1"
-            title="Appearance"
-            description="Choose how the interface looks for you."
-          >
-            <ThemeSelector />
-          </SectionCard>
-
           {/* ── Change Password (admin and ipatroller) ───────────────────── */}
           {(isAdmin || userAccessLevel === 'ipatroller') && (
             <SectionCard
@@ -440,11 +383,6 @@ const styles = `
 :root.dark .settings-title          { color: #f1f5f9; }
 :root.dark .settings-subtitle       { color: #94a3b8; }
 :root.dark .settings-header         { background: #1e293b; border-bottom-color: #334155; }
-:root.dark .theme-option-btn        { background: #0f172a; border-color: #334155; color: #94a3b8; }
-:root.dark .theme-option-btn:hover  { border-color: #6366f1; background: #1e293b; }
-:root.dark .theme-option-active     { border-color: #6366f1 !important; background: #1e293b !important; color: #f1f5f9 !important; }
-:root.dark .theme-option-label      { color: #f1f5f9; }
-:root.dark .theme-option-desc       { color: #64748b; }
 :root.dark .pw-label                { color: #cbd5e1; }
 :root.dark .pw-input                { background: #0f172a; border-color: #334155; color: #f1f5f9; }
 :root.dark .pw-input:focus          { border-color: #3b82f6; }
@@ -535,73 +473,6 @@ const styles = `
 
 @media (max-width: 800px) {
   .settings-body { grid-template-columns: 1fr; }
-}
-
-.theme-options {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.theme-option-btn {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  background: #f8fafc;
-  cursor: pointer;
-  transition: all 0.18s ease;
-  text-align: left;
-  position: relative;
-  color: #475569;
-}
-.theme-option-btn:hover {
-  border-color: #6366f1;
-  background: #eef2ff;
-}
-.theme-option-active {
-  border-color: #6366f1 !important;
-  background: #eef2ff !important;
-  color: #1e293b !important;
-}
-.theme-option-icon {
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.light-icon { background: #fef9c3; color: #ca8a04; }
-.dark-icon  { background: #1e293b; color: #818cf8; }
-.theme-option-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-}
-.theme-option-label {
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-.theme-option-desc {
-  font-size: 0.75rem;
-  color: #94a3b8;
-}
-.theme-option-check {
-  position: absolute;
-  top: 8px;
-  right: 10px;
-  background: #6366f1;
-  color: #fff;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 /* ── Password Form ── */
@@ -738,7 +609,6 @@ const styles = `
 @media (max-width: 600px) {
   .settings-header { padding: 16px 20px; }
   .settings-body   { padding: 20px 16px; }
-  .theme-options   { grid-template-columns: 1fr; }
   .pw-submit-btn   { width: 100%; }
 }
 

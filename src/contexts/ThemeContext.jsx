@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useEffect } from 'react';
 
 const ThemeContext = createContext();
 
@@ -7,36 +7,25 @@ export function useTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(() => {
-    // Use the same key as main.jsx so no flash occurs on load
-    return localStorage.getItem('theme') || 'light';
-  });
-
-  const isDark = theme === 'dark';
+  // Force light theme only
+  const theme = 'light';
+  const isDark = false;
 
   useEffect(() => {
-    localStorage.setItem('theme', theme);
+    // Always set light theme
+    localStorage.setItem('theme', 'light');
     const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => (prev === 'dark' ? 'light' : 'dark'));
-  };
-
-  const setLight = () => setTheme('light');
-  const setDark = () => setTheme('dark');
+    root.classList.remove('dark');
+    root.classList.add('light');
+  }, []);
 
   const value = {
     theme,
     isDark,
-    toggleTheme,
-    setLight,
-    setDark,
+    // Keep functions for compatibility but they do nothing
+    toggleTheme: () => {},
+    setLight: () => {},
+    setDark: () => {},
   };
 
   return (

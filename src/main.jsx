@@ -4,21 +4,14 @@ import './styles/index.css'
 import './styles/dark-theme.css'
 import App from './App.jsx'
 
-// Apply initial theme to prevent flash
+// Force light theme only
 const applyInitialTheme = () => {
   try {
-    const saved = localStorage.getItem('theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const isDark = saved ? saved === 'dark' : prefersDark;
-    
+    // Always set light theme
+    localStorage.setItem('theme', 'light');
     const root = document.documentElement;
-    if (isDark) {
-      root.classList.add('dark');
-      root.classList.remove('light');
-    } else {
-      root.classList.add('light');
-      root.classList.remove('dark');
-    }
+    root.classList.add('light');
+    root.classList.remove('dark');
   } catch (error) {
     console.warn('Could not apply initial theme:', error);
   }
