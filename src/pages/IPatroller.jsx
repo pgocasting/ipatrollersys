@@ -48,6 +48,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Activity,
   TrendingUp,
   FileSpreadsheet,
@@ -115,6 +116,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(false);
   const topPerformersPreviewRef = useRef(null);
   const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+  const [showImageFormatModal, setShowImageFormatModal] = useState(false);
   // Weight sliders for Top Performers ranking formula
 
 
@@ -1710,6 +1712,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         return;
       }
 
+      // Add a class to hide the STATUS column during export
+      previewElement.classList.add('exporting-image');
+
       // Options for html-to-image
       const options = {
         quality: 0.95,
@@ -1731,6 +1736,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         dataUrl = await toPng(previewElement, options);
       }
 
+      // Remove the export class after generating
+      previewElement.classList.remove('exporting-image');
+
       // Convert data URL to blob and download
       const link = document.createElement('a');
       const monthName = new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" });
@@ -1751,6 +1759,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
     } catch (error) {
       console.error('Error generating image:', error);
+      // Make sure to remove the class even if there's an error
+      const previewElement = document.getElementById('top-performers-table-preview');
+      if (previewElement) {
+        previewElement.classList.remove('exporting-image');
+      }
       toast.error('Failed to generate image', {
         description: error.message || 'Please try again or contact support if the issue persists',
         duration: 4000,
@@ -2838,6 +2851,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
   return (
     <Layout onLogout={onLogout} onNavigate={onNavigate} currentPage={currentPage}>
+      {/* CSS for hiding STATUS column during image export */}
+      <style>{`
+        #top-performers-table-preview.exporting-image .status-column {
+          display: none !important;
+        }
+      `}</style>
       <div className="h-full flex flex-col overflow-hidden">
         {/* Header */}
         <div className="ipatroller-header flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 w-full px-4 sm:px-6 lg:px-8 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200">
@@ -3802,7 +3821,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     Generate PDF
                   </Button>
                   <Button
-                    onClick={() => generateTopPerformersImage('png')}
+                    onClick={() => setShowImageFormatModal(true)}
                     disabled={loadingTopPerformers || !getTopPerformers().length || isGeneratingImage}
                     className="bg-purple-600 hover:bg-purple-700 text-white"
                     size="sm"
@@ -3812,20 +3831,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     ) : (
                       <ImageIcon className="w-4 h-4 mr-2" />
                     )}
-                    PNG
-                  </Button>
-                  <Button
-                    onClick={() => generateTopPerformersImage('jpeg')}
-                    disabled={loadingTopPerformers || !getTopPerformers().length || isGeneratingImage}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
-                    size="sm"
-                  >
-                    {isGeneratingImage ? (
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    ) : (
-                      <ImageIcon className="w-4 h-4 mr-2" />
-                    )}
-                    JPEG
+                    Export Image
                   </Button>
                   <Button
                     onClick={() => setShowTopPerformersModal(false)}
@@ -3986,7 +3992,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                       </span>
                                     </div>
                                   </th>
-                                  <th className="px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
+                                  <th className="status-column px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider transition-colors duration-300 text-gray-700">
                                     Status
                                   </th>
                                 </tr>
@@ -4064,7 +4070,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                                           {activePercentage}%
                                         </span>
                                       </td>
-                                      <td className="px-6 py-4 text-center">
+                                      <td className="status-column px-6 py-4 text-center">
                                         <Badge className={`transition-all duration-300 ${getStatusStyle()}`}>
                                           {getStatusText()}
                                         </Badge>
@@ -4238,6 +4244,87 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                               Generate PDF
                             </>
                           )}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Image Format Selection Modal - Inside Top Performers Modal */}
+                {showImageFormatModal && (
+                  <div className="absolute inset-0 flex items-center justify-center z-10 p-4">
+                    <div className="absolute inset-0 bg-navy-900 bg-opacity-70" onClick={() => setShowImageFormatModal(false)}></div>
+                    <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-full flex items-center justify-center bg-purple-100">
+                            <ImageIcon className="h-5 w-5 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-gray-900">Export Image</h3>
+                            <p className="text-sm text-gray-600">Choose your preferred image format</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Format Selection */}
+                      <div className="space-y-3">
+                        {/* PNG Option */}
+                        <button
+                          onClick={async () => {
+                            setShowImageFormatModal(false);
+                            await generateTopPerformersImage('png');
+                          }}
+                          disabled={isGeneratingImage}
+                          className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-purple-500 hover:bg-purple-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-12 w-12 rounded-lg bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                                <ImageIcon className="h-6 w-6 text-purple-600" />
+                              </div>
+                              <div className="text-left">
+                                <h4 className="text-base font-bold text-gray-900">PNG Format</h4>
+                                <p className="text-xs text-gray-500">High quality with transparency support</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-purple-600" />
+                          </div>
+                        </button>
+
+                        {/* JPEG Option */}
+                        <button
+                          onClick={async () => {
+                            setShowImageFormatModal(false);
+                            await generateTopPerformersImage('jpeg');
+                          }}
+                          disabled={isGeneratingImage}
+                          className="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition-all duration-200 group disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="h-12 w-12 rounded-lg bg-indigo-100 flex items-center justify-center group-hover:bg-indigo-200 transition-colors">
+                                <ImageIcon className="h-6 w-6 text-indigo-600" />
+                              </div>
+                              <div className="text-left">
+                                <h4 className="text-base font-bold text-gray-900">JPEG Format</h4>
+                                <p className="text-xs text-gray-500">Smaller file size, universal compatibility</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-5 w-5 text-gray-400 group-hover:text-indigo-600" />
+                          </div>
+                        </button>
+                      </div>
+
+                      {/* Cancel Button */}
+                      <div className="flex items-center justify-end gap-3 mt-6">
+                        <Button
+                          onClick={() => setShowImageFormatModal(false)}
+                          variant="outline"
+                          size="sm"
+                        >
+                          Cancel
                         </Button>
                       </div>
                     </div>
