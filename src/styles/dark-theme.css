@@ -25,17 +25,17 @@
 :root.dark .bg-slate-950 { background-color: #020617 !important; }
 
 /* Subtle backgrounds */
-:root.dark .bg-blue-50   { background-color: #172554 !important; }
-:root.dark .bg-blue-100  { background-color: #1e3a8a !important; }
-:root.dark .bg-emerald-50 { background-color: #052e16 !important; }
-:root.dark .bg-rose-50   { background-color: #4c0519 !important; }
-:root.dark .bg-amber-50  { background-color: #451a03 !important; }
-:root.dark .bg-purple-50 { background-color: #2e1065 !important; }
-:root.dark .bg-indigo-50 { background-color: #1e1b4b !important; }
-:root.dark .bg-green-50  { background-color: #052e16 !important; }
-:root.dark .bg-red-50    { background-color: #4c0519 !important; }
-:root.dark .bg-yellow-50 { background-color: #422006 !important; }
-:root.dark .bg-orange-50 { background-color: #431407 !important; }
+:root.dark .bg-blue-50   { background-color: #1e3a8a !important; }
+:root.dark .bg-blue-100  { background-color: #1e40af !important; }
+:root.dark .bg-emerald-50 { background-color: #064e3b !important; }
+:root.dark .bg-rose-50   { background-color: #881337 !important; }
+:root.dark .bg-amber-50  { background-color: #78350f !important; }
+:root.dark .bg-purple-50 { background-color: #581c87 !important; }
+:root.dark .bg-indigo-50 { background-color: #312e81 !important; }
+:root.dark .bg-green-50  { background-color: #064e3b !important; }
+:root.dark .bg-red-50    { background-color: #7f1d1d !important; }
+:root.dark .bg-yellow-50 { background-color: #713f12 !important; }
+:root.dark .bg-orange-50 { background-color: #7c2d12 !important; }
 
 /* Backdrop / transparent whites */
 :root.dark .bg-white\/80,
@@ -61,11 +61,11 @@
 
 /* ── 4. Border Overrides ─────────────────────────────────── */
 :root.dark .border-gray-100,
-:root.dark .border-slate-100 { border-color: #1e293b !important; }
+:root.dark .border-slate-100 { border-color: #334155 !important; }
 :root.dark .border-gray-200,
-:root.dark .border-slate-200 { border-color: #334155 !important; }
+:root.dark .border-slate-200 { border-color: #475569 !important; }
 :root.dark .border-gray-300,
-:root.dark .border-slate-300 { border-color: #475569 !important; }
+:root.dark .border-slate-300 { border-color: #64748b !important; }
 
 /* ── 5. Sidebar Specific ─────────────────────────────────── */
 :root.dark aside.flex.h-screen {
@@ -80,18 +80,18 @@
 
 /* Sidebar "Main Hub" label */
 :root.dark aside h2.text-slate-400 {
-  color: #475569 !important;
+  color: #94a3b8 !important;
 }
 
 /* Brand text in sidebar */
 :root.dark aside h1.text-slate-500 {
-  color: #64748b !important;
+  color: #cbd5e1 !important;
 }
 
 /* Nav items - default state */
 :root.dark aside button.text-slate-600,
 :root.dark aside a.text-slate-600 {
-  color: #94a3b8 !important;
+  color: #cbd5e1 !important;
 }
 
 /* Nav items - hover state */
@@ -102,7 +102,7 @@
 
 /* Nav items - active state */
 :root.dark aside button.bg-blue-50 {
-  background-color: #1e3a8a !important;
+  background-color: #1e40af !important;
   color: #93c5fd !important;
 }
 
@@ -131,15 +131,15 @@
 
 /* Settings & Sign Out buttons */
 :root.dark aside button.hover\:bg-slate-50 {
-  color: #94a3b8 !important;
+  color: #cbd5e1 !important;
 }
 :root.dark aside button.hover\:bg-slate-50:hover {
   background-color: #334155 !important;
   color: #f1f5f9 !important;
 }
 :root.dark aside button.hover\:bg-rose-50:hover {
-  background-color: rgba(76, 5, 25, 0.5) !important;
-  color: #fda4af !important;
+  background-color: rgba(127, 29, 29, 0.6) !important;
+  color: #fca5a5 !important;
 }
 
 /* Collapsed user avatar button */
@@ -161,20 +161,22 @@
 :root.dark .rounded-lg.bg-white,
 :root.dark .rounded-md.bg-white {
   background-color: #1e293b !important;
+  border-color: #334155 !important;
 }
 
 /* Shadow cards (common pattern) */
 :root.dark .shadow-sm,
 :root.dark .shadow-md {
-  --tw-shadow-color: rgba(0, 0, 0, 0.4);
+  --tw-shadow-color: rgba(0, 0, 0, 0.5);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.5), 0 1px 2px -1px rgba(0, 0, 0, 0.5);
 }
 
 /* ── 7. Table Overrides ──────────────────────────────────── */
 :root.dark table thead tr,
 :root.dark table thead th {
   background-color: #1e293b !important;
-  color: #cbd5e1 !important;
-  border-bottom-color: #334155 !important;
+  color: #e2e8f0 !important;
+  border-bottom-color: #475569 !important;
 }
 
 :root.dark table tbody tr {
@@ -182,7 +184,7 @@
   border-bottom-color: #334155 !important;
 }
 :root.dark table tbody tr:nth-child(even) {
-  background-color: #172033 !important;
+  background-color: #0f172a !important;
 }
 :root.dark table tbody tr:hover {
   background-color: #334155 !important;
@@ -205,13 +207,13 @@
 :root.dark textarea,
 :root.dark select {
   background-color: #0f172a !important;
-  border-color: #334155 !important;
+  border-color: #475569 !important;
   color: #f1f5f9 !important;
 }
 
 :root.dark input::placeholder,
 :root.dark textarea::placeholder {
-  color: #475569 !important;
+  color: #94a3b8 !important;
 }
 
 :root.dark input:focus,
@@ -219,6 +221,7 @@
 :root.dark select:focus {
   border-color: #3b82f6 !important;
   outline-color: #3b82f6 !important;
+  ring-color: #3b82f6 !important;
 }
 
 /* ── 9. Modal / Dialog Overrides ─────────────────────────── */
@@ -232,7 +235,7 @@
 
 /* Radix Dialog overlay */
 :root.dark [data-radix-dialog-overlay] {
-  background-color: rgba(0, 0, 0, 0.7) !important;
+  background-color: rgba(0, 0, 0, 0.8) !important;
 }
 
 /* Sheet (used for mobile sidebar) */
@@ -266,7 +269,7 @@
 
 :root.dark [data-slot="tabs-trigger"]:not([data-state="active"]),
 :root.dark [role="tab"]:not([aria-selected="true"]) {
-  color: #64748b !important;
+  color: #94a3b8 !important;
 }
 
 :root.dark [data-slot="tabs-trigger"][data-state="active"],
@@ -277,12 +280,12 @@
 
 /* ── 12. Badge Overrides ─────────────────────────────────── */
 :root.dark .bg-blue-100\/50 {
-  background-color: rgba(30, 58, 138, 0.5) !important;
+  background-color: rgba(30, 64, 175, 0.5) !important;
 }
 
 /* ── 13. Scrollbars ──────────────────────────────────────── */
 :root.dark ::-webkit-scrollbar-track {
-  background: #1e293b;
+  background: #0f172a;
 }
 :root.dark ::-webkit-scrollbar-thumb {
   background-color: #334155;
@@ -301,15 +304,15 @@
 /* Stat cards / summary blocks — gradient colors stay vibrant, no override needed */
 
 /* Status badge pill backgrounds */
-:root.dark .bg-green-100  { background-color: rgba(6, 78, 59, 0.4) !important; }
-:root.dark .bg-red-100    { background-color: rgba(127, 29, 29, 0.4) !important; }
-:root.dark .bg-yellow-100 { background-color: rgba(113, 63, 18, 0.4) !important; }
-:root.dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.4) !important; }
-:root.dark .bg-purple-100 { background-color: rgba(88, 28, 135, 0.4) !important; }
-:root.dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.4) !important; }
-:root.dark .bg-pink-100   { background-color: rgba(131, 24, 67, 0.4) !important; }
-:root.dark .bg-teal-100   { background-color: rgba(19, 78, 74, 0.4) !important; }
-:root.dark .bg-cyan-100   { background-color: rgba(22, 78, 99, 0.4) !important; }
+:root.dark .bg-green-100  { background-color: rgba(6, 78, 59, 0.5) !important; }
+:root.dark .bg-red-100    { background-color: rgba(127, 29, 29, 0.5) !important; }
+:root.dark .bg-yellow-100 { background-color: rgba(113, 63, 18, 0.5) !important; }
+:root.dark .bg-orange-100 { background-color: rgba(124, 45, 18, 0.5) !important; }
+:root.dark .bg-purple-100 { background-color: rgba(88, 28, 135, 0.5) !important; }
+:root.dark .bg-indigo-100 { background-color: rgba(49, 46, 129, 0.5) !important; }
+:root.dark .bg-pink-100   { background-color: rgba(131, 24, 67, 0.5) !important; }
+:root.dark .bg-teal-100   { background-color: rgba(19, 78, 74, 0.5) !important; }
+:root.dark .bg-cyan-100   { background-color: rgba(22, 78, 99, 0.5) !important; }
 
 /* Dividers / separators */
 :root.dark [data-slot="separator"],
@@ -340,4 +343,801 @@
 @media print {
   :root.dark body,
   :root.dark .bg-white { background-color: #ffffff !important; color: #000 !important; }
+}
+
+
+/* Loading spinner base */
+:root.dark .bg-slate-50.overflow-hidden {
+  background-color: #0a0f1e !important;
+}
+
+/* ── 17. Dashboard Specific Improvements ──────────────────── */
+
+/* Municipality list items */
+:root.dark .rounded-lg.border.p-3,
+:root.dark .rounded-lg.border.p-4 {
+  background-color: #1e293b !important;
+  border-color: #475569 !important;
+}
+
+:root.dark .rounded-lg.border.p-3:hover,
+:root.dark .rounded-lg.border.p-4:hover {
+  background-color: #334155 !important;
+  border-color: #64748b !important;
+}
+
+/* District headers and sections */
+:root.dark .bg-gradient-to-r {
+  opacity: 0.9;
+}
+
+/* Improve text contrast in cards */
+:root.dark .text-gray-600 {
+  color: #cbd5e1 !important;
+}
+
+:root.dark .text-gray-700 {
+  color: #e2e8f0 !important;
+}
+
+/* Stat card improvements */
+:root.dark .bg-blue-600,
+:root.dark .bg-emerald-600,
+:root.dark .bg-rose-600,
+:root.dark .bg-amber-600 {
+  filter: brightness(1.1);
+}
+
+/* Better visibility for warning/inactive states */
+:root.dark .bg-amber-600 {
+  background-color: #d97706 !important;
+}
+
+:root.dark .bg-rose-600 {
+  background-color: #dc2626 !important;
+}
+
+/* Municipality names should be bold and visible */
+:root.dark .font-bold {
+  color: #f1f5f9 !important;
+}
+
+/* Improve badge visibility */
+:root.dark .bg-emerald-100 {
+  background-color: rgba(6, 95, 70, 0.6) !important;
+}
+
+:root.dark .text-emerald-700 {
+  color: #6ee7b7 !important;
+}
+
+:root.dark .text-rose-700 {
+  color: #fca5a5 !important;
+}
+
+:root.dark .text-amber-700 {
+  color: #fcd34d !important;
+}
+
+/* List sections spacing */
+:root.dark .space-y-2 > *,
+:root.dark .space-y-3 > *,
+:root.dark .space-y-4 > * {
+  margin-top: 0.5rem;
+}
+
+/* Better grid spacing in dark mode */
+:root.dark .grid {
+  gap: 1.25rem;
+}
+
+/* Card content padding adjustments */
+:root.dark .p-4 {
+  padding: 1.25rem !important;
+}
+
+:root.dark .p-6 {
+  padding: 1.75rem !important;
+}
+
+/* Scrollable sections */
+:root.dark .overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: #475569 #1e293b;
+}
+
+/* Better separation between sections */
+:root.dark .border-t {
+  border-top-color: #475569 !important;
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+
+/* ── 18. Chart & Data Visualization Improvements ────────── */
+
+/* Chart containers */
+:root.dark canvas {
+  filter: brightness(1.1);
+}
+
+/* ── 19. Command Center Specific Fixes ───────────────────── */
+
+/* Command Center table text visibility */
+:root.dark .text-gray-900,
+:root.dark .text-slate-900,
+:root.dark .text-gray-800,
+:root.dark .text-slate-800 {
+  color: #f1f5f9 !important;
+}
+
+/* Command Center dropdowns and selects */
+:root.dark select,
+:root.dark [role="combobox"] {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Command Center table cells */
+:root.dark td input,
+:root.dark td select,
+:root.dark td [role="combobox"] {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Command Center date labels and headers */
+:root.dark .bg-slate-100,
+:root.dark .bg-gray-100 {
+  background-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Command Center week labels */
+:root.dark th,
+:root.dark .font-medium {
+  color: #e2e8f0 !important;
+}
+
+/* Command Center action buttons */
+:root.dark button.border-emerald-600,
+:root.dark button.border-blue-600,
+:root.dark button.border-rose-600 {
+  color: #f1f5f9 !important;
+}
+
+/* Command Center "Add New Line" buttons */
+:root.dark button.border-dashed {
+  border-color: #64748b !important;
+  color: #cbd5e1 !important;
+}
+
+:root.dark button.border-dashed:hover {
+  border-color: #94a3b8 !important;
+  background-color: #334155 !important;
+  color: #f1f5f9 !important;
+}
+
+/* Command Center remarks column */
+:root.dark textarea {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Command Center municipality badges */
+:root.dark .bg-emerald-100,
+:root.dark .bg-blue-100,
+:root.dark .bg-purple-100,
+:root.dark .bg-amber-100 {
+  filter: brightness(1.3);
+}
+
+/* Progress bars - better visibility */
+:root.dark .bg-emerald-600 {
+  background-color: #10b981 !important;
+}
+
+:root.dark .bg-blue-600 {
+  background-color: #3b82f6 !important;
+}
+
+:root.dark .bg-rose-600 {
+  background-color: #f43f5e !important;
+}
+
+:root.dark .bg-amber-600 {
+  background-color: #f59e0b !important;
+}
+
+/* District and municipality list items */
+:root.dark .hover\:bg-gray-50:hover {
+  background-color: #334155 !important;
+}
+
+:root.dark .hover\:bg-slate-50:hover {
+  background-color: #334155 !important;
+}
+
+/* Better text color for municipality names */
+:root.dark .text-slate-900 {
+  color: #f1f5f9 !important;
+}
+
+:root.dark .text-slate-800 {
+  color: #e2e8f0 !important;
+}
+
+/* Action buttons in dark mode */
+:root.dark .bg-blue-600:hover {
+  background-color: #2563eb !important;
+}
+
+:root.dark .bg-green-600:hover {
+  background-color: #16a34a !important;
+}
+
+:root.dark .bg-red-600:hover {
+  background-color: #dc2626 !important;
+}
+
+/* Better visibility for icons */
+:root.dark .text-blue-600 {
+  color: #60a5fa !important;
+}
+
+:root.dark .text-green-600,
+:root.dark .text-emerald-600 {
+  color: #34d399 !important;
+}
+
+:root.dark .text-red-600,
+:root.dark .text-rose-600 {
+  color: #f87171 !important;
+}
+
+:root.dark .text-amber-600,
+:root.dark .text-yellow-600 {
+  color: #fbbf24 !important;
+}
+
+:root.dark .text-orange-600 {
+  color: #fb923c !important;
+}
+
+:root.dark .text-purple-600,
+:root.dark .text-violet-600 {
+  color: #a78bfa !important;
+}
+
+/* District section headers */
+:root.dark .bg-gradient-to-r.from-blue-50.to-blue-100 {
+  background: linear-gradient(to right, #1e3a8a, #1e40af) !important;
+}
+
+:root.dark .bg-gradient-to-r.from-emerald-50.to-emerald-100 {
+  background: linear-gradient(to right, #064e3b, #065f46) !important;
+}
+
+:root.dark .bg-gradient-to-r.from-purple-50.to-purple-100 {
+  background: linear-gradient(to right, #581c87, #6b21a8) !important;
+}
+
+/* Municipality item borders */
+:root.dark .border-emerald-200 {
+  border-color: #059669 !important;
+}
+
+:root.dark .border-rose-200 {
+  border-color: #e11d48 !important;
+}
+
+:root.dark .border-amber-200 {
+  border-color: #d97706 !important;
+}
+
+:root.dark .border-blue-200 {
+  border-color: #3b82f6 !important;
+}
+
+/* Better spacing for scrollable lists */
+:root.dark .max-h-96,
+:root.dark .max-h-\[400px\],
+:root.dark .max-h-\[500px\] {
+  border: 1px solid #475569;
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+}
+
+/* Improve visibility of disabled states */
+:root.dark button:disabled,
+:root.dark button[disabled] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Better loading states */
+:root.dark .animate-spin {
+  filter: brightness(1.2);
+}
+
+/* Header subtitle text */
+:root.dark .text-gray-500 {
+  color: #94a3b8 !important;
+}
+
+:root.dark .text-gray-400 {
+  color: #cbd5e1 !important;
+}
+
+/* Instruction modal improvements */
+:root.dark .bg-gradient-to-r.from-blue-50.to-violet-50 {
+  background: linear-gradient(to right, #1e3a8a, #581c87) !important;
+}
+
+:root.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+:root.dark .hover\:bg-slate-100:hover {
+  background-color: #334155 !important;
+}
+
+:root.dark .hover\:border-slate-300:hover {
+  border-color: #64748b !important;
+}
+
+/* Card hover effects */
+:root.dark .hover\:shadow-md:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.6), 0 2px 4px -2px rgba(0, 0, 0, 0.6);
+}
+
+/* Better notification/alert styling */
+:root.dark .bg-blue-50 {
+  background-color: #1e3a8a !important;
+}
+
+:root.dark .text-blue-700 {
+  color: #93c5fd !important;
+}
+
+:root.dark .text-green-700 {
+  color: #86efac !important;
+}
+
+:root.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+
+/* Ensure proper z-index layering in dark mode */
+:root.dark .z-40,
+:root.dark .z-50 {
+  position: relative;
+}
+
+/* ── 20. Additional Command Center Table Fixes ────────────── */
+
+/* All table text should be bright */
+:root.dark table td,
+:root.dark table th,
+:root.dark table span,
+:root.dark table div {
+  color: #e2e8f0 !important;
+}
+
+/* Dropdown options */
+:root.dark option {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Input number fields in tables */
+:root.dark input[type="number"] {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+}
+
+/* Placeholder text in Command Center */
+:root.dark input::placeholder,
+:root.dark textarea::placeholder,
+:root.dark select::placeholder {
+  color: #94a3b8 !important;
+  -webkit-text-fill-color: #94a3b8 !important;
+}
+
+/* Date section headers (June 1, June 2, etc.) */
+:root.dark .bg-slate-100.font-medium,
+:root.dark .bg-gray-100.font-medium {
+  background-color: #475569 !important;
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+/* Week column headers */
+:root.dark th.text-xs {
+  color: #cbd5e1 !important;
+  font-weight: 500 !important;
+}
+
+/* Delete buttons (X) */
+:root.dark button.text-red-600,
+:root.dark button.text-rose-600 {
+  color: #f87171 !important;
+}
+
+:root.dark button.text-red-600:hover,
+:root.dark button.text-rose-600:hover {
+  color: #fca5a5 !important;
+  background-color: rgba(127, 29, 29, 0.3) !important;
+}
+
+/* View/Edit buttons */
+:root.dark button.text-emerald-600 {
+  color: #34d399 !important;
+  border-color: #059669 !important;
+}
+
+:root.dark button.text-emerald-600:hover {
+  color: #6ee7b7 !important;
+  background-color: rgba(6, 78, 59, 0.3) !important;
+}
+
+:root.dark button.text-blue-600 {
+  color: #60a5fa !important;
+  border-color: #2563eb !important;
+}
+
+:root.dark button.text-blue-600:hover {
+  color: #93c5fd !important;
+  background-color: rgba(30, 58, 138, 0.3) !important;
+}
+
+/* Scrollable table container */
+:root.dark .overflow-x-auto,
+:root.dark .overflow-y-auto {
+  border-color: #475569 !important;
+}
+
+/* Sticky column backgrounds */
+:root.dark .sticky {
+  background-color: #1e293b !important;
+}
+
+/* Command Center select dropdowns - force visibility */
+:root.dark select[name="barangay"],
+:root.dark select[name="concernType"] {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border: 1px solid #475569 !important;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+
+/* Force text color in all inputs */
+:root.dark input,
+:root.dark select,
+:root.dark textarea {
+  color: #f1f5f9 !important;
+  -webkit-text-fill-color: #f1f5f9 !important;
+}
+
+/* Override any inline styles */
+:root.dark [style*="color"] {
+  color: #e2e8f0 !important;
+}
+
+/* ── 21. Aggressive Command Center Text Fixes ────────────── */
+
+/* Force all text elements to be light in dark mode */
+:root.dark .text-gray-900,
+:root.dark .text-gray-800,
+:root.dark .text-gray-700,
+:root.dark .text-slate-900,
+:root.dark .text-slate-800,
+:root.dark .text-slate-700 {
+  color: #f1f5f9 !important;
+}
+
+:root.dark .text-gray-600,
+:root.dark .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+:root.dark .text-gray-500,
+:root.dark .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+/* Page headers in Command Center */
+:root.dark h1,
+:root.dark h2,
+:root.dark h3,
+:root.dark h4,
+:root.dark h5,
+:root.dark h6 {
+  color: #f1f5f9 !important;
+}
+
+/* All paragraph text */
+:root.dark p {
+  color: #e2e8f0 !important;
+}
+
+/* All list text */
+:root.dark li {
+  color: #e2e8f0 !important;
+}
+
+/* All span text */
+:root.dark span {
+  color: #e2e8f0 !important;
+}
+
+/* All div text (be careful with this one) */
+:root.dark div.text-gray-900,
+:root.dark div.text-gray-800,
+:root.dark div.text-gray-700,
+:root.dark div.text-gray-600 {
+  color: #e2e8f0 !important;
+}
+
+/* Labels */
+:root.dark label {
+  color: #e2e8f0 !important;
+}
+
+/* Strong/bold text */
+:root.dark strong,
+:root.dark b,
+:root.dark .font-bold,
+:root.dark .font-semibold {
+  color: #f1f5f9 !important;
+}
+
+/* Command Center help dialog */
+:root.dark [role="dialog"] h3,
+:root.dark [role="dialog"] p,
+:root.dark [role="dialog"] li,
+:root.dark [role="dialog"] span {
+  color: #e2e8f0 !important;
+}
+
+/* Municipality badges at top */
+:root.dark .bg-emerald-500,
+:root.dark .bg-blue-500,
+:root.dark .bg-purple-500,
+:root.dark .bg-amber-500 {
+  filter: brightness(1.1);
+}
+
+/* Ensure white text on colored backgrounds */
+:root.dark .bg-emerald-500 span,
+:root.dark .bg-blue-500 span,
+:root.dark .bg-purple-500 span,
+:root.dark .bg-amber-500 span,
+:root.dark .bg-rose-500 span {
+  color: #ffffff !important;
+}
+
+/* Table header sticky positioning */
+:root.dark .sticky.z-10 {
+  background-color: #1e293b !important;
+}
+
+/* Date headers in table */
+:root.dark .bg-slate-100.font-medium div,
+:root.dark .bg-slate-100.font-medium span {
+  color: #f1f5f9 !important;
+}
+
+/* Weekly report title */
+:root.dark .text-base.font-bold,
+:root.dark .text-lg.font-bold,
+:root.dark .text-xl.font-bold {
+  color: #f1f5f9 !important;
+}
+
+/* Concern type dropdown text */
+:root.dark select option {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+}
+
+/* Action taken textarea */
+:root.dark textarea.w-full {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Week input fields */
+:root.dark input.w-16,
+:root.dark input.w-20 {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+  text-align: center !important;
+}
+
+/* Remarks column */
+:root.dark td textarea {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+}
+
+/* Badge text colors */
+:root.dark .text-emerald-700 {
+  color: #6ee7b7 !important;
+}
+
+:root.dark .text-blue-700 {
+  color: #93c5fd !important;
+}
+
+:root.dark .text-purple-700 {
+  color: #c4b5fd !important;
+}
+
+:root.dark .text-amber-700 {
+  color: #fcd34d !important;
+}
+
+
+/* ── 22. Final Command Center Text Visibility Fixes ────── */
+
+/* Ensure ALL table text is visible */
+:root.dark table * {
+  color: #e2e8f0 !important;
+}
+
+/* Date section (June 1, June 2, etc.) */
+:root.dark .bg-slate-100 > div,
+:root.dark .bg-gray-100 > div {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+/* "Add New Line" button text */
+:root.dark button.border-dashed span,
+:root.dark button.border-dashed div {
+  color: #cbd5e1 !important;
+}
+
+/* Select dropdown arrow */
+:root.dark select::-ms-expand {
+  color: #f1f5f9 !important;
+}
+
+/* Number input spinners */
+:root.dark input[type="number"]::-webkit-inner-spin-button,
+:root.dark input[type="number"]::-webkit-outer-spin-button {
+  opacity: 1;
+}
+
+/* Municipality tabs text */
+:root.dark button[role="tab"] {
+  color: #cbd5e1 !important;
+}
+
+:root.dark button[role="tab"][aria-selected="true"] {
+  color: #f1f5f9 !important;
+}
+
+/* Help dialog instruction numbers */
+:root.dark .bg-gradient-to-br span {
+  color: #ffffff !important;
+}
+
+/* Statistics numbers */
+:root.dark .text-2xl,
+:root.dark .text-3xl,
+:root.dark .text-4xl {
+  color: #f1f5f9 !important;
+  font-weight: bold !important;
+}
+
+/* Card titles and descriptions */
+:root.dark .rounded-xl.border h3,
+:root.dark .rounded-xl.border h4,
+:root.dark .rounded-xl.border p {
+  color: #e2e8f0 !important;
+}
+
+/* Export buttons */
+:root.dark button.bg-emerald-600,
+:root.dark button.bg-blue-600,
+:root.dark button.bg-purple-600 {
+  color: #ffffff !important;
+}
+
+/* Filter selects */
+:root.dark select.border-slate-200 {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Barangay list items */
+:root.dark .hover\:bg-gray-50 div,
+:root.dark .hover\:bg-slate-50 div {
+  color: #e2e8f0 !important;
+}
+
+/* Concern type list items */
+:root.dark .rounded-lg.border.p-3 div,
+:root.dark .rounded-lg.border.p-4 div {
+  color: #e2e8f0 !important;
+}
+
+/* Edit dialog inputs */
+:root.dark [role="dialog"] input,
+:root.dark [role="dialog"] select,
+:root.dark [role="dialog"] textarea {
+  background-color: #0f172a !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+}
+
+/* Import section */
+:root.dark .border-dashed.border-2 p,
+:root.dark .border-dashed.border-2 span {
+  color: #cbd5e1 !important;
+}
+
+/* Month/Year selector dropdowns */
+:root.dark select.rounded-lg {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #475569 !important;
+  padding-right: 2rem;
+}
+
+/* Ensure dropdown carets are visible */
+:root.dark select {
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23cbd5e1' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+}
+
+/* Photo upload section */
+:root.dark .text-gray-700 {
+  color: #cbd5e1 !important;
+}
+
+/* Alert/warning text */
+:root.dark .text-red-600 {
+  color: #fca5a5 !important;
+}
+
+:root.dark .text-green-600 {
+  color: #86efac !important;
+}
+
+/* Quick tips section */
+:root.dark ul.space-y-3 li {
+  color: #e2e8f0 !important;
+}
+
+/* Municipality name in header */
+:root.dark .text-emerald-600,
+:root.dark .text-blue-600,
+:root.dark .text-purple-600 {
+  filter: brightness(1.3);
+  font-weight: 600 !important;
+}
+
+/* View button icons */
+:root.dark button svg {
+  filter: brightness(1.2);
+}
+
+/* Empty state text */
+:root.dark .text-center.py-8 p {
+  color: #94a3b8 !important;
 }
