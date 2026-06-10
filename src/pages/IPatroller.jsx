@@ -68,7 +68,8 @@ import {
   Menu,
   Eye,
   Loader2,
-  Info
+  Info,
+  Image as ImageIcon
 } from "lucide-react";
 
 export default function IPatroller({ onLogout, onNavigate, currentPage }) {
@@ -447,6 +448,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
       ];
 
+      // Determine counting logic based on year and month
+      // April to December 2026 and future years (2027+): Count based on after photos
+      // January to March (all years): Keep existing logic unchanged
+      const isAprilToDecember2026OrLater = 
+        (selectedYear === 2026 && selectedMonth >= 3) || 
+        (selectedYear > 2026 && selectedMonth >= 3);
       const isMarchToOctober = selectedMonth >= 2 && selectedMonth <= 9;
 
       // OPTIMIZED: Load all municipalities in PARALLEL instead of sequential loop
@@ -467,10 +474,11 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             if (Array.isArray(dateEntries)) {
               dateEntries.forEach(entry => {
                 let shouldCount = false;
+                let countValue = 0;
 
-                if (isMarchToOctober) {
-                  shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
-                } else {
+                // NEW LOGIC: April to December 2026 and future years count based on after photos
+                if (isAprilToDecember2026OrLater) {
+                  // Count based on after photos
                   let rowsWithAfterPhotos = 0;
 
                   if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
@@ -483,20 +491,37 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     if (hasAfterPhoto) rowsWithAfterPhotos = 1;
                   }
 
-                  if (rowsWithAfterPhotos > 0) {
-                    const entryDate = new Date(dateKey);
-                    const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
-                    if (weekIndex >= 0 && weekIndex < 4) {
-                      weeklyActionCounts[weekIndex] += rowsWithAfterPhotos;
+                  shouldCount = rowsWithAfterPhotos > 0;
+                  countValue = rowsWithAfterPhotos;
+                } else {
+                  // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
+                  if (isMarchToOctober) {
+                    shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
+                    countValue = shouldCount ? 1 : 0;
+                  } else {
+                    let rowsWithAfterPhotos = 0;
+
+                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
+                      rowsWithAfterPhotos = entry.photos.rows.filter(row =>
+                        row.after && Array.isArray(row.after) && row.after.length > 0
+                      ).length;
+                    } else {
+                      const hasBeforePhoto = entry.photos && entry.photos.before;
+                      const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
+                      if (hasAfterPhoto) rowsWithAfterPhotos = 1;
                     }
+
+                    shouldCount = rowsWithAfterPhotos > 0;
+                    countValue = rowsWithAfterPhotos;
                   }
                 }
 
-                if (isMarchToOctober && shouldCount) {
+                // Add to weekly count if shouldCount is true
+                if (shouldCount) {
                   const entryDate = new Date(dateKey);
                   const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
                   if (weekIndex >= 0 && weekIndex < 4) {
-                    weeklyActionCounts[weekIndex]++;
+                    weeklyActionCounts[weekIndex] += countValue;
                   }
                 }
               });
@@ -1097,6 +1122,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         "Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa",
         "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"
       ];
+      // Same logic as main criteria: April to December 2026 and future years count based on after photos
+      const isAprilToDecember2026OrLater = 
+        (year === 2026 && month >= 3) || 
+        (year > 2026 && month >= 3);
       const isMarchToOctober = month >= 2 && month <= 9;
 
       // Load patrol data AND Command Center action data IN PARALLEL for the correct month/year
@@ -1116,11 +1145,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   const entryDate = new Date(dateKey);
                   const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
                   if (weekIndex < 0 || weekIndex >= 4) return;
-                  if (isMarchToOctober) {
-                    if (entry.actionTaken && entry.actionTaken.trim() !== '') {
-                      weeklyActionCounts[weekIndex]++;
-                    }
-                  } else {
+                  
+                  let shouldCount = false;
+                  let countValue = 0;
+
+                  // NEW LOGIC: April to December 2026 and future years count based on after photos
+                  if (isAprilToDecember2026OrLater) {
                     let rowsWithAfterPhotos = 0;
                     if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
                       rowsWithAfterPhotos = entry.photos.rows.filter(row =>
@@ -1129,7 +1159,29 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                     } else if (entry.photos && entry.photos.after && entry.photos.before) {
                       rowsWithAfterPhotos = 1;
                     }
-                    if (rowsWithAfterPhotos > 0) weeklyActionCounts[weekIndex] += rowsWithAfterPhotos;
+                    shouldCount = rowsWithAfterPhotos > 0;
+                    countValue = rowsWithAfterPhotos;
+                  } else {
+                    // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
+                    if (isMarchToOctober) {
+                      shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
+                      countValue = shouldCount ? 1 : 0;
+                    } else {
+                      let rowsWithAfterPhotos = 0;
+                      if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
+                        rowsWithAfterPhotos = entry.photos.rows.filter(row =>
+                          row.after && Array.isArray(row.after) && row.after.length > 0
+                        ).length;
+                      } else if (entry.photos && entry.photos.after && entry.photos.before) {
+                        rowsWithAfterPhotos = 1;
+                      }
+                      shouldCount = rowsWithAfterPhotos > 0;
+                      countValue = rowsWithAfterPhotos;
+                    }
+                  }
+
+                  if (shouldCount) {
+                    weeklyActionCounts[weekIndex] += countValue;
                   }
                 });
               }
@@ -2052,6 +2104,10 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
       const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
       const monthYear = `${monthNames[month]}_${year}`;
       const municipalities = ["Abucay", "Bagac", "Balanga City", "Dinalupihan", "Hermosa", "Limay", "Mariveles", "Morong", "Orani", "Orion", "Pilar", "Samal"];
+      // Same logic as main criteria: April to December 2026 and future years count based on after photos
+      const isAprilToDecember2026OrLater = 
+        (year === 2026 && month >= 3) || 
+        (year > 2026 && month >= 3);
       const isMarchToOctoberCurrent = month >= 2 && month <= 9;
 
       const [snapshot, ccResults] = await Promise.all([
@@ -2068,16 +2124,38 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
             Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
               if (Array.isArray(dateEntries)) {
                 dateEntries.forEach(entry => {
-                  if (isMarchToOctoberCurrent) {
-                    if (entry.actionTaken && entry.actionTaken.trim() !== '') totalActionTakenCount++;
-                  } else {
+                  let shouldCount = false;
+                  let countValue = 0;
+
+                  // NEW LOGIC: April to December 2026 and future years count based on after photos
+                  if (isAprilToDecember2026OrLater) {
                     let rowsCount = 0;
                     if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
                       rowsCount = entry.photos.rows.filter(row => row.after && Array.isArray(row.after) && row.after.length > 0).length;
                     } else if (entry.photos && entry.photos.after && entry.photos.before) {
                       rowsCount = 1;
                     }
-                    totalActionTakenCount += rowsCount;
+                    shouldCount = rowsCount > 0;
+                    countValue = rowsCount;
+                  } else {
+                    // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
+                    if (isMarchToOctoberCurrent) {
+                      shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
+                      countValue = shouldCount ? 1 : 0;
+                    } else {
+                      let rowsCount = 0;
+                      if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
+                        rowsCount = entry.photos.rows.filter(row => row.after && Array.isArray(row.after) && row.after.length > 0).length;
+                      } else if (entry.photos && entry.photos.after && entry.photos.before) {
+                        rowsCount = 1;
+                      }
+                      shouldCount = rowsCount > 0;
+                      countValue = rowsCount;
+                    }
+                  }
+
+                  if (shouldCount) {
+                    totalActionTakenCount += countValue;
                   }
                 });
               }
