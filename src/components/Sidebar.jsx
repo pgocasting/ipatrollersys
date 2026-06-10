@@ -42,63 +42,61 @@ const Sidebar = React.memo(({
   const initials = userInfo.name.split(' ').map(n => n[0]).join('').toUpperCase();
   return (
     <TooltipProvider>
-      <aside className={`flex h-screen flex-col bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 transition-all duration-300 ease-in-out flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.02)]
+      <aside className={`flex h-screen flex-col bg-gradient-to-b from-white to-slate-50/30 border-r border-slate-200/60 transition-all duration-300 ease-in-out flex-shrink-0 shadow-[2px_0_20px_rgba(0,0,0,0.04)]
         ${isCollapsed && !isMobile ? 'w-20' : 'w-72'}
         ${isMobile ? 'block' : 'hidden md:block'}`}>
         
-        {/* Header Section - Modern White Theme */}
-        <div className="relative border-b border-slate-100 dark:border-slate-700">
-          <div className={`relative flex h-24 items-center ${
-            isCollapsed && !isMobile ? 'justify-center px-4' : 'justify-between px-6'
+        {/* Header Section - Clean Modern Light */}
+        <div className="relative border-b border-slate-100">
+          <div className={`relative flex h-20 items-center bg-white ${
+            isCollapsed && !isMobile ? 'justify-center px-4' : 'justify-between px-5'
           }`}>
             {isCollapsed && !isMobile ? (
               <Tooltip>
                 <TooltipTrigger asChild>
                   <button 
                     onClick={() => onToggleCollapsed && onToggleCollapsed()}
-                    className="flex h-12 w-12 items-center justify-center transition-all duration-300"
+                    className="flex h-11 w-11 items-center justify-center transition-all duration-300 hover:scale-105"
                   >
                     <img 
                       src="/images/Ipatroller_Logo.png" 
                       alt="IPatroller Logo" 
-                      className="h-18 w-18 object-contain"
+                      className="h-16 w-16 object-contain drop-shadow-sm"
                     />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-slate-900">
+                <TooltipContent side="right" className="bg-blue-600 border-blue-600">
                   <p>Expand navigation</p>
                 </TooltipContent>
               </Tooltip>
             ) : (
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="flex h-20 w-20 items-center justify-center flex-shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-14 w-14 items-center justify-center flex-shrink-0 bg-gradient-to-br from-blue-50 to-blue-100/50 rounded-xl p-1.5 shadow-sm">
                   <img 
                     src="/images/Ipatroller_Logo.png" 
                     alt="IPatroller Logo" 
-                    className="h-18 w-18 object-contain"
+                    className="h-full w-full object-contain"
                   />
                 </div>
                 <div className="flex flex-col">
-                  <div className="flex flex-col">
-                    <h1 className="text-[11px] font-black text-slate-500 dark:text-slate-400 leading-none tracking-[0.2em] uppercase">
-                      1Bataan
-                    </h1>
-                    <h2 className="text-xl font-black text-blue-600 dark:text-blue-400 leading-tight tracking-tight uppercase">
-                      I-Patroller
-                    </h2>
-                  </div>
+                  <h1 className="text-[10px] font-extrabold text-slate-400 leading-none tracking-[0.15em] uppercase">
+                    1Bataan
+                  </h1>
+                  <h2 className="text-lg font-black bg-gradient-to-r from-blue-600 to-blue-500 bg-clip-text text-transparent leading-tight tracking-tight uppercase mt-0.5">
+                    I-Patroller
+                  </h2>
                 </div>
               </div>
             )}
           </div>
         </div>
 
-        {/* Navigation - Enhanced White Theme */}
-        <ScrollArea className="flex-1 py-6">
-          <nav className="px-4 space-y-1.5">
+        {/* Navigation - Clean Light Theme */}
+        <ScrollArea className="flex-1 py-4">
+          <nav className="px-3 space-y-1">
             {(!isCollapsed || isMobile) && (
-              <div className="px-3 pb-4">
-                <h2 className="text-[10px] font-black tracking-[0.2em] text-slate-400 dark:text-slate-500 uppercase">
+              <div className="px-3 pb-3">
+                <h2 className="text-[9px] font-black tracking-[0.15em] text-slate-400 uppercase">
                   Main Hub
                 </h2>
               </div>
@@ -112,55 +110,49 @@ const Sidebar = React.memo(({
                   key={item.id}
                   variant="ghost"
                   size={isCollapsed && !isMobile ? "icon" : "default"}
-                  className={`relative w-full h-12 font-semibold transition-all duration-300 group ${
+                  className={`relative w-full h-11 font-semibold transition-all duration-200 group ${
                     isActive 
-                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300' 
-                      : 'hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'
+                      ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/30' 
+                      : 'hover:bg-slate-100 text-slate-600 hover:text-slate-900'
                   } ${
-                    isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-4 justify-start'
-                  } rounded-xl overflow-hidden`}
+                    isCollapsed && !isMobile ? 'px-2 justify-center' : 'px-3 justify-start'
+                  } rounded-lg overflow-hidden`}
                   onClick={() => handleNavigation(item.id)}
                 >
-                  {/* Active Indicator Line */}
-                  {isActive && (
-                    <div className="absolute left-0 top-1/4 bottom-1/4 w-1 bg-blue-600 rounded-r-full shadow-[0_0_8px_rgba(37,99,235,0.4)]"></div>
-                  )}
-
                   {isCollapsed && !isMobile ? (
-                    <div className={`p-2 rounded-lg transition-all duration-300 ${
-                      isActive ? 'bg-blue-100/50 dark:bg-blue-800/50 text-blue-600 dark:text-blue-300' : 'text-slate-500 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-100'
+                    <div className={`p-1.5 rounded-md transition-all duration-200 ${
+                      isActive ? 'text-white' : 'text-slate-500 group-hover:text-slate-900'
                     }`}>
                       <Icon className="h-5 w-5" />
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className={`p-2 rounded-lg transition-all duration-300 flex-shrink-0 ${
+                    <div className="flex items-center gap-3 min-w-0 w-full">
+                      <div className={`p-1.5 rounded-md transition-all duration-200 flex-shrink-0 ${
                         isActive 
-                          ? 'bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-300 shadow-sm border border-blue-100 dark:border-blue-800' 
-                          : 'bg-slate-100/50 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 group-hover:bg-slate-100 dark:group-hover:bg-slate-700 group-hover:text-slate-900 dark:group-hover:text-slate-100'
+                          ? 'text-white' 
+                          : 'text-slate-500 group-hover:text-blue-600'
                       }`}>
                         <Icon className="h-4.5 w-4.5" />
                       </div>
-                      <span className="text-sm font-bold tracking-tight">
+                      <span className="text-[13px] font-bold tracking-tight">
                         {item.label}
                       </span>
-                    </div>
-                  )}
-                  
-                  {!isCollapsed && isActive && (
-                    <div className="ml-auto flex items-center gap-1">
-                       <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                      {isActive && (
+                        <div className="ml-auto flex items-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </Button>
               );
 
               return isCollapsed && !isMobile ? (
-                <Tooltip>
+                <Tooltip key={item.id}>
                   <TooltipTrigger asChild>
                     {NavButton}
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="bg-slate-900 text-white font-bold text-xs px-3 py-2 border-none">
+                  <TooltipContent side="right" className="bg-blue-600 text-white font-semibold text-xs px-3 py-1.5 border-blue-600">
                     <p>{item.label}</p>
                   </TooltipContent>
                 </Tooltip>
@@ -169,17 +161,17 @@ const Sidebar = React.memo(({
           </nav>
         </ScrollArea>
 
-        {/* Footer Section - Integrated Profile */}
-        <div className="p-4 border-t border-slate-100 dark:border-slate-700">
-          <div className="space-y-1.5 mb-4">
+        {/* Footer Section - Clean Light Profile */}
+        <div className="p-3 border-t border-slate-100 bg-white/80 backdrop-blur-sm">
+          <div className="space-y-1 mb-3">
             {/* View Instructions - for command-center users */}
             {userAccessLevel === 'command-center' && !isAdmin && onShowHelp && !isCollapsed && (
               <Button
                 variant="ghost"
-                className="w-full h-10 font-bold bg-emerald-50/50 hover:bg-emerald-50 text-emerald-700 px-4 justify-start rounded-xl border border-emerald-100/50 transition-all duration-300"
+                className="w-full h-9 font-semibold bg-gradient-to-r from-emerald-50 to-teal-50 hover:from-emerald-100 hover:to-teal-100 text-emerald-700 px-3 justify-start rounded-lg border border-emerald-200/50 transition-all duration-200 shadow-sm"
                 onClick={onShowHelp}
               >
-                <HelpCircle className="h-4 w-4 mr-3" />
+                <HelpCircle className="h-4 w-4 mr-2.5" />
                 <span className="text-xs">Help & Guide</span>
               </Button>
             )}
@@ -188,50 +180,50 @@ const Sidebar = React.memo(({
               <>
                 <Button
                   variant="ghost"
-                  className="w-full h-10 font-bold hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100 px-4 justify-start rounded-xl transition-all duration-300"
+                  className="w-full h-9 font-semibold hover:bg-slate-100 text-slate-600 hover:text-slate-900 px-3 justify-start rounded-lg transition-all duration-200"
                   onClick={() => handleNavigation('settings')}
                 >
-                  <Settings className="h-4 w-4 mr-3 text-slate-400 dark:text-slate-500" />
+                  <Settings className="h-4 w-4 mr-2.5 text-slate-400" />
                   <span className="text-xs">System Settings</span>
                 </Button>
 
                 <Button
                   variant="ghost"
-                  className="w-full h-10 font-bold hover:bg-rose-50 dark:hover:bg-rose-900/30 text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 px-4 justify-start rounded-xl transition-all duration-300"
+                  className="w-full h-9 font-semibold hover:bg-rose-50 text-slate-600 hover:text-rose-600 px-3 justify-start rounded-lg transition-all duration-200"
                   onClick={onLogout}
                 >
-                  <LogOut className="h-4 w-4 mr-3 text-slate-400 dark:text-slate-500" />
+                  <LogOut className="h-4 w-4 mr-2.5 text-slate-400" />
                   <span className="text-xs">Sign Out</span>
                 </Button>
               </>
             )}
           </div>
 
-          {/* New Modern Integration Style User Profile */}
+          {/* Modern User Profile */}
           {isCollapsed && !isMobile ? (
             <div className="flex flex-col items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 hover:border-blue-400 transition-all duration-300 p-0 overflow-hidden shadow-sm">
+                  <Button variant="ghost" size="icon" className="h-11 w-11 rounded-xl bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 hover:border-blue-400 transition-all duration-200 p-0 overflow-hidden shadow-sm hover:shadow-md">
                     <Avatar className="h-full w-full rounded-none">
                       <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                      <AvatarFallback className="text-xs font-black bg-blue-600 text-white rounded-none">{initials}</AvatarFallback>
+                      <AvatarFallback className="text-xs font-black bg-gradient-to-br from-blue-600 to-blue-500 text-white rounded-none">{initials}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent className="w-64 p-2 bg-white dark:bg-slate-800 rounded-2xl border-slate-200 dark:border-slate-700 shadow-2xl ml-2" align="end" side="right">
-                   <div className="flex items-center gap-4 p-4 mb-2 bg-slate-50 dark:bg-slate-700 rounded-xl">
-                      <Avatar className="h-12 w-12 ring-2 ring-white shadow-sm">
+                <DropdownMenuContent className="w-64 p-2 bg-white rounded-xl border-slate-200 shadow-xl ml-2" align="end" side="right">
+                   <div className="flex items-center gap-3 p-3 mb-2 bg-gradient-to-br from-slate-50 to-blue-50/30 rounded-lg">
+                      <Avatar className="h-11 w-11 ring-2 ring-white shadow-sm">
                         <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                        <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
+                        <AvatarFallback className="text-sm font-black bg-gradient-to-br from-blue-600 to-blue-500 text-white">{initials}</AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col overflow-hidden">
                         <p className="text-sm font-black text-slate-900 truncate">{userInfo.name}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-wider">@{userInfo.username}</p>
+                        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">@{userInfo.username}</p>
                       </div>
                     </div>
                   <DropdownMenuSeparator className="bg-slate-100" />
-                  <DropdownMenuItem onClick={onLogout} className="rounded-lg mt-1 text-rose-600 font-bold hover:bg-rose-50 focus:bg-rose-50 focus:text-rose-600">
+                  <DropdownMenuItem onClick={onLogout} className="rounded-md mt-1 text-rose-600 font-semibold hover:bg-rose-50 focus:bg-rose-50 focus:text-rose-600">
                     <LogOut className="mr-2 h-4 w-4" />
                     <span>Disconnect</span>
                   </DropdownMenuItem>
@@ -240,27 +232,27 @@ const Sidebar = React.memo(({
               
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <button onClick={onToggleCollapsed} className="p-2 text-slate-400 hover:text-blue-500 transition-colors">
+                  <button onClick={onToggleCollapsed} className="p-1.5 text-slate-400 hover:text-blue-500 transition-colors rounded-md hover:bg-slate-100">
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent side="right" className="bg-slate-900 text-white text-xs font-bold">
+                <TooltipContent side="right" className="bg-blue-600 text-white text-xs font-semibold">
                    <p>Expand Sidebar</p>
                 </TooltipContent>
               </Tooltip>
             </div>
           ) : (
-            <div className="group relative overflow-hidden rounded-2xl border border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 px-4 py-4 transition-all duration-300 hover:shadow-md hover:border-blue-200 dark:hover:border-blue-700">
-              <div className="flex items-center gap-4">
-                <Avatar className="h-12 w-12 border-2 border-white shadow-sm transition-transform duration-300 group-hover:scale-105">
+            <div className="group relative overflow-hidden rounded-xl border border-slate-200 bg-gradient-to-br from-white to-slate-50/50 px-3 py-3 transition-all duration-200 hover:shadow-md hover:border-blue-300">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-11 w-11 border-2 border-white shadow-sm transition-transform duration-200 group-hover:scale-105 ring-2 ring-blue-100">
                   <AvatarImage src={userInfo.avatar} alt={userInfo.name} />
-                  <AvatarFallback className="text-sm font-black bg-blue-600 text-white">{initials}</AvatarFallback>
+                  <AvatarFallback className="text-sm font-black bg-gradient-to-br from-blue-600 to-blue-500 text-white">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-black text-slate-900 dark:text-slate-100 truncate leading-tight mb-1">{userInfo.name}</p>
+                  <p className="text-[13px] font-black text-slate-900 truncate leading-tight mb-1">{userInfo.name}</p>
                   <div className="flex items-center gap-1.5">
-                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 border border-white dark:border-slate-800"></span>
-                    <Badge variant="secondary" className="bg-blue-100/50 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 border-none text-[9px] font-black uppercase tracking-widest px-1.5 py-0 h-4">
+                    <span className="flex h-1.5 w-1.5 rounded-full bg-emerald-500 border border-white animate-pulse"></span>
+                    <Badge variant="secondary" className="bg-blue-100 text-blue-700 border-none text-[9px] font-black uppercase tracking-wide px-1.5 py-0 h-4">
                       {isAdmin ? 'SYSTEM ADMIN' : userAccessLevel}
                     </Badge>
                   </div>
@@ -269,7 +261,7 @@ const Sidebar = React.memo(({
               
               <button 
                 onClick={onToggleCollapsed}
-                className="absolute top-2 right-2 p-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white dark:hover:bg-slate-700 text-slate-400 hover:text-blue-500 shadow-sm"
+                className="absolute top-2 right-2 p-1 rounded-md opacity-0 group-hover:opacity-100 transition-all duration-200 hover:bg-slate-100 text-slate-400 hover:text-blue-500"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
@@ -278,11 +270,11 @@ const Sidebar = React.memo(({
 
           {/* System Version & Copyright */}
           {(!isCollapsed || isMobile) && (
-            <div className="mt-12 px-2 text-center pb-2">
-              <p className="text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] leading-none mb-1.5">
+            <div className="mt-8 px-2 text-center pb-2">
+              <p className="text-[10px] font-black text-blue-600 uppercase tracking-[0.15em] leading-none mb-1">
                 v2.5.4-STABLE
               </p>
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-500 uppercase tracking-wider">
+              <p className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">
                 EST. 2025 • UPDATED 2026
               </p>
             </div>
