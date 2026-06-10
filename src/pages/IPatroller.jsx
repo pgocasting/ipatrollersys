@@ -26,6 +26,7 @@ import { db } from '../lib/firebase';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from "xlsx";
+import { toPng, toJpeg } from 'html-to-image';
 import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import {
   Plus,
@@ -113,6 +114,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
   const [topPerformersActionData, setTopPerformersActionData] = useState({});
   const [showTopPerformersSignatures, setShowTopPerformersSignatures] = useState(false);
   const topPerformersPreviewRef = useRef(null);
+  const [isGeneratingImage, setIsGeneratingImage] = useState(false);
   // Weight sliders for Top Performers ranking formula
 
 
@@ -1689,6 +1691,75 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         style: { background: 'white' },
       });
       showError('Failed to generate PDF report');
+    }
+  };
+
+  // Function to generate PNG/JPEG image for Top Performers
+  const generateTopPerformersImage = async (format = 'png') => {
+    try {
+      setIsGeneratingImage(true);
+
+      // Get the preview element
+      const previewElement = document.getElementById('top-performers-table-preview');
+      if (!previewElement) {
+        toast.error('Preview element not found', {
+          description: 'Please try again',
+          duration: 3000,
+          position: 'top-right',
+        });
+        return;
+      }
+
+      // Options for html-to-image
+      const options = {
+        quality: 0.95,
+        pixelRatio: 2, // Higher quality (2x resolution)
+        backgroundColor: '#ffffff',
+        cacheBust: true,
+        style: {
+          // Force styles to ensure proper rendering
+          transform: 'scale(1)',
+          transformOrigin: 'top left',
+        },
+      };
+
+      // Generate image based on format
+      let dataUrl;
+      if (format === 'jpeg') {
+        dataUrl = await toJpeg(previewElement, options);
+      } else {
+        dataUrl = await toPng(previewElement, options);
+      }
+
+      // Convert data URL to blob and download
+      const link = document.createElement('a');
+      const monthName = new Date(selectedTopPerformersYear, selectedTopPerformersMonth).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+      const fileName = `Top_Performers_${monthName.replace(' ', '_')}.${format}`;
+      link.download = fileName;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      toast.success(`${format.toUpperCase()} image generated successfully`, {
+        description: `Top Performers image saved as ${fileName}`,
+        duration: 3000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showSuccess(`${format.toUpperCase()} image generated successfully!`);
+
+    } catch (error) {
+      console.error('Error generating image:', error);
+      toast.error('Failed to generate image', {
+        description: error.message || 'Please try again or contact support if the issue persists',
+        duration: 4000,
+        position: 'top-right',
+        style: { background: 'white' },
+      });
+      showError('Failed to generate image');
+    } finally {
+      setIsGeneratingImage(false);
     }
   };
 
@@ -3723,12 +3794,38 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                   {/* Action Buttons */}
                   <Button
                     onClick={generateTopPerformersPDF}
-                    disabled={loadingTopPerformers || !getTopPerformers().length}
+                    disabled={loadingTopPerformers || !getTopPerformers().length || isGeneratingImage}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                     size="sm"
                   >
                     <FileText className="w-4 h-4 mr-2" />
                     Generate PDF
+                  </Button>
+                  <Button
+                    onClick={() => generateTopPerformersImage('png')}
+                    disabled={loadingTopPerformers || !getTopPerformers().length || isGeneratingImage}
+                    className="bg-purple-600 hover:bg-purple-700 text-white"
+                    size="sm"
+                  >
+                    {isGeneratingImage ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                    )}
+                    PNG
+                  </Button>
+                  <Button
+                    onClick={() => generateTopPerformersImage('jpeg')}
+                    disabled={loadingTopPerformers || !getTopPerformers().length || isGeneratingImage}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    size="sm"
+                  >
+                    {isGeneratingImage ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <ImageIcon className="w-4 h-4 mr-2" />
+                    )}
+                    JPEG
                   </Button>
                   <Button
                     onClick={() => setShowTopPerformersModal(false)}
@@ -3851,7 +3948,7 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       </div>
 
                       {/* Top Performers Table */}
-                      <Card className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
+                      <Card id="top-performers-table-preview" className="backdrop-blur-sm border-0 shadow-lg bg-white/80">
                         <CardHeader>
                           <CardTitle className="text-lg font-semibold transition-colors duration-300 text-gray-900 flex items-center gap-2">
                             <Trophy className="w-5 h-5 text-yellow-500" />
