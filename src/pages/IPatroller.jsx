@@ -482,41 +482,49 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
                 // NEW LOGIC: April to December 2026 and future years count based on after photos
                 if (isAprilToDecember2026OrLater) {
-                  // Count based on after photos
-                  let rowsWithAfterPhotos = 0;
+                  // Count total number of all after photos
+                  let totalAfterPhotos = 0;
 
                   if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                    rowsWithAfterPhotos = entry.photos.rows.filter(row =>
-                      row.after && Array.isArray(row.after) && row.after.length > 0
-                    ).length;
+                    // Count total number of all after photos across all rows
+                    totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                      if (row.after && Array.isArray(row.after)) {
+                        return sum + row.after.length;
+                      }
+                      return sum;
+                    }, 0);
                   } else {
                     const hasBeforePhoto = entry.photos && entry.photos.before;
                     const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
-                    if (hasAfterPhoto) rowsWithAfterPhotos = 1;
+                    if (hasAfterPhoto) totalAfterPhotos = 1;
                   }
 
-                  shouldCount = rowsWithAfterPhotos > 0;
-                  countValue = rowsWithAfterPhotos;
+                  shouldCount = totalAfterPhotos > 0;
+                  countValue = totalAfterPhotos;
                 } else {
                   // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
                   if (isMarchToOctober) {
                     shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
                     countValue = shouldCount ? 1 : 0;
                   } else {
-                    let rowsWithAfterPhotos = 0;
+                    let totalAfterPhotos = 0;
 
                     if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      rowsWithAfterPhotos = entry.photos.rows.filter(row =>
-                        row.after && Array.isArray(row.after) && row.after.length > 0
-                      ).length;
+                      // Count total number of all after photos across all rows
+                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                        if (row.after && Array.isArray(row.after)) {
+                          return sum + row.after.length;
+                        }
+                        return sum;
+                      }, 0);
                     } else {
                       const hasBeforePhoto = entry.photos && entry.photos.before;
                       const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
-                      if (hasAfterPhoto) rowsWithAfterPhotos = 1;
+                      if (hasAfterPhoto) totalAfterPhotos = 1;
                     }
 
-                    shouldCount = rowsWithAfterPhotos > 0;
-                    countValue = rowsWithAfterPhotos;
+                    shouldCount = totalAfterPhotos > 0;
+                    countValue = totalAfterPhotos;
                   }
                 }
 
@@ -1155,32 +1163,40 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
                   // NEW LOGIC: April to December 2026 and future years count based on after photos
                   if (isAprilToDecember2026OrLater) {
-                    let rowsWithAfterPhotos = 0;
+                    let totalAfterPhotos = 0;
                     if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      rowsWithAfterPhotos = entry.photos.rows.filter(row =>
-                        row.after && Array.isArray(row.after) && row.after.length > 0
-                      ).length;
+                      // Count total number of all after photos across all rows
+                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                        if (row.after && Array.isArray(row.after)) {
+                          return sum + row.after.length;
+                        }
+                        return sum;
+                      }, 0);
                     } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                      rowsWithAfterPhotos = 1;
+                      totalAfterPhotos = 1;
                     }
-                    shouldCount = rowsWithAfterPhotos > 0;
-                    countValue = rowsWithAfterPhotos;
+                    shouldCount = totalAfterPhotos > 0;
+                    countValue = totalAfterPhotos;
                   } else {
                     // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
                     if (isMarchToOctober) {
                       shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
                       countValue = shouldCount ? 1 : 0;
                     } else {
-                      let rowsWithAfterPhotos = 0;
+                      let totalAfterPhotos = 0;
                       if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                        rowsWithAfterPhotos = entry.photos.rows.filter(row =>
-                          row.after && Array.isArray(row.after) && row.after.length > 0
-                        ).length;
+                        // Count total number of all after photos across all rows
+                        totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                          if (row.after && Array.isArray(row.after)) {
+                            return sum + row.after.length;
+                          }
+                          return sum;
+                        }, 0);
                       } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                        rowsWithAfterPhotos = 1;
+                        totalAfterPhotos = 1;
                       }
-                      shouldCount = rowsWithAfterPhotos > 0;
-                      countValue = rowsWithAfterPhotos;
+                      shouldCount = totalAfterPhotos > 0;
+                      countValue = totalAfterPhotos;
                     }
                   }
 
@@ -2213,28 +2229,40 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
 
                   // NEW LOGIC: April to December 2026 and future years count based on after photos
                   if (isAprilToDecember2026OrLater) {
-                    let rowsCount = 0;
+                    let totalAfterPhotos = 0;
                     if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      rowsCount = entry.photos.rows.filter(row => row.after && Array.isArray(row.after) && row.after.length > 0).length;
+                      // Count total number of all after photos across all rows
+                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                        if (row.after && Array.isArray(row.after)) {
+                          return sum + row.after.length;
+                        }
+                        return sum;
+                      }, 0);
                     } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                      rowsCount = 1;
+                      totalAfterPhotos = 1;
                     }
-                    shouldCount = rowsCount > 0;
-                    countValue = rowsCount;
+                    shouldCount = totalAfterPhotos > 0;
+                    countValue = totalAfterPhotos;
                   } else {
                     // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
                     if (isMarchToOctoberCurrent) {
                       shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
                       countValue = shouldCount ? 1 : 0;
                     } else {
-                      let rowsCount = 0;
+                      let totalAfterPhotos = 0;
                       if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                        rowsCount = entry.photos.rows.filter(row => row.after && Array.isArray(row.after) && row.after.length > 0).length;
+                        // Count total number of all after photos across all rows
+                        totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
+                          if (row.after && Array.isArray(row.after)) {
+                            return sum + row.after.length;
+                          }
+                          return sum;
+                        }, 0);
                       } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                        rowsCount = 1;
+                        totalAfterPhotos = 1;
                       }
-                      shouldCount = rowsCount > 0;
-                      countValue = rowsCount;
+                      shouldCount = totalAfterPhotos > 0;
+                      countValue = totalAfterPhotos;
                     }
                   }
 
