@@ -4911,36 +4911,36 @@ const handleSaveAllMonths = async () => {
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
                   <div className="overflow-x-auto" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
                     <table className="command-center-table w-full min-w-[1200px]">
-                      <thead className="sticky top-0 z-20">
+                      <thead className="sticky top-0 z-40 bg-white">
                       <tr className="bg-white border-b-2 border-gray-300">
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200">DATE</th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">DATE</th>
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32 bg-white">
                           <div className="flex items-center gap-2">
                             <MapPinIcon className="h-4 w-4 text-blue-500" />
                             BARANGAY
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">
                           <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-orange-500" />
                             CONCERN TYPE
                           </div>
                           <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
                         </th>
-                        <th className="px-3 py-2 text-center text-sm font-bold text-gray-800 border-r border-gray-200" colSpan="4">
+                        <th className="px-3 py-2 text-center text-sm font-bold text-gray-800 border-r border-gray-200 bg-white" colSpan="4">
                           <div className="flex items-center justify-center gap-2">
                             <BarChart3 className="h-4 w-4 text-purple-500" />
                             WEEKLY REPORT
                           </div>
                         </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing bg-white">
                           <div className="flex items-center gap-2">
                             <MessageSquare className="h-4 w-4 text-gray-500" />
                             REMARKS
                           </div>
                         </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 table-cell-spacing">
+                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 table-cell-spacing bg-white">
                           <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             ACTION TAKEN
@@ -4948,9 +4948,9 @@ const handleSaveAllMonths = async () => {
                         </th>
                       </tr>
                       <tr className="bg-gray-100 border-b border-gray-300">
-                        <th className="px-3 py-2 border-r border-gray-200"></th>
-                        <th className="px-3 py-2 border-r border-gray-200"></th>
-                        <th className="px-3 py-2 border-r border-gray-200"></th>
+                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
                         <th className="px-3 py-2 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
                           <div className="font-bold">Week 1</div>
                           <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
@@ -4967,8 +4967,8 @@ const handleSaveAllMonths = async () => {
                           <div className="font-bold">Week 4</div>
                           <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
                         </th>
-                        <th className="px-3 py-2 border-r border-gray-200"></th>
-                        <th className="px-3 py-2"></th>
+                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                        <th className="px-3 py-2 bg-gray-100"></th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200 bg-white">
