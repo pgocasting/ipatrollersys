@@ -4430,97 +4430,99 @@ const handleSaveAllMonths = async () => {
 
         {/* Weekly Report Section */}
         {activeTab === "weekly-report" && (
-          <div className="space-y-1 sm:space-y-2">
-            {/* Weekly Report Header */}
-            <div>
-              <div className={`${isCommandUser ? 'p-1 sm:p-2' : 'p-1 sm:p-2'} pb-0`}>
-                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
-                  <div className="flex items-start gap-3 w-full lg:w-auto">
-                    <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                      <FileText className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
-                      {activeMunicipalityTab && (
-                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-0.5">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-green-600" />
-                            <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
-                          </div>
-                          <div className="text-xs sm:text-sm text-gray-600">
-                            {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
-                            {importedBarangays.filter(b => {
-                              if (!activeMunicipalityTab) return false;
-                              const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
-                              const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                              return normalizedBarangay === normalizedTab;
-                            }).length} barangays
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {(isAdmin || isReadOnly || isCommandUser) && (
-                    <div className="w-full lg:w-auto lg:ml-auto flex flex-col lg:flex-row gap-3 lg:items-start">
-                      {/* Action Taken Count Card */}
-                      <div className="lg:w-72 flex-shrink-0">
-                        <div 
-                          onClick={() => setShowActionTakenModal(true)}
-                          className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all cursor-pointer h-full"
-                        >
-                          <div className="flex items-center gap-4">
-                            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md flex-shrink-0">
-                              <CheckCircle className="h-7 w-7 text-white" />
-                            </div>
-                            <div className="flex-1">
-                              <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
-                              <p className="text-3xl font-bold text-green-700 leading-none mb-1">
-                                {getActionTakenCount().count}
-                              </p>
-                              <p className="text-xs text-gray-500">with after photos</p>
-                            </div>
-                          </div>
-                        </div>
+          <div className="flex flex-col h-full">
+            {/* Sticky Filter Section */}
+            <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+              {/* Weekly Report Header */}
+              <div>
+                <div className={`${isCommandUser ? 'p-1 sm:p-2' : 'p-1 sm:p-2'} pb-0`}>
+                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
+                    <div className="flex items-start gap-3 w-full lg:w-auto">
+                      <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                        <FileText className="w-5 h-5 text-green-600" />
                       </div>
-                      
-                      {/* Municipality Tabs */}
-                      {(isAdmin || isReadOnly) && (
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <div className="text-sm font-medium text-gray-700">Municipality</div>
-                            {!Object.values(municipalitiesByDistrict).flat().length && (
-                              <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
-                            )}
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
+                        {activeMunicipalityTab && (
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-0.5">
+                            <div className="flex items-center gap-2">
+                              <Building2 className="w-4 h-4 text-green-600" />
+                              <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
+                            </div>
+                            <div className="text-xs sm:text-sm text-gray-600">
+                              {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
+                              {importedBarangays.filter(b => {
+                                if (!activeMunicipalityTab) return false;
+                                const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                                const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                                return normalizedBarangay === normalizedTab;
+                              }).length} barangays
+                            </div>
                           </div>
+                        )}
+                      </div>
+                    </div>
 
-                          <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
-                            {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                              const isActive = activeMunicipalityTab === municipality;
-                              return (
-                                <button
-                                  key={municipality}
-                                  type="button"
-                                  onClick={() => handleMunicipalityTabChange(municipality)}
-                                  className={`${
-                                    isActive
-                                      ? 'bg-green-600 text-white border-green-600'
-                                      : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
-                                  } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
-                                  title={municipality}
-                                >
-                                  <span className="block truncate">{municipality}</span>
-                                </button>
-                              );
-                            })}
+                    {(isAdmin || isReadOnly || isCommandUser) && (
+                      <div className="w-full lg:w-auto lg:ml-auto flex flex-col lg:flex-row gap-3 lg:items-start">
+                        {/* Action Taken Count Card */}
+                        <div className="lg:w-72 flex-shrink-0">
+                          <div 
+                            onClick={() => setShowActionTakenModal(true)}
+                            className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all cursor-pointer h-full"
+                          >
+                            <div className="flex items-center gap-4">
+                              <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md flex-shrink-0">
+                                <CheckCircle className="h-7 w-7 text-white" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
+                                <p className="text-3xl font-bold text-green-700 leading-none mb-1">
+                                  {getActionTakenCount().count}
+                                </p>
+                                <p className="text-xs text-gray-500">with after photos</p>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      )}
-                    </div>
-                  )}
+                        
+                        {/* Municipality Tabs */}
+                        {(isAdmin || isReadOnly) && (
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <div className="text-sm font-medium text-gray-700">Municipality</div>
+                              {!Object.values(municipalitiesByDistrict).flat().length && (
+                                <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
+                              )}
+                            </div>
+
+                            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
+                              {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                                const isActive = activeMunicipalityTab === municipality;
+                                return (
+                                  <button
+                                    key={municipality}
+                                    type="button"
+                                    onClick={() => handleMunicipalityTabChange(municipality)}
+                                    className={`${
+                                      isActive
+                                        ? 'bg-green-600 text-white border-green-600'
+                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
+                                    } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
+                                    title={municipality}
+                                  >
+                                    <span className="block truncate">{municipality}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-              <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-0`}>
+                <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-2`}>
                 {/* Month/Year Selection */}
                 <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-1 mb-0">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
@@ -4901,7 +4903,10 @@ const handleSaveAllMonths = async () => {
                   </div>
                 </div>
               </div>
-              
+            </div>
+            
+            {/* Scrollable Table Section */}
+            <div className="flex-1 overflow-auto">
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
                   <div className="overflow-x-auto" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
@@ -5421,7 +5426,7 @@ const handleSaveAllMonths = async () => {
                 </div>
               </div>
             </div>
-
+            </div>
           </div>
         )}
 
