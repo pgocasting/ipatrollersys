@@ -4909,7 +4909,8 @@ const handleSaveAllMonths = async () => {
             <div className="flex-1 overflow-auto">
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
-                  <div className="overflow-x-auto" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
+                  {/* Table with sticky header */}
+                  <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
                     <table className="command-center-table w-full min-w-[1200px]">
                       <thead className="sticky top-0 z-40 bg-white">
                       <tr className="bg-white border-b-2 border-gray-300">
