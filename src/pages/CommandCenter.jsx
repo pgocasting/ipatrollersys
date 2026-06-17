@@ -254,6 +254,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [viewingPhotos, setViewingPhotos] = useState(null);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
   
+  // Search and Action Taken Count States
+  const [searchTerm, setSearchTerm] = useState("");
+  const [showActionTakenModal, setShowActionTakenModal] = useState(false);
+  
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
 
@@ -1281,6 +1285,77 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return allEntries
       .map((entry, entryIndex) => ({ entry, entryIndex }))
       .filter(({ entry }) => filteredEntries.includes(entry));
+  };
+
+  // Search filter function
+  const matchesSearchTerm = (entry) => {
+    if (!searchTerm || searchTerm.trim() === '') return true;
+    
+    const searchLower = searchTerm.toLowerCase().trim();
+    
+    // Search in barangay, concern type, action taken, and remarks
+    const barangayMatch = entry.barangay?.toLowerCase().includes(searchLower);
+    const concernMatch = entry.concernType?.toLowerCase().includes(searchLower);
+    const actionMatch = entry.actionTaken?.toLowerCase().includes(searchLower);
+    const remarksMatch = entry.remarks?.toLowerCase().includes(searchLower);
+    
+    return barangayMatch || concernMatch || actionMatch || remarksMatch;
+  };
+
+  // Count entries with action taken (after photos)
+  const getActionTakenCount = () => {
+    let entryCount = 0;
+    let totalAfterPhotosCount = 0;
+    const entriesWithActionTaken = [];
+    
+    Object.keys(weeklyReportData).forEach(date => {
+      const entries = weeklyReportData[date] || [];
+      entries.forEach((entry, index) => {
+        if (entry.actionTaken && entry.actionTaken.trim() !== '') {
+          let afterPhotosInEntry = 0;
+          
+          // Check if entry has photos
+          if (entry.photos) {
+            // New format: rows structure
+            if (entry.photos.rows && Array.isArray(entry.photos.rows)) {
+              entry.photos.rows.forEach(row => {
+                if (row.after && Array.isArray(row.after)) {
+                  afterPhotosInEntry += row.after.length;
+                }
+              });
+            }
+            // Old format: direct before/after
+            else if (entry.photos.after) {
+              if (Array.isArray(entry.photos.after)) {
+                afterPhotosInEntry += entry.photos.after.length;
+              } else if (entry.photos.after) {
+                afterPhotosInEntry += 1; // Single photo
+              }
+            }
+          }
+          
+          if (afterPhotosInEntry > 0) {
+            entryCount++;
+            totalAfterPhotosCount += afterPhotosInEntry;
+            entriesWithActionTaken.push({ date, entry, entryIndex: index, afterPhotosCount: afterPhotosInEntry });
+          }
+        }
+      });
+    });
+    
+    return { 
+      count: totalAfterPhotosCount, // Total after photos count
+      entryCount: entryCount, // Number of entries
+      entries: entriesWithActionTaken 
+    };
+  };
+
+  // Get filtered search results with date
+  const getSearchFilteredEntries = (date) => {
+    const dateEntries = getFilteredDateEntriesWithIndex(date);
+    if (!searchTerm || searchTerm.trim() === '') return dateEntries;
+    
+    return dateEntries.filter(({ entry }) => matchesSearchTerm(entry));
   };
 
   useEffect(() => {
@@ -4386,35 +4461,61 @@ const handleSaveAllMonths = async () => {
                     </div>
                   </div>
 
-                  {(isAdmin || isReadOnly) && (
-                    <div className="w-full lg:w-auto lg:ml-auto">
-                      <div className="flex items-center gap-2">
-                        <div className="text-sm font-medium text-gray-700">Municipality</div>
-                        {!Object.values(municipalitiesByDistrict).flat().length && (
-                          <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
-                        )}
+                  {(isAdmin || isReadOnly || isCommandUser) && (
+                    <div className="w-full lg:w-auto lg:ml-auto flex flex-col lg:flex-row gap-3 lg:items-start">
+                      {/* Action Taken Count Card */}
+                      <div className="lg:w-72 flex-shrink-0">
+                        <div 
+                          onClick={() => setShowActionTakenModal(true)}
+                          className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all cursor-pointer h-full"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md flex-shrink-0">
+                              <CheckCircle className="h-7 w-7 text-white" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
+                              <p className="text-3xl font-bold text-green-700 leading-none mb-1">
+                                {getActionTakenCount().count}
+                              </p>
+                              <p className="text-xs text-gray-500">with after photos</p>
+                            </div>
+                          </div>
+                        </div>
                       </div>
+                      
+                      {/* Municipality Tabs */}
+                      {(isAdmin || isReadOnly) && (
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <div className="text-sm font-medium text-gray-700">Municipality</div>
+                            {!Object.values(municipalitiesByDistrict).flat().length && (
+                              <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
+                            )}
+                          </div>
 
-                      <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
-                        {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                          const isActive = activeMunicipalityTab === municipality;
-                          return (
-                            <button
-                              key={municipality}
-                              type="button"
-                              onClick={() => handleMunicipalityTabChange(municipality)}
-                              className={`${
-                                isActive
-                                  ? 'bg-green-600 text-white border-green-600'
-                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
-                              } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
-                              title={municipality}
-                            >
-                              <span className="block truncate">{municipality}</span>
-                            </button>
-                          );
-                        })}
-                      </div>
+                          <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
+                            {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                              const isActive = activeMunicipalityTab === municipality;
+                              return (
+                                <button
+                                  key={municipality}
+                                  type="button"
+                                  onClick={() => handleMunicipalityTabChange(municipality)}
+                                  className={`${
+                                    isActive
+                                      ? 'bg-green-600 text-white border-green-600'
+                                      : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
+                                  } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
+                                  title={municipality}
+                                >
+                                  <span className="block truncate">{municipality}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4422,7 +4523,7 @@ const handleSaveAllMonths = async () => {
               <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-0`}>
                 {/* Month/Year Selection */}
                 <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-1 mb-0">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
                     <div className="lg:w-[220px]">
                       <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
                       <select 
@@ -4485,6 +4586,34 @@ const handleSaveAllMonths = async () => {
                             </option>
                           ))}
                       </select>
+                    </div>
+                    
+                    {/* Search Bar */}
+                    <div className="lg:w-[280px]">
+                      <label htmlFor="search-entries" className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                      <div className="relative">
+                        <input
+                          id="search-entries"
+                          type="text"
+                          placeholder="Search entries..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        />
+                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                        </div>
+                        {searchTerm && (
+                          <button
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -4773,7 +4902,6 @@ const handleSaveAllMonths = async () => {
                 </div>
               </div>
               
-              
               <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
                 <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
                   <div className="overflow-x-auto" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
@@ -4842,7 +4970,7 @@ const handleSaveAllMonths = async () => {
                       {currentDates.map((date, index) => {
                         const weekNumber = getWeekNumber(date);
                         const isWeekend = index % 7 >= 5; // Saturday and Sunday
-                        const dateEntries = getFilteredDateEntriesWithIndex(date);
+                        const dateEntries = getSearchFilteredEntries(date);
                         
                         // Debug logging for first few dates
                         if (index < 3) {
@@ -6995,6 +7123,168 @@ const handleSaveAllMonths = async () => {
             >
               Close
             </button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Action Taken Entries Modal */}
+      <Dialog open={showActionTakenModal} onOpenChange={setShowActionTakenModal}>
+        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-2xl">
+              <CheckCircle className="h-6 w-6 text-green-600" />
+              Mga May Action Taken (with After Photos)
+            </DialogTitle>
+            <DialogDescription>
+              List of all entries na may action taken at may after photos
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            {getActionTakenCount().entries.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
+                  <CheckCircle className="h-8 w-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">Walang entries na may action taken at after photos</p>
+              </div>
+            ) : (
+              getActionTakenCount().entries.map(({ date, entry, entryIndex, afterPhotosCount }, index) => (
+                <div key={`${date}-${entryIndex}`} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-gray-500">
+                        <Clock className="h-4 w-4" />
+                        <span className="font-medium">{date}</span>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Barangay</p>
+                          <p className="text-sm font-semibold text-gray-900">{entry.barangay || 'N/A'}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 font-medium">Concern Type</p>
+                          <p className="text-sm font-semibold text-orange-600">{entry.concernType || 'N/A'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                        <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
+                        <p className="text-sm text-gray-800">{entry.actionTaken}</p>
+                      </div>
+                      
+                      {entry.remarks && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                          <p className="text-xs font-semibold text-blue-700 mb-1">Remarks</p>
+                          <p className="text-sm text-gray-800">{entry.remarks}</p>
+                        </div>
+                      )}
+                      
+                      {entry.photos && (
+                        <div className="pt-2">
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs text-gray-500 font-medium">After Photos:</p>
+                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm">
+                              {afterPhotosCount}
+                            </span>
+                          </div>
+                          <div className="flex gap-2 text-xs mt-1 flex-wrap">
+                            {/* New format: rows structure */}
+                            {entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.map((row, rowIndex) => (
+                              <div key={rowIndex} className="flex gap-2">
+                                {row.before && Array.isArray(row.before) && row.before.length > 0 && (
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                    Row {rowIndex + 1}: {row.before.length} before
+                                  </span>
+                                )}
+                                {row.after && Array.isArray(row.after) && row.after.length > 0 && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                                    {row.after.length} after
+                                  </span>
+                                )}
+                              </div>
+                            ))}
+                            {/* Old format: direct before/after */}
+                            {!entry.photos.rows && (
+                              <>
+                                {entry.photos.before && (
+                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                    1 before
+                                  </span>
+                                )}
+                                {entry.photos.after && (
+                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                                    {Array.isArray(entry.photos.after) ? entry.photos.after.length : 1} after
+                                  </span>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => {
+                          // Handle both photo formats
+                          const photoData = entry.photos || {};
+                          
+                          // Check if it's the new rows format
+                          const hasRows = photoData.rows && Array.isArray(photoData.rows) && photoData.rows.length > 0;
+                          
+                          setViewingPhotos({
+                            date: date,
+                            barangay: entry.barangay,
+                            concernType: entry.concernType,
+                            actionTaken: entry.actionTaken,
+                            remarks: entry.remarks,
+                            rows: hasRows ? photoData.rows : null,
+                            before: !hasRows && photoData.before ? (Array.isArray(photoData.before) ? photoData.before : [photoData.before]) : [],
+                            after: !hasRows && photoData.after ? (Array.isArray(photoData.after) ? photoData.after : [photoData.after]) : []
+                          });
+                          setShowPhotoViewDialog(true);
+                          setShowActionTakenModal(false);
+                        }}
+                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center gap-2 text-sm"
+                      >
+                        <Eye className="h-4 w-4" />
+                        View Photos
+                      </button>
+                      
+                      <button
+                        onClick={() => {
+                          // Copy to clipboard
+                          const text = `Date: ${date}\nBarangay: ${entry.barangay}\nConcern: ${entry.concernType}\nAction Taken: ${entry.actionTaken}${entry.remarks ? `\nRemarks: ${entry.remarks}` : ''}`;
+                          navigator.clipboard.writeText(text);
+                          toast.success('Copied to clipboard!');
+                        }}
+                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors flex items-center gap-2 text-sm"
+                        title="Copy details"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          
+          <DialogFooter className="border-t pt-4">
+            <div className="flex items-center justify-between w-full">
+              <div className="text-sm text-gray-600">
+                <span className="font-bold text-gray-900">{getActionTakenCount().entryCount}</span> entries • 
+                <span className="font-bold text-green-700 ml-1">{getActionTakenCount().count}</span> after photos
+              </div>
+              <button
+                onClick={() => setShowActionTakenModal(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+              >
+                Close
+              </button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
