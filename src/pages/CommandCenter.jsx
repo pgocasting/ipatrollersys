@@ -1350,6 +1350,73 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     };
   };
 
+  const getEntryActionCountValue = (entry, monthIndex, year) => {
+    const isAprilToDecember2026OrLater =
+      (year === 2026 && monthIndex >= 3) ||
+      (year > 2026 && monthIndex >= 3);
+    const isMarchToOctober = monthIndex >= 2 && monthIndex <= 9;
+
+    const countAfterPhotos = () => {
+      if (entry.photos?.rows && Array.isArray(entry.photos.rows)) {
+        return entry.photos.rows.reduce((sum, row) => {
+          if (row.after && Array.isArray(row.after)) {
+            return sum + row.after.length;
+          }
+          return sum;
+        }, 0);
+      }
+
+      const hasBeforePhoto = entry.photos && entry.photos.before;
+      const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
+      return hasAfterPhoto ? 1 : 0;
+    };
+
+    if (isAprilToDecember2026OrLater) {
+      const totalAfterPhotos = countAfterPhotos();
+      return totalAfterPhotos > 0 ? totalAfterPhotos : 0;
+    }
+
+    if (isMarchToOctober) {
+      return entry.actionTaken && entry.actionTaken.trim() !== '' ? 1 : 0;
+    }
+
+    const totalAfterPhotos = countAfterPhotos();
+    return totalAfterPhotos > 0 ? totalAfterPhotos : 0;
+  };
+
+  // Overall % per municipality — same formula as iPatroller Criteria tab
+  const getCriteriaOverallPercentage = useCallback(() => {
+    if (!activeMunicipalityTab || !selectedMonth || !selectedYear) return 0;
+
+    const WEEKLY_MIN = 98;
+    const monthIndex = months.indexOf(selectedMonth);
+    const year = parseInt(selectedYear, 10);
+    if (monthIndex < 0 || Number.isNaN(year)) return 0;
+
+    const weeklyAttended = [0, 0, 0, 0];
+
+    Object.entries(weeklyReportData).forEach(([dateKey, entries]) => {
+      if (!Array.isArray(entries)) return;
+
+      const entryDate = new Date(dateKey);
+      if (Number.isNaN(entryDate.getTime())) return;
+
+      const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
+      if (weekIndex < 0 || weekIndex >= 4) return;
+
+      entries.forEach((entry) => {
+        const countValue = getEntryActionCountValue(entry, monthIndex, year);
+        if (countValue > 0) {
+          weeklyAttended[weekIndex] += countValue;
+        }
+      });
+    });
+
+    const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+    const totalMinimum = WEEKLY_MIN * 4;
+    return Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
+  }, [activeMunicipalityTab, selectedMonth, selectedYear, weeklyReportData, months]);
+
   // Get filtered search results with date
   const getSearchFilteredEntries = (date) => {
     const dateEntries = getFilteredDateEntriesWithIndex(date);
@@ -1357,62 +1424,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     
     return dateEntries.filter(({ entry }) => matchesSearchTerm(entry));
   };
-
-  // Calculate overall average from IPatroller data for current municipality
-  const getOverallAverage = useCallback(() => {
-    if (!activeMunicipalityTab || !selectedMonth || !selectedYear) return 0;
-
-    const WEEKLY_MIN = 98;
-    const monthIndex = months.indexOf(selectedMonth);
-    const year = parseInt(selectedYear);
-    
-    // Check if it's Jan 2026 or later (new formula)
-    const isJan2026OrLater = year >= 2026;
-    
-    if (!isJan2026OrLater) return 0; // Only calculate for Jan 2026 onwards
-
-    // Get all dates in the month
-    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-    const totalDays = daysInMonth;
-
-    // Count action taken entries per week
-    const weeklyAttended = [0, 0, 0, 0];
-    
-    Object.keys(weeklyReportData).forEach(dateKey => {
-      const entries = weeklyReportData[dateKey] || [];
-      
-      entries.forEach(entry => {
-        // Check if entry has action taken and after photos
-        if (entry.actionTaken && entry.actionTaken.trim() !== '' && 
-            entry.photos && entry.photos.rows && entry.photos.rows.length > 0) {
-          // Check if there are after photos
-          const hasAfterPhotos = entry.photos.rows.some(row => 
-            row.after && Array.isArray(row.after) && row.after.length > 0
-          );
-          
-          if (hasAfterPhotos) {
-            // Determine which week this date belongs to
-            const dayMatch = dateKey.match(/\d+/);
-            if (dayMatch) {
-              const day = parseInt(dayMatch[0]);
-              const weekIndex = Math.floor((day - 1) / 7);
-              if (weekIndex >= 0 && weekIndex < 4) {
-                weeklyAttended[weekIndex]++;
-              }
-            }
-          }
-        }
-      });
-    });
-
-    // Calculate Overall Average using Criteria tab formula:
-    // Overall % = (Total Attended / Total Minimum) × 100, capped at 100%
-    const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
-    const totalMinimum = WEEKLY_MIN * 4; // 98 × 4 = 392
-    const overallAverage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
-
-    return overallAverage;
-  }, [activeMunicipalityTab, selectedMonth, selectedYear, weeklyReportData, months]);
 
   useEffect(() => {
     if (!selectedBarangayFilter) return;
@@ -4537,16 +4548,16 @@ const handleSaveAllMonths = async () => {
                                   <p className="text-3xl font-bold text-green-700 leading-none">
                                     {getActionTakenCount().count}
                                   </p>
-                                  {selectedYear && parseInt(selectedYear) >= 2026 && (
+                                  {activeMunicipalityTab && (
                                     <p className="text-lg font-bold text-blue-600 leading-none">
-                                      {getOverallAverage()}%
+                                      {getCriteriaOverallPercentage()}%
                                     </p>
                                   )}
                                 </div>
                                 <p className="text-xs text-gray-500">
                                   with after photos
-                                  {selectedYear && parseInt(selectedYear) >= 2026 && (
-                                    <span className="text-blue-600"> • avg</span>
+                                  {activeMunicipalityTab && (
+                                    <span className="text-blue-600"> • overall avg ({activeMunicipalityTab})</span>
                                   )}
                                 </p>
                               </div>
@@ -7211,6 +7222,11 @@ const handleSaveAllMonths = async () => {
             </DialogTitle>
             <DialogDescription>
               List of all entries na may action taken at may after photos
+              {activeMunicipalityTab && (
+                <span className="block mt-1 text-blue-600 font-medium">
+                  {activeMunicipalityTab} — Overall Average: {getCriteriaOverallPercentage()}%
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           
