@@ -1358,6 +1358,62 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return dateEntries.filter(({ entry }) => matchesSearchTerm(entry));
   };
 
+  // Calculate overall average from IPatroller data for current municipality
+  const getOverallAverage = useCallback(() => {
+    if (!activeMunicipalityTab || !selectedMonth || !selectedYear) return 0;
+
+    const WEEKLY_MIN = 98;
+    const monthIndex = months.indexOf(selectedMonth);
+    const year = parseInt(selectedYear);
+    
+    // Check if it's Jan 2026 or later (new formula)
+    const isJan2026OrLater = year >= 2026;
+    
+    if (!isJan2026OrLater) return 0; // Only calculate for Jan 2026 onwards
+
+    // Get all dates in the month
+    const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+    const totalDays = daysInMonth;
+
+    // Count action taken entries per week
+    const weeklyAttended = [0, 0, 0, 0];
+    
+    Object.keys(weeklyReportData).forEach(dateKey => {
+      const entries = weeklyReportData[dateKey] || [];
+      
+      entries.forEach(entry => {
+        // Check if entry has action taken and after photos
+        if (entry.actionTaken && entry.actionTaken.trim() !== '' && 
+            entry.photos && entry.photos.rows && entry.photos.rows.length > 0) {
+          // Check if there are after photos
+          const hasAfterPhotos = entry.photos.rows.some(row => 
+            row.after && Array.isArray(row.after) && row.after.length > 0
+          );
+          
+          if (hasAfterPhotos) {
+            // Determine which week this date belongs to
+            const dayMatch = dateKey.match(/\d+/);
+            if (dayMatch) {
+              const day = parseInt(dayMatch[0]);
+              const weekIndex = Math.floor((day - 1) / 7);
+              if (weekIndex >= 0 && weekIndex < 4) {
+                weeklyAttended[weekIndex]++;
+              }
+            }
+          }
+        }
+      });
+    });
+
+    // Calculate Overall Average using Criteria tab formula:
+    // Overall % = (Total Attended / Total Minimum) × 100, capped at 100%
+    const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+    const totalMinimum = WEEKLY_MIN * 4; // 98 × 4 = 392
+    const overallAverage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
+
+    return overallAverage;
+  }, [activeMunicipalityTab, selectedMonth, selectedYear, weeklyReportData, months]);
+
   useEffect(() => {
     if (!selectedBarangayFilter) return;
 
@@ -4477,10 +4533,22 @@ const handleSaveAllMonths = async () => {
                               </div>
                               <div className="flex-1">
                                 <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
-                                <p className="text-3xl font-bold text-green-700 leading-none mb-1">
-                                  {getActionTakenCount().count}
+                                <div className="flex items-baseline gap-2 mb-1">
+                                  <p className="text-3xl font-bold text-green-700 leading-none">
+                                    {getActionTakenCount().count}
+                                  </p>
+                                  {selectedYear && parseInt(selectedYear) >= 2026 && (
+                                    <p className="text-lg font-bold text-blue-600 leading-none">
+                                      {getOverallAverage()}%
+                                    </p>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500">
+                                  with after photos
+                                  {selectedYear && parseInt(selectedYear) >= 2026 && (
+                                    <span className="text-blue-600"> • avg</span>
+                                  )}
                                 </p>
-                                <p className="text-xs text-gray-500">with after photos</p>
                               </div>
                             </div>
                           </div>
