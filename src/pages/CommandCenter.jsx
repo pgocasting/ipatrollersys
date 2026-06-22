@@ -1471,6 +1471,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     return hasRemarks;
   };
 
+  const entryHasExistingPhotos = (entry) => {
+    if (!entry?.photos) return false;
+    if (entry.photos.before || entry.photos.after) return true;
+    if (entry.photos.rows && Array.isArray(entry.photos.rows)) {
+      return entry.photos.rows.some(
+        (row) => (row.before?.length > 0) || (row.after?.length > 0)
+      );
+    }
+    return false;
+  };
+
+  const isUrlPreview = (preview) =>
+    typeof preview === 'string' && (preview.startsWith('http://') || preview.startsWith('https://'));
+
   // Photo upload handlers
   const handleOpenPhotoUpload = (date, entryIndex) => {
     const entry = weeklyReportData[date]?.[entryIndex];
@@ -1478,6 +1492,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     // Validate that entry has all required data before allowing photo upload
     if (isEntryIncomplete(entry)) {
       showError('Please complete all required fields (Barangay, Concern Type, at least one Week, and Action Taken) before uploading photos.');
+      return;
+    }
+
+    if (entryHasExistingPhotos(entry) && !isAdmin) {
+      showError('Only administrators can edit existing photos.');
       return;
     }
     
@@ -1673,6 +1692,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   const handleUploadPhotos = async () => {
     if (!currentPhotoEntry) return;
+
+    const isEditingExisting = entryHasExistingPhotos(currentPhotoEntry.entry);
+    if (isEditingExisting && !isAdmin) {
+      showError('Only administrators can update existing photos.');
+      return;
+    }
     
     // Check if remarks are required (when after photos exist)
     const hasAfterPhotos = photoRows.some(row => row.afterPreviews.length > 0 || row.afterPhotos.length > 0);
@@ -1703,99 +1728,77 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       const existingAfter = Array.isArray(existingAfterData) ? existingAfterData : (existingAfterData ? [existingAfterData] : []);
       const existingBeforeTimestamps = currentPhotoEntry?.entry?.photos?.beforeUploadedAt || [];
       const existingAfterTimestamps = currentPhotoEntry?.entry?.photos?.afterUploadedAt || [];
+
+      const getKeptTimestamps = (keptUrls, sourceUrls, sourceTimestamps) =>
+        keptUrls.map((url) => {
+          const idx = sourceUrls.indexOf(url);
+          return idx >= 0 && sourceTimestamps[idx] ? sourceTimestamps[idx] : uploadTimestamp;
+        });
       
       for (const row of photoRows) {
         const rowPhotos = {};
         
         // Check if this row already exists in database
         const existingRow = existingRows.find(r => r.rowId === row.id);
-        
-        // Upload before photos for this row
-        if (row.beforePhotos.length > 0) {
-          const beforeUrls = [];
-          const beforeTimestamps = [];
-          
-          for (let i = 0; i < row.beforePhotos.length; i++) {
-            const result = await cloudinaryUtils.uploadImage(row.beforePhotos[i], {
-              folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-              publicId: `before-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
-            });
-            
-            if (result.success) {
-              beforeUrls.push(result.data.url);
-              beforeTimestamps.push(uploadTimestamp);
-              totalNewPhotos++;
-            } else {
-              throw new Error(`Failed to upload before photo in row ${row.id}`);
-            }
+
+        const sourceBefore = existingRow?.before || (row.id === 1 ? existingBefore : []);
+        const sourceBeforeTimestamps = existingRow?.beforeUploadedAt || (row.id === 1 ? existingBeforeTimestamps : []);
+        const sourceAfter = existingRow?.after || (row.id === 1 ? existingAfter : []);
+        const sourceAfterTimestamps = existingRow?.afterUploadedAt || (row.id === 1 ? existingAfterTimestamps : []);
+
+        const keptBeforeUrls = row.beforePreviews.filter(isUrlPreview);
+        const keptAfterUrls = row.afterPreviews.filter(isUrlPreview);
+
+        const newBeforeUrls = [];
+        const newBeforeTimestamps = [];
+        for (let i = 0; i < row.beforePhotos.length; i++) {
+          const result = await cloudinaryUtils.uploadImage(row.beforePhotos[i], {
+            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+            publicId: `before-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
+          });
+
+          if (result.success) {
+            newBeforeUrls.push(result.data.url);
+            newBeforeTimestamps.push(uploadTimestamp);
+            totalNewPhotos++;
+          } else {
+            throw new Error(`Failed to upload before photo in row ${row.id}`);
           }
-          
-          // Combine with existing before photos from this row
-          const existingRowBefore = existingRow?.before || [];
-          const existingRowBeforeTimestamps = existingRow?.beforeUploadedAt || [];
-          
-          // For Row 1, also include old format photos if they exist
-          let allBefore = [...existingRowBefore];
-          let allBeforeTimestamps = [...existingRowBeforeTimestamps];
-          if (row.id === 1 && existingBefore.length > 0) {
-            allBefore = [...existingBefore, ...existingRowBefore];
-            allBeforeTimestamps = [...existingBeforeTimestamps, ...existingRowBeforeTimestamps];
-          }
-          
-          rowPhotos.before = [...allBefore, ...beforeUrls];
-          rowPhotos.beforeUploadedAt = [...allBeforeTimestamps, ...beforeTimestamps];
-        } else if (existingRow?.before) {
-          // Keep existing before photos if no new ones
-          rowPhotos.before = existingRow.before;
-          rowPhotos.beforeUploadedAt = existingRow.beforeUploadedAt || [];
-        } else if (row.id === 1 && existingBefore.length > 0) {
-          // For Row 1, include old format photos if they exist
-          rowPhotos.before = existingBefore;
-          rowPhotos.beforeUploadedAt = existingBeforeTimestamps;
         }
-        
-        // Upload after photos for this row
-        if (row.afterPhotos.length > 0) {
-          const afterUrls = [];
-          const afterTimestamps = [];
-          
-          for (let i = 0; i <row.afterPhotos.length; i++) {
-            const result = await cloudinaryUtils.uploadImage(row.afterPhotos[i], {
-              folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
-              publicId: `after-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
-            });
-            
-            if (result.success) {
-              afterUrls.push(result.data.url);
-              afterTimestamps.push(uploadTimestamp);
-              totalNewPhotos++;
-            } else {
-              throw new Error(`Failed to upload after photo in row ${row.id}`);
-            }
+
+        const allBefore = [...keptBeforeUrls, ...newBeforeUrls];
+        if (allBefore.length > 0) {
+          rowPhotos.before = allBefore;
+          rowPhotos.beforeUploadedAt = [
+            ...getKeptTimestamps(keptBeforeUrls, sourceBefore, sourceBeforeTimestamps),
+            ...newBeforeTimestamps
+          ];
+        }
+
+        const newAfterUrls = [];
+        const newAfterTimestamps = [];
+        for (let i = 0; i < row.afterPhotos.length; i++) {
+          const result = await cloudinaryUtils.uploadImage(row.afterPhotos[i], {
+            folder: `ipatroller/command-center/${activeMunicipalityTab}/${selectedMonth}_${selectedYear}`,
+            publicId: `after-${date}-${entryIndex}-row${row.id}-${i}-${Date.now()}`
+          });
+
+          if (result.success) {
+            newAfterUrls.push(result.data.url);
+            newAfterTimestamps.push(uploadTimestamp);
+            totalNewPhotos++;
+          } else {
+            throw new Error(`Failed to upload after photo in row ${row.id}`);
           }
-          
-          // Combine with existing after photos from this row
-          const existingRowAfter = existingRow?.after || [];
-          const existingRowAfterTimestamps = existingRow?.afterUploadedAt || [];
-          
-          // For Row 1, also include old format photos if they exist
-          let allAfter = [...existingRowAfter];
-          let allAfterTimestamps = [...existingRowAfterTimestamps];
-          if (row.id === 1 && existingAfter.length > 0) {
-            allAfter = [...existingAfter, ...existingRowAfter];
-            allAfterTimestamps = [...existingAfterTimestamps, ...existingRowAfterTimestamps];
-          }
-          
-          rowPhotos.after = [...allAfter, ...afterUrls];
-          rowPhotos.afterUploadedAt = [...allAfterTimestamps, ...afterTimestamps];
-        } else if (existingRow?.after) {
-          // Keep existing after photos if no new ones
-          rowPhotos.after = existingRow.after;
-          rowPhotos.afterUploadedAt = existingRow.afterUploadedAt || [];
-        } else if (row.id === 1 && existingAfter.length > 0) {
-          // For Row 1, include old format photos if they exist
-          rowPhotos.after = existingAfter;
-          rowPhotos.afterUploadedAt = existingAfterTimestamps;
+        }
+
+        const allAfter = [...keptAfterUrls, ...newAfterUrls];
+        if (allAfter.length > 0) {
+          rowPhotos.after = allAfter;
+          rowPhotos.afterUploadedAt = [
+            ...getKeptTimestamps(keptAfterUrls, sourceAfter, sourceAfterTimestamps),
+            ...newAfterTimestamps
+          ];
         }
         
         // Add row photos if there are any photos in this row
@@ -1807,20 +1810,25 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         }
       }
       
-      // Also keep existing photos for backward compatibility
-      if (existingBefore.length > 0) {
-        photos.before = existingBefore;
-        photos.beforeUploadedAt = existingBeforeTimestamps;
+      // Backward compatibility fields from row 1
+      const row1 = photos.rows.find((r) => r.rowId === 1);
+      if (row1?.before) {
+        photos.before = row1.before;
+        photos.beforeUploadedAt = row1.beforeUploadedAt;
       }
-      if (existingAfter.length > 0) {
-        photos.after = existingAfter;
-        photos.afterUploadedAt = existingAfterTimestamps;
+      if (row1?.after) {
+        photos.after = row1.after;
+        photos.afterUploadedAt = row1.afterUploadedAt;
       }
       
       // Update the entry with photo URLs
-      updateDateData(date, entryIndex, 'photos', photos);
+      updateDateData(date, entryIndex, 'photos', photos.rows.length > 0 ? photos : null);
       
-      showSuccess(`${totalNewPhotos} photo(s) uploaded successfully!`);
+      showSuccess(
+        isEditingExisting
+          ? 'Photo changes saved successfully!'
+          : `${totalNewPhotos} photo(s) uploaded successfully!`
+      );
       setShowPhotoUploadDialog(false);
       setPhotoRows([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
       setCurrentPhotoEntry(null);
@@ -5411,14 +5419,14 @@ const handleSaveAllMonths = async () => {
                                             <Eye className="w-4 h-4" />
                                             <span className="text-sm font-medium">View</span>
                                           </button>
-                                          {/* Edit button - show if before OR after photo is missing, OR if user is admin */}
-                                          {!isReadOnly && (isAdmin || (!entry.remarks && ((!entry.photos.before || !entry.photos.after) || (entry.photos.rows && entry.photos.rows.some(row => !row.after || !row.after.length))))) && (
+                                          {/* Edit button - admin only when photos already exist */}
+                                          {isAdmin && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                              title="Upload / Edit Photos"
+                                              title="Edit Photos (Admin Only)"
                                             >
-                                              <Upload className="w-4 h-4" />
+                                              <Edit className="w-4 h-4" />
                                               <span className="text-sm font-medium">Edit</span>
                                             </button>
                                           )}
@@ -5434,24 +5442,26 @@ const handleSaveAllMonths = async () => {
                                           )}
                                         </>
                                       ) : (
-                                        // Show Upload button only when no photos exist
-                                        <button
-                                          onClick={() => handleOpenPhotoUpload(date, entryIndex)}
-                                          disabled={isEntryIncomplete(entry)}
-                                          className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-colors duration-200 border ${
-                                            isEntryIncomplete(entry)
-                                              ? 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed opacity-50'
-                                              : 'text-blue-600 hover:text-white hover:bg-blue-600 border-blue-300 hover:border-blue-600'
-                                          }`}
-                                          title={
-                                            isEntryIncomplete(entry)
-                                              ? 'Complete all required fields first: Barangay, Concern Type, at least one Week, and Action Taken'
-                                              : 'Upload Photos & Add Remarks'
-                                          }
-                                        >
-                                          <Upload className="w-4 h-4" />
-                                          <span className="text-sm font-medium">Upload</span>
-                                        </button>
+                                        // Show Upload button only when no photos exist (non-readonly users)
+                                        !isReadOnly && (
+                                          <button
+                                            onClick={() => handleOpenPhotoUpload(date, entryIndex)}
+                                            disabled={isEntryIncomplete(entry)}
+                                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-colors duration-200 border ${
+                                              isEntryIncomplete(entry)
+                                                ? 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed opacity-50'
+                                                : 'text-blue-600 hover:text-white hover:bg-blue-600 border-blue-300 hover:border-blue-600'
+                                            }`}
+                                            title={
+                                              isEntryIncomplete(entry)
+                                                ? 'Complete all required fields first: Barangay, Concern Type, at least one Week, and Action Taken'
+                                                : 'Upload Photos & Add Remarks'
+                                            }
+                                          >
+                                            <Upload className="w-4 h-4" />
+                                            <span className="text-sm font-medium">Upload</span>
+                                          </button>
+                                        )
                                       )}
                                       {entry.remarks && (
                                         (entry.photos?.after && Array.isArray(entry.photos.after) && entry.photos.after.length > 0) ||
@@ -6792,13 +6802,25 @@ const handleSaveAllMonths = async () => {
       {/* Photo Upload Dialog */}
       <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
         <DialogContent className="sm:max-w-[900px]">
+          {(() => {
+            const isEditingExistingPhotos = entryHasExistingPhotos(currentPhotoEntry?.entry);
+            const canSavePhotos = isEditingExistingPhotos || photoRows.some(
+              (row) => row.beforePhotos.length > 0 || row.afterPhotos.length > 0 || row.beforePreviews.length > 0 || row.afterPreviews.length > 0
+            );
+
+            return (
+          <>
           <div className="flex items-start justify-between gap-2">
 
             <div className="flex-1">
               <DialogHeader>
-                <DialogTitle className="text-2xl font-bold text-gray-900">Upload Before & After Photos</DialogTitle>
+                <DialogTitle className="text-2xl font-bold text-gray-900">
+                  {isEditingExistingPhotos ? 'Edit Before & After Photos' : 'Upload Before & After Photos'}
+                </DialogTitle>
                 <DialogDescription className="text-gray-600">
-                  Document the before and after state of your action with photos.
+                  {isEditingExistingPhotos
+                    ? 'Admin only: remove, replace, or add photos then save your changes.'
+                    : 'Document the before and after state of your action with photos.'}
                 </DialogDescription>
               </DialogHeader>
             </div>
@@ -6856,14 +6878,26 @@ const handleSaveAllMonths = async () => {
                                   <button
                                     onClick={() => {
                                       const newRows = photoRows.map(r => {
-                                        if (r.id === row.id) {
+                                        if (r.id !== row.id) return r;
+
+                                        const previewToRemove = r.beforePreviews[index];
+                                        if (isUrlPreview(previewToRemove)) {
                                           return {
                                             ...r,
-                                            beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index),
-                                            beforePhotos: r.beforePhotos.filter((_, idx) => idx !== index)
+                                            beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index)
                                           };
                                         }
-                                        return r;
+
+                                        const existingCountBefore = r.beforePreviews
+                                          .slice(0, index)
+                                          .filter(isUrlPreview).length;
+                                        const newFileIndex = index - existingCountBefore;
+
+                                        return {
+                                          ...r,
+                                          beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index),
+                                          beforePhotos: r.beforePhotos.filter((_, idx) => idx !== newFileIndex)
+                                        };
                                       });
                                       setPhotoRows(newRows);
                                     }}
@@ -6935,14 +6969,26 @@ const handleSaveAllMonths = async () => {
                                   <button
                                     onClick={() => {
                                       const newRows = photoRows.map(r => {
-                                        if (r.id === row.id) {
+                                        if (r.id !== row.id) return r;
+
+                                        const previewToRemove = r.afterPreviews[index];
+                                        if (isUrlPreview(previewToRemove)) {
                                           return {
                                             ...r,
-                                            afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index),
-                                            afterPhotos: r.afterPhotos.filter((_, idx) => idx !== index)
+                                            afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index)
                                           };
                                         }
-                                        return r;
+
+                                        const existingCountBefore = r.afterPreviews
+                                          .slice(0, index)
+                                          .filter(isUrlPreview).length;
+                                        const newFileIndex = index - existingCountBefore;
+
+                                        return {
+                                          ...r,
+                                          afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index),
+                                          afterPhotos: r.afterPhotos.filter((_, idx) => idx !== newFileIndex)
+                                        };
                                       });
                                       setPhotoRows(newRows);
                                     }}
@@ -7074,23 +7120,26 @@ const handleSaveAllMonths = async () => {
               </button>
               <button
                 onClick={handleUploadPhotos}
-                disabled={isUploadingPhotos || !photoRows.some(row => row.beforePhotos.length > 0 || row.afterPhotos.length > 0)}
+                disabled={isUploadingPhotos || !canSavePhotos}
                 className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
               >
                 {isUploadingPhotos ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    Uploading...
+                    {isEditingExistingPhotos ? 'Saving...' : 'Uploading...'}
                   </>
                 ) : (
                   <>
-                    <Upload className="w-4 h-4" />
-                    Upload Photos
+                    {isEditingExistingPhotos ? <Save className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                    {isEditingExistingPhotos ? 'Save Changes' : 'Upload Photos'}
                   </>
                 )}
               </button>
             </div>
           </DialogFooter>
+          </>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
