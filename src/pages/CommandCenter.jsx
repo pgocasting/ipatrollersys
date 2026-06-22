@@ -1485,6 +1485,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const isUrlPreview = (preview) =>
     typeof preview === 'string' && (preview.startsWith('http://') || preview.startsWith('https://'));
 
+  const entryNeedsPhotoCompletion = (entry) => {
+    if (!entry?.photos) return false;
+    const hasRemarks = entry.remarks && String(entry.remarks).trim() !== '';
+    if (hasRemarks) return false;
+
+    if (entry.photos.rows && Array.isArray(entry.photos.rows)) {
+      return entry.photos.rows.some((row) => !row.after || !row.after.length);
+    }
+
+    return !entry.photos.before || !entry.photos.after;
+  };
+
+  const canUserEditPhotos = (entry) =>
+    isAdmin || (!isReadOnly && (entryNeedsPhotoCompletion(entry) || entryHasExistingPhotos(entry)));
+
   // Photo upload handlers
   const handleOpenPhotoUpload = (date, entryIndex) => {
     const entry = weeklyReportData[date]?.[entryIndex];
@@ -1495,8 +1510,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
 
-    if (entryHasExistingPhotos(entry) && !isAdmin) {
-      showError('Only administrators can edit existing photos.');
+    if (entryHasExistingPhotos(entry) && !canUserEditPhotos(entry)) {
+      showError('You do not have permission to edit photos for this entry.');
       return;
     }
     
@@ -1694,8 +1709,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     if (!currentPhotoEntry) return;
 
     const isEditingExisting = entryHasExistingPhotos(currentPhotoEntry.entry);
-    if (isEditingExisting && !isAdmin) {
-      showError('Only administrators can update existing photos.');
+    if (isEditingExisting && !canUserEditPhotos(currentPhotoEntry.entry)) {
+      showError('You do not have permission to update photos for this entry.');
       return;
     }
     
@@ -5419,12 +5434,12 @@ const handleSaveAllMonths = async () => {
                                             <Eye className="w-4 h-4" />
                                             <span className="text-sm font-medium">View</span>
                                           </button>
-                                          {/* Edit button - admin only when photos already exist */}
-                                          {isAdmin && (
+                                          {/* Edit button - command users can add/update; admin can also remove */}
+                                          {!isReadOnly && canUserEditPhotos(entry) && (
                                             <button
                                               onClick={() => handleOpenPhotoUpload(date, entryIndex)}
                                               className="flex items-center gap-2 px-4 py-1 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                              title="Edit Photos (Admin Only)"
+                                              title={isAdmin ? 'Edit Photos (Admin)' : 'Edit / Add Photos'}
                                             >
                                               <Edit className="w-4 h-4" />
                                               <span className="text-sm font-medium">Edit</span>
@@ -6804,6 +6819,7 @@ const handleSaveAllMonths = async () => {
         <DialogContent className="sm:max-w-[900px]">
           {(() => {
             const isEditingExistingPhotos = entryHasExistingPhotos(currentPhotoEntry?.entry);
+            const isAdminPhotoEdit = isAdmin;
             const canSavePhotos = isEditingExistingPhotos || photoRows.some(
               (row) => row.beforePhotos.length > 0 || row.afterPhotos.length > 0 || row.beforePreviews.length > 0 || row.afterPreviews.length > 0
             );
@@ -6819,7 +6835,9 @@ const handleSaveAllMonths = async () => {
                 </DialogTitle>
                 <DialogDescription className="text-gray-600">
                   {isEditingExistingPhotos
-                    ? 'Admin only: remove, replace, or add photos then save your changes.'
+                    ? isAdminPhotoEdit
+                      ? 'Remove, replace, or add photos then save your changes.'
+                      : 'Add or update photos. Only administrators can remove existing photos.'
                     : 'Document the before and after state of your action with photos.'}
                 </DialogDescription>
               </DialogHeader>
@@ -6845,7 +6863,7 @@ const handleSaveAllMonths = async () => {
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</span>
                     </div>
-                    {photoRows.length > 1 && (
+                    {photoRows.length > 1 && isAdminPhotoEdit && (
                       <button
                         onClick={() => {
                           setPhotoRows(photoRows.filter(r => r.id !== row.id));
@@ -6874,6 +6892,7 @@ const handleSaveAllMonths = async () => {
                               <div key={index} className="relative aspect-square border-2 border-blue-300 rounded-lg overflow-hidden bg-gray-100 group">
                                 <img src={preview} alt={`Before ${index + 1}`} className="w-full h-full object-cover" />
                                 <div className="absolute top-1 right-1 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <button
                                     onClick={() => {
@@ -6906,6 +6925,7 @@ const handleSaveAllMonths = async () => {
                                     <X className="w-2.5 h-2.5" />
                                   </button>
                                 </div>
+                                )}
                               </div>
                             ))}
                           </div>
@@ -6965,6 +6985,7 @@ const handleSaveAllMonths = async () => {
                               <div key={index} className="relative aspect-square border-2 border-green-300 rounded-lg overflow-hidden bg-gray-100 group">
                                 <img src={preview} alt={`After ${index + 1}`} className="w-full h-full object-cover" />
                                 <div className="absolute top-1 right-1 bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
                                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                   <button
                                     onClick={() => {
@@ -6997,6 +7018,7 @@ const handleSaveAllMonths = async () => {
                                     <X className="w-2.5 h-2.5" />
                                   </button>
                                 </div>
+                                )}
                               </div>
                             ))}
                           </div>
