@@ -538,126 +538,265 @@ export default function Users({ onLogout, onNavigate, currentPage }) {
                     New Identity
                   </Button>
                 </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] bg-white dark:bg-slate-900 border-none shadow-2xl rounded-2xl">
-                <DialogHeader>
-                  <DialogTitle>Create New User</DialogTitle>
-                  <DialogDescription>
-                    Add a new user to the system.
-                  </DialogDescription>
+              <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white via-slate-50 to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 border-none shadow-2xl rounded-3xl">
+                <DialogHeader className="space-y-3 pb-2">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-blue-600 rounded-2xl shadow-lg shadow-blue-500/30">
+                      <UserPlus className="h-6 w-6 text-white" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-2xl font-black text-slate-900 dark:text-white">Create New Identity</DialogTitle>
+                      <DialogDescription className="text-sm text-slate-600 dark:text-slate-400 mt-1">
+                        Register a new user and assign system access
+                      </DialogDescription>
+                    </div>
+                  </div>
                 </DialogHeader>
-                <form onSubmit={handleCreateUser} className="space-y-4 py-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="firstName">First Name</Label>
-                      <Input id="firstName" name="firstName" placeholder="John" value={newUser.firstName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="given-name" required />
+                
+                <form onSubmit={handleCreateUser} className="space-y-6 py-2">
+                  {/* Personal Information Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
+                      <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Personal Information</h3>
                     </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          First Name <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          id="firstName" 
+                          name="firstName" 
+                          placeholder="Juan" 
+                          value={newUser.firstName} 
+                          onChange={handleInputChange} 
+                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                          autoComplete="given-name" 
+                          required 
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          Last Name <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          id="lastName" 
+                          name="lastName" 
+                          placeholder="Dela Cruz" 
+                          value={newUser.lastName} 
+                          onChange={handleInputChange} 
+                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                          autoComplete="family-name" 
+                          required 
+                        />
+                      </div>
+                    </div>
+
                     <div className="space-y-2">
-                      <Label htmlFor="lastName">Last Name</Label>
-                      <Input id="lastName" name="lastName" placeholder="Doe" value={newUser.lastName} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="family-name" required />
+                      <Label htmlFor="email" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        Email Address <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        id="email" 
+                        name="email" 
+                        type="email" 
+                        placeholder="juan.delacruz@example.com" 
+                        value={newUser.email} 
+                        onChange={handleInputChange} 
+                        className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                        autoComplete="email" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="phoneNumber" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                        Contact Number <span className="text-slate-400 text-xs">(Optional)</span>
+                      </Label>
+                      <Input
+                        id="phoneNumber"
+                        name="phoneNumber"
+                        type="tel"
+                        autoComplete="tel"
+                        placeholder="+63 9XX XXX XXXX"
+                        value={newUser.phoneNumber}
+                        onChange={(e) => {
+                          let value = e.target.value.replace(/\D/g, "");
+                          if (!value.startsWith("63") && value.length > 0) {
+                            value = "63" + value;
+                          }
+                          if (value.length > 12) {
+                            value = value.slice(0, 12);
+                          }
+                          if (value.length > 2) {
+                            const rest = value.slice(2);
+                            const parts = rest.match(/.{1,3}/g) || [];
+                            value = "+" + value.slice(0, 2) + " " + parts.join(" ");
+                          }
+                          setNewUser((prev) => ({ ...prev, phoneNumber: value }));
+                        }}
+                        className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all"
+                      />
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input id="email" name="email" type="email" placeholder="john@example.com" value={newUser.email} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="email" required />
+
+                  {/* Access & Location Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
+                      <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Access & Location</h3>
                     </div>
-                    {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && newUser.accessLevel !== "viewing" && (
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="municipality">Municipality</Label>
-                        <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
-                          <SelectTrigger id="municipality" name="municipality" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
-                            <SelectValue placeholder="Select municipality" />
+                        <Label htmlFor="accessLevel" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          Access Level <span className="text-red-500">*</span>
+                        </Label>
+                        <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "", viewingPage: value === "viewing" ? prev.viewingPage : "" }))}>
+                          <SelectTrigger id="accessLevel" name="accessLevel" className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 !text-slate-900 dark:!text-white !opacity-100 rounded-xl h-12 font-medium">
+                            <SelectValue placeholder="Select access level" />
                           </SelectTrigger>
-                          <SelectContent className="bg-white border border-slate-200">
-                            {municipalities.map((m) => (
-                              <SelectItem key={m} value={m}>{m}</SelectItem>
-                            ))}
+                          <SelectContent className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                            <SelectItem value="command-center" className="font-medium">Command Center</SelectItem>
+                            <SelectItem value="ipatroller" className="font-medium">IPatroller</SelectItem>
+                            <SelectItem value="quarry-monitoring" className="font-medium">Quarry Site Monitoring</SelectItem>
+                            <SelectItem value="incidents" className="font-medium">Incidents</SelectItem>
+                            <SelectItem value="viewing" className="font-medium">Viewing</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="accessLevel">Access Level</Label>
-                      <Select value={newUser.accessLevel} onValueChange={(value) => setNewUser((prev) => ({ ...prev, accessLevel: value, department: "", viewingPage: value === "viewing" ? prev.viewingPage : "" }))}>
-                        <SelectTrigger id="accessLevel" name="accessLevel" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
-                          <SelectValue placeholder="Select access level" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-white border border-slate-200">
-                          <SelectItem value="command-center">Command Center</SelectItem>
-                          <SelectItem value="ipatroller">IPatroller</SelectItem>
-                          <SelectItem value="quarry-monitoring">Quarry Site Monitoring</SelectItem>
-                          <SelectItem value="incidents">Incidents</SelectItem>
-                          <SelectItem value="viewing">Viewing</SelectItem>
-                        </SelectContent>
-                      </Select>
+
+                      {newUser.accessLevel === "viewing" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="viewingPage" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                            Allowed Page <span className="text-red-500">*</span>
+                          </Label>
+                          <Select value={newUser.viewingPage} onValueChange={(value) => setNewUser((prev) => ({ ...prev, viewingPage: value }))}>
+                            <SelectTrigger id="viewingPage" name="viewingPage" className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 !text-slate-900 dark:!text-white !opacity-100 rounded-xl h-12 font-medium">
+                              <SelectValue placeholder="Select page" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                              {viewingPageOptions.map((opt) => (
+                                <SelectItem key={opt.value} value={opt.value} className="font-medium">
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+
+                      {newUser.accessLevel !== "ipatroller" && newUser.accessLevel !== "quarry-monitoring" && newUser.accessLevel !== "incidents" && newUser.accessLevel !== "viewing" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="municipality" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            Municipality <span className="text-red-500">*</span>
+                          </Label>
+                          <Select value={newUser.municipality} onValueChange={(value) => setNewUser((prev) => ({ ...prev, municipality: value }))}>
+                            <SelectTrigger id="municipality" name="municipality" className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 !text-slate-900 dark:!text-white !opacity-100 rounded-xl h-12 font-medium">
+                              <SelectValue placeholder="Select municipality" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl">
+                              {municipalities.map((m) => (
+                                <SelectItem key={m} value={m} className="font-medium">{m}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                    {newUser.accessLevel === "viewing" && (
+                  </div>
+
+                  {/* Account Credentials Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200 dark:border-slate-700">
+                      <Shield className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">Account Credentials</h3>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="username" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                        Username <span className="text-red-500">*</span>
+                      </Label>
+                      <Input 
+                        id="username" 
+                        name="username" 
+                        placeholder="juandelacruz" 
+                        value={newUser.username} 
+                        onChange={handleInputChange} 
+                        className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                        autoComplete="username" 
+                        required 
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="viewingPage">Allowed Page</Label>
-                        <Select value={newUser.viewingPage} onValueChange={(value) => setNewUser((prev) => ({ ...prev, viewingPage: value }))}>
-                          <SelectTrigger id="viewingPage" name="viewingPage" className="col-span-3 bg-white border border-slate-200 !text-black !opacity-100">
-                            <SelectValue placeholder="Select page" />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-slate-200">
-                            {viewingPageOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <Label htmlFor="password" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          Password <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          id="password" 
+                          name="password" 
+                          type="password" 
+                          placeholder="••••••••" 
+                          value={newUser.password} 
+                          onChange={handleInputChange} 
+                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                          autoComplete="new-password" 
+                          required 
+                        />
                       </div>
-                    )}
+                      <div className="space-y-2">
+                        <Label htmlFor="confirmPassword" className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-1">
+                          Confirm Password <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          id="confirmPassword" 
+                          name="confirmPassword" 
+                          type="password" 
+                          placeholder="••••••••" 
+                          value={newUser.confirmPassword} 
+                          onChange={handleInputChange} 
+                          className="bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 !text-slate-900 dark:!text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 rounded-xl h-12 font-medium transition-all" 
+                          autoComplete="new-password" 
+                          required 
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input id="username" name="username" placeholder="johndoe" value={newUser.username} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="username" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input id="password" name="password" type="password" placeholder="••••••••" value={newUser.password} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="new-password" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="confirmPassword">Confirm Password</Label>
-                    <Input id="confirmPassword" name="confirmPassword" type="password" placeholder="••••••••" value={newUser.confirmPassword} onChange={handleInputChange} className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400" autoComplete="new-password" required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phoneNumber">Contact Number (Optional)</Label>
-                    <Input
-                      id="phoneNumber"
-                      name="phoneNumber"
-                      type="tel"
-                      autoComplete="tel"
-                      placeholder="+63 9XX XXX XXXX"
-                      value={newUser.phoneNumber}
-                      onChange={(e) => {
-                        let value = e.target.value.replace(/\D/g, "");
-                        if (!value.startsWith("63") && value.length > 0) {
-                          value = "63" + value;
-                        }
-                        if (value.length > 12) {
-                          value = value.slice(0, 12);
-                        }
-                        if (value.length > 2) {
-                          const rest = value.slice(2);
-                          const parts = rest.match(/.{1,3}/g) || [];
-                          value = "+" + value.slice(0, 2) + " " + parts.join(" ");
-                        }
-                        setNewUser((prev) => ({ ...prev, phoneNumber: value }));
-                      }}
-                      className="col-span-3 bg-white border-slate-200 !text-black placeholder:text-gray-400"
-                    />
-                    <p className="text-xs text-gray-500">Format: +63 XXX XXX XXXX</p>
-                  </div>
-                  <DialogFooter>
+
+                  <DialogFooter className="gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
                     <DialogClose asChild>
-                      <Button type="button" variant="outline" className="rounded-xl border-slate-200 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
+                      <Button 
+                        type="button" 
+                        variant="outline" 
+                        className="rounded-xl border-2 border-slate-300 dark:border-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold h-12 px-6 transition-all"
+                      >
+                        Cancel
+                      </Button>
                     </DialogClose>
-                    <Button type="submit" name="create-user" disabled={createLoading} className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md transition-all duration-300 font-bold">
-                      {createLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                      Create User
+                    <Button 
+                      type="submit" 
+                      name="create-user" 
+                      disabled={createLoading} 
+                      className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-xl shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 h-12 px-8 font-bold transition-all duration-300"
+                    >
+                      {createLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        <>
+                          <UserPlus className="mr-2 h-5 w-5" />
+                          Create User
+                        </>
+                      )}
                     </Button>
                   </DialogFooter>
                 </form>
