@@ -3812,7 +3812,7 @@ const handleSaveWeeklyReport = async () => {
           console.log('✅ All weekly documents and summary saved successfully');
           
           // CRITICAL: Clear the cache for this month to force reload of split data
-          const cacheKey = `${selectedMonth}_${selectedYear}_${activeMunicipalityTab}`;
+          const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
           delete weeklyReportCache.current[cacheKey];
           lastLoadedWeeklyRef.current = { month: null, year: null, municipality: null };
           console.log('🧹 Cleared cache to force reload of split data');
@@ -3857,9 +3857,12 @@ const handleSaveWeeklyReport = async () => {
       // IMPORTANT: Reload the data to display the saved split documents correctly
       if (nestedSaveResult.wasSplit) {
         console.log('🔄 Reloading split data to refresh display...');
-        setTimeout(() => {
-          loadWeeklyReportData();
-        }, 500); // Small delay to ensure Firestore has committed the data
+        console.log('🔍 Current weeklyReportData keys before reload:', Object.keys(weeklyReportData).length);
+        setTimeout(async () => {
+          console.log('⏰ Executing delayed reload...');
+          await loadWeeklyReportData();
+          console.log('🔍 weeklyReportData keys after reload:', Object.keys(weeklyReportData).length);
+        }, 1000); // Increased delay to 1 second to ensure Firestore has committed
       }
       
     } else {
