@@ -3676,6 +3676,8 @@ const handleSaveWeeklyReport = async () => {
   const reportKey = `${monthYear}${municipalityKey}`;
   setIsLoadingWeeklyReports(true);
   
+  let shouldReloadSplitData = false; // Flag to track if we need to reload
+  
   try {
     // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
     const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
@@ -3856,13 +3858,27 @@ const handleSaveWeeklyReport = async () => {
       
       // IMPORTANT: Reload the data to display the saved split documents correctly
       if (nestedSaveResult.wasSplit) {
-        console.log('🔄 Reloading split data to refresh display...');
+        shouldReloadSplitData = true; // Set flag for finally block
+        console.log('🔄 Split data saved, preparing to reload...');
         console.log('🔍 Current weeklyReportData keys before reload:', Object.keys(weeklyReportData).length);
+        
+        // Keep loading state true during reload
+        // Then reload after a delay to ensure Firestore has committed
         setTimeout(async () => {
-          console.log('⏰ Executing delayed reload...');
-          await loadWeeklyReportData();
-          console.log('🔍 weeklyReportData keys after reload:', Object.keys(weeklyReportData).length);
-        }, 1000); // Increased delay to 1 second to ensure Firestore has committed
+          console.log('⏰ Executing delayed reload after split save...');
+          console.log('🔍 About to call loadWeeklyReportData for:', selectedMonth, selectedYear, activeMunicipalityTab);
+          
+          try {
+            await loadWeeklyReportData();
+            console.log('✅ Reload completed after split save');
+          } catch (reloadError) {
+            console.error('❌ Error during reload:', reloadError);
+          } finally {
+            setIsLoadingWeeklyReports(false);
+          }
+        }, 1500); // 1.5 seconds delay for Firestore to commit
+        
+        return; // Exit early to prevent finally block from running too soon
       }
       
     } else {
@@ -3872,7 +3888,10 @@ const handleSaveWeeklyReport = async () => {
     console.error("Error saving weekly report:", error);
     toast.error("Error saving weekly report");
   } finally {
-    setIsLoadingWeeklyReports(false);
+    // Only set loading to false if we're not doing a split reload (which handles it internally)
+    if (!shouldReloadSplitData) {
+      setIsLoadingWeeklyReports(false);
+    }
   }
 };
 
