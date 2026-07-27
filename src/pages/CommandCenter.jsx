@@ -991,6 +991,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Load weekly report data from Firestore
   const loadWeeklyReportData = async () => {
+    console.log('📥 ========== LOAD OPERATION STARTED ==========');
+    console.log('📋 Load Parameters:', {
+      selectedMonth,
+      selectedYear,
+      activeMunicipalityTab,
+      hasSelectedMonth: !!selectedMonth,
+      hasSelectedYear: !!selectedYear
+    });
+    
     if (!selectedMonth || !selectedYear) {
       console.log('❌ loadWeeklyReportData: No month or year selected');
       return;
@@ -998,11 +1007,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     
     // Check cache first
     const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    console.log('🔑 Cache key:', cacheKey);
+    
     if (weeklyReportCache.current[cacheKey] &&
         lastLoadedWeeklyRef.current.month === selectedMonth &&
         lastLoadedWeeklyRef.current.year === selectedYear &&
         lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab) {
       console.log('📦 Using cached data, skipping Firestore read');
+      console.log('📊 Cached data keys:', Object.keys(weeklyReportCache.current[cacheKey]).length);
       setWeeklyReportData(weeklyReportCache.current[cacheKey]);
       return;
     }
@@ -1140,7 +1152,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           weeklyReportCache.current[cacheKey] = weeklyData;
           lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
+          console.log('💾 Caching loaded data with key:', cacheKey);
+          console.log('📊 Setting weeklyReportData state with', Object.keys(weeklyData).length, 'dates');
           setWeeklyReportData(weeklyData);
+          console.log('✅ State updated successfully');
           
           // Force re-render by updating a dummy state
           setIsLoadingWeeklyReports(false);
@@ -1153,6 +1168,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setActionTaken(formData.actionTaken || "");
           setRemarks(formData.remarks || "");
           console.log('✅ Loaded weekly report data for:', reportKey);
+          console.log('📥 ========== LOAD OPERATION COMPLETED ==========');
           return;
         } else {
           console.log('⚠️ Found document but no recognizable weekly data structure');
@@ -3665,6 +3681,15 @@ Are you absolutely sure you want to proceed?`;
 
 // Save weekly report data to Firestore
 const handleSaveWeeklyReport = async () => {
+  console.log('🚀 ========== SAVE OPERATION STARTED ==========');
+  console.log('📊 Current State Before Save:', {
+    selectedMonth,
+    selectedYear,
+    activeMunicipalityTab,
+    weeklyReportDataKeys: Object.keys(weeklyReportData).length,
+    weeklyReportDataSample: Object.keys(weeklyReportData).slice(0, 3)
+  });
+  
   if (isReadOnly) {
     const message = 'View-only access: you do not have permission to save weekly reports.';
     toast.error(message);
@@ -3678,6 +3703,8 @@ const handleSaveWeeklyReport = async () => {
   
   let shouldReloadSplitData = false; // Flag to track if we need to reload
   
+  console.log('📋 Save Configuration:', { monthYear, reportKey, municipality: activeMunicipalityTab });
+  
   try {
     // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
     const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
@@ -3686,6 +3713,12 @@ const handleSaveWeeklyReport = async () => {
       }
       return acc;
     }, {});
+
+    console.log('🧹 Sanitized Data:', {
+      originalKeys: Object.keys(weeklyReportData).length,
+      sanitizedKeys: Object.keys(sanitizedWeeklyReportData).length,
+      removed: Object.keys(weeklyReportData).length - Object.keys(sanitizedWeeklyReportData).length
+    });
 
     // Collect all form data from the weekly report table
     const reportData = {
@@ -3703,7 +3736,9 @@ const handleSaveWeeklyReport = async () => {
     console.log('💾 Saving weekly report data:', {
       reportKey,
       dataCount: Object.keys(weeklyReportData).length,
-      sampleData: Object.keys(weeklyReportData).slice(0, 3)
+      sanitizedCount: Object.keys(sanitizedWeeklyReportData).length,
+      sampleData: Object.keys(weeklyReportData).slice(0, 3),
+      firstDateData: Object.keys(weeklyReportData).length > 0 ? weeklyReportData[Object.keys(weeklyReportData)[0]] : 'No data'
     });
 
     // Save to the nested structure: commandCenter > weeklyReports > Municipality > MonthYear
@@ -3859,39 +3894,60 @@ const handleSaveWeeklyReport = async () => {
       // IMPORTANT: Reload the data to display the saved split documents correctly
       if (nestedSaveResult.wasSplit) {
         shouldReloadSplitData = true; // Set flag for finally block
-        console.log('🔄 Split data saved, preparing to reload...');
-        console.log('🔍 Current weeklyReportData keys before reload:', Object.keys(weeklyReportData).length);
+        console.log('🔄 ========== SPLIT SAVE SUCCESSFUL - PREPARING RELOAD ==========');
+        console.log('🔍 State BEFORE reload:');
+        console.log('  - weeklyReportData keys:', Object.keys(weeklyReportData).length);
+        console.log('  - Sample keys:', Object.keys(weeklyReportData).slice(0, 5));
+        console.log('  - selectedMonth:', selectedMonth);
+        console.log('  - selectedYear:', selectedYear);
+        console.log('  - activeMunicipalityTab:', activeMunicipalityTab);
         
         // Keep loading state true during reload
         // Then reload after a delay to ensure Firestore has committed
         setTimeout(async () => {
-          console.log('⏰ Executing delayed reload after split save...');
-          console.log('🔍 About to call loadWeeklyReportData for:', selectedMonth, selectedYear, activeMunicipalityTab);
+          console.log('⏰ ========== EXECUTING DELAYED RELOAD (1.5s elapsed) ==========');
+          console.log('📡 Calling loadWeeklyReportData with:', {
+            selectedMonth,
+            selectedYear,
+            activeMunicipalityTab
+          });
           
           try {
             await loadWeeklyReportData();
-            console.log('✅ Reload completed after split save');
+            console.log('✅ ========== RELOAD COMPLETED SUCCESSFULLY ==========');
+            console.log('🔍 State AFTER reload:');
+            console.log('  - weeklyReportData keys:', Object.keys(weeklyReportData).length);
+            console.log('  - Sample keys:', Object.keys(weeklyReportData).slice(0, 5));
           } catch (reloadError) {
-            console.error('❌ Error during reload:', reloadError);
+            console.error('❌ ========== RELOAD FAILED ==========');
+            console.error('Error:', reloadError);
           } finally {
             setIsLoadingWeeklyReports(false);
+            console.log('🏁 Loading state set to FALSE');
           }
         }, 1500); // 1.5 seconds delay for Firestore to commit
         
+        console.log('⏱️ Reload scheduled for 1.5 seconds from now...');
         return; // Exit early to prevent finally block from running too soon
       }
       
     } else {
+      console.error('❌ Save failed:', nestedSaveResult.error);
       toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
     }
   } catch (error) {
+    console.error("❌ ========== SAVE ERROR ==========");
     console.error("Error saving weekly report:", error);
     toast.error("Error saving weekly report");
   } finally {
     // Only set loading to false if we're not doing a split reload (which handles it internally)
     if (!shouldReloadSplitData) {
+      console.log('🏁 Finally block: Setting loading to FALSE (non-split save)');
       setIsLoadingWeeklyReports(false);
+    } else {
+      console.log('⏭️ Finally block: Skipping (split save will handle loading state)');
     }
+    console.log('🏁 ========== SAVE OPERATION FINISHED ==========');
   }
 };
 
