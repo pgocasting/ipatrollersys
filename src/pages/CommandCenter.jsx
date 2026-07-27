@@ -3810,6 +3810,12 @@ const handleSaveWeeklyReport = async () => {
           
           nestedSaveResult = { success: true, wasSplit: true };
           console.log('✅ All weekly documents and summary saved successfully');
+          
+          // CRITICAL: Clear the cache for this month to force reload of split data
+          const cacheKey = `${selectedMonth}_${selectedYear}_${activeMunicipalityTab}`;
+          delete weeklyReportCache.current[cacheKey];
+          lastLoadedWeeklyRef.current = { month: null, year: null, municipality: null };
+          console.log('🧹 Cleared cache to force reload of split data');
         } else {
           // Document size is okay, save normally
           console.log(`✅ Document size (${sizeInKB} KB) is within safe limits, saving as single document`);
@@ -3847,6 +3853,14 @@ const handleSaveWeeklyReport = async () => {
         timestamp: new Date()
       };
       setTerminalHistory(prev => [...prev, newEntry]);
+      
+      // IMPORTANT: Reload the data to display the saved split documents correctly
+      if (nestedSaveResult.wasSplit) {
+        console.log('🔄 Reloading split data to refresh display...');
+        setTimeout(() => {
+          loadWeeklyReportData();
+        }, 500); // Small delay to ensure Firestore has committed the data
+      }
       
     } else {
       toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
