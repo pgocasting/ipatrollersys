@@ -3719,14 +3719,22 @@ const handleSaveWeeklyReport = async () => {
           sizeInKB: `${sizeInKB} KB`,
           sizeInMB: `${sizeInMB} MB`,
           maxAllowed: '1 MB (1,048,576 bytes)',
-          dateCount: Object.keys(sanitizedWeeklyReportData).length
+          dateCount: Object.keys(sanitizedWeeklyReportData).length,
+          willSplit: estimatedSize > 700000
         });
         
-        // Use more conservative threshold: 800KB (leaving 200KB+ buffer for Firestore overhead)
-        // Firestore limit is 1,048,576 bytes (1MB)
-        const SAFE_SIZE_LIMIT = 800000; // 800KB
+        // CRITICAL: If document is already over 1MB, we MUST split regardless of threshold
+        const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit
+        if (estimatedSize >= FIRESTORE_MAX_SIZE) {
+          console.error(`🚨 CRITICAL: Document size (${estimatedSize} bytes) exceeds or equals Firestore's 1MB limit!`);
+          console.error(`🚨 This document CANNOT be saved as a single document. Forcing split...`);
+        }
         
-        if (estimatedSize > SAFE_SIZE_LIMIT) {
+        // Use more conservative threshold: 700KB (leaving 300KB+ buffer for Firestore overhead)
+        // Firestore limit is 1,048,576 bytes (1MB)
+        const SAFE_SIZE_LIMIT = 700000; // 700KB - very conservative to avoid any issues
+        
+        if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
           console.log(`⚠️ Document size (${sizeInKB} KB) exceeds safe limit (${(SAFE_SIZE_LIMIT/1024).toFixed(2)} KB)`);
           console.log('📦 Splitting data by weeks to stay within Firestore limits...');
           
