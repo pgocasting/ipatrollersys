@@ -3708,13 +3708,27 @@ const handleSaveWeeklyReport = async () => {
     let nestedSaveResult = { success: false };
     if (activeMunicipalityTab) {
       try {
-        // Check document size before saving
-        const estimatedSize = new Blob([JSON.stringify(reportData)]).size;
-        console.log(`📊 Estimated document size: ${(estimatedSize / 1024).toFixed(2)} KB`);
+        // Calculate more accurate document size
+        const reportDataString = JSON.stringify(reportData);
+        const estimatedSize = new TextEncoder().encode(reportDataString).length;
+        const sizeInKB = (estimatedSize / 1024).toFixed(2);
+        const sizeInMB = (estimatedSize / 1024 / 1024).toFixed(2);
         
-        // If document is too large (>900KB to leave buffer), split by weeks
-        if (estimatedSize > 900000) {
-          console.log('⚠️ Document size exceeds safe limit, splitting data by weeks...');
+        console.log(`📊 Document size analysis:`, {
+          estimatedSize: `${estimatedSize} bytes`,
+          sizeInKB: `${sizeInKB} KB`,
+          sizeInMB: `${sizeInMB} MB`,
+          maxAllowed: '1 MB (1,048,576 bytes)',
+          dateCount: Object.keys(sanitizedWeeklyReportData).length
+        });
+        
+        // Use more conservative threshold: 800KB (leaving 200KB+ buffer for Firestore overhead)
+        // Firestore limit is 1,048,576 bytes (1MB)
+        const SAFE_SIZE_LIMIT = 800000; // 800KB
+        
+        if (estimatedSize > SAFE_SIZE_LIMIT) {
+          console.log(`⚠️ Document size (${sizeInKB} KB) exceeds safe limit (${(SAFE_SIZE_LIMIT/1024).toFixed(2)} KB)`);
+          console.log('📦 Splitting data by weeks to stay within Firestore limits...');
           
           // Split weeklyReportData by weeks
           const weeks = [
@@ -3735,9 +3749,14 @@ const handleSaveWeeklyReport = async () => {
             }
           });
           
+          console.log('📅 Week distribution:', weeks.map((w, i) => `Week ${i+1}: ${w.dates.length} dates`).join(', '));
+          
           // Save each week as a separate document
           const savePromises = weeks.map(async (week, index) => {
-            if (week.dates.length === 0) return { success: true };
+            if (week.dates.length === 0) {
+              console.log(`⏭️ Week ${index + 1}: No data, skipping`);
+              return { success: true };
+            }
             
             const weekData = week.dates.reduce((acc, dateKey) => {
               acc[dateKey] = sanitizedWeeklyReportData[dateKey];
@@ -3745,15 +3764,21 @@ const handleSaveWeeklyReport = async () => {
             }, {});
             
             const weekReportData = {
-              ...reportData,
+              selectedMonth,
+              selectedYear,
+              activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
               weeklyReportData: weekData,
               weekNumber: index + 1,
-              isPartial: true
+              isPartial: true,
+              savedAt: new Date().toISOString()
             };
+            
+            const weekSize = new TextEncoder().encode(JSON.stringify(weekReportData)).length;
+            console.log(`💾 Week ${index + 1}: Saving ${week.dates.length} dates (${(weekSize/1024).toFixed(2)} KB)`);
             
             const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, `${monthYear}_week${index + 1}`);
             await setDoc(weekDocRef, weekReportData);
-            console.log(`✅ Saved week ${index + 1} (${week.dates.length} dates)`);
+            console.log(`✅ Week ${index + 1}: Saved successfully`);
             return { success: true };
           });
           
@@ -3766,7 +3791,9 @@ const handleSaveWeeklyReport = async () => {
             activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
             savedAt: new Date().toISOString(),
             isSplit: true,
-            weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })),
+            originalSize: estimatedSize,
+            originalSizeKB: parseFloat(sizeInKB),
+            weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })).filter(w => w.dateCount > 0),
             totalDates: Object.keys(sanitizedWeeklyReportData).length
           };
           
@@ -3774,9 +3801,10 @@ const handleSaveWeeklyReport = async () => {
           await setDoc(summaryDocRef, summaryData);
           
           nestedSaveResult = { success: true, wasSplit: true };
-          console.log('✅ Saved split data successfully with summary');
+          console.log('✅ All weekly documents and summary saved successfully');
         } else {
           // Document size is okay, save normally
+          console.log(`✅ Document size (${sizeInKB} KB) is within safe limits, saving as single document`);
           const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
           await setDoc(docRef, reportData);
           nestedSaveResult = { success: true };
