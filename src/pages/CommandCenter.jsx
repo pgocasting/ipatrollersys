@@ -1039,8 +1039,42 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             };
             console.log('✅ Found data in nested structure:', docSnap.data());
           } else {
-            console.log('❌ No document found in nested structure');
-            result = { success: false, data: null };
+            // Check if data was split by weeks
+            console.log('🔍 Checking for split weekly documents...');
+            const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_summary`);
+            const summarySnap = await getDoc(summaryDocRef);
+            
+            if (summarySnap.exists() && summarySnap.data().isSplit) {
+              console.log('📦 Found split data, loading all weeks...');
+              const summaryData = summarySnap.data();
+              const weekPromises = summaryData.weeks.map(async (weekInfo) => {
+                const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekInfo.weekNumber}`);
+                const weekSnap = await getDoc(weekDocRef);
+                return weekSnap.exists() ? weekSnap.data() : null;
+              });
+              
+              const weekDocs = await Promise.all(weekPromises);
+              
+              // Merge all week data into one object
+              const mergedWeeklyData = {};
+              weekDocs.forEach(weekDoc => {
+                if (weekDoc && weekDoc.weeklyReportData) {
+                  Object.assign(mergedWeeklyData, weekDoc.weeklyReportData);
+                }
+              });
+              
+              result = {
+                success: true,
+                data: {
+                  ...summaryData,
+                  weeklyReportData: mergedWeeklyData
+                }
+              };
+              console.log(`✅ Merged ${weekDocs.length} week documents with ${Object.keys(mergedWeeklyData).length} total dates`);
+            } else {
+              console.log('❌ No document found in nested structure');
+              result = { success: false, data: null };
+            }
           }
         } catch (error) {
           console.error('❌ Error loading from nested structure:', error);
@@ -3674,10 +3708,80 @@ const handleSaveWeeklyReport = async () => {
     let nestedSaveResult = { success: false };
     if (activeMunicipalityTab) {
       try {
-        const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
-        await setDoc(docRef, reportData);
-        nestedSaveResult = { success: true };
-        console.log('✅ Saved to nested structure successfully');
+        // Check document size before saving
+        const estimatedSize = new Blob([JSON.stringify(reportData)]).size;
+        console.log(`📊 Estimated document size: ${(estimatedSize / 1024).toFixed(2)} KB`);
+        
+        // If document is too large (>900KB to leave buffer), split by weeks
+        if (estimatedSize > 900000) {
+          console.log('⚠️ Document size exceeds safe limit, splitting data by weeks...');
+          
+          // Split weeklyReportData by weeks
+          const weeks = [
+            { name: 'week1', dates: [] },
+            { name: 'week2', dates: [] },
+            { name: 'week3', dates: [] },
+            { name: 'week4', dates: [] },
+            { name: 'week5', dates: [] }
+          ];
+          
+          // Group dates by week
+          Object.keys(sanitizedWeeklyReportData).forEach(dateKey => {
+            const date = new Date(dateKey);
+            const dayOfMonth = date.getDate();
+            const weekIndex = Math.floor((dayOfMonth - 1) / 7);
+            if (weekIndex < 5) {
+              weeks[weekIndex].dates.push(dateKey);
+            }
+          });
+          
+          // Save each week as a separate document
+          const savePromises = weeks.map(async (week, index) => {
+            if (week.dates.length === 0) return { success: true };
+            
+            const weekData = week.dates.reduce((acc, dateKey) => {
+              acc[dateKey] = sanitizedWeeklyReportData[dateKey];
+              return acc;
+            }, {});
+            
+            const weekReportData = {
+              ...reportData,
+              weeklyReportData: weekData,
+              weekNumber: index + 1,
+              isPartial: true
+            };
+            
+            const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, `${monthYear}_week${index + 1}`);
+            await setDoc(weekDocRef, weekReportData);
+            console.log(`✅ Saved week ${index + 1} (${week.dates.length} dates)`);
+            return { success: true };
+          });
+          
+          await Promise.all(savePromises);
+          
+          // Also save a summary document
+          const summaryData = {
+            selectedMonth,
+            selectedYear,
+            activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
+            savedAt: new Date().toISOString(),
+            isSplit: true,
+            weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })),
+            totalDates: Object.keys(sanitizedWeeklyReportData).length
+          };
+          
+          const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, `${monthYear}_summary`);
+          await setDoc(summaryDocRef, summaryData);
+          
+          nestedSaveResult = { success: true, wasSplit: true };
+          console.log('✅ Saved split data successfully with summary');
+        } else {
+          // Document size is okay, save normally
+          const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
+          await setDoc(docRef, reportData);
+          nestedSaveResult = { success: true };
+          console.log('✅ Saved to nested structure successfully');
+        }
       } catch (error) {
         console.error('❌ Error saving to nested structure:', error);
         nestedSaveResult = { success: false, error };
@@ -3686,7 +3790,8 @@ const handleSaveWeeklyReport = async () => {
     
     // Only use nested structure save - no more root level saves
     if (nestedSaveResult.success) {
-      toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}`);
+      const splitMessage = nestedSaveResult.wasSplit ? ' (split into weeks due to size)' : '';
+      toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`);
       
       // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
       const monthKey = selectedMonth.toLowerCase();
@@ -3701,7 +3806,7 @@ const handleSaveWeeklyReport = async () => {
       const newEntry = {
         id: Date.now(),
         command: "weekly.save",
-        output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}`,
+        output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`,
         type: "success",
         timestamp: new Date()
       };
