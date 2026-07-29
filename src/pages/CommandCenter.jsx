@@ -871,12 +871,22 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     console.log('🔄 Loading weekly report data for:', {
       selectedMonth,
       selectedYear,
-      activeMunicipalityTab
+      activeMunicipalityTab,
+      hasMonth: !!selectedMonth,
+      hasYear: !!selectedYear,
+      hasMunicipality: !!activeMunicipalityTab
     });
     
     // Only load if we have a valid month and year
     if (selectedMonth && selectedYear && activeMunicipalityTab) {
+      console.log('✅ All conditions met, calling loadWeeklyReportData...');
       loadWeeklyReportData();
+    } else {
+      console.log('⚠️ Missing required fields:', {
+        selectedMonth: selectedMonth || 'MISSING',
+        selectedYear: selectedYear || 'MISSING', 
+        activeMunicipalityTab: activeMunicipalityTab || 'MISSING'
+      });
     }
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
@@ -1303,6 +1313,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Initialize weekly report data structure for all dates
   const initializeWeeklyReportData = () => {
+    console.log('🔧 Initializing empty weekly report data structure...');
     const dates = generateDates(selectedMonth, selectedYear);
     const initialData = {};
     
@@ -1310,7 +1321,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       initialData[date] = []; // Array to hold multiple entries per date
     });
     
+    console.log('✅ Initialized', Object.keys(initialData).length, 'dates with empty arrays');
+    console.log('📋 Sample dates:', Object.keys(initialData).slice(0, 5));
     setWeeklyReportData(initialData);
+    setDataVersion(prev => prev + 1); // Force re-render
   };
 
   // Update individual date data
