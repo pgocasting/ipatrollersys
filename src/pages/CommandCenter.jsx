@@ -1935,7 +1935,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log('✅ Auto-save completed successfully');
         } catch (autoSaveError) {
           console.error('❌ Auto-save failed:', autoSaveError);
-          showWarning('Photos uploaded but auto-save to database failed. Please click "Save Data" manually.');
+          showWarning('Photos uploaded successfully but auto-save to database failed. Please refresh the page and check if photos are saved.');
         }
       }, 500); // Small delay to ensure state is updated
       
@@ -4266,22 +4266,7 @@ const handleSaveAllMonths = async () => {
             )}
 
             <div className="relative w-full sm:w-auto flex items-center gap-3">
-              {/* Save Data Button - Top Right */}
-              {(isAdmin || userAccessLevel === 'command-center') && !isReadOnly && (
-                <button
-                  onClick={handleSaveWeeklyReport}
-                  disabled={isLoadingWeeklyReports}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 whitespace-nowrap"
-                  title="Save Data"
-                >
-                  {isLoadingWeeklyReports ? (
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  ) : (
-                    <Save className="w-5 h-5" />
-                  )}
-                  <span className="text-sm font-medium">Save Data</span>
-                </button>
-              )}
+              {/* Save Data button removed - now using auto-save after photo upload */}
 
               {userAccessLevel !== 'viewing' && (
                 <>
@@ -4599,9 +4584,9 @@ const handleSaveAllMonths = async () => {
                   <li className="flex gap-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200">
                     <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-md">7</span>
                     <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Save Data</p>
+                      <p className="font-bold text-gray-900 text-base">Upload Photos</p>
                       <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-red-600">⚠️ Important:</span> Always click <span className="font-semibold text-red-600">"Save Data"</span> at the top of the page to save your weekly input to the database. Unsaved data will be lost.
+                        <span className="font-bold text-blue-600">✨ Auto-Save:</span> Your data is <span className="font-semibold text-blue-600">automatically saved to the database</span> after uploading photos. No need to click Save Data button anymore!
                       </p>
                     </div>
                   </li>
@@ -4695,7 +4680,7 @@ const handleSaveAllMonths = async () => {
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>Remember to click "Save Data" after adding all your daily entries</span>
+                    <span>Data is automatically saved to the database after uploading photos</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-yellow-600 font-bold text-lg">✓</span>
