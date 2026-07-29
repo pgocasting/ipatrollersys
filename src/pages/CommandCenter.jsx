@@ -3701,8 +3701,6 @@ const handleSaveWeeklyReport = async () => {
   const reportKey = `${monthYear}${municipalityKey}`;
   setIsLoadingWeeklyReports(true);
   
-  let shouldReloadSplitData = false; // Flag to track if we need to reload
-  
   console.log('📋 Save Configuration:', { monthYear, reportKey, municipality: activeMunicipalityTab });
   
   try {
@@ -3745,121 +3743,18 @@ const handleSaveWeeklyReport = async () => {
     let nestedSaveResult = { success: false };
     if (activeMunicipalityTab) {
       try {
-        // Calculate more accurate document size
-        const reportDataString = JSON.stringify(reportData);
-        const estimatedSize = new TextEncoder().encode(reportDataString).length;
-        const sizeInKB = (estimatedSize / 1024).toFixed(2);
-        const sizeInMB = (estimatedSize / 1024 / 1024).toFixed(2);
+        // Use saveWeeklyReportByMunicipality for consistent behavior with admin save
+        // This function handles size checking and splitting internally per municipality
+        console.log(`💾 Saving via saveWeeklyReportByMunicipality for ${activeMunicipalityTab}`);
+        nestedSaveResult = await saveWithQuotaCheck(
+          () => saveWeeklyReportByMunicipality(reportData),
+          "Save Weekly Report"
+        );
         
-        console.log(`📊 Document size analysis:`, {
-          estimatedSize: `${estimatedSize} bytes`,
-          sizeInKB: `${sizeInKB} KB`,
-          sizeInMB: `${sizeInMB} MB`,
-          maxAllowed: '1 MB (1,048,576 bytes)',
-          dateCount: Object.keys(sanitizedWeeklyReportData).length,
-          willSplit: estimatedSize > 700000
-        });
-        
-        // CRITICAL: If document is already over 1MB, we MUST split regardless of threshold
-        const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit
-        if (estimatedSize >= FIRESTORE_MAX_SIZE) {
-          console.error(`🚨 CRITICAL: Document size (${estimatedSize} bytes) exceeds or equals Firestore's 1MB limit!`);
-          console.error(`🚨 This document CANNOT be saved as a single document. Forcing split...`);
-        }
-        
-        // Use more conservative threshold: 700KB (leaving 300KB+ buffer for Firestore overhead)
-        // Firestore limit is 1,048,576 bytes (1MB)
-        const SAFE_SIZE_LIMIT = 700000; // 700KB - very conservative to avoid any issues
-        
-        if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
-          console.log(`⚠️ Document size (${sizeInKB} KB) exceeds safe limit (${(SAFE_SIZE_LIMIT/1024).toFixed(2)} KB)`);
-          console.log('📦 Splitting data by weeks to stay within Firestore limits...');
-          
-          // Split weeklyReportData by weeks
-          const weeks = [
-            { name: 'week1', dates: [] },
-            { name: 'week2', dates: [] },
-            { name: 'week3', dates: [] },
-            { name: 'week4', dates: [] },
-            { name: 'week5', dates: [] }
-          ];
-          
-          // Group dates by week
-          Object.keys(sanitizedWeeklyReportData).forEach(dateKey => {
-            const date = new Date(dateKey);
-            const dayOfMonth = date.getDate();
-            const weekIndex = Math.floor((dayOfMonth - 1) / 7);
-            if (weekIndex < 5) {
-              weeks[weekIndex].dates.push(dateKey);
-            }
-          });
-          
-          console.log('📅 Week distribution:', weeks.map((w, i) => `Week ${i+1}: ${w.dates.length} dates`).join(', '));
-          
-          // Save each week as a separate document
-          const savePromises = weeks.map(async (week, index) => {
-            if (week.dates.length === 0) {
-              console.log(`⏭️ Week ${index + 1}: No data, skipping`);
-              return { success: true };
-            }
-            
-            const weekData = week.dates.reduce((acc, dateKey) => {
-              acc[dateKey] = sanitizedWeeklyReportData[dateKey];
-              return acc;
-            }, {});
-            
-            const weekReportData = {
-              selectedMonth,
-              selectedYear,
-              activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
-              weeklyReportData: weekData,
-              weekNumber: index + 1,
-              isPartial: true,
-              savedAt: new Date().toISOString()
-            };
-            
-            const weekSize = new TextEncoder().encode(JSON.stringify(weekReportData)).length;
-            console.log(`💾 Week ${index + 1}: Saving ${week.dates.length} dates (${(weekSize/1024).toFixed(2)} KB)`);
-            
-            const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, `${monthYear}_week${index + 1}`);
-            await setDoc(weekDocRef, weekReportData);
-            console.log(`✅ Week ${index + 1}: Saved successfully`);
-            return { success: true };
-          });
-          
-          await Promise.all(savePromises);
-          
-          // Also save a summary document
-          const summaryData = {
-            selectedMonth,
-            selectedYear,
-            activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
-            savedAt: new Date().toISOString(),
-            isSplit: true,
-            originalSize: estimatedSize,
-            originalSizeKB: parseFloat(sizeInKB),
-            weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })).filter(w => w.dateCount > 0),
-            totalDates: Object.keys(sanitizedWeeklyReportData).length
-          };
-          
-          const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, `${monthYear}_summary`);
-          await setDoc(summaryDocRef, summaryData);
-          
-          nestedSaveResult = { success: true, wasSplit: true };
-          console.log('✅ All weekly documents and summary saved successfully');
-          
-          // CRITICAL: Clear the cache for this month to force reload of split data
-          const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
-          delete weeklyReportCache.current[cacheKey];
-          lastLoadedWeeklyRef.current = { month: null, year: null, municipality: null };
-          console.log('🧹 Cleared cache to force reload of split data');
+        if (nestedSaveResult.success) {
+          console.log(`✅ Successfully saved for ${activeMunicipalityTab}`);
         } else {
-          // Document size is okay, save normally
-          console.log(`✅ Document size (${sizeInKB} KB) is within safe limits, saving as single document`);
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYear);
-          await setDoc(docRef, reportData);
-          nestedSaveResult = { success: true };
-          console.log('✅ Saved to nested structure successfully');
+          console.error(`❌ Failed to save for ${activeMunicipalityTab}:`, nestedSaveResult.error);
         }
       } catch (error) {
         console.error('❌ Error saving to nested structure:', error);
@@ -3891,46 +3786,21 @@ const handleSaveWeeklyReport = async () => {
       };
       setTerminalHistory(prev => [...prev, newEntry]);
       
-      // IMPORTANT: Reload the data to display the saved split documents correctly
+      // If data was split, reload to show the split documents correctly
       if (nestedSaveResult.wasSplit) {
-        shouldReloadSplitData = true; // Set flag for finally block
-        console.log('🔄 ========== SPLIT SAVE SUCCESSFUL - PREPARING RELOAD ==========');
-        console.log('🔍 State BEFORE reload:');
-        console.log('  - weeklyReportData keys:', Object.keys(weeklyReportData).length);
-        console.log('  - Sample keys:', Object.keys(weeklyReportData).slice(0, 5));
-        console.log('  - selectedMonth:', selectedMonth);
-        console.log('  - selectedYear:', selectedYear);
-        console.log('  - activeMunicipalityTab:', activeMunicipalityTab);
-        
-        // Keep loading state true during reload
-        // Then reload after a delay to ensure Firestore has committed
+        console.log('🔄 Data was split - reloading to show split documents...');
         setTimeout(async () => {
-          console.log('⏰ ========== EXECUTING DELAYED RELOAD (1.5s elapsed) ==========');
-          console.log('📡 Calling loadWeeklyReportData with:', {
-            selectedMonth,
-            selectedYear,
-            activeMunicipalityTab
-          });
-          
           try {
             await loadWeeklyReportData();
-            console.log('✅ ========== RELOAD COMPLETED SUCCESSFULLY ==========');
-            console.log('🔍 State AFTER reload:');
-            console.log('  - weeklyReportData keys:', Object.keys(weeklyReportData).length);
-            console.log('  - Sample keys:', Object.keys(weeklyReportData).slice(0, 5));
+            console.log('✅ Reload after split completed');
           } catch (reloadError) {
-            console.error('❌ ========== RELOAD FAILED ==========');
-            console.error('Error:', reloadError);
+            console.error('❌ Reload after split failed:', reloadError);
           } finally {
             setIsLoadingWeeklyReports(false);
-            console.log('🏁 Loading state set to FALSE');
           }
-        }, 1500); // 1.5 seconds delay for Firestore to commit
-        
-        console.log('⏱️ Reload scheduled for 1.5 seconds from now...');
-        return; // Exit early to prevent finally block from running too soon
+        }, 1500);
+        return; // Exit early to let reload handle loading state
       }
-      
     } else {
       console.error('❌ Save failed:', nestedSaveResult.error);
       toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
@@ -3940,13 +3810,7 @@ const handleSaveWeeklyReport = async () => {
     console.error("Error saving weekly report:", error);
     toast.error("Error saving weekly report");
   } finally {
-    // Only set loading to false if we're not doing a split reload (which handles it internally)
-    if (!shouldReloadSplitData) {
-      console.log('🏁 Finally block: Setting loading to FALSE (non-split save)');
-      setIsLoadingWeeklyReports(false);
-    } else {
-      console.log('⏭️ Finally block: Skipping (split save will handle loading state)');
-    }
+    setIsLoadingWeeklyReports(false);
     console.log('🏁 ========== SAVE OPERATION FINISHED ==========');
   }
 };

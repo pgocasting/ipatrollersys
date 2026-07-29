@@ -369,23 +369,125 @@ export const useFirebase = () => {
         return { success: false, error: "No user logged in" };
       }
 
-      const { selectedMonth, selectedYear, activeMunicipalityTab } = reportData;
+      const { selectedMonth, selectedYear, activeMunicipalityTab, weeklyReportData } = reportData;
       const municipality = activeMunicipalityTab || 'All';
       const docId = `${selectedMonth}_${selectedYear}`;
 
-      const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
-      await setDoc(municipalDocRef, {
-        ...reportData,
-        id: docId,
-        municipality: municipality,
-        createdAt: new Date().toISOString(),
-        createdBy: user.email,
-        lastUpdated: new Date().toISOString(),
-        updatedBy: user.email
-      }, { merge: true });
+      // Calculate document size to check if we need to split
+      const reportDataString = JSON.stringify(reportData);
+      const estimatedSize = new TextEncoder().encode(reportDataString).length;
+      const sizeInKB = (estimatedSize / 1024).toFixed(2);
+      
+      console.log(`📊 Document size for ${municipality}:`, {
+        estimatedSize: `${estimatedSize} bytes`,
+        sizeInKB: `${sizeInKB} KB`,
+        dateCount: Object.keys(weeklyReportData || {}).length
+      });
+      
+      // CRITICAL: Per-municipality size check - only split if THIS municipality's data is too large
+      const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit (1MB)
+      const SAFE_SIZE_LIMIT = 700000; // 700KB - conservative limit
+      
+      if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
+        console.log(`⚠️ ${municipality}: Document size (${sizeInKB} KB) exceeds safe limit. Splitting by weeks...`);
+        
+        // Split weeklyReportData by weeks
+        const weeks = [
+          { name: 'week1', dates: [] },
+          { name: 'week2', dates: [] },
+          { name: 'week3', dates: [] },
+          { name: 'week4', dates: [] },
+          { name: 'week5', dates: [] }
+        ];
+        
+        // Group dates by week
+        Object.keys(weeklyReportData || {}).forEach(dateKey => {
+          try {
+            const date = new Date(dateKey);
+            if (!isNaN(date.getTime())) {
+              const dayOfMonth = date.getDate();
+              const weekIndex = Math.floor((dayOfMonth - 1) / 7);
+              if (weekIndex >= 0 && weekIndex < 5) {
+                weeks[weekIndex].dates.push(dateKey);
+              }
+            }
+          } catch (e) {
+            console.warn(`⚠️ Could not parse date: ${dateKey}`);
+          }
+        });
+        
+        console.log(`📅 ${municipality} week distribution:`, weeks.map((w, i) => `Week ${i+1}: ${w.dates.length}`).join(', '));
+        
+        // Save each week as a separate document
+        const savePromises = weeks.map(async (week, index) => {
+          if (week.dates.length === 0) return { success: true };
+          
+          const weekData = week.dates.reduce((acc, dateKey) => {
+            acc[dateKey] = weeklyReportData[dateKey];
+            return acc;
+          }, {});
+          
+          const weekReportData = {
+            ...reportData,
+            weeklyReportData: weekData,
+            weekNumber: index + 1,
+            isPartial: true,
+            municipality: municipality,
+            createdAt: new Date().toISOString(),
+            createdBy: user.email,
+            lastUpdated: new Date().toISOString(),
+            updatedBy: user.email
+          };
+          
+          const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_week${index + 1}`);
+          await setDoc(weekDocRef, weekReportData, { merge: true });
+          console.log(`✅ ${municipality} Week ${index + 1}: Saved`);
+          return { success: true };
+        });
+        
+        await Promise.all(savePromises);
+        
+        // Save summary document
+        const summaryData = {
+          selectedMonth,
+          selectedYear,
+          activeMunicipalityTab: municipality,
+          municipality: municipality,
+          savedAt: new Date().toISOString(),
+          isSplit: true,
+          originalSize: estimatedSize,
+          originalSizeKB: parseFloat(sizeInKB),
+          weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })).filter(w => w.dateCount > 0),
+          totalDates: Object.keys(weeklyReportData || {}).length,
+          createdAt: new Date().toISOString(),
+          createdBy: user.email,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: user.email
+        };
+        
+        const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_summary`);
+        await setDoc(summaryDocRef, summaryData, { merge: true });
+        
+        console.log(`✅ ${municipality}: Split save completed (${weeks.filter(w => w.dates.length > 0).length} weeks)`);
+        return { success: true, wasSplit: true, docId };
+      } else {
+        // Document size is OK - save normally as single document
+        console.log(`✅ ${municipality}: Document size OK (${sizeInKB} KB), saving as single document`);
+        
+        const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
+        await setDoc(municipalDocRef, {
+          ...reportData,
+          id: docId,
+          municipality: municipality,
+          createdAt: new Date().toISOString(),
+          createdBy: user.email,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: user.email
+        }, { merge: true });
 
-      console.log('✅ Weekly report saved by municipality:', municipality, docId);
-      return { success: true, docId };
+        console.log(`✅ ${municipality}: Saved successfully as single document`);
+        return { success: true, docId };
+      }
     } catch (error) {
       console.error('❌ Error saving weekly report by municipality:', error);
       return { success: false, error: error.message };
