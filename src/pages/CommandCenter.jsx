@@ -1063,52 +1063,26 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
     
-    // CRITICAL FIX: Check localStorage FIRST before going to Firestore
-    // This ensures data persistence even after refresh and reduces Firestore reads
+    // MODIFIED: Check localStorage first for speed, but also check Firestore for cross-device sync
+    // Priority: localStorage (for current device) → Firestore (for other devices)
     const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+    
+    let localStorageData = null;
     try {
       const storedData = localStorage.getItem(storageKey);
       if (storedData) {
         console.log('✅ Found data in localStorage with key:', storageKey);
-        const parsedData = JSON.parse(storedData);
-        
-        if (parsedData && Object.keys(parsedData).length > 0) {
-          console.log('✅ Loading from localStorage with', Object.keys(parsedData).length, 'dates');
-          
-          // Log photo data from localStorage
-          const photoDates = Object.entries(parsedData).filter(([date, entries]) =>
-            Array.isArray(entries) && entries.some(entry => entry.photos)
-          );
-          console.log('📸 localStorage data contains photos for', photoDates.length, 'dates');
-          
-          // Cache the data
-          weeklyReportCache.current[cacheKey] = parsedData;
-          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
-          
-          // Set the data immediately - use functional update to ensure freshness
-          setWeeklyReportData(() => parsedData);
-          
-          // CRITICAL: Force UI update by incrementing version and resetting loading state
-          setDataVersion(prev => prev + 1);
-          setIsLoadingWeeklyReports(true);
-          setTimeout(() => {
-            setIsLoadingWeeklyReports(false);
-            console.log('✅ Data loaded from localStorage successfully');
-            console.log('📊 weeklyReportData should now have', Object.keys(parsedData).length, 'dates');
-            console.log('📥 ========== LOAD OPERATION COMPLETED (localStorage) ==========');
-          }, 100);
-          
-          return; // Exit early - no need to check Firestore
-        }
+        localStorageData = JSON.parse(storedData);
+        console.log('📦 localStorage has', Object.keys(localStorageData).length, 'dates');
       } else {
-        console.log('ℹ️ No data found in localStorage, will check Firestore');
+        console.log('ℹ️ No data in localStorage, will check Firestore');
       }
     } catch (storageError) {
       console.warn('⚠️ Error reading from localStorage:', storageError);
-      // Continue to Firestore if localStorage fails
     }
     
-    console.log(`🔄 Loading weekly report data from Firestore for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
+    // ALWAYS check Firestore for latest data (for cross-device sync)
+    console.log(`🔄 Checking Firestore for latest data...`);
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
     try {
@@ -1249,24 +1223,61 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             })));
           }
           
-          // Cache the loaded data (in-memory)
-          weeklyReportCache.current[cacheKey] = weeklyData;
+          // CRITICAL: Compare with localStorage and use newer data
+          let finalData = weeklyData;
+          
+          if (localStorageData && Object.keys(localStorageData).length > 0) {
+            console.log('🔄 Comparing localStorage vs Firestore data...');
+            console.log('  📦 localStorage:', Object.keys(localStorageData).length, 'dates');
+            console.log('  ☁️  Firestore:', Object.keys(weeklyData).length, 'dates');
+            
+            // Count total entries in each
+            const localCount = Object.values(localStorageData).reduce((sum, entries) => 
+              sum + (Array.isArray(entries) ? entries.length : 0), 0
+            );
+            const firestoreCount = Object.values(weeklyData).reduce((sum, entries) => 
+              sum + (Array.isArray(entries) ? entries.length : 0), 0
+            );
+            
+            console.log('  📦 localStorage entries:', localCount);
+            console.log('  ☁️  Firestore entries:', firestoreCount);
+            
+            // Use Firestore data as it's the source of truth for cross-device sync
+            if (firestoreCount >= localCount) {
+              console.log('✅ Using Firestore data (newer or same)');
+              finalData = weeklyData;
+            } else {
+              console.log('⚠️ Firestore has LESS data than localStorage!');
+              console.log('   This means localStorage has unsaved changes.');
+              console.log('   Using localStorage data and will sync to Firestore');
+              finalData = localStorageData;
+              
+              // Auto-save localStorage data to Firestore to sync
+              setTimeout(() => {
+                console.log('🔄 Auto-syncing localStorage to Firestore...');
+                handleSaveWeeklyReport(true); // true = skip reload
+              }, 2000);
+            }
+          }
+          
+          // Cache the final data
+          weeklyReportCache.current[cacheKey] = finalData;
           lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
           console.log('💾 Caching loaded data with key:', cacheKey);
           
-          // CRITICAL: Save to localStorage for photo preservation
+          // CRITICAL: Save to localStorage for faster future loads
           try {
             const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-            localStorage.setItem(storageKey, JSON.stringify(weeklyData));
+            localStorage.setItem(storageKey, JSON.stringify(finalData));
             console.log('💾 Saved data to localStorage with key:', storageKey);
           } catch (storageError) {
             console.error('❌ Error saving to localStorage:', storageError);
             // Continue even if localStorage fails
           }
           
-          console.log('📊 Setting weeklyReportData state with', Object.keys(weeklyData).length, 'dates');
-          setWeeklyReportData(() => weeklyData);
+          console.log('📊 Setting weeklyReportData state with', Object.keys(finalData).length, 'dates');
+          setWeeklyReportData(() => finalData);
           setDataVersion(prev => prev + 1); // Force re-render
           console.log('✅ State updated successfully');
           
