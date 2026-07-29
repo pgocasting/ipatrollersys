@@ -260,6 +260,39 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
+  
+  // Auto-save to localStorage whenever weeklyReportData changes (debounced)
+  const autoSaveDebounceRef = useRef(null);
+  
+  useEffect(() => {
+    // Clear previous timeout
+    if (autoSaveDebounceRef.current) {
+      clearTimeout(autoSaveDebounceRef.current);
+    }
+    
+    // Don't auto-save if no data or no municipality/month/year selected
+    if (!weeklyReportData || Object.keys(weeklyReportData).length === 0 || !activeMunicipalityTab || !selectedMonth || !selectedYear) {
+      return;
+    }
+    
+    // Debounce the auto-save to avoid too many writes
+    autoSaveDebounceRef.current = setTimeout(() => {
+      try {
+        const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+        localStorage.setItem(storageKey, JSON.stringify(weeklyReportData));
+        console.log('💾 Auto-saved to localStorage:', storageKey, 'with', Object.keys(weeklyReportData).length, 'dates');
+      } catch (error) {
+        console.error('❌ Auto-save to localStorage failed:', error);
+      }
+    }, 1000); // Save 1 second after last change
+    
+    // Cleanup
+    return () => {
+      if (autoSaveDebounceRef.current) {
+        clearTimeout(autoSaveDebounceRef.current);
+      }
+    };
+  }, [weeklyReportData, activeMunicipalityTab, selectedMonth, selectedYear]);
 
   // Municipalities by district
   const municipalitiesByDistrict = {
@@ -1019,7 +1052,37 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
     
-    console.log(`🔄 Loading weekly report data for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
+    // CRITICAL FIX: Check localStorage FIRST before going to Firestore
+    // This ensures data persistence even after refresh and reduces Firestore reads
+    const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+    try {
+      const storedData = localStorage.getItem(storageKey);
+      if (storedData) {
+        console.log('✅ Found data in localStorage with key:', storageKey);
+        const parsedData = JSON.parse(storedData);
+        
+        if (parsedData && Object.keys(parsedData).length > 0) {
+          console.log('✅ Loading from localStorage with', Object.keys(parsedData).length, 'dates');
+          
+          // Cache the data
+          weeklyReportCache.current[cacheKey] = parsedData;
+          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
+          
+          // Set the data immediately
+          setWeeklyReportData(parsedData);
+          console.log('✅ Data loaded from localStorage successfully');
+          console.log('📥 ========== LOAD OPERATION COMPLETED (localStorage) ==========');
+          return; // Exit early - no need to check Firestore
+        }
+      } else {
+        console.log('ℹ️ No data found in localStorage, will check Firestore');
+      }
+    } catch (storageError) {
+      console.warn('⚠️ Error reading from localStorage:', storageError);
+      // Continue to Firestore if localStorage fails
+    }
+    
+    console.log(`🔄 Loading weekly report data from Firestore for: ${selectedMonth} ${selectedYear} (${activeMunicipalityTab})`);
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
     try {
@@ -3851,6 +3914,7 @@ const handleSaveWeeklyReport = async (skipReload = false) => {
     }
 
     // Collect all form data from the weekly report table
+    // CRITICAL FIX: Use mergedWeeklyReportData to include photos
     const reportData = {
       selectedMonth,
       selectedYear,
@@ -3859,7 +3923,7 @@ const handleSaveWeeklyReport = async (skipReload = false) => {
       selectedConcernType,
       actionTaken,
       remarks,
-      weeklyReportData: sanitizedWeeklyReportData, // Use current state directly - no merging
+      weeklyReportData: mergedWeeklyReportData, // FIXED: Use merged data to preserve photos
       savedAt: new Date().toISOString()
     };
 
@@ -3867,10 +3931,11 @@ const handleSaveWeeklyReport = async (skipReload = false) => {
       reportKey,
       dataCount: Object.keys(weeklyReportData).length,
       sanitizedCount: Object.keys(sanitizedWeeklyReportData).length,
-      hasPhotos: Object.values(sanitizedWeeklyReportData).some(entries => 
+      mergedCount: Object.keys(mergedWeeklyReportData).length,
+      hasPhotos: Object.values(mergedWeeklyReportData).some(entries => 
         Array.isArray(entries) && entries.some(entry => entry.photos)
       ),
-      photoDetails: Object.entries(sanitizedWeeklyReportData).map(([date, entries]) => ({
+      photoDetails: Object.entries(mergedWeeklyReportData).map(([date, entries]) => ({
         date,
         entries: Array.isArray(entries) ? entries.map((entry, idx) => ({
           index: idx,
