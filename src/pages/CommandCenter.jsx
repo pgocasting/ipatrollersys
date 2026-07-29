@@ -5241,6 +5241,23 @@ const handleSaveAllMonths = async () => {
                         </button>
                       )}
 
+                      {/* MANUAL SAVE DATA BUTTON - Added back for cross-device sync */}
+                      <button
+                        onClick={() => handleSaveWeeklyReport(false)}
+                        disabled={isLoadingWeeklyReports || !selectedMonth || !selectedYear || !activeMunicipalityTab}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                        title="Save current data to Firestore for cross-device sync"
+                      >
+                        {isLoadingWeeklyReports ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <Save className="h-4 w-4" />
+                        )}
+                        <span className="text-sm font-medium">
+                          Save Data
+                        </span>
+                      </button>
+
                       {isAdmin && (
                         <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
                           <DialogTrigger asChild>
