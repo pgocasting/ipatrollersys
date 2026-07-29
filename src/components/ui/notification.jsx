@@ -85,19 +85,21 @@ const Notification = ({
   return (
     <div className={`fixed z-50 ${getPositionStyles()}`}>
       <div className={`
-        flex items-center gap-3 px-4 py-3 rounded-lg border shadow-lg
+        flex items-start gap-3 px-4 py-3 rounded-lg border shadow-lg
         ${getTypeStyles()}
         transform transition-all duration-300 ease-in-out
         ${show ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'}
-        max-w-md min-w-[300px]
+        max-w-2xl min-w-[300px]
       `}>
-        {getIcon()}
-        <span className="flex-1 text-sm font-medium">
+        <div className="flex-shrink-0 mt-0.5">
+          {getIcon()}
+        </div>
+        <div className="flex-1 text-sm font-medium break-words whitespace-pre-wrap overflow-hidden">
           {message}
-        </span>
+        </div>
         <button
           onClick={handleClose}
-          className="ml-2 p-1 rounded-full hover:bg-black/10 transition-colors duration-200"
+          className="ml-2 p-1 rounded-full hover:bg-black/10 transition-colors duration-200 flex-shrink-0"
           aria-label="Close notification"
         >
           <X className="w-4 h-4" />
@@ -131,10 +133,10 @@ export const useNotification = () => {
     setNotifications(prev => prev.filter(notification => notification.id !== id));
   };
 
-  const showSuccess = (message, duration) => showNotification(message, 'success', duration);
-  const showError = (message, duration) => showNotification(message, 'error', duration);
-  const showWarning = (message, duration) => showNotification(message, 'warning', duration);
-  const showInfo = (message, duration) => showNotification(message, 'info', duration);
+  const showSuccess = (message, duration = 5000) => showNotification(message, 'success', duration);
+  const showError = (message, duration = 8000) => showNotification(message, 'error', duration); // Longer duration for errors
+  const showWarning = (message, duration = 6000) => showNotification(message, 'warning', duration);
+  const showInfo = (message, duration = 5000) => showNotification(message, 'info', duration);
 
   return {
     notifications,

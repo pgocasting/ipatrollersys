@@ -3789,16 +3789,18 @@ const handleSaveWeeklyReport = async () => {
         mergedWeeklyReportData[dateKey] = newEntries.map((newEntry, index) => {
           const existingEntry = existingEntries[index];
           
-          // If existing entry has photos and new entry doesn't, preserve the photos
+          // ALWAYS prefer new entry data (from current state) as it's most recent
+          // New entry already has photos if they were uploaded
+          // Only fall back to existing entry photos if new entry explicitly has none
           if (existingEntry && existingEntry.photos && !newEntry.photos) {
-            console.log(`📸 Preserving photos for ${dateKey} entry ${index}`);
+            console.log(`📸 Preserving photos from Firestore for ${dateKey} entry ${index}`);
             return {
               ...newEntry,
               photos: existingEntry.photos
             };
           }
           
-          // If both have photos, use new photos (user intentionally updated)
+          // Use new entry as-is (photos included if present)
           return newEntry;
         });
       } else {
@@ -3869,7 +3871,8 @@ const handleSaveWeeklyReport = async () => {
     // Only use nested structure save - no more root level saves
     if (nestedSaveResult.success) {
       const splitMessage = nestedSaveResult.wasSplit ? ' (split into weeks due to size)' : '';
-      toast.success(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`);
+      // Use custom notification for success message
+      showSuccess(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`);
       
       // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
       const monthKey = selectedMonth.toLowerCase();
@@ -3907,12 +3910,15 @@ const handleSaveWeeklyReport = async () => {
       }
     } else {
       console.error('❌ Save failed:', nestedSaveResult.error);
-      toast.error("Failed to save weekly report: " + (nestedSaveResult.error?.message || 'Unknown error'));
+      const errorMessage = nestedSaveResult.error?.message || nestedSaveResult.error || 'Unknown error';
+      // Use custom notification for better error display with long messages
+      showError(`Failed to save weekly report: ${errorMessage}`);
     }
   } catch (error) {
     console.error("❌ ========== SAVE ERROR ==========");
     console.error("Error saving weekly report:", error);
-    toast.error("Error saving weekly report");
+    // Use custom notification for better error display
+    showError(`Error saving weekly report: ${error.message || error}`);
   } finally {
     setIsLoadingWeeklyReports(false);
     console.log('🏁 ========== SAVE OPERATION FINISHED ==========');
