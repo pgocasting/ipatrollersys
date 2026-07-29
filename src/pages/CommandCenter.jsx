@@ -4,7 +4,7 @@ import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/c
 import { useFirebase } from "../hooks/useFirebase";
 import { useFirestoreQuota } from "../hooks/useFirestoreQuota";
 import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
   Command, 
@@ -894,6 +894,98 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         activeMunicipalityTab: activeMunicipalityTab || 'MISSING'
       });
     }
+  }, [selectedMonth, selectedYear, activeMunicipalityTab]);
+
+  // REAL-TIME LISTENER: Listen for changes from other devices
+  useEffect(() => {
+    if (!selectedMonth || !selectedYear || !activeMunicipalityTab) {
+      console.log('⏸️ Real-time listener: Missing required parameters, skipping');
+      return;
+    }
+
+    const monthYear = `${selectedMonth}_${selectedYear}`;
+    const municipality = activeMunicipalityTab;
+    
+    console.log('🔴 REAL-TIME LISTENER: Setting up for', {
+      municipality,
+      monthYear,
+      path: `commandCenter/weeklyReports/${municipality}/${monthYear}`
+    });
+
+    // Create reference to the Firestore document
+    const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+    
+    // Set up real-time listener
+    const unsubscribe = onSnapshot(docRef, 
+      (docSnapshot) => {
+        if (docSnapshot.exists()) {
+          const data = docSnapshot.data();
+          console.log('🔴 REAL-TIME UPDATE RECEIVED:', {
+            municipality,
+            monthYear,
+            dataKeys: Object.keys(data),
+            hasWeeklyReportData: !!data.weeklyReportData
+          });
+
+          let weeklyData = null;
+          
+          // Extract weekly report data from different structures
+          if (data.weeklyReportData) {
+            weeklyData = data.weeklyReportData;
+          } else if (data.data && data.data.weeklyReportData) {
+            weeklyData = data.data.weeklyReportData;
+          }
+
+          if (weeklyData && Object.keys(weeklyData).length > 0) {
+            const entryCount = Object.values(weeklyData).reduce((sum, entries) => 
+              sum + (Array.isArray(entries) ? entries.length : 0), 0
+            );
+            
+            console.log('🔴 REAL-TIME: Updating with', Object.keys(weeklyData).length, 'dates,', entryCount, 'total entries');
+            
+            // Update localStorage with fresh data
+            try {
+              const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+              localStorage.setItem(storageKey, JSON.stringify(weeklyData));
+              console.log('💾 Real-time: Saved to localStorage');
+            } catch (err) {
+              console.warn('⚠️ Real-time: Could not save to localStorage:', err);
+            }
+
+            // Force update the state
+            setWeeklyReportData(() => ({})); // Clear first
+            setTimeout(() => {
+              setWeeklyReportData(() => weeklyData);
+              setDataVersion(prev => prev + 1); // Force re-render
+              console.log('✅ REAL-TIME: State updated successfully');
+              
+              // Show toast notification for real-time updates (only if data actually changed)
+              const currentCount = Object.values(weeklyReportData || {}).reduce((sum, entries) => 
+                sum + (Array.isArray(entries) ? entries.length : 0), 0
+              );
+              
+              if (entryCount !== currentCount && currentCount > 0) {
+                showInfo(`Data updated in real-time: ${entryCount} entries`);
+              }
+            }, 10);
+          } else {
+            console.log('🔴 REAL-TIME: Document exists but no weekly data found');
+          }
+        } else {
+          console.log('🔴 REAL-TIME: Document does not exist yet');
+        }
+      },
+      (error) => {
+        console.error('❌ REAL-TIME LISTENER ERROR:', error);
+        showError('Real-time sync error: ' + error.message);
+      }
+    );
+
+    // Cleanup function: unsubscribe when component unmounts or dependencies change
+    return () => {
+      console.log('🔴 REAL-TIME LISTENER: Cleaning up for', municipality, monthYear);
+      unsubscribe();
+    };
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
   // Component initialization - removed local storage usage
