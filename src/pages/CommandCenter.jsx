@@ -226,6 +226,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   
   // Weekly Report Data - Individual date entries
   const [weeklyReportData, setWeeklyReportData] = useState({});
+  const [dataVersion, setDataVersion] = useState(0); // Force re-render trigger
   const weeklyReportCache = useRef({});
   const lastLoadedWeeklyRef = useRef({ month: null, year: null, municipality: null });
   
@@ -1064,14 +1065,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         if (parsedData && Object.keys(parsedData).length > 0) {
           console.log('✅ Loading from localStorage with', Object.keys(parsedData).length, 'dates');
           
+          // Log photo data from localStorage
+          const photoDates = Object.entries(parsedData).filter(([date, entries]) =>
+            Array.isArray(entries) && entries.some(entry => entry.photos)
+          );
+          console.log('📸 localStorage data contains photos for', photoDates.length, 'dates');
+          
           // Cache the data
           weeklyReportCache.current[cacheKey] = parsedData;
           lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
-          // Set the data immediately
-          setWeeklyReportData(parsedData);
-          console.log('✅ Data loaded from localStorage successfully');
-          console.log('📥 ========== LOAD OPERATION COMPLETED (localStorage) ==========');
+          // Set the data immediately - use functional update to ensure freshness
+          setWeeklyReportData(() => parsedData);
+          
+          // CRITICAL: Force UI update by incrementing version and resetting loading state
+          setDataVersion(prev => prev + 1);
+          setIsLoadingWeeklyReports(true);
+          setTimeout(() => {
+            setIsLoadingWeeklyReports(false);
+            console.log('✅ Data loaded from localStorage successfully');
+            console.log('📊 weeklyReportData should now have', Object.keys(parsedData).length, 'dates');
+            console.log('📥 ========== LOAD OPERATION COMPLETED (localStorage) ==========');
+          }, 100);
+          
           return; // Exit early - no need to check Firestore
         }
       } else {
@@ -1240,7 +1256,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           }
           
           console.log('📊 Setting weeklyReportData state with', Object.keys(weeklyData).length, 'dates');
-          setWeeklyReportData(weeklyData);
+          setWeeklyReportData(() => weeklyData);
+          setDataVersion(prev => prev + 1); // Force re-render
           console.log('✅ State updated successfully');
           
           // Force re-render by updating a dummy state
@@ -1352,9 +1369,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Get data for a specific date (returns array of entries)
   const getDateData = (date) => {
     const data = weeklyReportData[date] || [];
-    // Debug logging for data retrieval
+    // Debug logging for data retrieval - only log when there's a mismatch
     if (Object.keys(weeklyReportData).length > 0 && data.length === 0) {
-      console.log(`🔍 getDateData Debug - Looking for: "${date}", Available keys:`, Object.keys(weeklyReportData).slice(0, 5), 'Found:', data.length, 'entries');
+      console.log(`🔍 getDateData Debug - Looking for: "${date}"`);
+      console.log('Available keys sample:', Object.keys(weeklyReportData).slice(0, 5));
+      console.log('Total available dates:', Object.keys(weeklyReportData).length);
+      console.log('Found entries for this date:', data.length);
     }
     return data;
   };
