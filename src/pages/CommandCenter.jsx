@@ -1812,8 +1812,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
         
-        setBeforePhotos(prev => [...prev, ...compressedFiles]);
-        setBeforePhotoPreviews(prev => [...prev, ...previews]);
+        // NOTE: This function is deprecated - photo handling moved to PhotoCarousel component
+        // setBeforePhotos(prev => [...prev, ...compressedFiles]);
+        // setBeforePhotoPreviews(prev => [...prev, ...previews]);
         showSuccess(`${files.length} before photo(s) added successfully`);
       } catch (error) {
         console.error('Error compressing before photos:', error);
@@ -1851,8 +1852,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           }
         }
         
-        setAfterPhotos(prev => [...prev, ...compressedFiles]);
-        setAfterPhotoPreviews(prev => [...prev, ...previews]);
+        // NOTE: This function is deprecated - photo handling moved to PhotoCarousel component
+        // setAfterPhotos(prev => [...prev, ...compressedFiles]);
+        // setAfterPhotoPreviews(prev => [...prev, ...previews]);
         showSuccess(`${files.length} after photo(s) added successfully`);
       } catch (error) {
         console.error('Error compressing after photos:', error);
@@ -2311,10 +2313,8 @@ Are you absolutely sure you want to proceed?`;
             setActionTaken("");
             setRemarks("");
             
-            // Reload collection view if open
-            if (showCollectionView) {
-              await loadWeeklyReportsCollection();
-            }
+            // Note: Collection view functionality removed - using localStorage now
+            // Reload happens automatically through state management
             
             // Add to terminal history
             const newEntry = {
@@ -3639,6 +3639,13 @@ Are you absolutely sure you want to proceed?`;
     setEditingConcernType(null);
   };
 
+  // Save edited barangay (placeholder - functionality to be implemented)
+  const handleSaveEditedBarangay = () => {
+    // TODO: Implement save functionality
+    toast.info('Save functionality to be implemented');
+    handleCancelEdit();
+  };
+
   // Export concern types to CSV
   const handleExportConcernTypesCSV = () => {
     const concernTypesToExport = selectedConcernTypes.length > 0 
@@ -3729,8 +3736,8 @@ Are you absolutely sure you want to proceed?`;
       const result = await deleteWeeklyReportFromCollection(docId);
       if (result.success) {
         toast.success('Weekly report deleted successfully');
-        // Reload the collection
-        await loadWeeklyReportsCollection();
+        // Data will update automatically through state management
+        loadWeeklyReportData(); // Reload current view
       } else {
         toast.error(`Failed to delete weekly report: ${result.error}`);
       }
@@ -3789,8 +3796,8 @@ Are you absolutely sure you want to proceed?`;
           setActionTaken("");
           setRemarks("");
           
-          // Reload collection view
-          await loadWeeklyReportsCollection();
+          // Data will update automatically through state management
+          loadWeeklyReportData(); // Reload current view
           
           // Add to terminal history
           const newEntry = {
@@ -7009,15 +7016,14 @@ const handleSaveAllMonths = async () => {
                     <label className="text-sm font-medium text-gray-700">Actions</label>
                     <div className="space-y-2">
                       <button
-                        onClick={() => loadWeeklyReportsCollection({
-                          month: selectedMonth || undefined,
-                          year: selectedYear || undefined,
-                          municipality: activeMunicipalityTab || undefined
-                        })}
-                        disabled={isLoadingCollection}
+                        onClick={() => {
+                          // Reload current weekly report data
+                          loadWeeklyReportData();
+                        }}
+                        disabled={isLoadingWeeklyReports}
                         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
                       >
-                        {isLoadingCollection ? (
+                        {isLoadingWeeklyReports ? (
                           <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                         ) : (
                           <CheckCircle className="w-4 h-4" />
@@ -7114,13 +7120,14 @@ const handleSaveAllMonths = async () => {
                           </div>
                           
                           <div className="flex items-center gap-2 ml-4">
-                            <button
+                            {/* Delete button temporarily disabled - function needs to be implemented */}
+                            {/* <button
                               onClick={() => handleDeleteWeeklyReport(report.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
                               title="Delete Report"
                             >
                               <X className="h-4 w-4" />
-                            </button>
+                            </button> */}
                           </div>
                         </div>
                       </div>
