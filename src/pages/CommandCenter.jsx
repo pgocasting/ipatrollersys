@@ -3704,6 +3704,27 @@ const handleSaveWeeklyReport = async () => {
   console.log('📋 Save Configuration:', { monthYear, reportKey, municipality: activeMunicipalityTab });
   
   try {
+    // CRITICAL FIX: Load existing data from Firestore first to preserve photos
+    console.log('📥 Loading existing data from Firestore to preserve photos...');
+    let existingWeeklyReportData = {};
+    
+    try {
+      const monthYearDoc = `${selectedMonth}_${selectedYear}`;
+      const existingDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYearDoc);
+      const existingDocSnap = await getDoc(existingDocRef);
+      
+      if (existingDocSnap.exists()) {
+        const existingData = existingDocSnap.data();
+        existingWeeklyReportData = existingData.weeklyReportData || {};
+        console.log('✅ Loaded existing data with', Object.keys(existingWeeklyReportData).length, 'dates');
+      } else {
+        console.log('ℹ️ No existing document found, creating new one');
+      }
+    } catch (loadError) {
+      console.warn('⚠️ Error loading existing data:', loadError);
+      // Continue with save even if load fails
+    }
+    
     // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
     const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
       if (key && key.trim().length > 0) {
@@ -3718,6 +3739,41 @@ const handleSaveWeeklyReport = async () => {
       removed: Object.keys(weeklyReportData).length - Object.keys(sanitizedWeeklyReportData).length
     });
 
+    // CRITICAL FIX: Merge existing data with new data, preserving photos
+    const mergedWeeklyReportData = { ...existingWeeklyReportData };
+    
+    Object.keys(sanitizedWeeklyReportData).forEach(dateKey => {
+      const newEntries = sanitizedWeeklyReportData[dateKey];
+      const existingEntries = mergedWeeklyReportData[dateKey] || [];
+      
+      // Merge entries for this date
+      if (Array.isArray(newEntries)) {
+        mergedWeeklyReportData[dateKey] = newEntries.map((newEntry, index) => {
+          const existingEntry = existingEntries[index];
+          
+          // If existing entry has photos and new entry doesn't, preserve the photos
+          if (existingEntry && existingEntry.photos && !newEntry.photos) {
+            console.log(`📸 Preserving photos for ${dateKey} entry ${index}`);
+            return {
+              ...newEntry,
+              photos: existingEntry.photos
+            };
+          }
+          
+          // If both have photos, use new photos (user intentionally updated)
+          return newEntry;
+        });
+      } else {
+        mergedWeeklyReportData[dateKey] = newEntries;
+      }
+    });
+
+    console.log('🔀 Merged Data:', {
+      existingKeys: Object.keys(existingWeeklyReportData).length,
+      newKeys: Object.keys(sanitizedWeeklyReportData).length,
+      mergedKeys: Object.keys(mergedWeeklyReportData).length
+    });
+
     // Collect all form data from the weekly report table
     const reportData = {
       selectedMonth,
@@ -3727,7 +3783,7 @@ const handleSaveWeeklyReport = async () => {
       selectedConcernType,
       actionTaken,
       remarks,
-      weeklyReportData: sanitizedWeeklyReportData, // Include individual date data
+      weeklyReportData: mergedWeeklyReportData, // Use merged data with preserved photos
       savedAt: new Date().toISOString()
     };
 
