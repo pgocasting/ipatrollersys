@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+﻿import React, { useState, useEffect, useRef, useCallback } from "react";
 import Layout from "../components/Layout";
 import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import { useFirebase } from "../hooks/useFirebase";
@@ -1147,6 +1147,18 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log('✅ Loading weekly data with', Object.keys(weeklyData).length, 'dates');
           console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
           console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
+          
+          // Log photo data
+          const photoDates = Object.entries(weeklyData).filter(([date, entries]) =>
+            Array.isArray(entries) && entries.some(entry => entry.photos)
+          );
+          console.log('📸 Loaded data contains photos for', photoDates.length, 'dates');
+          if (photoDates.length > 0) {
+            console.log('📸 Photo details:', photoDates.slice(0, 3).map(([date, entries]) => ({
+              date,
+              entriesWithPhotos: entries.filter(e => e.photos).length
+            })));
+          }
           
           // Cache the loaded data (in-memory)
           weeklyReportCache.current[cacheKey] = weeklyData;
@@ -3858,6 +3870,17 @@ const handleSaveWeeklyReport = async (skipReload = false) => {
       hasPhotos: Object.values(sanitizedWeeklyReportData).some(entries => 
         Array.isArray(entries) && entries.some(entry => entry.photos)
       ),
+      photoDetails: Object.entries(sanitizedWeeklyReportData).map(([date, entries]) => ({
+        date,
+        entries: Array.isArray(entries) ? entries.map((entry, idx) => ({
+          index: idx,
+          hasPhotos: !!entry.photos,
+          photoUrls: entry.photos?.rows?.map(row => ({
+            before: row.before?.length || 0,
+            after: row.after?.length || 0
+          })) || []
+        })) : []
+      })).filter(d => d.entries.some(e => e.hasPhotos)),
       sampleData: Object.keys(weeklyReportData).slice(0, 3),
       firstDateData: Object.keys(weeklyReportData).length > 0 ? weeklyReportData[Object.keys(weeklyReportData)[0]] : 'No data'
     });
