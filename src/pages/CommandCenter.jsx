@@ -1242,12 +1242,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             
             // CRITICAL FIX: ALWAYS prefer Firestore data for cross-device sync
             // Firestore is the single source of truth
-            console.log('✅ Using Firestore data (source of truth for all devices)');
-            finalData = weeklyData;
-            
-            // If localStorage has more data, it means there are unsaved local changes
-            // Auto-sync them to Firestore
-            if (localCount > firestoreCount) {
+            if (firestoreCount >= localCount) {
+              console.log('✅ Using Firestore data (has equal or more entries - source of truth)');
+              finalData = weeklyData;
+              
+              // CRITICAL: Clear old localStorage to prevent conflicts
+              console.log('🧹 Clearing old localStorage to prevent conflicts');
+              try {
+                const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+                localStorage.removeItem(storageKey);
+                console.log('✅ Old localStorage cleared');
+              } catch (err) {
+                console.warn('⚠️ Could not clear old localStorage:', err);
+              }
+            } else {
               console.log('⚠️ localStorage has MORE data than Firestore!');
               console.log('   This means there are unsaved local changes.');
               console.log('   Will sync to Firestore after loading...');
@@ -1276,30 +1284,31 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             console.log('✅ No localStorage data, using Firestore as source of truth');
           }
           
-          // Cache the final data
-          weeklyReportCache.current[cacheKey] = finalData;
-          lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
+          // DO NOT cache - always load fresh from Firestore for cross-device sync
+          console.log('� Skipping cache to ensure fresh data on every load');
           
-          console.log('💾 Caching loaded data with key:', cacheKey);
-          
-          // CRITICAL: Save to localStorage for faster future loads
+          // Save Firestore data to localStorage for offline access
           try {
             const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
             localStorage.setItem(storageKey, JSON.stringify(finalData));
-            console.log('💾 Saved data to localStorage with key:', storageKey);
+            console.log('💾 Saved Firestore data to localStorage with key:', storageKey);
           } catch (storageError) {
             console.error('❌ Error saving to localStorage:', storageError);
             // Continue even if localStorage fails
           }
           
           console.log('📊 Setting weeklyReportData state with', Object.keys(finalData).length, 'dates');
-          setWeeklyReportData(() => finalData);
-          setDataVersion(prev => prev + 1); // Force re-render
-          console.log('✅ State updated successfully');
+          console.log('📋 Total entries:', Object.values(finalData).reduce((sum, entries) => 
+            sum + (Array.isArray(entries) ? entries.length : 0), 0
+          ));
           
-          // Force re-render by updating a dummy state
-          setIsLoadingWeeklyReports(false);
-          setTimeout(() => setIsLoadingWeeklyReports(false), 100);
+          // CRITICAL: Force complete state reset to ensure UI updates
+          setWeeklyReportData(() => ({})); // Clear first
+          setTimeout(() => {
+            setWeeklyReportData(() => finalData); // Then set new data
+            setDataVersion(prev => prev + 1); // Force re-render
+            console.log('✅ State updated successfully with', Object.keys(finalData).length, 'dates');
+          }, 10);
           
           // Load form fields if they exist (for backward compatibility)
           const formData = result.data.data || result.data;
@@ -1309,6 +1318,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setRemarks(formData.remarks || "");
           console.log('✅ Loaded weekly report data for:', reportKey);
           console.log('📥 ========== LOAD OPERATION COMPLETED ==========');
+          
+          setIsLoadingWeeklyReports(false);
           return;
         } else {
           console.log('⚠️ Found document but no recognizable weekly data structure');
