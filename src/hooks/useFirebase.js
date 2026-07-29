@@ -381,12 +381,18 @@ export const useFirebase = () => {
       console.log(`📊 Document size for ${municipality}:`, {
         estimatedSize: `${estimatedSize} bytes`,
         sizeInKB: `${sizeInKB} KB`,
-        dateCount: Object.keys(weeklyReportData || {}).length
+        dateCount: Object.keys(weeklyReportData || {}).length,
+        totalEntries: Object.values(weeklyReportData || {}).reduce((sum, entries) => 
+          sum + (Array.isArray(entries) ? entries.length : 0), 0
+        ),
+        hasPhotos: Object.values(weeklyReportData || {}).some(entries =>
+          Array.isArray(entries) && entries.some(entry => entry.photos)
+        )
       });
       
       // CRITICAL: Per-municipality size check - only split if THIS municipality's data is too large
       const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit (1MB)
-      const SAFE_SIZE_LIMIT = 700000; // 700KB - conservative limit
+      const SAFE_SIZE_LIMIT = 900000; // 900KB - more generous limit (was 700KB)
       
       if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
         console.log(`⚠️ ${municipality}: Document size (${sizeInKB} KB) exceeds safe limit. Splitting by weeks...`);

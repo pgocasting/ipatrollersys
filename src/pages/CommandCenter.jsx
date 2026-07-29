@@ -1931,7 +1931,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       console.log('💾 Auto-saving to Firestore after photo upload...');
       setTimeout(async () => {
         try {
-          await handleSaveWeeklyReport();
+          await handleSaveWeeklyReport(true); // Pass true to skip reload
           console.log('✅ Auto-save completed successfully');
         } catch (autoSaveError) {
           console.error('❌ Auto-save failed:', autoSaveError);
@@ -3722,14 +3722,15 @@ Are you absolutely sure you want to proceed?`;
 };
 
 // Save weekly report data to Firestore
-const handleSaveWeeklyReport = async () => {
+const handleSaveWeeklyReport = async (skipReload = false) => {
   console.log('🚀 ========== SAVE OPERATION STARTED ==========');
   console.log('📊 Current State Before Save:', {
     selectedMonth,
     selectedYear,
     activeMunicipalityTab,
     weeklyReportDataKeys: Object.keys(weeklyReportData).length,
-    weeklyReportDataSample: Object.keys(weeklyReportData).slice(0, 3)
+    weeklyReportDataSample: Object.keys(weeklyReportData).slice(0, 3),
+    skipReload
   });
   
   if (isReadOnly) {
@@ -3886,7 +3887,7 @@ const handleSaveWeeklyReport = async () => {
     
     // Only use nested structure save - no more root level saves
     if (nestedSaveResult.success) {
-      const splitMessage = nestedSaveResult.wasSplit ? ' (split into weeks due to size)' : '';
+      const splitMessage = nestedSaveResult.wasSplit ? ' (optimized for large dataset)' : '';
       // Use custom notification for success message
       showSuccess(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`);
       
@@ -3910,7 +3911,8 @@ const handleSaveWeeklyReport = async () => {
       setTerminalHistory(prev => [...prev, newEntry]);
       
       // If data was split, reload to show the split documents correctly
-      if (nestedSaveResult.wasSplit) {
+      // BUT skip reload if this was called from auto-save after photo upload
+      if (nestedSaveResult.wasSplit && !skipReload) {
         console.log('🔄 Data was split - reloading to show split documents...');
         setTimeout(async () => {
           try {
@@ -3923,6 +3925,8 @@ const handleSaveWeeklyReport = async () => {
           }
         }, 1500);
         return; // Exit early to let reload handle loading state
+      } else if (nestedSaveResult.wasSplit && skipReload) {
+        console.log('ℹ️ Data was split but skipping reload (auto-save after photo upload)');
       }
     } else {
       console.error('❌ Save failed:', nestedSaveResult.error);
