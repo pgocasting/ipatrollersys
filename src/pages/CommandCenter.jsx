@@ -262,7 +262,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
   
-  // Auto-save to localStorage whenever weeklyReportData changes (debounced)
+  // Auto-save to localStorage AND Firestore whenever weeklyReportData changes (debounced)
   const autoSaveDebounceRef = useRef(null);
   
   useEffect(() => {
@@ -277,15 +277,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
     
     // Debounce the auto-save to avoid too many writes
-    autoSaveDebounceRef.current = setTimeout(() => {
+    autoSaveDebounceRef.current = setTimeout(async () => {
       try {
+        // Save to localStorage for instant local access
         const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
         localStorage.setItem(storageKey, JSON.stringify(weeklyReportData));
         console.log('💾 Auto-saved to localStorage:', storageKey, 'with', Object.keys(weeklyReportData).length, 'dates');
+        
+        // CRITICAL FIX: Also auto-save to Firestore for cross-device sync
+        console.log('☁️  Auto-syncing to Firestore for cross-device access...');
+        await handleSaveWeeklyReport(true); // Pass true to skip reload
+        console.log('✅ Auto-sync to Firestore completed');
       } catch (error) {
-        console.error('❌ Auto-save to localStorage failed:', error);
+        console.error('❌ Auto-save failed:', error);
       }
-    }, 1000); // Save 1 second after last change
+    }, 3000); // Save 3 seconds after last change (increased from 1s to reduce Firestore writes)
     
     // Cleanup
     return () => {
