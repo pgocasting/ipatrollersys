@@ -3833,7 +3833,7 @@ const handleSaveWeeklyReport = async () => {
       selectedConcernType,
       actionTaken,
       remarks,
-      weeklyReportData: mergedWeeklyReportData, // Use merged data with preserved photos
+      weeklyReportData: sanitizedWeeklyReportData, // Use current state directly - no merging
       savedAt: new Date().toISOString()
     };
 
@@ -3841,6 +3841,9 @@ const handleSaveWeeklyReport = async () => {
       reportKey,
       dataCount: Object.keys(weeklyReportData).length,
       sanitizedCount: Object.keys(sanitizedWeeklyReportData).length,
+      hasPhotos: Object.values(sanitizedWeeklyReportData).some(entries => 
+        Array.isArray(entries) && entries.some(entry => entry.photos)
+      ),
       sampleData: Object.keys(weeklyReportData).slice(0, 3),
       firstDateData: Object.keys(weeklyReportData).length > 0 ? weeklyReportData[Object.keys(weeklyReportData)[0]] : 'No data'
     });
