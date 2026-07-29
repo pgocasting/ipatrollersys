@@ -1148,11 +1148,22 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
           console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
           
-          // Cache the loaded data
+          // Cache the loaded data (in-memory)
           weeklyReportCache.current[cacheKey] = weeklyData;
           lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
           
           console.log('💾 Caching loaded data with key:', cacheKey);
+          
+          // CRITICAL: Save to localStorage for photo preservation
+          try {
+            const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+            localStorage.setItem(storageKey, JSON.stringify(weeklyData));
+            console.log('💾 Saved data to localStorage with key:', storageKey);
+          } catch (storageError) {
+            console.error('❌ Error saving to localStorage:', storageError);
+            // Continue even if localStorage fails
+          }
+          
           console.log('📊 Setting weeklyReportData state with', Object.keys(weeklyData).length, 'dates');
           setWeeklyReportData(weeklyData);
           console.log('✅ State updated successfully');
@@ -1888,6 +1899,24 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       
       // Update the entry with photo URLs
       updateDateData(date, entryIndex, 'photos', photos.rows.length > 0 ? photos : null);
+      
+      // CRITICAL: Save to localStorage immediately after photo upload
+      try {
+        const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+        const updatedData = { ...weeklyReportData };
+        if (!updatedData[date]) {
+          updatedData[date] = [];
+        }
+        if (!updatedData[date][entryIndex]) {
+          updatedData[date][entryIndex] = {};
+        }
+        updatedData[date][entryIndex].photos = photos.rows.length > 0 ? photos : null;
+        
+        localStorage.setItem(storageKey, JSON.stringify(updatedData));
+        console.log('💾 Photos saved to localStorage immediately');
+      } catch (storageError) {
+        console.error('❌ Error saving photos to localStorage:', storageError);
+      }
       
       showSuccess(
         isEditingExisting
@@ -3704,21 +3733,30 @@ const handleSaveWeeklyReport = async () => {
   console.log('📋 Save Configuration:', { monthYear, reportKey, municipality: activeMunicipalityTab });
   
   try {
-    // CRITICAL FIX: Load existing data from Firestore first to preserve photos
-    console.log('📥 Loading existing data from Firestore to preserve photos...');
+    // CRITICAL FIX: Use localStorage to preserve photos instead of loading from Firestore
+    console.log('� Loading existing data from localStorage to preserve photos...');
     let existingWeeklyReportData = {};
     
     try {
-      const monthYearDoc = `${selectedMonth}_${selectedYear}`;
-      const existingDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYearDoc);
-      const existingDocSnap = await getDoc(existingDocRef);
+      const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+      const storedData = localStorage.getItem(storageKey);
       
-      if (existingDocSnap.exists()) {
-        const existingData = existingDocSnap.data();
-        existingWeeklyReportData = existingData.weeklyReportData || {};
-        console.log('✅ Loaded existing data with', Object.keys(existingWeeklyReportData).length, 'dates');
+      if (storedData) {
+        existingWeeklyReportData = JSON.parse(storedData);
+        console.log('✅ Loaded existing data from localStorage with', Object.keys(existingWeeklyReportData).length, 'dates');
       } else {
-        console.log('ℹ️ No existing document found, creating new one');
+        console.log('ℹ️ No existing data in localStorage, trying Firestore...');
+        
+        // Fallback to Firestore if localStorage is empty
+        const monthYearDoc = `${selectedMonth}_${selectedYear}`;
+        const existingDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYearDoc);
+        const existingDocSnap = await getDoc(existingDocRef);
+        
+        if (existingDocSnap.exists()) {
+          const existingData = existingDocSnap.data();
+          existingWeeklyReportData = existingData.weeklyReportData || {};
+          console.log('✅ Loaded existing data from Firestore with', Object.keys(existingWeeklyReportData).length, 'dates');
+        }
       }
     } catch (loadError) {
       console.warn('⚠️ Error loading existing data:', loadError);
@@ -3773,6 +3811,16 @@ const handleSaveWeeklyReport = async () => {
       newKeys: Object.keys(sanitizedWeeklyReportData).length,
       mergedKeys: Object.keys(mergedWeeklyReportData).length
     });
+
+    // CRITICAL: Save to localStorage BEFORE Firestore
+    try {
+      const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+      localStorage.setItem(storageKey, JSON.stringify(mergedWeeklyReportData));
+      console.log('💾 Saved merged data to localStorage with key:', storageKey);
+    } catch (storageError) {
+      console.error('❌ Error saving to localStorage:', storageError);
+      // Continue even if localStorage fails
+    }
 
     // Collect all form data from the weekly report table
     const reportData = {
