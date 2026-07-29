@@ -909,7 +909,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     console.log('🔴 REAL-TIME LISTENER: Setting up for', {
       municipality,
       monthYear,
-      path: `commandCenter/weeklyReports/${municipality}/${monthYear}`
+      path: `commandCenter/weeklyReports/${municipality}/${monthYear}`,
+      timestamp: new Date().toISOString()
     });
 
     // Create reference to the Firestore document
@@ -918,16 +919,34 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     // Set up real-time listener
     const unsubscribe = onSnapshot(docRef, 
       (docSnapshot) => {
+        console.log('🔴 REAL-TIME LISTENER FIRED:', {
+          exists: docSnapshot.exists(),
+          municipality,
+          monthYear,
+          timestamp: new Date().toISOString()
+        });
+        
         if (docSnapshot.exists()) {
           const data = docSnapshot.data();
           console.log('🔴 REAL-TIME UPDATE RECEIVED:', {
             municipality,
             monthYear,
             dataKeys: Object.keys(data),
-            hasWeeklyReportData: !!data.weeklyReportData
+            hasWeeklyReportData: !!data.weeklyReportData,
+            isSplit: !!data.isSplit,
+            timestamp: new Date().toISOString()
           });
 
           let weeklyData = null;
+          
+          // Check if data is split into multiple documents
+          if (data.isSplit && data.weeks) {
+            console.log('🔴 REAL-TIME: Data is SPLIT, need to load individual week documents');
+            console.warn('⚠️ REAL-TIME: Split documents not yet supported in real-time listener!');
+            console.warn('⚠️ Please refresh page manually to see updates for split data');
+            showWarning('Data structure changed. Please refresh page (F5) to see latest updates.');
+            return;
+          }
           
           // Extract weekly report data from different structures
           if (data.weeklyReportData) {
@@ -942,34 +961,39 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             );
             
             console.log('🔴 REAL-TIME: Updating with', Object.keys(weeklyData).length, 'dates,', entryCount, 'total entries');
+            console.log('🔴 REAL-TIME: Current state has', Object.keys(weeklyReportData || {}).length, 'dates');
             
             // Update localStorage with fresh data
             try {
               const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
               localStorage.setItem(storageKey, JSON.stringify(weeklyData));
-              console.log('💾 Real-time: Saved to localStorage');
+              console.log('💾 Real-time: Saved to localStorage with key:', storageKey);
             } catch (err) {
               console.warn('⚠️ Real-time: Could not save to localStorage:', err);
             }
 
-            // Force update the state
+            // Force update the state AGGRESSIVELY
+            console.log('🔴 REAL-TIME: Forcing state update...');
             setWeeklyReportData(() => ({})); // Clear first
+            
+            // Use longer timeout to ensure clearing happens
             setTimeout(() => {
+              console.log('🔴 REAL-TIME: Setting new data with', entryCount, 'entries');
               setWeeklyReportData(() => weeklyData);
-              setDataVersion(prev => prev + 1); // Force re-render
-              console.log('✅ REAL-TIME: State updated successfully');
+              setDataVersion(prev => {
+                const newVersion = prev + 1;
+                console.log('🔴 REAL-TIME: Incremented dataVersion to', newVersion);
+                return newVersion;
+              });
+              setIsLoadingWeeklyReports(false); // Ensure loading state is correct
+              console.log('✅ REAL-TIME: State update complete!');
               
-              // Show toast notification for real-time updates (only if data actually changed)
-              const currentCount = Object.values(weeklyReportData || {}).reduce((sum, entries) => 
-                sum + (Array.isArray(entries) ? entries.length : 0), 0
-              );
-              
-              if (entryCount !== currentCount && currentCount > 0) {
-                showInfo(`Data updated in real-time: ${entryCount} entries`);
-              }
-            }, 10);
+              // Always show notification for debugging
+              showInfo(`🔴 Real-time update: ${entryCount} entries loaded`);
+            }, 50); // Increased timeout
           } else {
             console.log('🔴 REAL-TIME: Document exists but no weekly data found');
+            console.log('🔴 REAL-TIME: Document data:', data);
           }
         } else {
           console.log('🔴 REAL-TIME: Document does not exist yet');
@@ -977,6 +1001,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       },
       (error) => {
         console.error('❌ REAL-TIME LISTENER ERROR:', error);
+        console.error('❌ Error details:', error.message, error.code);
         showError('Real-time sync error: ' + error.message);
       }
     );
@@ -987,6 +1012,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       unsubscribe();
     };
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
+
 
   // Component initialization - removed local storage usage
 
