@@ -4410,7 +4410,22 @@ const handleSaveAllMonths = async () => {
             )}
 
             <div className="relative w-full sm:w-auto flex items-center gap-3">
-              {/* Save Data button removed - now using auto-save after photo upload */}
+              {/* Sync to Cloud button - for manual Firestore save without photos */}
+              {userAccessLevel !== 'viewing' && !isReadOnly && (
+                <button
+                  onClick={() => {
+                    handleSaveWeeklyReport(false);
+                  }}
+                  disabled={isLoadingWeeklyReports}
+                  className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 text-white px-4 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 w-full sm:w-auto"
+                  title="Save data to cloud (Firestore) - Syncs across all devices"
+                >
+                  <Database className="w-5 h-5" />
+                  <span className="text-sm font-medium">
+                    {isLoadingWeeklyReports ? 'Saving...' : 'Sync to Cloud'}
+                  </span>
+                </button>
+              )}
 
               {userAccessLevel !== 'viewing' && (
                 <>
@@ -4719,18 +4734,27 @@ const handleSaveAllMonths = async () => {
                   <li className="flex gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200">
                     <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg shadow-md">6</span>
                     <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Sync to Cloud</p>
+                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                        <span className="font-bold text-blue-600">⚡ IMPORTANT:</span> Click the <span className="font-semibold text-blue-600">"Sync to Cloud"</span> button at the top to save your data to Firestore (cloud database). This syncs your entries across ALL devices and other users can see them. Auto-save only saves locally!
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg shadow-md">7</span>
+                    <div className="flex-1">
                       <p className="font-bold text-gray-900 text-base">Upload Photos (Optional)</p>
                       <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB. You can also add remarks while uploading photos.
+                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB. Uploading photos also auto-saves to cloud.
                       </p>
                     </div>
                   </li>
                   <li className="flex gap-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl hover:border-red-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-md">7</span>
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-red-500 to-orange-600 text-white font-bold text-lg shadow-md">8</span>
                     <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Upload Photos</p>
+                      <p className="font-bold text-gray-900 text-base">Auto-Save vs Cloud Save</p>
                       <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-blue-600">✨ Auto-Save:</span> Your data is <span className="font-semibold text-blue-600">automatically saved to the database</span> after uploading photos. No need to click Save Data button anymore!
+                        <span className="font-bold text-red-600">✨ Auto-Save:</span> Saves locally (your device only). <span className="font-bold text-blue-600">☁️ Cloud Save:</span> Saves to Firestore (visible to all devices/users). Always click "Sync to Cloud" to share your data!
                       </p>
                     </div>
                   </li>
