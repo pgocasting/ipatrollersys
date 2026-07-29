@@ -1055,19 +1055,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       return;
     }
     
-    // Check cache first
+    // REMOVED CACHE CHECK - Always load fresh from Firestore for cross-device sync
+    // Cache was preventing other devices from seeing updated data
     const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
     console.log('🔑 Cache key:', cacheKey);
-    
-    if (weeklyReportCache.current[cacheKey] &&
-        lastLoadedWeeklyRef.current.month === selectedMonth &&
-        lastLoadedWeeklyRef.current.year === selectedYear &&
-        lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab) {
-      console.log('📦 Using cached data, skipping Firestore read');
-      console.log('📊 Cached data keys:', Object.keys(weeklyReportCache.current[cacheKey]).length);
-      setWeeklyReportData(weeklyReportCache.current[cacheKey]);
-      return;
-    }
+    console.log('🔄 Loading fresh data from Firestore (cache disabled for cross-device sync)');
     
     // MODIFIED: Check localStorage first for speed, but also check Firestore for cross-device sync
     // Priority: localStorage (for current device) → Firestore (for other devices)
@@ -1229,7 +1221,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             })));
           }
           
-          // CRITICAL: Compare with localStorage and use newer data
+          // CRITICAL: ALWAYS use Firestore data as source of truth for cross-device sync
           let finalData = weeklyData;
           
           if (localStorageData && Object.keys(localStorageData).length > 0) {
@@ -1248,22 +1240,40 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             console.log('  📦 localStorage entries:', localCount);
             console.log('  ☁️  Firestore entries:', firestoreCount);
             
-            // Use Firestore data as it's the source of truth for cross-device sync
-            if (firestoreCount >= localCount) {
-              console.log('✅ Using Firestore data (newer or same)');
-              finalData = weeklyData;
-            } else {
-              console.log('⚠️ Firestore has LESS data than localStorage!');
-              console.log('   This means localStorage has unsaved changes.');
-              console.log('   Using localStorage data and will sync to Firestore');
-              finalData = localStorageData;
+            // CRITICAL FIX: ALWAYS prefer Firestore data for cross-device sync
+            // Firestore is the single source of truth
+            console.log('✅ Using Firestore data (source of truth for all devices)');
+            finalData = weeklyData;
+            
+            // If localStorage has more data, it means there are unsaved local changes
+            // Auto-sync them to Firestore
+            if (localCount > firestoreCount) {
+              console.log('⚠️ localStorage has MORE data than Firestore!');
+              console.log('   This means there are unsaved local changes.');
+              console.log('   Will sync to Firestore after loading...');
               
-              // Auto-save localStorage data to Firestore to sync
+              // Merge localStorage data with Firestore data
+              const mergedData = { ...weeklyData };
+              Object.keys(localStorageData).forEach(dateKey => {
+                const localEntries = localStorageData[dateKey];
+                const firestoreEntries = mergedData[dateKey] || [];
+                
+                // If localStorage has more entries for this date, use those
+                if (Array.isArray(localEntries) && localEntries.length > firestoreEntries.length) {
+                  mergedData[dateKey] = localEntries;
+                }
+              });
+              
+              finalData = mergedData;
+              
+              // Auto-save merged data to Firestore to sync
               setTimeout(() => {
-                console.log('🔄 Auto-syncing localStorage to Firestore...');
+                console.log('🔄 Auto-syncing merged data to Firestore...');
                 handleSaveWeeklyReport(true); // true = skip reload
               }, 2000);
             }
+          } else {
+            console.log('✅ No localStorage data, using Firestore as source of truth');
           }
           
           // Cache the final data
