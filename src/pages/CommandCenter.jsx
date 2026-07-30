@@ -4676,7 +4676,16 @@ const handleSaveAllMonths = async () => {
                     <div className="flex-1">
                       <p className="font-bold text-gray-900 text-base">Upload Photos (Optional)</p>
                       <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB. Data is automatically saved to cloud after photo upload.
+                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB.
+                      </p>
+                    </div>
+                  </li>
+                  <li className="flex gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl hover:border-green-400 hover:shadow-md transition-all duration-200">
+                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">7</span>
+                    <div className="flex-1">
+                      <p className="font-bold text-gray-900 text-base">Save Data (Required)</p>
+                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                        <span className="font-bold text-green-600">IMPORTANT:</span> After filling entries and uploading photos (if any), click the <span className="font-semibold text-green-600">"Save Data"</span> button (blue button at top) to save all your changes to the database. Without clicking this button, your data will NOT be saved!
                       </p>
                     </div>
                   </li>
@@ -4769,8 +4778,12 @@ const handleSaveAllMonths = async () => {
                     <span>Photos and remarks are optional but helpful for detailed documentation</span>
                   </li>
                   <li className="flex items-start gap-3">
+                    <span className="text-red-600 font-bold text-lg">⚠</span>
+                    <span className="font-bold text-red-700">IMPORTANT: Always click "Save Data" button after adding entries or uploading photos! Data is NOT automatically saved.</span>
+                  </li>
+                  <li className="flex items-start gap-3">
                     <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>Data is automatically saved to the database after uploading photos</span>
+                    <span>To see updates from other devices, simply refresh the page (F5 or Ctrl+R)</span>
                   </li>
                   <li className="flex items-start gap-3">
                     <span className="text-yellow-600 font-bold text-lg">✓</span>
