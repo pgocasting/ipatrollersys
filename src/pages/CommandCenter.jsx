@@ -2007,23 +2007,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       showSuccess(
         isEditingExisting
           ? 'Photo changes saved! Auto-saving to database...'
-          : `${totalNewPhotos} photo(s) uploaded successfully! Auto-saving to database...`
+          : `${totalNewPhotos} photo(s) uploaded successfully! Click "Save Data" to save.`
       );
       setShowPhotoUploadDialog(false);
       setPhotoRows([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
       setCurrentPhotoEntry(null);
       
-      // Auto-save to Firestore after photo upload
-      console.log('💾 Auto-saving to Firestore after photo upload...');
-      setTimeout(async () => {
-        try {
-          await handleSaveWeeklyReport(true); // Pass true to skip reload
-          console.log('✅ Auto-save completed successfully');
-        } catch (autoSaveError) {
-          console.error('❌ Auto-save failed:', autoSaveError);
-          showWarning('Photos uploaded successfully but auto-save to database failed. Please refresh the page and check if photos are saved.');
-        }
-      }, 500); // Small delay to ensure state is updated
+      // Removed auto-save to Firestore after photo upload
+      // User must manually click "Save Data" button to save
+      console.log('✅ Photos uploaded successfully. Reminder: Click "Save Data" button to save changes.');
+      showInfo('Photos uploaded! Remember to click "Save Data" button to save your changes.');
       
     } catch (error) {
       console.error('Error uploading photos:', error);
