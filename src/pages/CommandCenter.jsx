@@ -4,7 +4,7 @@ import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/c
 import { useFirebase } from "../hooks/useFirebase";
 import { useFirestoreQuota } from "../hooks/useFirestoreQuota";
 import { useAuth } from "../contexts/AuthContext";
-import { doc, getDoc, setDoc, collection, getDocs, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { 
   Command, 
@@ -262,44 +262,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
   
-  // Auto-save to localStorage AND Firestore whenever weeklyReportData changes (debounced)
-  const autoSaveDebounceRef = useRef(null);
-  
-  useEffect(() => {
-    // Clear previous timeout
-    if (autoSaveDebounceRef.current) {
-      clearTimeout(autoSaveDebounceRef.current);
-    }
-    
-    // Don't auto-save if no data or no municipality/month/year selected
-    if (!weeklyReportData || Object.keys(weeklyReportData).length === 0 || !activeMunicipalityTab || !selectedMonth || !selectedYear) {
-      return;
-    }
-    
-    // Debounce the auto-save to avoid too many writes
-    autoSaveDebounceRef.current = setTimeout(async () => {
-      try {
-        // Save to localStorage for instant local access
-        const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-        localStorage.setItem(storageKey, JSON.stringify(weeklyReportData));
-        console.log('💾 Auto-saved to localStorage:', storageKey, 'with', Object.keys(weeklyReportData).length, 'dates');
-        
-        // CRITICAL FIX: Also auto-save to Firestore for cross-device sync
-        console.log('☁️  Auto-syncing to Firestore for cross-device access...');
-        await handleSaveWeeklyReport(true); // Pass true to skip reload
-        console.log('✅ Auto-sync to Firestore completed');
-      } catch (error) {
-        console.error('❌ Auto-save failed:', error);
-      }
-    }, 3000); // Save 3 seconds after last change (increased from 1s to reduce Firestore writes)
-    
-    // Cleanup
-    return () => {
-      if (autoSaveDebounceRef.current) {
-        clearTimeout(autoSaveDebounceRef.current);
-      }
-    };
-  }, [weeklyReportData, activeMunicipalityTab, selectedMonth, selectedYear]);
+  // Removed auto-save to localStorage/Firestore - now only saves when:
+  // 1. User uploads photos (auto-save after upload)
+  // 2. User clicks "Save Data" button (manual save)
 
   // Municipalities by district
   const municipalitiesByDistrict = {
@@ -896,123 +861,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
-  // REAL-TIME LISTENER: Listen for changes from other devices
-  useEffect(() => {
-    if (!selectedMonth || !selectedYear || !activeMunicipalityTab) {
-      console.log('⏸️ Real-time listener: Missing required parameters, skipping');
-      return;
-    }
-
-    const monthYear = `${selectedMonth}_${selectedYear}`;
-    const municipality = activeMunicipalityTab;
-    
-    console.log('🔴 REAL-TIME LISTENER: Setting up for', {
-      municipality,
-      monthYear,
-      path: `commandCenter/weeklyReports/${municipality}/${monthYear}`,
-      timestamp: new Date().toISOString()
-    });
-
-    // Create reference to the Firestore document
-    const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-    
-    // Set up real-time listener
-    const unsubscribe = onSnapshot(docRef, 
-      (docSnapshot) => {
-        console.log('🔴 REAL-TIME LISTENER FIRED:', {
-          exists: docSnapshot.exists(),
-          municipality,
-          monthYear,
-          timestamp: new Date().toISOString()
-        });
-        
-        if (docSnapshot.exists()) {
-          const data = docSnapshot.data();
-          console.log('🔴 REAL-TIME UPDATE RECEIVED:', {
-            municipality,
-            monthYear,
-            dataKeys: Object.keys(data),
-            hasWeeklyReportData: !!data.weeklyReportData,
-            isSplit: !!data.isSplit,
-            timestamp: new Date().toISOString()
-          });
-
-          let weeklyData = null;
-          
-          // Check if data is split into multiple documents
-          if (data.isSplit && data.weeks) {
-            console.log('🔴 REAL-TIME: Data is SPLIT, need to load individual week documents');
-            console.warn('⚠️ REAL-TIME: Split documents not yet supported in real-time listener!');
-            console.warn('⚠️ Please refresh page manually to see updates for split data');
-            // Removed warning toast - will show in console only
-            return;
-          }
-          
-          // Extract weekly report data from different structures
-          if (data.weeklyReportData) {
-            weeklyData = data.weeklyReportData;
-          } else if (data.data && data.data.weeklyReportData) {
-            weeklyData = data.data.weeklyReportData;
-          }
-
-          if (weeklyData && Object.keys(weeklyData).length > 0) {
-            const entryCount = Object.values(weeklyData).reduce((sum, entries) => 
-              sum + (Array.isArray(entries) ? entries.length : 0), 0
-            );
-            
-            console.log('🔴 REAL-TIME: Updating with', Object.keys(weeklyData).length, 'dates,', entryCount, 'total entries');
-            console.log('🔴 REAL-TIME: Current state has', Object.keys(weeklyReportData || {}).length, 'dates');
-            
-            // Update localStorage with fresh data
-            try {
-              const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-              localStorage.setItem(storageKey, JSON.stringify(weeklyData));
-              console.log('💾 Real-time: Saved to localStorage with key:', storageKey);
-            } catch (err) {
-              console.warn('⚠️ Real-time: Could not save to localStorage:', err);
-            }
-
-            // Force update the state AGGRESSIVELY
-            console.log('🔴 REAL-TIME: Forcing state update...');
-            setWeeklyReportData(() => ({})); // Clear first
-            
-            // Use longer timeout to ensure clearing happens
-            setTimeout(() => {
-              console.log('🔴 REAL-TIME: Setting new data with', entryCount, 'entries');
-              setWeeklyReportData(() => weeklyData);
-              setDataVersion(prev => {
-                const newVersion = prev + 1;
-                console.log('🔴 REAL-TIME: Incremented dataVersion to', newVersion);
-                return newVersion;
-              });
-              setIsLoadingWeeklyReports(false); // Ensure loading state is correct
-              console.log('✅ REAL-TIME: State update complete!');
-              
-              // Removed toast notification - silent background sync
-            }, 50); // Increased timeout
-          } else {
-            console.log('🔴 REAL-TIME: Document exists but no weekly data found');
-            console.log('🔴 REAL-TIME: Document data:', data);
-          }
-        } else {
-          console.log('🔴 REAL-TIME: Document does not exist yet');
-        }
-      },
-      (error) => {
-        console.error('❌ REAL-TIME LISTENER ERROR:', error);
-        console.error('❌ Error details:', error.message, error.code);
-        // Removed error toast - will show in console only
-      }
-    );
-
-    // Cleanup function: unsubscribe when component unmounts or dependencies change
-    return () => {
-      console.log('🔴 REAL-TIME LISTENER: Cleaning up for', municipality, monthYear);
-      unsubscribe();
-    };
-  }, [selectedMonth, selectedYear, activeMunicipalityTab]);
-
-
+  // Removed real-time listener - back to simple manual refresh model
+  // Data updates only when:
+  // 1. Page loads/refreshes  
+  // 2. After photo upload (auto-save triggers reload)
+  // 3. After clicking "Save Data" button
+  
   // Component initialization - removed local storage usage
 
   // Clear concern types when municipality changes
