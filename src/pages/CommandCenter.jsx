@@ -1192,67 +1192,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             })));
           }
           
-          // CRITICAL: ALWAYS use Firestore data as source of truth for cross-device sync
-          let finalData = weeklyData;
+          // CRITICAL: ALWAYS use Firestore data - it's the ONLY source of truth
+          // Completely ignore localStorage to prevent conflicts
+          console.log('✅ Using Firestore data as ONLY source of truth');
+          console.log('📊 Firestore has', Object.keys(weeklyData).length, 'dates');
           
+          const firestoreCount = Object.values(weeklyData).reduce((sum, entries) => 
+            sum + (Array.isArray(entries) ? entries.length : 0), 0
+          );
+          console.log('📊 Firestore has', firestoreCount, 'total entries');
+          
+          let finalData = weeklyData; // Always use Firestore!
+          
+          // If there was localStorage, log it but DON'T use it
           if (localStorageData && Object.keys(localStorageData).length > 0) {
-            console.log('🔄 Comparing localStorage vs Firestore data...');
-            console.log('  📦 localStorage:', Object.keys(localStorageData).length, 'dates');
-            console.log('  ☁️  Firestore:', Object.keys(weeklyData).length, 'dates');
-            
-            // Count total entries in each
             const localCount = Object.values(localStorageData).reduce((sum, entries) => 
               sum + (Array.isArray(entries) ? entries.length : 0), 0
             );
-            const firestoreCount = Object.values(weeklyData).reduce((sum, entries) => 
-              sum + (Array.isArray(entries) ? entries.length : 0), 0
-            );
+            console.log('ℹ️  localStorage had', localCount, 'entries (IGNORED - using Firestore instead)');
             
-            console.log('  📦 localStorage entries:', localCount);
-            console.log('  ☁️  Firestore entries:', firestoreCount);
-            
-            // CRITICAL FIX: ALWAYS prefer Firestore data for cross-device sync
-            // Firestore is the single source of truth
-            if (firestoreCount >= localCount) {
-              console.log('✅ Using Firestore data (has equal or more entries - source of truth)');
-              finalData = weeklyData;
-              
-              // CRITICAL: Clear old localStorage to prevent conflicts
-              console.log('🧹 Clearing old localStorage to prevent conflicts');
-              try {
-                const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-                localStorage.removeItem(storageKey);
-                console.log('✅ Old localStorage cleared');
-              } catch (err) {
-                console.warn('⚠️ Could not clear old localStorage:', err);
-              }
-            } else {
-              console.log('⚠️ localStorage has MORE data than Firestore!');
-              console.log('   This means there are unsaved local changes.');
-              console.log('   Will sync to Firestore after loading...');
-              
-              // Merge localStorage data with Firestore data
-              const mergedData = { ...weeklyData };
-              Object.keys(localStorageData).forEach(dateKey => {
-                const localEntries = localStorageData[dateKey];
-                const firestoreEntries = mergedData[dateKey] || [];
-                
-                // If localStorage has more entries for this date, use those
-                if (Array.isArray(localEntries) && localEntries.length > firestoreEntries.length) {
-                  mergedData[dateKey] = localEntries;
-                }
-              });
-              
-              finalData = mergedData;
-              
-              // Auto-save merged data to Firestore to sync
-              setTimeout(() => {
-                console.log('🔄 Auto-syncing merged data to Firestore...');
-                handleSaveWeeklyReport(true); // true = skip reload
-              }, 2000);
+            // Clear localStorage immediately
+            try {
+              const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
+              localStorage.removeItem(storageKey);
+              console.log('🧹 Cleared old localStorage');
+            } catch (err) {
+              console.warn('⚠️ Could not clear localStorage:', err);
             }
-          } else {
-            console.log('✅ No localStorage data, using Firestore as source of truth');
           }
           
           // DO NOT cache - always load fresh from Firestore for cross-device sync
