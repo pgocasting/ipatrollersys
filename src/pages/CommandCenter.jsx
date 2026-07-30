@@ -944,7 +944,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             console.log('🔴 REAL-TIME: Data is SPLIT, need to load individual week documents');
             console.warn('⚠️ REAL-TIME: Split documents not yet supported in real-time listener!');
             console.warn('⚠️ Please refresh page manually to see updates for split data');
-            showWarning('Data structure changed. Please refresh page (F5) to see latest updates.');
+            // Removed warning toast - will show in console only
             return;
           }
           
@@ -988,8 +988,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               setIsLoadingWeeklyReports(false); // Ensure loading state is correct
               console.log('✅ REAL-TIME: State update complete!');
               
-              // Always show notification for debugging
-              showInfo(`🔴 Real-time update: ${entryCount} entries loaded`);
+              // Removed toast notification - silent background sync
             }, 50); // Increased timeout
           } else {
             console.log('🔴 REAL-TIME: Document exists but no weekly data found');
@@ -1002,7 +1001,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       (error) => {
         console.error('❌ REAL-TIME LISTENER ERROR:', error);
         console.error('❌ Error details:', error.message, error.code);
-        showError('Real-time sync error: ' + error.message);
+        // Removed error toast - will show in console only
       }
     );
 
