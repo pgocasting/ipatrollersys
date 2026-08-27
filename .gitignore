@@ -25,3 +25,5 @@ dist-ssr
 
 # Project-specific ignored files
 serviceAccountKey.json
+.vercel
+.env*
