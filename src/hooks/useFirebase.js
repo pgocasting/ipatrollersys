@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
-import { 
-  signInWithEmailAndPassword, 
-  onAuthStateChanged, 
-  signOut, 
+import {
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut,
   setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
@@ -10,15 +10,15 @@ import {
   reauthenticateWithCredential,
   updatePassword
 } from 'firebase/auth';
-import { 
-  doc, 
-  setDoc, 
-  getDoc, 
-  collection, 
-  getDocs, 
-  query, 
-  where, 
-  deleteDoc, 
+import {
+  doc,
+  setDoc,
+  getDoc,
+  collection,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
   updateDoc,
   serverTimestamp,
   Timestamp
@@ -41,11 +41,11 @@ export const useFirebase = () => {
   const signIn = async (username, password, keepLoggedIn = false) => {
     try {
       setLoading(true);
-      
+
       // First, get the user's email from Firestore using the username
       const docRef = doc(db, 'users', 'management');
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         throw new Error('User management data not found');
       }
@@ -71,12 +71,12 @@ export const useFirebase = () => {
       // Now sign in with the email
       const userCredential = await signInWithEmailAndPassword(auth, userRecord.email, password);
       const user = userCredential.user;
-      
+
       return { success: true, user };
     } catch (error) {
       console.error('❌ Sign in error:', error);
       let errorMessage = 'Sign in failed';
-      
+
       if (error.code === 'permission-denied') {
         console.error('Permission denied error. Please check Firestore rules.');
         errorMessage = 'System error: Unable to verify credentials';
@@ -100,7 +100,7 @@ export const useFirebase = () => {
             errorMessage = 'Login failed. Please try again.';
         }
       }
-      
+
       return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
@@ -129,7 +129,7 @@ export const useFirebase = () => {
       const data = docSnap.data();
       const users = data.users || [];
       const currentUser = users.find(u => u.email === user.email);
-      
+
       if (currentUser?.role) {
         return { success: true, data: { role: currentUser.role } };
       } else {
@@ -191,7 +191,7 @@ export const useFirebase = () => {
       return { success: true, message: "Password updated successfully" };
     } catch (error) {
       console.error('Error changing password:', error);
-      
+
       if (error.code === 'auth/wrong-password') {
         return { success: false, error: "Current password is incorrect" };
       } else if (error.code === 'auth/weak-password') {
@@ -208,12 +208,12 @@ export const useFirebase = () => {
   const getBarangays = async () => {
     try {
       console.log('🔍 Fetching barangays from Firestore...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', 'barangays');
       const docSnap = await getDoc(docRef);
 
@@ -235,12 +235,12 @@ export const useFirebase = () => {
   const getConcernTypes = async () => {
     try {
       console.log('🔍 Fetching concern types from Firestore...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', 'concernTypes');
       const docSnap = await getDoc(docRef);
 
@@ -262,12 +262,12 @@ export const useFirebase = () => {
   const getWeeklyReport = async (monthYear) => {
     try {
       console.log('🔍 Fetching weekly report from Firestore for:', monthYear);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', `weeklyReports_${monthYear}`);
       const docSnap = await getDoc(docRef);
 
@@ -275,7 +275,7 @@ export const useFirebase = () => {
         const fullDocData = docSnap.data();
         console.log('✅ Found weekly report in Firestore for:', monthYear);
         console.log('📊 Document structure:', Object.keys(fullDocData));
-        
+
         // Return the full document data to match what the loading function expects
         return { success: true, data: fullDocData };
       } else {
@@ -291,24 +291,24 @@ export const useFirebase = () => {
   const saveWeeklyReport = async (reportKey, reportData) => {
     try {
       console.log('💾 Saving weekly report to Firestore for:', reportKey);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', `weeklyReports_${reportKey}`);
       await setDoc(docRef, {
         data: reportData,
         lastUpdated: new Date().toISOString(),
         updatedBy: user.email
       }, { merge: true });
-      
+
       console.log('✅ Weekly report saved successfully to Firestore for:', reportKey);
       return { success: true };
     } catch (error) {
@@ -321,12 +321,12 @@ export const useFirebase = () => {
   const saveWeeklyReportToCollection = async (reportData) => {
     try {
       console.log('💾 Saving weekly report to weeklyReports collection...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -335,7 +335,7 @@ export const useFirebase = () => {
       // Generate a unique document ID based on month, year, and municipality
       const { selectedMonth, selectedYear, activeMunicipalityTab } = reportData;
       const docId = `${selectedMonth}_${selectedYear}_${activeMunicipalityTab || 'All'}_${Date.now()}`;
-      
+
       const docRef = doc(db, 'weeklyReports', docId);
       await setDoc(docRef, {
         ...reportData,
@@ -345,7 +345,7 @@ export const useFirebase = () => {
         lastUpdated: new Date().toISOString(),
         updatedBy: user.email
       });
-      
+
       console.log('✅ Weekly report saved successfully to weeklyReports collection:', docId);
       return { success: true, docId };
     } catch (error) {
@@ -358,12 +358,12 @@ export const useFirebase = () => {
   const saveWeeklyReportByMunicipality = async (reportData) => {
     try {
       console.log('💾 Saving weekly report by municipality...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -377,26 +377,26 @@ export const useFirebase = () => {
       const reportDataString = JSON.stringify(reportData);
       const estimatedSize = new TextEncoder().encode(reportDataString).length;
       const sizeInKB = (estimatedSize / 1024).toFixed(2);
-      
+
       console.log(`📊 Document size for ${municipality}:`, {
         estimatedSize: `${estimatedSize} bytes`,
         sizeInKB: `${sizeInKB} KB`,
         dateCount: Object.keys(weeklyReportData || {}).length,
-        totalEntries: Object.values(weeklyReportData || {}).reduce((sum, entries) => 
+        totalEntries: Object.values(weeklyReportData || {}).reduce((sum, entries) =>
           sum + (Array.isArray(entries) ? entries.length : 0), 0
         ),
         hasPhotos: Object.values(weeklyReportData || {}).some(entries =>
           Array.isArray(entries) && entries.some(entry => entry.photos)
         )
       });
-      
+
       // CRITICAL: Per-municipality size check - only split if THIS municipality's data is too large
       const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit (1MB)
       const SAFE_SIZE_LIMIT = 900000; // 900KB - more generous limit (was 700KB)
-      
+
       if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
         console.log(`⚠️ ${municipality}: Document size (${sizeInKB} KB) exceeds safe limit. Splitting by weeks...`);
-        
+
         // Split weeklyReportData by weeks
         const weeks = [
           { name: 'week1', dates: [] },
@@ -405,7 +405,7 @@ export const useFirebase = () => {
           { name: 'week4', dates: [] },
           { name: 'week5', dates: [] }
         ];
-        
+
         // Group dates by week
         Object.keys(weeklyReportData || {}).forEach(dateKey => {
           try {
@@ -421,18 +421,18 @@ export const useFirebase = () => {
             console.warn(`⚠️ Could not parse date: ${dateKey}`);
           }
         });
-        
-        console.log(`📅 ${municipality} week distribution:`, weeks.map((w, i) => `Week ${i+1}: ${w.dates.length}`).join(', '));
-        
+
+        console.log(`📅 ${municipality} week distribution:`, weeks.map((w, i) => `Week ${i + 1}: ${w.dates.length}`).join(', '));
+
         // Save each week as a separate document
         const savePromises = weeks.map(async (week, index) => {
           if (week.dates.length === 0) return { success: true };
-          
+
           const weekData = week.dates.reduce((acc, dateKey) => {
             acc[dateKey] = weeklyReportData[dateKey];
             return acc;
           }, {});
-          
+
           const weekReportData = {
             ...reportData,
             weeklyReportData: weekData,
@@ -444,15 +444,15 @@ export const useFirebase = () => {
             lastUpdated: new Date().toISOString(),
             updatedBy: user.email
           };
-          
+
           const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_week${index + 1}`);
           await setDoc(weekDocRef, weekReportData, { merge: true });
           console.log(`✅ ${municipality} Week ${index + 1}: Saved`);
           return { success: true };
         });
-        
+
         await Promise.all(savePromises);
-        
+
         // Save summary document
         const summaryData = {
           selectedMonth,
@@ -470,17 +470,35 @@ export const useFirebase = () => {
           lastUpdated: new Date().toISOString(),
           updatedBy: user.email
         };
-        
+
         const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_summary`);
         await setDoc(summaryDocRef, summaryData, { merge: true });
-        
+
         console.log(`✅ ${municipality}: Split save completed (${weeks.filter(w => w.dates.length > 0).length} weeks)`);
         return { success: true, wasSplit: true, docId };
       } else {
         // Document size is OK - save normally as single document
         console.log(`✅ ${municipality}: Document size OK (${sizeInKB} KB), saving as single document`);
-        
+
         const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
+
+        // CRITICAL: Log the actual data being saved
+        console.log('💾 About to save this data to Firestore:', {
+          path: `commandCenter/weeklyReports/${municipality}/${docId}`,
+          totalDates: Object.keys(reportData.weeklyReportData || {}).length,
+          totalEntries: Object.values(reportData.weeklyReportData || {}).reduce((sum, entries) =>
+            sum + (Array.isArray(entries) ? entries.length : 0), 0
+          ),
+          sampleEntries: Object.entries(reportData.weeklyReportData || {})
+            .filter(([_, entries]) => Array.isArray(entries) && entries.length > 0)
+            .slice(0, 2)
+            .map(([date, entries]) => ({
+              date,
+              count: entries.length,
+              sample: entries[0]
+            }))
+        });
+
         await setDoc(municipalDocRef, {
           ...reportData,
           id: docId,
@@ -490,6 +508,14 @@ export const useFirebase = () => {
           lastUpdated: new Date().toISOString(),
           updatedBy: user.email
         }, { merge: true });
+
+        // Update summary document if it exists so load function uses single document
+        try {
+          const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_summary`);
+          await setDoc(summaryDocRef, { isSplit: false }, { merge: true });
+        } catch (e) {
+          // ignore error if summary doesn't exist
+        }
 
         console.log(`✅ ${municipality}: Saved successfully as single document`);
         return { success: true, docId };
@@ -503,15 +529,15 @@ export const useFirebase = () => {
   const getWeeklyReportsFromCollection = async (filters = {}) => {
     try {
       console.log('🔍 Fetching weekly reports from collection with filters:', filters);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const collectionRef = collection(db, 'weeklyReports');
       let q = collectionRef;
-      
+
       // Apply filters if provided
       if (filters.month) {
         q = query(q, where('selectedMonth', '==', filters.month));
@@ -522,20 +548,20 @@ export const useFirebase = () => {
       if (filters.municipality) {
         q = query(q, where('activeMunicipalityTab', '==', filters.municipality));
       }
-      
+
       const querySnapshot = await getDocs(q);
       const reports = [];
-      
+
       querySnapshot.forEach((doc) => {
         reports.push({
           id: doc.id,
           ...doc.data()
         });
       });
-      
+
       // Sort by creation date (newest first)
       reports.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-      
+
       console.log('✅ Found weekly reports in collection:', reports.length);
       return { success: true, data: reports };
     } catch (error) {
@@ -547,24 +573,24 @@ export const useFirebase = () => {
   const updateWeeklyReportInCollection = async (docId, updateData) => {
     try {
       console.log('🔄 Updating weekly report in collection:', docId);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
       }
-      
+
       const docRef = doc(db, 'weeklyReports', docId);
       await updateDoc(docRef, {
         ...updateData,
         lastUpdated: new Date().toISOString(),
         updatedBy: user.email
       });
-      
+
       console.log('✅ Weekly report updated successfully in collection:', docId);
       return { success: true };
     } catch (error) {
@@ -576,20 +602,20 @@ export const useFirebase = () => {
   const deleteWeeklyReportFromCollection = async (docId) => {
     try {
       console.log('🗑️ Deleting weekly report from collection:', docId);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
       }
-      
+
       const docRef = doc(db, 'weeklyReports', docId);
       await deleteDoc(docRef);
-      
+
       console.log('✅ Weekly report deleted successfully from collection:', docId);
       return { success: true };
     } catch (error) {
@@ -602,24 +628,24 @@ export const useFirebase = () => {
   const saveBarangays = async (barangays) => {
     try {
       console.log('💾 Saving barangays to Firestore...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', 'barangays');
       await setDoc(docRef, {
         barangays: barangays,
         lastUpdated: new Date().toISOString(),
         updatedBy: user.email
       }, { merge: true });
-      
+
       console.log('✅ Barangays saved successfully to Firestore:', barangays.length);
       return { success: true };
     } catch (error) {
@@ -632,24 +658,24 @@ export const useFirebase = () => {
   const saveConcernTypes = async (concernTypes) => {
     try {
       console.log('💾 Saving concern types to Firestore...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
       }
-      
+
       const docRef = doc(db, 'commandCenter', 'concernTypes');
       await setDoc(docRef, {
         concernTypes: concernTypes,
         lastUpdated: new Date().toISOString(),
         updatedBy: user.email
       }, { merge: true });
-      
+
       console.log('✅ Concern types saved successfully to Firestore:', concernTypes.length);
       return { success: true };
     } catch (error) {
@@ -665,7 +691,7 @@ export const useFirebase = () => {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const docRef = doc(db, 'users', 'management');
       const docSnap = await getDoc(docRef);
 
@@ -717,7 +743,7 @@ export const useFirebase = () => {
       // Add user to Firestore management document
       const docRef = doc(db, 'users', 'management');
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return { success: false, error: "Management document not found" };
       }
@@ -764,14 +790,14 @@ export const useFirebase = () => {
       // Update user in Firestore management document
       const docRef = doc(db, 'users', 'management');
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return { success: false, error: "Management document not found" };
       }
 
       const currentData = docSnap.data();
       const users = currentData.users || [];
-      
+
       // Find the user to update
       const userIndex = users.findIndex(u => u.id === userId);
       if (userIndex === -1) {
@@ -817,14 +843,14 @@ export const useFirebase = () => {
       // Delete user from Firestore management document
       const docRef = doc(db, 'users', 'management');
       const docSnap = await getDoc(docRef);
-      
+
       if (!docSnap.exists()) {
         return { success: false, error: "Management document not found" };
       }
 
       const currentData = docSnap.data();
       const users = currentData.users || [];
-      
+
       // Find the user to delete
       const userToDelete = users.find(u => u.id === userId);
       if (!userToDelete) {
@@ -857,12 +883,12 @@ export const useFirebase = () => {
   const addActionReport = async (reportData) => {
     try {
       console.log('💾 Adding action report to Firestore...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -878,10 +904,10 @@ export const useFirebase = () => {
         reportDate = new Date(reportData.when);
       }
       const monthKey = `${String(reportDate.getMonth() + 1).padStart(2, '0')}-${reportDate.getFullYear()}`;
-      
+
       // Generate unique report ID
       const reportId = `report_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       // Prepare report data with metadata
       const reportWithMetadata = {
         ...reportData,
@@ -895,7 +921,7 @@ export const useFirebase = () => {
       // Get existing month document
       const monthDocRef = doc(db, 'actionReports', monthKey);
       const monthDocSnap = await getDoc(monthDocRef);
-      
+
       let monthData;
       if (monthDocSnap.exists()) {
         monthData = monthDocSnap.data();
@@ -930,7 +956,7 @@ export const useFirebase = () => {
 
       // Save updated month document
       await setDoc(monthDocRef, monthData);
-      
+
       console.log('✅ Action report saved successfully:', reportId);
       return { success: true, reportId, monthKey, reportCount: monthData.totalReports };
     } catch (error) {
@@ -942,12 +968,12 @@ export const useFirebase = () => {
   const updateActionReport = async (reportId, monthKey, updateData) => {
     try {
       console.log('🔄 Updating action report:', reportId);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -958,11 +984,11 @@ export const useFirebase = () => {
         try {
           const monthDocRef = doc(db, 'actionReports', monthKey);
           const monthDocSnap = await getDoc(monthDocRef);
-          
+
           if (monthDocSnap.exists()) {
             const monthData = monthDocSnap.data();
             const reportIndex = monthData.data.findIndex(report => report.id === reportId);
-            
+
             if (reportIndex !== -1) {
               // Update the report
               monthData.data[reportIndex] = {
@@ -976,7 +1002,7 @@ export const useFirebase = () => {
 
               // Save updated month document
               await setDoc(monthDocRef, monthData);
-              
+
               console.log('✅ Action report updated in month structure:', reportId);
               return { success: true };
             }
@@ -994,7 +1020,7 @@ export const useFirebase = () => {
           updatedAt: new Date().toISOString(),
           updatedBy: user.email
         });
-        
+
         console.log('✅ Action report updated in individual document:', reportId);
         return { success: true };
       } catch (error) {
@@ -1010,12 +1036,12 @@ export const useFirebase = () => {
   const deleteActionReport = async (reportId, monthKey) => {
     try {
       console.log('🗑️ Deleting action report:', reportId);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -1026,11 +1052,11 @@ export const useFirebase = () => {
         try {
           const monthDocRef = doc(db, 'actionReports', monthKey);
           const monthDocSnap = await getDoc(monthDocRef);
-          
+
           if (monthDocSnap.exists()) {
             const monthData = monthDocSnap.data();
             const reportIndex = monthData.data.findIndex(report => report.id === reportId);
-            
+
             if (reportIndex !== -1) {
               // Remove the report from data array
               monthData.data.splice(reportIndex, 1);
@@ -1039,7 +1065,7 @@ export const useFirebase = () => {
 
               // Save updated month document
               await setDoc(monthDocRef, monthData);
-              
+
               console.log('✅ Action report deleted from month structure:', reportId);
               return { success: true };
             }
@@ -1053,7 +1079,7 @@ export const useFirebase = () => {
       try {
         const reportDocRef = doc(db, 'actionReports', reportId);
         await deleteDoc(reportDocRef);
-        
+
         console.log('✅ Action report deleted from individual document:', reportId);
         return { success: true };
       } catch (error) {
@@ -1069,40 +1095,40 @@ export const useFirebase = () => {
   const queryDocuments = async (collectionName, filters = {}) => {
     try {
       console.log('🔍 Querying documents from collection:', collectionName);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const collectionRef = collection(db, collectionName);
       let q = collectionRef;
-      
+
       // Apply filters if provided
       if (filters.where) {
         filters.where.forEach(condition => {
           q = query(q, where(condition.field, condition.operator, condition.value));
         });
       }
-      
+
       if (filters.orderBy) {
         q = query(q, orderBy(filters.orderBy.field, filters.orderBy.direction || 'asc'));
       }
-      
+
       if (filters.limit) {
         q = query(q, limit(filters.limit));
       }
-      
+
       const querySnapshot = await getDocs(q);
       const documents = [];
-      
+
       querySnapshot.forEach((doc) => {
         documents.push({
           id: doc.id,
           ...doc.data()
         });
       });
-      
+
       console.log('✅ Found documents in collection:', documents.length);
       return { success: true, data: documents };
     } catch (error) {
@@ -1114,15 +1140,15 @@ export const useFirebase = () => {
   const getActionReportsByMonth = async (monthKey) => {
     try {
       console.log('🔍 Getting action reports for month:', monthKey);
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const monthDocRef = doc(db, 'actionReports', monthKey);
       const monthDocSnap = await getDoc(monthDocRef);
-      
+
       if (monthDocSnap.exists()) {
         const monthData = monthDocSnap.data();
         console.log('✅ Found action reports for month:', monthKey, monthData.data?.length || 0);
@@ -1140,15 +1166,15 @@ export const useFirebase = () => {
   const getAllActionReportsMonths = async () => {
     try {
       console.log('🔍 Getting all action report months...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const collectionRef = collection(db, 'actionReports');
       const querySnapshot = await getDocs(collectionRef);
-      
+
       const months = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
@@ -1157,7 +1183,7 @@ export const useFirebase = () => {
           ...data
         });
       });
-      
+
       // Sort by month key (newest first)
       months.sort((a, b) => {
         const [aMonth, aYear] = a.monthKey.split('-').map(Number);
@@ -1165,7 +1191,7 @@ export const useFirebase = () => {
         if (aYear !== bYear) return bYear - aYear;
         return bMonth - aMonth;
       });
-      
+
       console.log('✅ Found action report months:', months.length);
       return { success: true, data: months };
     } catch (error) {
@@ -1177,14 +1203,14 @@ export const useFirebase = () => {
   const getAllActionReports = async () => {
     try {
       console.log('🔍 Getting all action reports from Firestore (hybrid approach)...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       const allReports = [];
-      
+
       // First, try the new month-based structure
       try {
         const monthsResult = await getAllActionReportsMonths();
@@ -1200,17 +1226,17 @@ export const useFirebase = () => {
       } catch (error) {
         console.log('⚠️ Month-based structure not found or error:', error.message);
       }
-      
+
       // If no reports found in month-based structure, try the old individual document structure
       if (allReports.length === 0) {
         console.log('🔍 Trying old individual document structure...');
         try {
           const collectionRef = collection(db, 'actionReports');
           const querySnapshot = await getDocs(collectionRef);
-          
+
           querySnapshot.forEach((doc) => {
             const data = doc.data();
-            
+
             // Check if this is a month-based document (has 'data' array)
             if (data.data && Array.isArray(data.data)) {
               console.log('📅 Found month document:', doc.id, 'with', data.data.length, 'reports');
@@ -1224,20 +1250,20 @@ export const useFirebase = () => {
               });
             }
           });
-          
+
           console.log('✅ Found', allReports.length, 'total reports from both structures');
         } catch (error) {
           console.error('❌ Error loading from old structure:', error);
         }
       }
-      
+
       // Sort by creation date or when field (newest first)
       allReports.sort((a, b) => {
         const aDate = a.createdAt ? new Date(a.createdAt) : new Date(a.when || 0);
         const bDate = b.createdAt ? new Date(b.createdAt) : new Date(b.when || 0);
         return bDate - aDate;
       });
-      
+
       console.log('✅ Found total action reports:', allReports.length);
       return { success: true, data: allReports };
     } catch (error) {
@@ -1250,12 +1276,12 @@ export const useFirebase = () => {
   const deleteAllWeeklyReports = async () => {
     try {
       console.log('🗑️ Starting bulk deletion of all weekly reports...');
-      
+
       if (!db) {
         console.warn('⚠️ Firestore database not available');
         return { success: false, error: "Database not available" };
       }
-      
+
       if (!user) {
         console.warn('⚠️ No user logged in');
         return { success: false, error: "No user logged in" };
@@ -1269,7 +1295,7 @@ export const useFirebase = () => {
         console.log('🔍 Deleting from weeklyReports collection...');
         const weeklyReportsRef = collection(db, 'weeklyReports');
         const weeklyReportsSnapshot = await getDocs(weeklyReportsRef);
-        
+
         for (const docSnapshot of weeklyReportsSnapshot.docs) {
           try {
             await deleteDoc(doc(db, 'weeklyReports', docSnapshot.id));
@@ -1290,7 +1316,7 @@ export const useFirebase = () => {
         console.log('🔍 Deleting from commandCenter legacy structure...');
         const commandCenterRef = collection(db, 'commandCenter');
         const commandCenterSnapshot = await getDocs(commandCenterRef);
-        
+
         for (const docSnapshot of commandCenterSnapshot.docs) {
           if (docSnapshot.id.startsWith('weeklyReports_')) {
             try {
@@ -1314,7 +1340,7 @@ export const useFirebase = () => {
         console.log('🔍 Checking for additional weekly report documents in commandCenter...');
         const commandCenterRef = collection(db, 'commandCenter');
         const commandCenterSnapshot = await getDocs(commandCenterRef);
-        
+
         for (const docSnapshot of commandCenterSnapshot.docs) {
           // Look for any documents that contain weekly report data but weren't caught by the weeklyReports_ pattern
           if (docSnapshot.id.includes('weekly') || docSnapshot.id.includes('Weekly')) {
@@ -1338,21 +1364,21 @@ export const useFirebase = () => {
       }
 
       console.log(`✅ Bulk deletion completed. Deleted ${deletedCount} documents.`);
-      
+
       if (errors.length > 0) {
         console.warn('⚠️ Some deletions failed:', errors);
-        return { 
-          success: true, 
-          deletedCount, 
+        return {
+          success: true,
+          deletedCount,
           errors,
-          message: `Deleted ${deletedCount} documents with ${errors.length} errors` 
+          message: `Deleted ${deletedCount} documents with ${errors.length} errors`
         };
       }
-      
-      return { 
-        success: true, 
+
+      return {
+        success: true,
         deletedCount,
-        message: `Successfully deleted all ${deletedCount} weekly reports` 
+        message: `Successfully deleted all ${deletedCount} weekly reports`
       };
     } catch (error) {
       console.error('❌ Error in bulk deletion:', error);

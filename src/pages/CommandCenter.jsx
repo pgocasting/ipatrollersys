@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback } from "react";
+﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Layout from "../components/Layout";
 import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import { useFirebase } from "../hooks/useFirebase";
@@ -6,15 +6,15 @@ import { useFirestoreQuota } from "../hooks/useFirestoreQuota";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc, setDoc, collection, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { 
-  Command, 
-  Terminal, 
-  Send, 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
-  Users, 
-  MapPin, 
+import {
+  Command,
+  Terminal,
+  Send,
+  AlertTriangle,
+  CheckCircle,
+  Clock,
+  Users,
+  MapPin,
   Phone,
   MessageSquare,
   FileText,
@@ -45,14 +45,14 @@ import {
 import { toast } from "sonner";
 import { useNotification, NotificationContainer } from '../components/ui/notification';
 import * as XLSX from 'xlsx';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger
 } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { cloudinaryUtils } from '../utils/cloudinary';
@@ -67,7 +67,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const isReadOnly = (userAccessLevel === 'ipatroller' || userAccessLevel === 'viewing') && !isAdmin;
   const isViewingUser = userAccessLevel === 'viewing' && !isAdmin;
   const isFilterReadOnly = userAccessLevel === 'ipatroller' && !isAdmin;
-  
+
   // Access level check - only command-center users should access this page
   useEffect(() => {
     if (userAccessLevel && userAccessLevel !== 'command-center' && userAccessLevel !== 'ipatroller' && userAccessLevel !== 'viewing' && userAccessLevel !== 'admin') {
@@ -75,14 +75,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       // Optionally redirect to dashboard or show error
     }
   }, [userAccessLevel]);
-  
+
   // Municipality tabs state - moved here to be available for useEffect
   const [activeMunicipalityTab, setActiveMunicipalityTab] = useState("");
-  
+
   useEffect(() => {
     if (userMunicipality) {
+      console.log('🏢 Setting municipality from user:', userMunicipality);
       setActiveMunicipalityTab(userMunicipality);
       setSelectedReportMunicipality(userMunicipality);
+    } else {
+      console.log('⚠️ No userMunicipality available yet');
     }
   }, [userMunicipality]);
 
@@ -95,11 +98,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       setShowCommandCenterHelp(false);
     }
   }, [userAccessLevel, isAdmin]);
-  const { 
-    saveBarangays, 
-    getBarangays, 
-    saveConcernTypes, 
-    getConcernTypes, 
+  const {
+    saveBarangays,
+    getBarangays,
+    saveConcernTypes,
+    getConcernTypes,
     getWeeklyReport,
     saveWeeklyReportByMunicipality,
     getWeeklyReportsFromCollection,
@@ -157,7 +160,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [importAllMonths, setImportAllMonths] = useState(false); // Checkbox state for import all months
   const [isSavingAllMonths, setIsSavingAllMonths] = useState(false);
   const [saveAllProgress, setSaveAllProgress] = useState({ current: 0, total: 0 });
-  
+
   // Active Tab State
   const [activeTab, setActiveTab] = useState("weekly-report");
   const [showMenuDropdown, setShowMenuDropdown] = useState(false);
@@ -182,7 +185,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       }
     };
 
-  
+
 
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -192,10 +195,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     if (userMunicipality && activeTab === 'concern-types') {
       // Find the district that contains the user's municipality
-      const userDistrict = Object.entries(municipalitiesByDistrict).find(([district, municipalities]) => 
+      const userDistrict = Object.entries(municipalitiesByDistrict).find(([district, municipalities]) =>
         municipalities.includes(userMunicipality)
       );
-      
+
       if (userDistrict) {
         setSelectedDistrict(userDistrict[0]); // Set the district
         setSelectedMunicipality(userMunicipality); // Set the municipality
@@ -210,7 +213,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [selectedConcernType, setSelectedConcernType] = useState("");
   const [actionTaken, setActionTaken] = useState("");
   const [remarks, setRemarks] = useState("");
-  
+
   // Weekly Reports Collection State
   const [weeklyReportsCollection, setWeeklyReportsCollection] = useState([]);
   const [isLoadingCollection, setIsLoadingCollection] = useState(false);
@@ -223,25 +226,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [concernTypeData, setConcernTypeData] = useState("");
   const [isLoadingConcernTypes, setIsLoadingConcernTypes] = useState(false);
   const [isLoadingWeeklyReports, setIsLoadingWeeklyReports] = useState(false);
-  
+
   // Weekly Report Data - Individual date entries
   const [weeklyReportData, setWeeklyReportData] = useState({});
+  const weeklyReportDataRef = useRef({}); // Ref to always have latest state
   const [dataVersion, setDataVersion] = useState(0); // Force re-render trigger
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track if user is editing
+  const lastSaveTime = useRef(0); // Track when we last saved to prevent immediate reload
   const weeklyReportCache = useRef({});
   const lastLoadedWeeklyRef = useRef({ month: null, year: null, municipality: null });
-  
+
+  // Keep ref synchronized with state
+  useEffect(() => {
+    weeklyReportDataRef.current = weeklyReportData;
+  }, [weeklyReportData]);
+
   // Cache for barangays and concern types
   const barangaysCache = useRef(null);
   const concernTypesCache = useRef(null);
 
   // Municipality tabs state - moved to top of component
-  
+
   // Clear data options state
   const [showClearOptions, setShowClearOptions] = useState(false);
   const [showClearModal, setShowClearModal] = useState(false);
   const [selectedClearMunicipality, setSelectedClearMunicipality] = useState("");
-  
-  
+
+
   // Excel Import States
   const [isImportingExcel, setIsImportingExcel] = useState(false);
   const [excelFile, setExcelFile] = useState(null);
@@ -254,17 +265,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [showPhotoViewDialog, setShowPhotoViewDialog] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState(null);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
-  
+
   // Search and Action Taken Count States
   const [searchTerm, setSearchTerm] = useState("");
   const [showActionTakenModal, setShowActionTakenModal] = useState(false);
-  
+
   // Ref for debouncing remarks updates
   const remarksDebounceRef = useRef(null);
-  
-  // Removed auto-save to localStorage/Firestore - now only saves when:
-  // 1. User uploads photos (auto-save after upload)
-  // 2. User clicks "Save Data" button (manual save)
+
+  // FIXED: Data now saves ONLY to Firestore (live database)
+  // User must click "Save Data" button to save changes
+  // NO localStorage is used for data storage (only Firestore)
 
   // Municipalities by district
   const municipalitiesByDistrict = {
@@ -607,7 +618,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const generateDates = (month, year) => {
     const dates = [];
     const daysInMonth = new Date(year, months.indexOf(month) + 1, 0).getDate();
-    
+
     for (let day = 1; day <= daysInMonth; day++) {
       dates.push(`${month} ${day}, ${year}`);
     }
@@ -648,7 +659,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   };
 
-  const currentDates = generateDates(selectedMonth, selectedYear);
+  const currentDates = useMemo(() => generateDates(selectedMonth, selectedYear), [selectedMonth, selectedYear]);
+
+  // Pre-filtered barangays for the current active municipality tab (memoized to prevent lag during typing)
+  const availableBarangays = useMemo(() => {
+    if (!activeMunicipalityTab) return importedBarangays;
+    const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+    return importedBarangays.filter(barangay => {
+      const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+      return normalizedBarangay === normalizedTab;
+    });
+  }, [importedBarangays, activeMunicipalityTab]);
+
+  // Pre-filtered concern types for the current active municipality tab (memoized)
+  const availableConcernTypes = useMemo(() => {
+    if (!importedConcernTypes || importedConcernTypes.length === 0) return [];
+    if (!activeMunicipalityTab) return importedConcernTypes;
+    const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+    return importedConcernTypes.filter(type => {
+      if (type.municipality === "All Municipalities") return true;
+      const normalizedType = type.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+      return normalizedType === normalizedTab;
+    });
+  }, [importedConcernTypes, activeMunicipalityTab]);
 
   // Wrapper function for Firestore save operations with quota checking
   const saveWithQuotaCheck = useCallback(async (saveOperation, operationName = "Save") => {
@@ -670,7 +703,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
     try {
       const result = await executeWithQuotaCheck(saveOperation);
-      
+
       if (result.quotaExceeded) {
         const message = `⚠️ Firestore quota exceeded! Pwede ka ulit mag-save sa ${result.resetTime?.toLocaleString("en-PH", {
           dateStyle: "medium",
@@ -679,7 +712,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         toast.error(message);
         showError(message);
       }
-      
+
       return result;
     } catch (error) {
       console.error(`❌ Error in ${operationName}:`, error);
@@ -691,21 +724,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const debugFirestoreDocuments = async () => {
     try {
       console.log('🔍 COMPREHENSIVE FIRESTORE DEBUG - Starting analysis...');
-      
+
       // Check if database is available
       if (!db) {
         console.error('❌ Firestore database not available');
         return;
       }
-      
+
       console.log('✅ Firestore database connection OK');
-      
+
       // List all available collections
       console.log('📂 Checking available collections...');
       try {
         // Check common collections that might contain Command Center data
         const collectionsToCheck = ['commandCenter', 'weeklyReports', 'reports', 'barangays', 'concernTypes'];
-        
+
         for (const collectionName of collectionsToCheck) {
           try {
             const querySnapshot = await getDocs(collection(db, collectionName));
@@ -721,35 +754,35 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 dataStructure: typeof data
               });
             });
-            
+
             console.log(`📋 Collection "${collectionName}":`, {
               exists: true,
               documentCount: documents.length,
               documents: documents
             });
-            
+
             // Check for pattern matches in this collection
             if (selectedMonth && selectedYear) {
               const currentPattern = `${selectedMonth}_${selectedYear}`;
-              const matchingDocs = documents.filter(doc => 
-                doc.id.includes(currentPattern) || 
-                doc.id.includes(selectedMonth) || 
+              const matchingDocs = documents.filter(doc =>
+                doc.id.includes(currentPattern) ||
+                doc.id.includes(selectedMonth) ||
                 doc.id.includes(selectedYear)
               );
               if (matchingDocs.length > 0) {
                 console.log(`🎯 Found potential matches in "${collectionName}":`, matchingDocs);
               }
             }
-            
+
           } catch (collectionError) {
             console.log(`📋 Collection "${collectionName}": Does not exist or no access`);
           }
         }
-        
+
       } catch (error) {
         console.error('❌ Error checking collections:', error);
       }
-      
+
     } catch (error) {
       console.error('❌ Error in comprehensive Firestore debug:', error);
     }
@@ -759,10 +792,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const testDataLoading = async (collectionName, documentId) => {
     try {
       console.log(`🧪 TESTING: Loading from ${collectionName}/${documentId}`);
-      
+
       const docRef = doc(db, collectionName, documentId);
       const docSnap = await getDoc(docRef);
-      
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         console.log(`✅ TEST SUCCESS: Found document ${collectionName}/${documentId}:`, {
@@ -772,7 +805,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           hasDirectWeeklyData: !!data.weeklyReportData,
           fullData: data
         });
-        
+
         // Try to load this data into the Command Center
         if (data.data && data.data.weeklyReportData) {
           console.log('🔄 Loading nested data structure...');
@@ -783,11 +816,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         } else {
           console.log('⚠️ No recognizable weekly report data structure found');
         }
-        
+
       } else {
         console.log(`❌ TEST FAILED: Document ${collectionName}/${documentId} does not exist`);
       }
-      
+
     } catch (error) {
       console.error(`❌ TEST ERROR: Error loading ${collectionName}/${documentId}:`, error);
     }
@@ -803,7 +836,6 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   useEffect(() => {
     loadBarangaysFromFirestore();
     loadConcernTypesFromFirestore();
-    debugFirestoreDocuments();
   }, []);
 
   // Cleanup debounce timeout when photo upload dialog closes
@@ -826,39 +858,53 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     }
   }, [importedBarangays, activeMunicipalityTab, userMunicipality]);
 
+  // Auto-save when data changes (after 2 seconds of inactivity)
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+    if (!selectedMonth || !selectedYear || !activeMunicipalityTab) return;
+
+    // Don't auto-save if user is actively typing
+    const autoSaveTimer = setTimeout(() => {
+      console.log('💾 Auto-saving data...');
+      handleSaveWeeklyReport(true, true); // Skip reload & silent save
+    }, 4000); // 4 seconds after last change
+
+    return () => clearTimeout(autoSaveTimer);
+  }, [hasUnsavedChanges, weeklyReportData, selectedMonth, selectedYear, activeMunicipalityTab]);
+
   // Load weekly report data when year/municipality/month changes with debouncing
   useEffect(() => {
-    // Check if we already have this data cached
-    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
-    const isSameAsLast = lastLoadedWeeklyRef.current.month === selectedMonth &&
-                         lastLoadedWeeklyRef.current.year === selectedYear &&
-                         lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab;
-    
-    if (isSameAsLast && weeklyReportCache.current[cacheKey]) {
-      console.log('📦 Using cached weekly report data for:', cacheKey);
+    // Allow load on initial mount or when month/year/municipality changes
+    const isInitialMount = lastLoadedWeeklyRef.current.month === null;
+
+    // Skip if we don't have required values
+    if (!selectedMonth || !selectedYear) {
+      console.log('⏸️ Skipping load - missing month or year');
       return;
     }
-    
-    console.log('🔄 Loading weekly report data for:', {
-      selectedMonth,
-      selectedYear,
-      activeMunicipalityTab,
-      hasMonth: !!selectedMonth,
-      hasYear: !!selectedYear,
-      hasMunicipality: !!activeMunicipalityTab
-    });
-    
-    // Only load if we have a valid month and year
-    if (selectedMonth && selectedYear && activeMunicipalityTab) {
-      console.log('✅ All conditions met, calling loadWeeklyReportData...');
-      loadWeeklyReportData();
-    } else {
-      console.log('⚠️ Missing required fields:', {
-        selectedMonth: selectedMonth || 'MISSING',
-        selectedYear: selectedYear || 'MISSING', 
-        activeMunicipalityTab: activeMunicipalityTab || 'MISSING'
-      });
+
+    // Wait for municipality to be set
+    if (!activeMunicipalityTab || activeMunicipalityTab === '') {
+      console.log('⏸️ Skipping load - waiting for municipality to be set');
+      return;
     }
+
+    // Check if this is the same as what we already loaded
+    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
+    const isSameAsLast = lastLoadedWeeklyRef.current.month === selectedMonth &&
+      lastLoadedWeeklyRef.current.year === selectedYear &&
+      lastLoadedWeeklyRef.current.municipality === activeMunicipalityTab;
+
+    // On initial mount, always load
+    // After that, only load if something changed
+    if (isSameAsLast && !isInitialMount) {
+      console.log('✅ Already loaded this data:', cacheKey);
+      return;
+    }
+
+    // Load the data
+    console.log('📥 Loading data for:', { selectedMonth, selectedYear, activeMunicipalityTab });
+    loadWeeklyReportData();
   }, [selectedMonth, selectedYear, activeMunicipalityTab]);
 
   // Removed real-time listener - back to simple manual refresh model
@@ -866,36 +912,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // 1. Page loads/refreshes  
   // 2. After photo upload (auto-save triggers reload)
   // 3. After clicking "Save Data" button
-  
+
   // Component initialization - removed local storage usage
 
-  // Clear concern types when municipality changes
-  useEffect(() => {
-    if (activeMunicipalityTab) {
-      // Clear concern types that don't match the selected municipality
-      const updatedWeeklyData = { ...weeklyReportData };
-      const dates = generateDates(selectedMonth, selectedYear);
-      
-      dates.forEach(date => {
-        if (updatedWeeklyData[date]) {
-          const currentConcernType = updatedWeeklyData[date].concernType;
-          if (currentConcernType) {
-            // Check if the current concern type is valid for the selected municipality
-            const isValidForMunicipality = importedConcernTypes.some(type => 
-              type.name === currentConcernType && 
-              (type.municipality === activeMunicipalityTab || type.municipality === "All Municipalities")
-            );
-            
-            if (!isValidForMunicipality) {
-              updatedWeeklyData[date].concernType = "";
-            }
-          }
-        }
-      });
-      
-      setWeeklyReportData(updatedWeeklyData);
-    }
-  }, [activeMunicipalityTab]);
+
 
   // Removed local storage functionality - data now comes from Firestore only
 
@@ -903,15 +923,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const findAndLoadAvailableData = async () => {
     try {
       console.log('🔍 Searching for any available data in nested structure...');
-      
+
       // Search in the nested structure: commandCenter > weeklyReports > [municipalities]
       try {
         const weeklyReportsRef = collection(db, 'commandCenter', 'weeklyReports');
         const municipalitySnapshot = await getDocs(weeklyReportsRef);
-        
+
         if (!municipalitySnapshot.empty) {
           console.log(`📊 Found ${municipalitySnapshot.size} municipalities in weeklyReports`);
-          
+
           // Check each municipality
           for (const municipalityDoc of municipalitySnapshot.docs) {
             const municipalityName = municipalityDoc.id;
@@ -920,25 +940,25 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               continue;
             }
             console.log(`🔍 Checking municipality: ${municipalityName}`);
-            
+
             // Get all month/year documents for this municipality
             const monthsRef = collection(db, 'commandCenter', 'weeklyReports', municipalityName);
             const monthsSnapshot = await getDocs(monthsRef);
-            
+
             if (!monthsSnapshot.empty) {
               console.log(`📊 Found ${monthsSnapshot.size} month documents for ${municipalityName}`);
-              
+
               // Check each month document
               for (const monthDoc of monthsSnapshot.docs) {
                 const data = monthDoc.data();
                 const monthDocId = monthDoc.id;
-                
+
                 console.log(`🔍 Checking ${municipalityName}/${monthDocId}:`, Object.keys(data));
-                
+
                 if (data.weeklyReportData && Object.keys(data.weeklyReportData).length > 0) {
                   console.log('✅ Found available data! Loading...', Object.keys(data.weeklyReportData).slice(0, 3));
                   setWeeklyReportData(data.weeklyReportData);
-                  
+
                   // Extract month/year from document ID or data
                   const monthYearMatch = monthDocId.match(/([A-Za-z]+)_(\d{4})/);
                   if (monthYearMatch) {
@@ -951,13 +971,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                     setSelectedMonth(data.selectedMonth);
                     setSelectedYear(data.selectedYear);
                   }
-                  
+
                   // Set the municipality tab
                   if (municipalityName !== 'All') {
                     console.log(`📍 Auto-setting municipality to: ${municipalityName}`);
                     setActiveMunicipalityTab(municipalityName);
                   }
-                  
+
                   return true;
                 }
               }
@@ -967,29 +987,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } catch (error) {
         console.log('❌ Error checking nested structure:', error);
       }
-      
+
       // Fallback to old structure search
       console.log('🔄 Falling back to old structure search...');
       const collections = ['commandCenter', 'weeklyReports'];
-      
+
       for (const collectionName of collections) {
         try {
           const querySnapshot = await getDocs(collection(db, collectionName));
-          
+
           if (!querySnapshot.empty) {
             console.log(`📊 Found ${querySnapshot.size} documents in ${collectionName}`);
-            
+
             for (const doc of querySnapshot.docs) {
               const data = doc.data();
               console.log(`🔍 Checking document ${doc.id}:`, Object.keys(data));
-              
+
               let weeklyData = null;
               if (data.weeklyReportData && Object.keys(data.weeklyReportData).length > 0) {
                 weeklyData = data.weeklyReportData;
               } else if (data.data && data.data.weeklyReportData && Object.keys(data.data.weeklyReportData).length > 0) {
                 weeklyData = data.data.weeklyReportData;
               }
-              
+
               if (weeklyData) {
                 console.log('✅ Found available data in old structure! Loading...', Object.keys(weeklyData).slice(0, 3));
                 setWeeklyReportData(weeklyData);
@@ -1001,7 +1021,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           console.log(`❌ Error checking collection ${collectionName}:`, error);
         }
       }
-      
+
       console.log('❌ No available data found in any structure');
       return false;
     } catch (error) {
@@ -1020,37 +1040,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       hasSelectedMonth: !!selectedMonth,
       hasSelectedYear: !!selectedYear
     });
-    
+
     if (!selectedMonth || !selectedYear) {
       console.log('❌ loadWeeklyReportData: No month or year selected');
       return;
     }
-    
-    // REMOVED CACHE CHECK - Always load fresh from Firestore for cross-device sync
-    // Cache was preventing other devices from seeing updated data
-    const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
-    console.log('🔑 Cache key:', cacheKey);
-    console.log('🔄 Loading fresh data from Firestore (cache disabled for cross-device sync)');
-    
-    // MODIFIED: Check localStorage first for speed, but also check Firestore for cross-device sync
-    // Priority: localStorage (for current device) → Firestore (for other devices)
-    const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-    
-    let localStorageData = null;
-    try {
-      const storedData = localStorage.getItem(storageKey);
-      if (storedData) {
-        console.log('✅ Found data in localStorage with key:', storageKey);
-        localStorageData = JSON.parse(storedData);
-        console.log('📦 localStorage has', Object.keys(localStorageData).length, 'dates');
-      } else {
-        console.log('ℹ️ No data in localStorage, will check Firestore');
-      }
-    } catch (storageError) {
-      console.warn('⚠️ Error reading from localStorage:', storageError);
-    }
-    
-    // ALWAYS check Firestore for latest data (for cross-device sync)
+
+    // FIXED: Load ONLY from Firestore - NO localStorage
+    // This ensures all data is live and synchronized across all devices
+    console.log('🔄 Loading data ONLY from Firestore (live sync)');
+
+    // ALWAYS load from Firestore for latest data
     console.log(`🔄 Checking Firestore for latest data...`);
     console.log(`📊 Available months in allMonthsData:`, Object.keys(allMonthsData));
     setIsLoadingWeeklyReports(true);
@@ -1059,7 +1059,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       const monthYear = `${selectedMonth}_${selectedYear}`;
       const municipality = activeMunicipalityTab || 'All';
       const reportKey = `${monthYear}${activeMunicipalityTab ? `_${activeMunicipalityTab}` : ''}`;
-      
+
       console.log('🔍 Loading from nested collection structure:', {
         selectedMonth,
         selectedYear,
@@ -1068,53 +1068,74 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         municipality,
         expectedPath: `commandCenter/weeklyReports/${municipality}/${monthYear}`
       });
-      
+
+      console.log('🔑 Exact Firestore path we will query:', `commandCenter/weeklyReports/${municipality}/${monthYear}`);
+      console.log('🔑 Municipality from user:', userMunicipality);
+      console.log('🔑 Active tab:', activeMunicipalityTab);
+      console.log('🔑 Month/Year:', `${selectedMonth}/${selectedYear}`);
+
+      // CRITICAL: Log what we're looking for
+      console.log('📋 Looking for data saved with these exact values:');
+      console.log('   - Municipality:', municipality);
+      console.log('   - Month:', selectedMonth);
+      console.log('   - Year:', selectedYear);
+      console.log('   - Document ID:', monthYear);
+
+      // CRITICAL CHECK: Verify municipality is set
+      if (!activeMunicipalityTab || activeMunicipalityTab === '') {
+        console.error('🚨 CRITICAL: activeMunicipalityTab is empty! Cannot load data!');
+        console.error('🚨 userMunicipality:', userMunicipality);
+        showError('Municipality not set. Please refresh the page.');
+        setIsLoadingWeeklyReports(false);
+        return;
+      }
+
       // Try to load from the nested structure first
       let result = null;
       if (activeMunicipalityTab) {
         try {
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          const docSnap = await getDoc(docRef);
-          
-          if (docSnap.exists()) {
+          // Check if data was split by weeks first (split documents contain detailed data when size is large)
+          const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_summary`);
+          const summarySnap = await getDoc(summaryDocRef);
+
+          if (summarySnap.exists() && summarySnap.data().isSplit) {
+            console.log('📦 Found split data, loading all weeks...');
+            const summaryData = summarySnap.data();
+            const weekPromises = summaryData.weeks.map(async (weekInfo) => {
+              const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekInfo.weekNumber}`);
+              const weekSnap = await getDoc(weekDocRef);
+              return weekSnap.exists() ? weekSnap.data() : null;
+            });
+
+            const weekDocs = await Promise.all(weekPromises);
+
+            // Merge all week data into one object
+            const mergedWeeklyData = {};
+            weekDocs.forEach(weekDoc => {
+              if (weekDoc && weekDoc.weeklyReportData) {
+                Object.assign(mergedWeeklyData, weekDoc.weeklyReportData);
+              }
+            });
+
             result = {
               success: true,
-              data: docSnap.data()
+              data: {
+                ...summaryData,
+                weeklyReportData: mergedWeeklyData
+              }
             };
-            console.log('✅ Found data in nested structure:', docSnap.data());
+            console.log(`✅ Merged ${weekDocs.length} week documents with ${Object.keys(mergedWeeklyData).length} total dates`);
           } else {
-            // Check if data was split by weeks
-            console.log('🔍 Checking for split weekly documents...');
-            const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_summary`);
-            const summarySnap = await getDoc(summaryDocRef);
-            
-            if (summarySnap.exists() && summarySnap.data().isSplit) {
-              console.log('📦 Found split data, loading all weeks...');
-              const summaryData = summarySnap.data();
-              const weekPromises = summaryData.weeks.map(async (weekInfo) => {
-                const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekInfo.weekNumber}`);
-                const weekSnap = await getDoc(weekDocRef);
-                return weekSnap.exists() ? weekSnap.data() : null;
-              });
-              
-              const weekDocs = await Promise.all(weekPromises);
-              
-              // Merge all week data into one object
-              const mergedWeeklyData = {};
-              weekDocs.forEach(weekDoc => {
-                if (weekDoc && weekDoc.weeklyReportData) {
-                  Object.assign(mergedWeeklyData, weekDoc.weeklyReportData);
-                }
-              });
-              
+            // Load single document
+            const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
+            const docSnap = await getDoc(docRef);
+
+            if (docSnap.exists()) {
               result = {
                 success: true,
-                data: {
-                  ...summaryData,
-                  weeklyReportData: mergedWeeklyData
-                }
+                data: docSnap.data()
               };
-              console.log(`✅ Merged ${weekDocs.length} week documents with ${Object.keys(mergedWeeklyData).length} total dates`);
+              console.log('✅ Found data in single document structure:', docSnap.data());
             } else {
               console.log('❌ No document found in nested structure');
               result = { success: false, data: null };
@@ -1125,13 +1146,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           result = { success: false, data: null, error };
         }
       }
-      
+
       // Fallback to old structure if nested doesn't work
       if (!result || !result.success) {
         console.log('🔄 Trying fallback to old structure...');
         result = await getWeeklyReport(reportKey);
       }
-      
+
       console.log('🔍 Firestore Query Result:', {
         success: result.success,
         hasData: !!result.data,
@@ -1140,13 +1161,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         weeklyReportDataKeys: result.data && result.data.weeklyReportData ? Object.keys(result.data.weeklyReportData) : [],
         error: result.error
       });
-      
+
       if (result.success && result.data && Object.keys(result.data).length > 0) {
         console.log('📊 Found data in Firestore:', result.data);
         console.log('📋 Data structure keys:', Object.keys(result.data));
-        
+
         let weeklyData = null;
-        
+
         // Try different data structure patterns
         if (result.data.weeklyReportData) {
           // New structure: { weeklyReportData: {...}, selectedBarangay: "...", ... }
@@ -1163,7 +1184,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         } else {
           // Direct structure: { "January 1, 2024": [...], ... }
           console.log('📊 Checking for direct date structure');
-          const dateKeys = Object.keys(result.data).filter(key => 
+          const dateKeys = Object.keys(result.data).filter(key =>
             key.includes('January') || key.includes('February') || key.includes('March') ||
             key.includes('April') || key.includes('May') || key.includes('June') ||
             key.includes('July') || key.includes('August') || key.includes('September') ||
@@ -1174,12 +1195,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             weeklyData = result.data;
           }
         }
-        
+
         if (weeklyData && Object.keys(weeklyData).length > 0) {
           console.log('✅ Loading weekly data with', Object.keys(weeklyData).length, 'dates');
           console.log('📋 Sample data keys:', Object.keys(weeklyData).slice(0, 5));
           console.log('📋 Sample data entry:', Object.keys(weeklyData).length > 0 ? weeklyData[Object.keys(weeklyData)[0]] : 'No data');
-          
+
           // Log photo data
           const photoDates = Object.entries(weeklyData).filter(([date, entries]) =>
             Array.isArray(entries) && entries.some(entry => entry.photos)
@@ -1191,62 +1212,62 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               entriesWithPhotos: entries.filter(e => e.photos).length
             })));
           }
-          
+
           // CRITICAL: ALWAYS use Firestore data - it's the ONLY source of truth
-          // Completely ignore localStorage to prevent conflicts
           console.log('✅ Using Firestore data as ONLY source of truth');
           console.log('📊 Firestore has', Object.keys(weeklyData).length, 'dates');
-          
-          const firestoreCount = Object.values(weeklyData).reduce((sum, entries) => 
+
+          const firestoreCount = Object.values(weeklyData).reduce((sum, entries) =>
             sum + (Array.isArray(entries) ? entries.length : 0), 0
           );
           console.log('📊 Firestore has', firestoreCount, 'total entries');
-          
+
           let finalData = weeklyData; // Always use Firestore!
-          
-          // If there was localStorage, log it but DON'T use it
-          if (localStorageData && Object.keys(localStorageData).length > 0) {
-            const localCount = Object.values(localStorageData).reduce((sum, entries) => 
-              sum + (Array.isArray(entries) ? entries.length : 0), 0
-            );
-            console.log('ℹ️  localStorage had', localCount, 'entries (IGNORED - using Firestore instead)');
-            
-            // Clear localStorage immediately
-            try {
-              const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-              localStorage.removeItem(storageKey);
-              console.log('🧹 Cleared old localStorage');
-            } catch (err) {
-              console.warn('⚠️ Could not clear localStorage:', err);
-            }
-          }
-          
-          // DO NOT cache - always load fresh from Firestore for cross-device sync
-          console.log('� Skipping cache to ensure fresh data on every load');
-          
-          // Save Firestore data to localStorage for offline access
-          try {
-            const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-            localStorage.setItem(storageKey, JSON.stringify(finalData));
-            console.log('💾 Saved Firestore data to localStorage with key:', storageKey);
-          } catch (storageError) {
-            console.error('❌ Error saving to localStorage:', storageError);
-            // Continue even if localStorage fails
-          }
-          
+
+          // NO localStorage - Firestore is the single source of truth
+
           console.log('📊 Setting weeklyReportData state with', Object.keys(finalData).length, 'dates');
-          console.log('📋 Total entries:', Object.values(finalData).reduce((sum, entries) => 
+
+          // Count entries to verify we're loading everything
+          const loadedEntriesCount = Object.values(finalData).reduce((sum, entries) =>
             sum + (Array.isArray(entries) ? entries.length : 0), 0
-          ));
-          
-          // CRITICAL: Force complete state reset to ensure UI updates
-          setWeeklyReportData(() => ({})); // Clear first
-          setTimeout(() => {
-            setWeeklyReportData(() => finalData); // Then set new data
-            setDataVersion(prev => prev + 1); // Force re-render
-            console.log('✅ State updated successfully with', Object.keys(finalData).length, 'dates');
-          }, 10);
-          
+          );
+          console.log('📋 Total entries loaded:', loadedEntriesCount);
+
+          // Log a sample to verify structure
+          const sampleDate = Object.keys(finalData).find(date => {
+            const entries = finalData[date];
+            return Array.isArray(entries) && entries.length > 0;
+          });
+          if (sampleDate) {
+            console.log('📋 Sample date with entries:', {
+              date: sampleDate,
+              entriesCount: finalData[sampleDate].length,
+              firstEntry: finalData[sampleDate][0]
+            });
+          }
+
+          // CRITICAL FIX: Update state directly without clearing first
+          // The old pattern (clear → timeout → set) caused data to disappear temporarily
+          // This new pattern updates immediately and reliably
+          setWeeklyReportData(finalData);
+          setDataVersion(prev => prev + 1); // Force re-render
+          console.log('✅ State updated successfully with', Object.keys(finalData).length, 'dates and', loadedEntriesCount, 'entries');
+
+          // Update the last loaded ref to prevent redundant loads
+          lastLoadedWeeklyRef.current = {
+            month: selectedMonth,
+            year: selectedYear,
+            municipality: activeMunicipalityTab
+          };
+
+          // CRITICAL: Mark as no unsaved changes since we just loaded from Firestore
+          setHasUnsavedChanges(false);
+
+          // Verify data loaded correctly
+          console.log('✅ Data load completed successfully');
+          console.log('📊 State now has', loadedEntriesCount, 'entries across', Object.keys(finalData).length, 'dates');
+
           // Load form fields if they exist (for backward compatibility)
           const formData = result.data.data || result.data;
           setSelectedBarangay(formData.selectedBarangay || "");
@@ -1255,7 +1276,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setRemarks(formData.remarks || "");
           console.log('✅ Loaded weekly report data for:', reportKey);
           console.log('📥 ========== LOAD OPERATION COMPLETED ==========');
-          
+
           setIsLoadingWeeklyReports(false);
           return;
         } else {
@@ -1263,20 +1284,45 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         }
       } else {
         console.log('❌ No data found in Firestore for key:', reportKey);
-        
-        // Try to find data for other months/years if current selection has no data
-        console.log('🔍 Searching for available data in other months...');
-        await findAndLoadAvailableData();
+        console.error('🔍 CRITICAL: Firestore returned no data!');
+        console.error('🔍 Query path was:', `commandCenter/weeklyReports/${municipality}/${monthYear}`);
+        console.error('🔍 This will trigger empty initialization - any unsaved data will be lost!');
+
+        console.log('ℹ️ No document found for selected month/year/municipality - initializing empty form');
       }
-      
+
       // If no data anywhere, initialize empty structure
       console.log('📝 No data found anywhere, initializing empty structure');
+      console.warn('⚠️ WARNING: Initializing empty data - this will replace current state!');
+
+      // CRITICAL: Check if we already have data in state before wiping it!
+      const currentEntriesCount = Object.values(weeklyReportData).reduce((sum, entries) =>
+        sum + (Array.isArray(entries) ? entries.length : 0), 0
+      );
+
+      if (currentEntriesCount > 0) {
+        console.error('🚨 CRITICAL: State already has', currentEntriesCount, 'entries!');
+        console.error('🚨 NOT initializing empty data to preserve existing entries!');
+        console.error('🚨 This means Firestore load failed but we have unsaved data in state!');
+        setIsLoadingWeeklyReports(false);
+        showWarning(`Could not load data from Firestore, but you have ${currentEntriesCount} unsaved entries. Please save your data!`);
+        return;
+      }
+
       initializeWeeklyReportData();
       // Clear form fields if no data found
       setSelectedBarangay("");
       setSelectedConcernType("");
       setActionTaken("");
       setRemarks("");
+
+      // Update the last loaded ref
+      lastLoadedWeeklyRef.current = {
+        month: selectedMonth,
+        year: selectedYear,
+        municipality: activeMunicipalityTab
+      };
+
       console.log('📝 No existing weekly report data found for:', reportKey);
     } catch (error) {
       console.error('❌ Error loading weekly report data:', error);
@@ -1288,14 +1334,25 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Initialize weekly report data structure for all dates
   const initializeWeeklyReportData = () => {
+    // CRITICAL: Check if we already have data before wiping!
+    const currentEntriesCount = Object.values(weeklyReportData).reduce((sum, entries) =>
+      sum + (Array.isArray(entries) ? entries.length : 0), 0
+    );
+
+    if (currentEntriesCount > 0) {
+      console.warn('⚠️ Skipping initialization - state already has', currentEntriesCount, 'entries!');
+      console.warn('⚠️ Will keep existing data to prevent data loss!');
+      return; // DON'T wipe existing data!
+    }
+
     console.log('🔧 Initializing empty weekly report data structure...');
     const dates = generateDates(selectedMonth, selectedYear);
     const initialData = {};
-    
+
     dates.forEach(date => {
       initialData[date] = []; // Array to hold multiple entries per date
     });
-    
+
     console.log('✅ Initialized', Object.keys(initialData).length, 'dates with empty arrays');
     console.log('📋 Sample dates:', Object.keys(initialData).slice(0, 5));
     setWeeklyReportData(initialData);
@@ -1304,27 +1361,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
   // Update individual date data
   const updateDateData = (date, entryIndex, field, value) => {
+    setHasUnsavedChanges(true); // Mark as having unsaved changes
     setWeeklyReportData(prev => {
       const dateEntries = prev[date] || [];
       const updatedEntries = [...dateEntries];
-      
+
       if (updatedEntries[entryIndex]) {
         updatedEntries[entryIndex] = { ...updatedEntries[entryIndex], [field]: value };
       }
-      
-      return {
+
+      const nextState = {
         ...prev,
         [date]: updatedEntries
       };
+      weeklyReportDataRef.current = nextState;
+      return nextState;
     });
   };
 
   // Add new entry to a date
-  const addDateEntry = (date) => {
+  const addDateEntry = (date, initialData = {}) => {
+    setHasUnsavedChanges(true); // Mark as having unsaved changes
     setWeeklyReportData(prev => {
       const dateEntries = prev[date] || [];
+      // Generate truly unique ID using timestamp, random, and entry count
+      const uniqueId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 15)}-${dateEntries.length}`;
       const newEntry = {
-        id: `entry-${Date.now()}-${Math.random()}`,
+        id: uniqueId,
         barangay: "",
         concernType: "",
         week1: "",
@@ -1332,13 +1395,57 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         week3: "",
         week4: "",
         actionTaken: "",
-        remarks: ""
+        remarks: "",
+        ...initialData // Allow passing initial values
       };
-      
-      return {
+
+      const nextState = {
         ...prev,
         [date]: [...dateEntries, newEntry]
       };
+      weeklyReportDataRef.current = nextState;
+      return nextState;
+    });
+  };
+
+  // Add entry with initial field value (prevents race condition)
+  const addDateEntryWithField = (date, field, value) => {
+    setHasUnsavedChanges(true);
+    setWeeklyReportData(prev => {
+      const dateEntries = prev[date] || [];
+      let nextState;
+
+      // Check if there's already an entry at index 0
+      if (dateEntries.length > 0) {
+        // Update existing entry
+        const updatedEntries = [...dateEntries];
+        updatedEntries[0] = { ...updatedEntries[0], [field]: value };
+        nextState = {
+          ...prev,
+          [date]: updatedEntries
+        };
+      } else {
+        // Create new entry with initial value
+        const uniqueId = `entry-${Date.now()}-${Math.random().toString(36).substring(2, 15)}-0`;
+        const newEntry = {
+          id: uniqueId,
+          barangay: "",
+          concernType: "",
+          week1: "",
+          week2: "",
+          week3: "",
+          week4: "",
+          actionTaken: "",
+          remarks: "",
+          [field]: value // Set the initial field
+        };
+        nextState = {
+          ...prev,
+          [date]: [newEntry]
+        };
+      }
+      weeklyReportDataRef.current = nextState;
+      return nextState;
     });
   };
 
@@ -1347,11 +1454,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     setWeeklyReportData(prev => {
       const dateEntries = prev[date] || [];
       const updatedEntries = dateEntries.filter((_, index) => index !== entryIndex);
-      
-      return {
+
+      const nextState = {
         ...prev,
         [date]: updatedEntries
       };
+      weeklyReportDataRef.current = nextState;
+      return nextState;
     });
   };
 
@@ -1435,30 +1544,30 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Search filter function
   const matchesSearchTerm = (entry) => {
     if (!searchTerm || searchTerm.trim() === '') return true;
-    
+
     const searchLower = searchTerm.toLowerCase().trim();
-    
+
     // Search in barangay, concern type, action taken, and remarks
     const barangayMatch = entry.barangay?.toLowerCase().includes(searchLower);
     const concernMatch = entry.concernType?.toLowerCase().includes(searchLower);
     const actionMatch = entry.actionTaken?.toLowerCase().includes(searchLower);
     const remarksMatch = entry.remarks?.toLowerCase().includes(searchLower);
-    
+
     return barangayMatch || concernMatch || actionMatch || remarksMatch;
   };
 
-  // Count entries with action taken (after photos)
-  const getActionTakenCount = () => {
+  // Count entries with action taken (after photos) - memoized to prevent lag on typing
+  const actionTakenMemo = useMemo(() => {
     let entryCount = 0;
     let totalAfterPhotosCount = 0;
     const entriesWithActionTaken = [];
-    
+
     Object.keys(weeklyReportData).forEach(date => {
       const entries = weeklyReportData[date] || [];
       entries.forEach((entry, index) => {
         if (entry.actionTaken && entry.actionTaken.trim() !== '') {
           let afterPhotosInEntry = 0;
-          
+
           // Check if entry has photos
           if (entry.photos) {
             // New format: rows structure
@@ -1478,7 +1587,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               }
             }
           }
-          
+
           if (afterPhotosInEntry > 0) {
             entryCount++;
             totalAfterPhotosCount += afterPhotosInEntry;
@@ -1487,13 +1596,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         }
       });
     });
-    
-    return { 
+
+    return {
       count: totalAfterPhotosCount, // Total after photos count
       entryCount: entryCount, // Number of entries
-      entries: entriesWithActionTaken 
+      entries: entriesWithActionTaken
     };
-  };
+  }, [weeklyReportData]);
+
+  const getActionTakenCount = useCallback(() => actionTakenMemo, [actionTakenMemo]);
 
   const getEntryActionCountValue = (entry, monthIndex, year) => {
     const isAprilToDecember2026OrLater =
@@ -1566,7 +1677,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const getSearchFilteredEntries = (date) => {
     const dateEntries = getFilteredDateEntriesWithIndex(date);
     if (!searchTerm || searchTerm.trim() === '') return dateEntries;
-    
+
     return dateEntries.filter(({ entry }) => matchesSearchTerm(entry));
   };
 
@@ -1593,18 +1704,18 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Validate if entry has all required data (required before photo upload)
   const isEntryIncomplete = (entry) => {
     if (!entry) return true;
-    
+
     const hasBarangay = entry.barangay && String(entry.barangay).trim() !== '';
     const hasConcernType = entry.concernType && String(entry.concernType).trim() !== '';
-    
+
     // Handle week data - can be either string or number
     const hasWeekData = (entry.week1 && (typeof entry.week1 === 'number' ? entry.week1 > 0 : String(entry.week1).trim() !== '')) ||
-                        (entry.week2 && (typeof entry.week2 === 'number' ? entry.week2 > 0 : String(entry.week2).trim() !== '')) ||
-                        (entry.week3 && (typeof entry.week3 === 'number' ? entry.week3 > 0 : String(entry.week3).trim() !== '')) ||
-                        (entry.week4 && (typeof entry.week4 === 'number' ? entry.week4 > 0 : String(entry.week4).trim() !== ''));
-    
+      (entry.week2 && (typeof entry.week2 === 'number' ? entry.week2 > 0 : String(entry.week2).trim() !== '')) ||
+      (entry.week3 && (typeof entry.week3 === 'number' ? entry.week3 > 0 : String(entry.week3).trim() !== '')) ||
+      (entry.week4 && (typeof entry.week4 === 'number' ? entry.week4 > 0 : String(entry.week4).trim() !== ''));
+
     const hasActionTaken = entry.actionTaken && String(entry.actionTaken).trim() !== '';
-    
+
     // Entry is incomplete if ANY required field is missing
     // All fields must be filled: barangay, concern type, at least one week, and action taken
     return !hasBarangay || !hasConcernType || !hasWeekData || !hasActionTaken;
@@ -1648,7 +1759,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   // Photo upload handlers
   const handleOpenPhotoUpload = (date, entryIndex) => {
     const entry = weeklyReportData[date]?.[entryIndex];
-    
+
     // Validate that entry has all required data before allowing photo upload
     if (isEntryIncomplete(entry)) {
       showError('Please complete all required fields (Barangay, Concern Type, at least one Week, and Action Taken) before uploading photos.');
@@ -1659,12 +1770,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       showError('You do not have permission to edit photos for this entry.');
       return;
     }
-    
+
     setCurrentPhotoEntry({ date, entryIndex, entry });
-    
+
     // Initialize photoRows from existing data
     let initialRows = [];
-    
+
     // Check if entry has rows structure (new format)
     if (entry?.photos?.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.length > 0) {
       // Load existing rows with their photos as previews
@@ -1679,11 +1790,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       // Fallback to old format (single row with before/after)
       const beforeData = entry?.photos?.before;
       const afterData = entry?.photos?.after;
-      
+
       // Convert to array if it's a string (old format)
       const beforePhotos = Array.isArray(beforeData) ? beforeData : (beforeData ? [beforeData] : []);
       const afterPhotos = Array.isArray(afterData) ? afterData : (afterData ? [afterData] : []);
-      
+
       initialRows = [{
         id: 1,
         beforePhotos: [],
@@ -1692,7 +1803,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         afterPreviews: afterPhotos
       }];
     }
-    
+
     // If no rows exist, create an empty first row
     if (initialRows.length === 0) {
       initialRows = [{
@@ -1703,7 +1814,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         afterPreviews: []
       }];
     }
-    
+
     setPhotoRows(initialRows);
     setShowPhotoUploadDialog(true);
   };
@@ -1721,7 +1832,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          
+
           // Calculate new dimensions while maintaining aspect ratio
           const maxDimension = 1920; // Max width or height
           if (width > height && width > maxDimension) {
@@ -1731,20 +1842,20 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             width = (width * maxDimension) / height;
             height = maxDimension;
           }
-          
+
           canvas.width = width;
           canvas.height = height;
-          
+
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, width, height);
-          
+
           // Start with quality 0.9 and reduce if needed
           let quality = 0.9;
           const tryCompress = () => {
             canvas.toBlob(
               (blob) => {
                 const sizeMB = blob.size / 1024 / 1024;
-                
+
                 if (sizeMB <= maxSizeMB || quality <= 0.5) {
                   // Convert blob to file
                   const compressedFile = new File([blob], file.name, {
@@ -1763,7 +1874,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               quality
             );
           };
-          
+
           tryCompress();
         };
         img.onerror = reject;
@@ -1778,15 +1889,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       try {
         const compressedFiles = [];
         const previews = [];
-        
+
         for (const file of files) {
           const originalSize = (file.size / 1024 / 1024).toFixed(2);
           console.log(`📸 Original before photo size: ${originalSize}MB`);
-          
+
           // Compress image
           const compressedFile = await compressImage(file, 2);
           compressedFiles.push(compressedFile);
-          
+
           // Create preview
           const reader = new FileReader();
           const preview = await new Promise((resolve) => {
@@ -1794,13 +1905,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             reader.readAsDataURL(compressedFile);
           });
           previews.push(preview);
-          
+
           const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
           if (originalSize > 2) {
             console.log(`✅ Before photo compressed from ${originalSize}MB to ${compressedSize}MB`);
           }
         }
-        
+
         // NOTE: This function is deprecated - photo handling moved to PhotoCarousel component
         // setBeforePhotos(prev => [...prev, ...compressedFiles]);
         // setBeforePhotoPreviews(prev => [...prev, ...previews]);
@@ -1818,15 +1929,15 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       try {
         const compressedFiles = [];
         const previews = [];
-        
+
         for (const file of files) {
           const originalSize = (file.size / 1024 / 1024).toFixed(2);
           console.log(`📸 Original after photo size: ${originalSize}MB`);
-          
+
           // Compress image
           const compressedFile = await compressImage(file, 2);
           compressedFiles.push(compressedFile);
-          
+
           // Create preview
           const reader = new FileReader();
           const preview = await new Promise((resolve) => {
@@ -1834,13 +1945,13 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             reader.readAsDataURL(compressedFile);
           });
           previews.push(preview);
-          
+
           const compressedSize = (compressedFile.size / 1024 / 1024).toFixed(2);
           if (originalSize > 2) {
             console.log(`✅ After photo compressed from ${originalSize}MB to ${compressedSize}MB`);
           }
         }
-        
+
         // NOTE: This function is deprecated - photo handling moved to PhotoCarousel component
         // setAfterPhotos(prev => [...prev, ...compressedFiles]);
         // setAfterPhotoPreviews(prev => [...prev, ...previews]);
@@ -1860,29 +1971,29 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       showError('You do not have permission to update photos for this entry.');
       return;
     }
-    
+
     // Check if remarks are required (when after photos exist)
     const hasAfterPhotos = photoRows.some(row => row.afterPreviews.length > 0 || row.afterPhotos.length > 0);
     const remarks = currentPhotoEntry?.entry?.remarks || '';
-    
+
     if (hasAfterPhotos && !remarks.trim()) {
       showError('Please add remarks before uploading. Remarks are required when after photos are present.');
       return;
     }
-    
+
     setIsUploadingPhotos(true);
     try {
       const { date, entryIndex } = currentPhotoEntry;
       const photos = {};
       const uploadTimestamp = new Date().toISOString();
-      
+
       // Process each row separately to maintain row organization
       let totalNewPhotos = 0;
       photos.rows = [];
-      
+
       // First, collect existing rows from database
       const existingRows = currentPhotoEntry?.entry?.photos?.rows || [];
-      
+
       // Get existing before/after photos from old format
       const existingBeforeData = currentPhotoEntry?.entry?.photos?.before;
       const existingBefore = Array.isArray(existingBeforeData) ? existingBeforeData : (existingBeforeData ? [existingBeforeData] : []);
@@ -1896,10 +2007,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           const idx = sourceUrls.indexOf(url);
           return idx >= 0 && sourceTimestamps[idx] ? sourceTimestamps[idx] : uploadTimestamp;
         });
-      
+
       for (const row of photoRows) {
         const rowPhotos = {};
-        
+
         // Check if this row already exists in database
         const existingRow = existingRows.find(r => r.rowId === row.id);
 
@@ -1962,7 +2073,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             ...newAfterTimestamps
           ];
         }
-        
+
         // Add row photos if there are any photos in this row
         if (Object.keys(rowPhotos).length > 0) {
           photos.rows.push({
@@ -1971,7 +2082,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           });
         }
       }
-      
+
       // Backward compatibility fields from row 1
       const row1 = photos.rows.find((r) => r.rowId === 1);
       if (row1?.before) {
@@ -1982,42 +2093,33 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         photos.after = row1.after;
         photos.afterUploadedAt = row1.afterUploadedAt;
       }
-      
-      // Update the entry with photo URLs
-      updateDateData(date, entryIndex, 'photos', photos.rows.length > 0 ? photos : null);
-      
-      // CRITICAL: Save to localStorage immediately after photo upload
-      try {
-        const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-        const updatedData = { ...weeklyReportData };
-        if (!updatedData[date]) {
-          updatedData[date] = [];
-        }
-        if (!updatedData[date][entryIndex]) {
-          updatedData[date][entryIndex] = {};
-        }
-        updatedData[date][entryIndex].photos = photos.rows.length > 0 ? photos : null;
-        
-        localStorage.setItem(storageKey, JSON.stringify(updatedData));
-        console.log('💾 Photos saved to localStorage immediately');
-      } catch (storageError) {
-        console.error('❌ Error saving photos to localStorage:', storageError);
+
+      // Clear any pending debounced remarks timer
+      if (remarksDebounceRef.current) {
+        clearTimeout(remarksDebounceRef.current);
+        remarksDebounceRef.current = null;
       }
-      
+
+      // Update the entry with photo URLs and remarks synchronously
+      updateDateData(date, entryIndex, 'remarks', remarks);
+      updateDateData(date, entryIndex, 'photos', photos.rows.length > 0 ? photos : null);
+
+      // Auto-save immediately to Firestore so photo uploads persist on browser refresh
+      console.log('✅ Photos uploaded successfully. Auto-saving to Firestore...');
+      setTimeout(() => {
+        handleSaveWeeklyReport(true, true);
+      }, 50);
+
       showSuccess(
         isEditingExisting
-          ? 'Photo changes saved! Auto-saving to database...'
-          : `${totalNewPhotos} photo(s) uploaded successfully! Click "Save Data" to save.`
+          ? 'Photo changes saved to database!'
+          : `${totalNewPhotos} photo(s) uploaded and saved successfully to database!`
       );
       setShowPhotoUploadDialog(false);
       setPhotoRows([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
       setCurrentPhotoEntry(null);
-      
-      // Removed auto-save to Firestore after photo upload
-      // User must manually click "Save Data" button to save
-      console.log('✅ Photos uploaded successfully. Reminder: Click "Save Data" button to save changes.');
-      showInfo('Photos uploaded! Remember to click "Save Data" button to save your changes.');
-      
+
+
     } catch (error) {
       console.error('Error uploading photos:', error);
       showError('Failed to upload photos. Please try again.');
@@ -2056,30 +2158,35 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
 
     if (confirmReset) {
       let deletionResults = { before: null, after: null };
-      
+
       // Try to delete photos from Cloudinary
       if (hasPhotos) {
         showInfo('Deleting photos from Cloudinary...');
-        
+
         if (entry.photos.before) {
           console.log('🗑️ Deleting before photo:', entry.photos.before);
           deletionResults.before = await cloudinaryUtils.deleteResource(entry.photos.before);
         }
-        
+
         if (entry.photos.after) {
           console.log('🗑️ Deleting after photo:', entry.photos.after);
           deletionResults.after = await cloudinaryUtils.deleteResource(entry.photos.after);
         }
       }
-      
+
       // Remove photos and remarks from the entry
       updateDateData(date, entryIndex, 'photos', null);
       updateDateData(date, entryIndex, 'remarks', '');
-      
+
+      // Auto-save photo reset immediately to Firestore
+      setTimeout(() => {
+        handleSaveWeeklyReport(true, true);
+      }, 50);
+
       // Determine success message based on deletion results
       const beforeDeleted = !entry?.photos?.before || deletionResults.before?.success;
       const afterDeleted = !entry?.photos?.after || deletionResults.after?.success;
-      
+
       if (beforeDeleted && afterDeleted) {
         showSuccess('Photos deleted from Cloudinary and reset successfully.');
       } else if (deletionResults.before?.partialSuccess || deletionResults.after?.partialSuccess) {
@@ -2087,7 +2194,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       } else {
         showSuccess('Photo links and remarks reset successfully.');
       }
-      
+
       // Add to terminal history
       const newEntry = {
         id: Date.now(),
@@ -2116,12 +2223,12 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         setSelectedConcernType("");
         setActionTaken("");
         setRemarks("");
-        
+
         // Clear from Firestore
         const monthYear = `${selectedMonth}_${selectedYear}`;
         const municipalityKey = activeMunicipalityTab ? `_${activeMunicipalityTab}` : '';
         const reportKey = `${monthYear}${municipalityKey}`;
-        
+
         const reportData = {
           month: selectedMonth,
           year: selectedYear,
@@ -2145,14 +2252,14 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           const cacheKey = `${selectedMonth}-${selectedYear}-${activeMunicipalityTab}`;
           weeklyReportCache.current[cacheKey] = {};
           lastLoadedWeeklyRef.current = { month: selectedMonth, year: selectedYear, municipality: activeMunicipalityTab };
-          
+
           toast.success(`Weekly report data cleared for ${activeMunicipalityTab}`);
           showSuccess(`Weekly report data cleared for ${activeMunicipalityTab}`);
         } else {
           toast.warning(`Local data cleared, but failed to clear from database: ${saveResult.error}`);
           showError(`Local data cleared, but failed to clear from database: ${saveResult.error}`);
         }
-        
+
         // Add to terminal history
         const newEntry = {
           id: Date.now(),
@@ -2190,7 +2297,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         const monthYear = `${selectedMonth}_${selectedYear}`;
         const municipalityKey = `_${selectedClearMunicipality}`;
         const reportKey = `${monthYear}${municipalityKey}`;
-        
+
         // Save empty data to Firestore
         const reportData = {
           month: selectedMonth,
@@ -2213,7 +2320,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         if (saveResult.success) {
           toast.success(`Weekly report data cleared for ${selectedClearMunicipality}`);
           showSuccess(`Weekly report data cleared for ${selectedClearMunicipality}`);
-          
+
           // If the cleared municipality is the active tab, also clear local data
           if (selectedClearMunicipality === activeMunicipalityTab) {
             initializeWeeklyReportData();
@@ -2222,7 +2329,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             setActionTaken("");
             setRemarks("");
           }
-          
+
           // Add to terminal history
           const newEntry = {
             id: Date.now(),
@@ -2269,16 +2376,16 @@ Are you absolutely sure you want to proceed?`;
       const doubleConfirm = window.prompt(
         'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
       );
-      
+
       if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
         try {
           toast.loading('Deleting all weekly reports from database...', { duration: 0, id: 'clear-all-delete' });
-          
+
           // Use the comprehensive delete function
           const result = await deleteAllWeeklyReports();
-          
+
           toast.dismiss('clear-all-delete');
-          
+
           if (result.success) {
             if (result.errors && result.errors.length > 0) {
               toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
@@ -2287,17 +2394,17 @@ Are you absolutely sure you want to proceed?`;
               toast.success(`Successfully deleted all ${result.deletedCount} weekly reports from database`);
               showSuccess(`All weekly reports deleted successfully! Deleted ${result.deletedCount} documents from database. Barangay and concern type options are preserved.`);
             }
-            
+
             // Clear local state
             initializeWeeklyReportData();
             setSelectedBarangay("");
             setSelectedConcernType("");
             setActionTaken("");
             setRemarks("");
-            
+
             // Note: Collection view functionality removed - using localStorage now
             // Reload happens automatically through state management
-            
+
             // Add to terminal history
             const newEntry = {
               id: Date.now(),
@@ -2307,7 +2414,7 @@ Are you absolutely sure you want to proceed?`;
               timestamp: new Date()
             };
             setTerminalHistory(prev => [...prev, newEntry]);
-            
+
           } else {
             toast.error(`Failed to delete weekly reports: ${result.error}`);
             showError(`Failed to delete weekly reports: ${result.error}`);
@@ -2328,7 +2435,7 @@ Are you absolutely sure you want to proceed?`;
   const handleExportWeeklyReport = () => {
     const dates = generateDates(selectedMonth, selectedYear);
     const csvRows = ["DATE,BARANGAY,TYPE OF CONCERN,Week 1,Week 2,Week 3,Week 4,STATUS,REMARKS"];
-    
+
     dates.forEach(date => {
       const dateEntries = getDateData(date);
       if (dateEntries.length === 0) {
@@ -2361,7 +2468,7 @@ Are you absolutely sure you want to proceed?`;
         });
       }
     });
-    
+
     const csvContent = csvRows.join('\n');
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -2373,7 +2480,7 @@ Are you absolutely sure you want to proceed?`;
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
+
     toast.success("Weekly report exported successfully");
     showSuccess('Weekly report exported successfully!');
   };
@@ -2381,10 +2488,10 @@ Are you absolutely sure you want to proceed?`;
   // Get concern types for a specific municipality
   const getConcernTypesForMunicipality = (municipality) => {
     if (!municipality) return importedConcernTypes;
-    
+
     // Normalize municipality name for comparison (handle "Balanga" vs "Balanga City")
     const normalizedMunicipality = municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-    
+
     return importedConcernTypes.filter(type => {
       if (type.municipality === "All Municipalities") return true;
       const normalizedType = type.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
@@ -2432,90 +2539,90 @@ Are you absolutely sure you want to proceed?`;
         };
       }
 
-    // Process all dates and their entries
-    dates.forEach(date => {
-      const dateEntries = getDateData(date);
-      dateEntries.forEach(entry => {
-        // Validate entry exists and has required properties
-        if (!entry || typeof entry !== 'object') {
-          return;
-        }
+      // Process all dates and their entries
+      dates.forEach(date => {
+        const dateEntries = getDateData(date);
+        dateEntries.forEach(entry => {
+          // Validate entry exists and has required properties
+          if (!entry || typeof entry !== 'object') {
+            return;
+          }
 
-        // Filter by municipality if specified
-        if (municipality && entry.barangay) {
-          // Handle different barangay formats
-          let barangayMunicipality = '';
-          if (entry.barangay.includes(', ')) {
-            // Format: "Barangay, Municipality"
-            barangayMunicipality = entry.barangay.split(', ')[1];
-          } else if (entry.barangay.includes(' (')) {
-            // Format: "Barangay (Municipality)"
-            const match = entry.barangay.match(/\(([^)]+)\)/);
-            barangayMunicipality = match ? match[1] : '';
-          } else {
-            // Try to find municipality from imported barangays (case-insensitive)
-            const matchingBarangay = importedBarangays.find(b => 
-              b.name.toLowerCase() === entry.barangay.toLowerCase()
-            );
-            barangayMunicipality = matchingBarangay ? matchingBarangay.municipality : '';
+          // Filter by municipality if specified
+          if (municipality && entry.barangay) {
+            // Handle different barangay formats
+            let barangayMunicipality = '';
+            if (entry.barangay.includes(', ')) {
+              // Format: "Barangay, Municipality"
+              barangayMunicipality = entry.barangay.split(', ')[1];
+            } else if (entry.barangay.includes(' (')) {
+              // Format: "Barangay (Municipality)"
+              const match = entry.barangay.match(/\(([^)]+)\)/);
+              barangayMunicipality = match ? match[1] : '';
+            } else {
+              // Try to find municipality from imported barangays (case-insensitive)
+              const matchingBarangay = importedBarangays.find(b =>
+                b.name.toLowerCase() === entry.barangay.toLowerCase()
+              );
+              barangayMunicipality = matchingBarangay ? matchingBarangay.municipality : '';
+            }
+
+            if (barangayMunicipality !== municipality) {
+              return; // Skip this entry if it doesn't match the selected municipality
+            }
           }
-          
-          if (barangayMunicipality !== municipality) {
-            return; // Skip this entry if it doesn't match the selected municipality
+
+          totalEntries++;
+
+          // Count weekly values - ensure they are valid numbers
+          const week1 = isNaN(parseInt(entry.week1)) ? 0 : parseInt(entry.week1);
+          const week2 = isNaN(parseInt(entry.week2)) ? 0 : parseInt(entry.week2);
+          const week3 = isNaN(parseInt(entry.week3)) ? 0 : parseInt(entry.week3);
+          const week4 = isNaN(parseInt(entry.week4)) ? 0 : parseInt(entry.week4);
+
+          totalWeek1 += week1;
+          totalWeek2 += week2;
+          totalWeek3 += week3;
+          totalWeek4 += week4;
+          totalWeeklySum += week1 + week2 + week3 + week4;
+
+          // Track unique values
+          if (entry.barangay) {
+            uniqueBarangays.add(entry.barangay);
+            barangayStats[entry.barangay] = (barangayStats[entry.barangay] || 0) + 1;
           }
-        }
-        
-        totalEntries++;
-        
-        // Count weekly values - ensure they are valid numbers
-        const week1 = isNaN(parseInt(entry.week1)) ? 0 : parseInt(entry.week1);
-        const week2 = isNaN(parseInt(entry.week2)) ? 0 : parseInt(entry.week2);
-        const week3 = isNaN(parseInt(entry.week3)) ? 0 : parseInt(entry.week3);
-        const week4 = isNaN(parseInt(entry.week4)) ? 0 : parseInt(entry.week4);
-        
-        totalWeek1 += week1;
-        totalWeek2 += week2;
-        totalWeek3 += week3;
-        totalWeek4 += week4;
-        totalWeeklySum += week1 + week2 + week3 + week4;
-        
-        // Track unique values
-        if (entry.barangay) {
-          uniqueBarangays.add(entry.barangay);
-          barangayStats[entry.barangay] = (barangayStats[entry.barangay] || 0) + 1;
-        }
-        
-        if (entry.concernType) {
-          uniqueConcernTypes.add(entry.concernType);
-          concernTypeStats[entry.concernType] = (concernTypeStats[entry.concernType] || 0) + 1;
-        }
-        
-        // Count entries with action taken and remarks
-        if (entry.actionTaken && entry.actionTaken.trim()) {
-          entriesWithAction++;
-        }
-        if (entry.remarks && entry.remarks.trim()) {
-          entriesWithRemarks++;
-        }
+
+          if (entry.concernType) {
+            uniqueConcernTypes.add(entry.concernType);
+            concernTypeStats[entry.concernType] = (concernTypeStats[entry.concernType] || 0) + 1;
+          }
+
+          // Count entries with action taken and remarks
+          if (entry.actionTaken && entry.actionTaken.trim()) {
+            entriesWithAction++;
+          }
+          if (entry.remarks && entry.remarks.trim()) {
+            entriesWithRemarks++;
+          }
+        });
       });
-    });
 
-    // Calculate week statistics
-    weekStats.week1 = totalWeek1;
-    weekStats.week2 = totalWeek2;
-    weekStats.week3 = totalWeek3;
-    weekStats.week4 = totalWeek4;
+      // Calculate week statistics
+      weekStats.week1 = totalWeek1;
+      weekStats.week2 = totalWeek2;
+      weekStats.week3 = totalWeek3;
+      weekStats.week4 = totalWeek4;
 
-    // Find top concern types and barangays
-    const topConcernTypes = Object.entries(concernTypeStats)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([type, count]) => ({ type, count }));
+      // Find top concern types and barangays
+      const topConcernTypes = Object.entries(concernTypeStats)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([type, count]) => ({ type, count }));
 
-    const topBarangays = Object.entries(barangayStats)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([barangay, count]) => ({ barangay, count }));
+      const topBarangays = Object.entries(barangayStats)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([barangay, count]) => ({ barangay, count }));
 
       return {
         totalEntries,
@@ -2636,43 +2743,43 @@ Are you absolutely sure you want to proceed?`;
                   const match = entry.barangay.match(/\(([^)]+)\)/);
                   barangayMunicipality = match ? match[1] : '';
                 } else {
-                  const matchingBarangay = importedBarangays.find(b => 
+                  const matchingBarangay = importedBarangays.find(b =>
                     b.name.toLowerCase() === entry.barangay.toLowerCase()
                   );
                   barangayMunicipality = matchingBarangay ? matchingBarangay.municipality : '';
                 }
-                
+
                 if (barangayMunicipality !== municipality) {
                   return;
                 }
               }
-              
+
               totalEntries++;
               quarterlyStats[quarter.name].entries++;
-              
+
               // Count weekly values
               const week1 = isNaN(parseInt(entry.week1)) ? 0 : parseInt(entry.week1);
               const week2 = isNaN(parseInt(entry.week2)) ? 0 : parseInt(entry.week2);
               const week3 = isNaN(parseInt(entry.week3)) ? 0 : parseInt(entry.week3);
               const week4 = isNaN(parseInt(entry.week4)) ? 0 : parseInt(entry.week4);
-              
+
               const entryWeeklySum = week1 + week2 + week3 + week4;
               totalWeeklySum += entryWeeklySum;
               quarterlyStats[quarter.name].weeklySum += entryWeeklySum;
-              
+
               // Track unique values
               if (entry.barangay) {
                 uniqueBarangays.add(entry.barangay);
                 quarterlyStats[quarter.name].barangays.add(entry.barangay);
                 barangayStats[entry.barangay] = (barangayStats[entry.barangay] || 0) + 1;
               }
-              
+
               if (entry.concernType) {
                 uniqueConcernTypes.add(entry.concernType);
                 quarterlyStats[quarter.name].concernTypes.add(entry.concernType);
                 concernTypeStats[entry.concernType] = (concernTypeStats[entry.concernType] || 0) + 1;
               }
-              
+
               // Count entries with action taken and remarks
               if (entry.actionTaken && entry.actionTaken.trim()) {
                 entriesWithAction++;
@@ -2698,12 +2805,12 @@ Are you absolutely sure you want to proceed?`;
 
       // Find top concern types and barangays
       const topConcernTypes = Object.entries(concernTypeStats)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
         .map(([type, count]) => ({ type, count }));
 
       const topBarangays = Object.entries(barangayStats)
-        .sort(([,a], [,b]) => b - a)
+        .sort(([, a], [, b]) => b - a)
         .slice(0, 5)
         .map(([barangay, count]) => ({ barangay, count }));
 
@@ -2752,7 +2859,7 @@ Are you absolutely sure you want to proceed?`;
   const detectMonthYearFromData = (data) => {
     const monthCounts = {};
     const yearCounts = {};
-    
+
     data.forEach(row => {
       if (row.date) {
         try {
@@ -2760,7 +2867,7 @@ Are you absolutely sure you want to proceed?`;
           if (!isNaN(parsedDate.getTime())) {
             const month = parsedDate.toLocaleDateString("en-US", { month: "long" });
             const year = parsedDate.getFullYear().toString();
-            
+
             monthCounts[month] = (monthCounts[month] || 0) + 1;
             yearCounts[year] = (yearCounts[year] || 0) + 1;
           }
@@ -2769,13 +2876,13 @@ Are you absolutely sure you want to proceed?`;
         }
       }
     });
-    
+
     // Find the most common month and year
-    const mostCommonMonth = Object.keys(monthCounts).reduce((a, b) => 
+    const mostCommonMonth = Object.keys(monthCounts).reduce((a, b) =>
       monthCounts[a] > monthCounts[b] ? a : b, '');
-    const mostCommonYear = Object.keys(yearCounts).reduce((a, b) => 
+    const mostCommonYear = Object.keys(yearCounts).reduce((a, b) =>
       yearCounts[a] > yearCounts[b] ? a : b, '');
-    
+
     return {
       month: mostCommonMonth,
       year: mostCommonYear
@@ -2804,7 +2911,7 @@ Are you absolutely sure you want to proceed?`;
       setImportedBarangays(barangaysCache.current);
       return;
     }
-    
+
     setIsLoadingBarangays(true);
     try {
       const result = await getBarangays();
@@ -2835,7 +2942,7 @@ Are you absolutely sure you want to proceed?`;
       setImportedConcernTypes(concernTypesCache.current);
       return;
     }
-    
+
     setIsLoadingConcernTypes(true);
     try {
       const result = await getConcernTypes();
@@ -3017,7 +3124,7 @@ Are you absolutely sure you want to proceed?`;
     }
 
     setIsImporting(true);
-    
+
     try {
       // Parse barangay data (assuming comma-separated or line-separated)
       const barangays = barangayData
@@ -3037,7 +3144,7 @@ Are you absolutely sure you want to proceed?`;
       const updatedBarangays = [...importedBarangays, ...newBarangays];
       setImportedBarangays(updatedBarangays);
       setBarangayData("");
-      
+
       // Save to Firestore with quota check
       const saveResult = await saveWithQuotaCheck(
         () => saveBarangays(updatedBarangays),
@@ -3046,7 +3153,7 @@ Are you absolutely sure you want to proceed?`;
       if (saveResult.success) {
         toast.success(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
         showSuccess(`Successfully imported ${barangays.length} barangays for ${selectedMunicipality}`);
-        
+
         // Add to terminal history
         const newEntry = {
           id: Date.now(),
@@ -3062,7 +3169,7 @@ Are you absolutely sure you want to proceed?`;
         // Revert local state if save failed
         setImportedBarangays(importedBarangays);
       }
-      
+
     } catch (error) {
       toast.error("Error importing barangays: " + error.message);
       showError('Error importing barangays: ' + error.message);
@@ -3079,7 +3186,7 @@ Are you absolutely sure you want to proceed?`;
     }
 
     setIsImporting(true);
-    
+
     try {
       // Parse concern type data (assuming comma-separated or line-separated)
       const concernTypes = concernTypeData
@@ -3099,7 +3206,7 @@ Are you absolutely sure you want to proceed?`;
       const updatedConcernTypes = [...importedConcernTypes, ...newConcernTypes];
       setImportedConcernTypes(updatedConcernTypes);
       setConcernTypeData("");
-      
+
       // Save to Firestore with quota check
       const saveResult = await saveWithQuotaCheck(
         () => saveConcernTypes(updatedConcernTypes),
@@ -3108,7 +3215,7 @@ Are you absolutely sure you want to proceed?`;
       if (saveResult.success) {
         toast.success(`Successfully imported ${concernTypes.length} concern types for ${selectedMunicipality}`);
         showSuccess(`Successfully imported ${concernTypes.length} concern types for ${selectedMunicipality}`);
-        
+
         // Add to terminal history
         const newEntry = {
           id: Date.now(),
@@ -3124,7 +3231,7 @@ Are you absolutely sure you want to proceed?`;
         // Revert local state if save failed
         setImportedConcernTypes(importedConcernTypes);
       }
-      
+
     } catch (error) {
       toast.error("Error importing concern types: " + error.message);
       showError('Error importing concern types: ' + error.message);
@@ -3142,7 +3249,7 @@ Are you absolutely sure you want to proceed?`;
 
     const csvContent = [
       "District,Municipality,Barangay,Imported Date",
-      ...importedBarangays.map(brgy => 
+      ...importedBarangays.map(brgy =>
         `${brgy.district},${brgy.municipality},${brgy.name},${new Date(brgy.importedAt).toLocaleDateString()}`
       )
     ].join('\n');
@@ -3156,7 +3263,7 @@ Are you absolutely sure you want to proceed?`;
     a.click();
     document.body.removeChild(a);
     window.URL.revokeObjectURL(url);
-    
+
     toast.success("Barangays exported successfully");
     showSuccess('Barangays exported successfully!');
   };
@@ -3268,15 +3375,15 @@ Are you absolutely sure you want to proceed?`;
     // First filter by municipality if filter is set
     let filteredBarangays = importedBarangays;
     if (barangayFilterMunicipality) {
-      filteredBarangays = importedBarangays.filter(barangay => 
+      filteredBarangays = importedBarangays.filter(barangay =>
         barangay.municipality.toLowerCase() === barangayFilterMunicipality.toLowerCase()
       );
     }
-    
+
     // Then sort the filtered results
     return [...filteredBarangays].sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (barangaySortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -3297,7 +3404,7 @@ Are you absolutely sure you want to proceed?`;
         default:
           return 0;
       }
-      
+
       if (aValue < bValue) return barangaySortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return barangaySortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -3313,7 +3420,7 @@ Are you absolutely sure you want to proceed?`;
   const getGroupedBarangays = () => {
     const grouped = {};
     const sortedBarangays = getSortedBarangays();
-    
+
     sortedBarangays.forEach(barangay => {
       const municipality = barangay.municipality;
       if (!grouped[municipality]) {
@@ -3321,7 +3428,7 @@ Are you absolutely sure you want to proceed?`;
       }
       grouped[municipality].push(barangay);
     });
-    
+
     return grouped;
   };
 
@@ -3374,22 +3481,22 @@ Are you absolutely sure you want to proceed?`;
   const getSortedConcernTypes = () => {
     // First filter by municipality if filter is set or if user is not admin
     let filteredConcernTypes = importedConcernTypes;
-    
+
     // For non-admin users, automatically filter by their municipality
     if (!isAdmin && userMunicipality) {
-      filteredConcernTypes = importedConcernTypes.filter(concernType => 
+      filteredConcernTypes = importedConcernTypes.filter(concernType =>
         concernType.municipality.toLowerCase() === userMunicipality.toLowerCase()
       );
     } else if (concernTypeFilterMunicipality) {
-      filteredConcernTypes = importedConcernTypes.filter(concernType => 
+      filteredConcernTypes = importedConcernTypes.filter(concernType =>
         concernType.municipality.toLowerCase() === concernTypeFilterMunicipality.toLowerCase()
       );
     }
-    
+
     // Then sort the filtered results
     return [...filteredConcernTypes].sort((a, b) => {
       let aValue, bValue;
-      
+
       switch (concernTypeSortBy) {
         case 'name':
           aValue = a.name.toLowerCase();
@@ -3411,7 +3518,7 @@ Are you absolutely sure you want to proceed?`;
           aValue = a.name.toLowerCase();
           bValue = b.name.toLowerCase();
       }
-      
+
       if (aValue < bValue) return concernTypeSortOrder === 'asc' ? -1 : 1;
       if (aValue > bValue) return concernTypeSortOrder === 'asc' ? 1 : -1;
       return 0;
@@ -3422,7 +3529,7 @@ Are you absolutely sure you want to proceed?`;
   const getGroupedConcernTypes = () => {
     const grouped = {};
     const sortedConcernTypes = getSortedConcernTypes();
-    
+
     sortedConcernTypes.forEach(concernType => {
       const municipality = concernType.municipality;
       if (!grouped[municipality]) {
@@ -3430,7 +3537,7 @@ Are you absolutely sure you want to proceed?`;
       }
       grouped[municipality].push(concernType);
     });
-    
+
     return grouped;
   };
 
@@ -3584,13 +3691,13 @@ Are you absolutely sure you want to proceed?`;
 
       // Update local state
       setImportedConcernTypes(updatedConcernTypes);
-      
+
       // Save to Firestore
       const saveResult = await saveWithQuotaCheck(
         () => saveConcernTypes(updatedConcernTypes),
         "Update Concern Types"
       );
-      
+
       if (!saveResult.success) {
         toast.error("Failed to save changes to database: " + saveResult.error);
         showError('Failed to save changes to database: ' + saveResult.error);
@@ -3601,7 +3708,7 @@ Are you absolutely sure you want to proceed?`;
 
       // Clear cache to force reload
       concernTypesCache.current = null;
-      
+
       // Close modal and clear selection
       setIsEditingConcernTypes(false);
       setEditingConcernType(null);
@@ -3630,7 +3737,7 @@ Are you absolutely sure you want to proceed?`;
 
   // Export concern types to CSV
   const handleExportConcernTypesCSV = () => {
-    const concernTypesToExport = selectedConcernTypes.length > 0 
+    const concernTypesToExport = selectedConcernTypes.length > 0
       ? getSortedConcernTypes().filter(concernType => selectedConcernTypes.includes(concernType.id))
       : getSortedConcernTypes();
 
@@ -3729,15 +3836,15 @@ Are you absolutely sure you want to proceed?`;
     }
   };
 
-// Bulk delete ALL weekly reports from ALL locations in Firestore
-const handleDeleteAllWeeklyReports = async () => {
-  if (isReadOnly) {
-    const message = 'View-only access: you do not have permission to delete weekly reports.';
-    toast.error(message);
-    showError(message);
-    return;
-  }
-  const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
+  // Bulk delete ALL weekly reports from ALL locations in Firestore
+  const handleDeleteAllWeeklyReports = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to delete weekly reports.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+    const confirmMessage = `⚠️ DANGER: DELETE ALL WEEKLY REPORTS ⚠️
 
 This will permanently delete ALL weekly reports from:
 • weeklyReports collection
@@ -3749,350 +3856,369 @@ This action CANNOT be undone.
 
 Are you absolutely sure you want to proceed?`;
 
-  if (window.confirm(confirmMessage)) {
-    // Double confirmation for safety
-    const doubleConfirm = window.prompt(
-      'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
-    );
-    
-    if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
-      try {
-        toast.loading('Deleting all weekly reports...', { duration: 0, id: 'bulk-delete' });
-        
-        const result = await deleteAllWeeklyReports();
-        
-        toast.dismiss('bulk-delete');
-        
-        if (result.success) {
-          if (result.errors && result.errors.length > 0) {
-            toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
-            console.warn('❌ Deletion errors:', result.errors);
-          } else {
-            toast.success(`Successfully deleted all ${result.deletedCount} weekly reports`);
-          }
-          
-          // Clear local state
-          initializeWeeklyReportData();
-          setSelectedBarangay("");
-          setSelectedConcernType("");
-          setActionTaken("");
-          setRemarks("");
-          
-          // Data will update automatically through state management
-          loadWeeklyReportData(); // Reload current view
-          
-          // Add to terminal history
-          const newEntry = {
-            id: Date.now(),
-            command: "bulk.delete.weekly.reports",
-            output: `Deleted ${result.deletedCount} weekly reports from all locations`,
-            type: "warning",
-            timestamp: new Date()
-          };
-          setTerminalHistory(prev => [...prev, newEntry]);
-          
-        } else {
-          toast.error(`Failed to delete weekly reports: ${result.error}`);
-        }
-      } catch (error) {
-        toast.dismiss('bulk-delete');
-        console.error('❌ Error in bulk delete:', error);
-        toast.error('Error deleting weekly reports');
-      }
-    } else {
-      toast.info('Bulk deletion cancelled - confirmation text did not match');
-    }
-  }
-};
+    if (window.confirm(confirmMessage)) {
+      // Double confirmation for safety
+      const doubleConfirm = window.prompt(
+        'Type "DELETE ALL WEEKLY REPORTS" (without quotes) to confirm this destructive action:'
+      );
 
-// Save weekly report data to Firestore
-const handleSaveWeeklyReport = async (skipReload = false) => {
-  console.log('🚀 ========== SAVE OPERATION STARTED ==========');
-  console.log('📊 Current State Before Save:', {
-    selectedMonth,
-    selectedYear,
-    activeMunicipalityTab,
-    weeklyReportDataKeys: Object.keys(weeklyReportData).length,
-    weeklyReportDataSample: Object.keys(weeklyReportData).slice(0, 3),
-    skipReload
-  });
-  
-  if (isReadOnly) {
-    const message = 'View-only access: you do not have permission to save weekly reports.';
-    toast.error(message);
-    showError(message);
-    return;
-  }
-  const monthYear = `${selectedMonth}_${selectedYear}`;
-  const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
-  const reportKey = `${monthYear}${municipalityKey}`;
-  setIsLoadingWeeklyReports(true);
-  
-  console.log('📋 Save Configuration:', { monthYear, reportKey, municipality: activeMunicipalityTab });
-  
-  try {
-    // CRITICAL FIX: Use localStorage to preserve photos instead of loading from Firestore
-    console.log('� Loading existing data from localStorage to preserve photos...');
-    let existingWeeklyReportData = {};
-    
-    try {
-      const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-      const storedData = localStorage.getItem(storageKey);
-      
-      if (storedData) {
-        existingWeeklyReportData = JSON.parse(storedData);
-        console.log('✅ Loaded existing data from localStorage with', Object.keys(existingWeeklyReportData).length, 'dates');
-      } else {
-        console.log('ℹ️ No existing data in localStorage, trying Firestore...');
-        
-        // Fallback to Firestore if localStorage is empty
-        const monthYearDoc = `${selectedMonth}_${selectedYear}`;
-        const existingDocRef = doc(db, 'commandCenter', 'weeklyReports', activeMunicipalityTab, monthYearDoc);
-        const existingDocSnap = await getDoc(existingDocRef);
-        
-        if (existingDocSnap.exists()) {
-          const existingData = existingDocSnap.data();
-          existingWeeklyReportData = existingData.weeklyReportData || {};
-          console.log('✅ Loaded existing data from Firestore with', Object.keys(existingWeeklyReportData).length, 'dates');
-        }
-      }
-    } catch (loadError) {
-      console.warn('⚠️ Error loading existing data:', loadError);
-      // Continue with save even if load fails
-    }
-    
-    // Sanitize data: remove any empty-string date keys to satisfy Firestore rules
-    const sanitizedWeeklyReportData = Object.keys(weeklyReportData || {}).reduce((acc, key) => {
-      if (key && key.trim().length > 0) {
-        acc[key] = weeklyReportData[key];
-      }
-      return acc;
-    }, {});
+      if (doubleConfirm === 'DELETE ALL WEEKLY REPORTS') {
+        try {
+          toast.loading('Deleting all weekly reports...', { duration: 0, id: 'bulk-delete' });
 
-    console.log('🧹 Sanitized Data:', {
-      originalKeys: Object.keys(weeklyReportData).length,
-      sanitizedKeys: Object.keys(sanitizedWeeklyReportData).length,
-      removed: Object.keys(weeklyReportData).length - Object.keys(sanitizedWeeklyReportData).length
-    });
+          const result = await deleteAllWeeklyReports();
 
-    // CRITICAL FIX: Merge existing data with new data, preserving photos
-    const mergedWeeklyReportData = { ...existingWeeklyReportData };
-    
-    Object.keys(sanitizedWeeklyReportData).forEach(dateKey => {
-      const newEntries = sanitizedWeeklyReportData[dateKey];
-      const existingEntries = mergedWeeklyReportData[dateKey] || [];
-      
-      // Merge entries for this date
-      if (Array.isArray(newEntries)) {
-        mergedWeeklyReportData[dateKey] = newEntries.map((newEntry, index) => {
-          const existingEntry = existingEntries[index];
-          
-          // ALWAYS prefer new entry data (from current state) as it's most recent
-          // New entry already has photos if they were uploaded
-          // Only fall back to existing entry photos if new entry explicitly has none
-          if (existingEntry && existingEntry.photos && !newEntry.photos) {
-            console.log(`📸 Preserving photos from Firestore for ${dateKey} entry ${index}`);
-            return {
-              ...newEntry,
-              photos: existingEntry.photos
+          toast.dismiss('bulk-delete');
+
+          if (result.success) {
+            if (result.errors && result.errors.length > 0) {
+              toast.warning(`Deleted ${result.deletedCount} documents with ${result.errors.length} errors. Check console for details.`);
+              console.warn('❌ Deletion errors:', result.errors);
+            } else {
+              toast.success(`Successfully deleted all ${result.deletedCount} weekly reports`);
+            }
+
+            // Clear local state
+            initializeWeeklyReportData();
+            setSelectedBarangay("");
+            setSelectedConcernType("");
+            setActionTaken("");
+            setRemarks("");
+
+            // Data will update automatically through state management
+            loadWeeklyReportData(); // Reload current view
+
+            // Add to terminal history
+            const newEntry = {
+              id: Date.now(),
+              command: "bulk.delete.weekly.reports",
+              output: `Deleted ${result.deletedCount} weekly reports from all locations`,
+              type: "warning",
+              timestamp: new Date()
             };
+            setTerminalHistory(prev => [...prev, newEntry]);
+
+          } else {
+            toast.error(`Failed to delete weekly reports: ${result.error}`);
           }
-          
-          // Use new entry as-is (photos included if present)
-          return newEntry;
-        });
-      } else {
-        mergedWeeklyReportData[dateKey] = newEntries;
-      }
-    });
-
-    console.log('🔀 Merged Data:', {
-      existingKeys: Object.keys(existingWeeklyReportData).length,
-      newKeys: Object.keys(sanitizedWeeklyReportData).length,
-      mergedKeys: Object.keys(mergedWeeklyReportData).length
-    });
-
-    // CRITICAL: Save to localStorage BEFORE Firestore
-    try {
-      const storageKey = `commandCenter_${activeMunicipalityTab}_${selectedMonth}_${selectedYear}`;
-      localStorage.setItem(storageKey, JSON.stringify(mergedWeeklyReportData));
-      console.log('💾 Saved merged data to localStorage with key:', storageKey);
-    } catch (storageError) {
-      console.error('❌ Error saving to localStorage:', storageError);
-      // Continue even if localStorage fails
-    }
-
-    // Collect all form data from the weekly report table
-    // CRITICAL FIX: Use mergedWeeklyReportData to include photos
-    const reportData = {
-      selectedMonth,
-      selectedYear,
-      activeMunicipalityTab: selectedReportMunicipality || activeMunicipalityTab,
-      selectedBarangay,
-      selectedConcernType,
-      actionTaken,
-      remarks,
-      weeklyReportData: mergedWeeklyReportData, // FIXED: Use merged data to preserve photos
-      savedAt: new Date().toISOString()
-    };
-
-    console.log('💾 Saving weekly report data:', {
-      reportKey,
-      dataCount: Object.keys(weeklyReportData).length,
-      sanitizedCount: Object.keys(sanitizedWeeklyReportData).length,
-      mergedCount: Object.keys(mergedWeeklyReportData).length,
-      hasPhotos: Object.values(mergedWeeklyReportData).some(entries => 
-        Array.isArray(entries) && entries.some(entry => entry.photos)
-      ),
-      photoDetails: Object.entries(mergedWeeklyReportData).map(([date, entries]) => ({
-        date,
-        entries: Array.isArray(entries) ? entries.map((entry, idx) => ({
-          index: idx,
-          hasPhotos: !!entry.photos,
-          photoUrls: entry.photos?.rows?.map(row => ({
-            before: row.before?.length || 0,
-            after: row.after?.length || 0
-          })) || []
-        })) : []
-      })).filter(d => d.entries.some(e => e.hasPhotos)),
-      sampleData: Object.keys(weeklyReportData).slice(0, 3),
-      firstDateData: Object.keys(weeklyReportData).length > 0 ? weeklyReportData[Object.keys(weeklyReportData)[0]] : 'No data'
-    });
-
-    // Save to the nested structure: commandCenter > weeklyReports > Municipality > MonthYear
-    let nestedSaveResult = { success: false };
-    if (activeMunicipalityTab) {
-      try {
-        // Use saveWeeklyReportByMunicipality for consistent behavior with admin save
-        // This function handles size checking and splitting internally per municipality
-        console.log(`💾 Saving via saveWeeklyReportByMunicipality for ${activeMunicipalityTab}`);
-        nestedSaveResult = await saveWithQuotaCheck(
-          () => saveWeeklyReportByMunicipality(reportData),
-          "Save Weekly Report"
-        );
-        
-        if (nestedSaveResult.success) {
-          console.log(`✅ Successfully saved for ${activeMunicipalityTab}`);
-        } else {
-          console.error(`❌ Failed to save for ${activeMunicipalityTab}:`, nestedSaveResult.error);
+        } catch (error) {
+          toast.dismiss('bulk-delete');
+          console.error('❌ Error in bulk delete:', error);
+          toast.error('Error deleting weekly reports');
         }
-      } catch (error) {
-        console.error('❌ Error saving to nested structure:', error);
-        nestedSaveResult = { success: false, error };
+      } else {
+        toast.info('Bulk deletion cancelled - confirmation text did not match');
       }
     }
-    
-    // Only use nested structure save - no more root level saves
-    if (nestedSaveResult.success) {
-      const splitMessage = nestedSaveResult.wasSplit ? ' (optimized for large dataset)' : '';
-      // Use custom notification for success message
-      showSuccess(`Weekly report saved successfully for ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`);
-      
-      // CLEAR MEMORY DATA: Remove any conflicting memory data for this month
-      const monthKey = selectedMonth.toLowerCase();
-      if (allMonthsData[monthKey]) {
-        console.log('🧹 Clearing memory data for this month to prevent conflicts');
-        const updatedAllMonthsData = { ...allMonthsData };
-        delete updatedAllMonthsData[monthKey];
-        setAllMonthsData(updatedAllMonthsData);
+  };
+
+  // Save weekly report data to Firestore
+  const handleSaveWeeklyReport = async (skipReload = false, isSilent = false) => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to save weekly reports.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+
+    if (!isSilent && !skipReload) {
+      setIsLoadingWeeklyReports(true);
+    }
+    setHasUnsavedChanges(false);
+    lastSaveTime.current = Date.now();
+
+    try {
+      // Get LATEST state value directly from ref or state
+      const latestWeeklyReportData = weeklyReportDataRef.current && Object.keys(weeklyReportDataRef.current).length > 0
+        ? weeklyReportDataRef.current
+        : weeklyReportData;
+
+      console.log('💾 ========== SAVE OPERATION STARTED ==========');
+      console.log('📊 Current weeklyReportData state:', latestWeeklyReportData);
+      console.log('📊 Keys in weeklyReportData:', latestWeeklyReportData ? Object.keys(latestWeeklyReportData) : 'null');
+      console.log('📊 State method used:', latestWeeklyReportData === weeklyReportDataRef.current ? 'ref' : 'callback');
+
+      // Check if we have data to save
+      if (!latestWeeklyReportData || Object.keys(latestWeeklyReportData).length === 0) {
+        console.error('❌ No data structure found');
+        console.error('State snapshot:', { latestWeeklyReportData, ref: weeklyReportDataRef.current });
+        showError('No data to save. Please add entries first.');
+        setIsLoadingWeeklyReports(false);
+        return;
       }
-      
-      // Add to terminal history
-      const newEntry = {
-        id: Date.now(),
-        command: "weekly.save",
-        output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab || 'All Municipalities'}${splitMessage}`,
-        type: "success",
-        timestamp: new Date()
+
+      // Count actual entries (not just dates)
+      const totalEntries = Object.values(latestWeeklyReportData).reduce((sum, entries) =>
+        sum + (Array.isArray(entries) ? entries.length : 0), 0
+      );
+
+      console.log('📊 Total entries to save:', totalEntries);
+      console.log('📊 Dates with entries:', Object.entries(latestWeeklyReportData)
+        .filter(([date, entries]) => Array.isArray(entries) && entries.length > 0)
+        .map(([date, entries]) => `${date}: ${entries.length} entries`)
+      );
+
+      // Check if we have actual entries (not just empty date arrays)
+      if (totalEntries === 0) {
+        console.error('❌ No entries found in data structure');
+        console.error('Data structure:', latestWeeklyReportData);
+        showError('No entries to save. Please add at least one entry with barangay and concern type.');
+        setIsLoadingWeeklyReports(false);
+        return;
+      }
+
+      const monthYear = `${selectedMonth}_${selectedYear}`;
+      const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
+      const reportKey = `${monthYear}${municipalityKey}`;
+
+      console.log('💾 Preparing to save:', {
+        monthYear,
+        municipality: activeMunicipalityTab,
+        totalEntries,
+        dateCount: Object.keys(latestWeeklyReportData).length
+      });
+
+      // Sanitize using LATEST state
+      const sanitizedWeeklyReportData = Object.keys(latestWeeklyReportData || {}).reduce((acc, key) => {
+        if (key && key.trim().length > 0) {
+          acc[key] = latestWeeklyReportData[key];
+        }
+        return acc;
+      }, {});
+
+      const finalWeeklyReportData = sanitizedWeeklyReportData;
+
+      // NO localStorage - Save ONLY to Firestore for live sync across all devices
+
+      const reportData = {
+        selectedMonth,
+        selectedYear,
+        activeMunicipalityTab: activeMunicipalityTab, // CRITICAL: Use activeMunicipalityTab directly, not selectedReportMunicipality
+        selectedBarangay,
+        selectedConcernType,
+        actionTaken,
+        remarks,
+        weeklyReportData: finalWeeklyReportData,
+        savedAt: new Date().toISOString(),
+        savedBy: user?.email || 'unknown',
+        dataVersion: '2.0' // Mark this as new format
       };
-      setTerminalHistory(prev => [...prev, newEntry]);
-      
-      // If data was split, reload to show the split documents correctly
-      // BUT skip reload if this was called from auto-save after photo upload
-      if (nestedSaveResult.wasSplit && !skipReload) {
-        console.log('🔄 Data was split - reloading to show split documents...');
-        setTimeout(async () => {
-          try {
-            await loadWeeklyReportData();
-            console.log('✅ Reload after split completed');
-          } catch (reloadError) {
-            console.error('❌ Reload after split failed:', reloadError);
-          } finally {
-            setIsLoadingWeeklyReports(false);
-          }
-        }, 1500);
-        return; // Exit early to let reload handle loading state
-      } else if (nestedSaveResult.wasSplit && skipReload) {
-        console.log('ℹ️ Data was split but skipping reload (auto-save after photo upload)');
+
+      // CRITICAL: Verify municipality is set before saving
+      if (!activeMunicipalityTab || activeMunicipalityTab === '') {
+        console.error('❌ Cannot save: activeMunicipalityTab is empty!');
+        showError('Cannot save: Municipality not set. Please refresh the page.');
+        setIsLoadingWeeklyReports(false);
+        return;
       }
-    } else {
-      console.error('❌ Save failed:', nestedSaveResult.error);
-      const errorMessage = nestedSaveResult.error?.message || nestedSaveResult.error || 'Unknown error';
-      // Use custom notification for better error display with long messages
-      showError(`Failed to save weekly report: ${errorMessage}`);
+
+      // DEBUG: Log EXACTLY what we're about to save
+      console.log('💾 ========== ABOUT TO SAVE TO FIRESTORE ==========');
+      console.log('📍 Firestore Path:', `commandCenter/weeklyReports/${activeMunicipalityTab}/${monthYear}`);
+      console.log('📦 Report Data:', {
+        selectedMonth: reportData.selectedMonth,
+        selectedYear: reportData.selectedYear,
+        municipality: reportData.activeMunicipalityTab,
+        totalEntries: Object.values(finalWeeklyReportData).reduce((sum, entries) =>
+          sum + (Array.isArray(entries) ? entries.length : 0), 0
+        ),
+        totalDates: Object.keys(finalWeeklyReportData).length,
+        sampleDates: Object.keys(finalWeeklyReportData).slice(0, 3),
+        sampleData: Object.entries(finalWeeklyReportData)
+          .filter(([_, entries]) => Array.isArray(entries) && entries.length > 0)
+          .slice(0, 2)
+          .map(([date, entries]) => ({
+            date,
+            entries: entries.map(e => ({
+              barangay: e.barangay,
+              concernType: e.concernType,
+              hasPhotos: !!e.photos
+            }))
+          }))
+      });
+
+      // Save to Firestore
+      let nestedSaveResult = { success: false };
+      if (activeMunicipalityTab) {
+        try {
+          console.log('🔄 Calling saveWeeklyReportByMunicipality...');
+          nestedSaveResult = await saveWithQuotaCheck(
+            () => saveWeeklyReportByMunicipality(reportData),
+            "Save Weekly Report"
+          );
+
+          console.log('✅ Save result:', nestedSaveResult);
+
+          if (!nestedSaveResult.success) {
+            console.error('❌ Failed to save:', nestedSaveResult.error);
+          }
+        } catch (error) {
+          console.error('❌ Error saving:', error);
+          nestedSaveResult = { success: false, error };
+        }
+      } else {
+        console.error('❌ No activeMunicipalityTab - cannot save!');
+      }
+
+      if (nestedSaveResult.success) {
+        const entriesCount = Object.values(finalWeeklyReportData).reduce((sum, entries) =>
+          sum + (Array.isArray(entries) ? entries.length : 0), 0
+        );
+
+        console.log('✅ Save successful! Saved', entriesCount, 'entries to Firestore');
+        console.log('📍 Saved to:', `commandCenter/weeklyReports/${activeMunicipalityTab}/${monthYear}`);
+        console.log('🔑 IMPORTANT: On refresh, data will load from this EXACT path!');
+        console.log('🔑 Municipality:', activeMunicipalityTab);
+        console.log('🔑 Month:', selectedMonth);
+        console.log('🔑 Year:', selectedYear);
+
+        showSuccess(`Weekly report saved successfully! ${entriesCount} entries saved to ${activeMunicipalityTab}`);
+
+        // Update last loaded ref so next page load will find this data
+        lastLoadedWeeklyRef.current = {
+          month: selectedMonth,
+          year: selectedYear,
+          municipality: activeMunicipalityTab
+        };
+
+        // Mark as no unsaved changes
+        setHasUnsavedChanges(false);
+
+        // Clear memory data
+        const monthKey = selectedMonth.toLowerCase();
+        if (allMonthsData[monthKey]) {
+          const updatedAllMonthsData = { ...allMonthsData };
+          delete updatedAllMonthsData[monthKey];
+          setAllMonthsData(updatedAllMonthsData);
+        }
+
+        // Add to terminal history
+        const newEntry = {
+          id: Date.now(),
+          command: "weekly.save",
+          output: `Weekly report saved for ${selectedMonth} ${selectedYear} - ${activeMunicipalityTab}`,
+          type: "success",
+          timestamp: new Date()
+        };
+        setTerminalHistory(prev => [...prev, newEntry]);
+
+        // NO AUTO-RELOAD - Keep the data visible in the UI
+        // User can manually refresh if needed
+        console.log('✅ Data saved successfully. Keeping current data visible in UI.');
+
+      } else {
+        const errorMessage = nestedSaveResult.error?.message || nestedSaveResult.error || 'Unknown error';
+        showError(`Failed to save weekly report: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error("Error saving weekly report:", error);
+      showError(`Error saving weekly report: ${error.message || error}`);
+    } finally {
+      setIsLoadingWeeklyReports(false);
     }
-  } catch (error) {
-    console.error("❌ ========== SAVE ERROR ==========");
-    console.error("Error saving weekly report:", error);
-    // Use custom notification for better error display
-    showError(`Error saving weekly report: ${error.message || error}`);
-  } finally {
-    setIsLoadingWeeklyReports(false);
-    console.log('🏁 ========== SAVE OPERATION FINISHED ==========');
-  }
-};
+  };
+  // Handle Excel file selection and import
+  const handleExcelFileSelect = async (event) => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to import Excel files.';
+      toast.error(message);
+      showError(message);
+      return;
+    }
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-// Handle Excel file selection and import
-const handleExcelFileSelect = async (event) => {
-  if (isReadOnly) {
-    const message = 'View-only access: you do not have permission to import Excel files.';
-    toast.error(message);
-    showError(message);
-    return;
-  }
-  const file = event.target.files?.[0];
-  if (!file) return;
+    setIsImportingExcel(true);
+    setExcelFile(file);
 
-  setIsImportingExcel(true);
-  setExcelFile(file);
+    try {
+      const reader = new FileReader();
 
-  try {
-    const reader = new FileReader();
-    
-    reader.onload = async (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        if (importAllMonths) {
-          // Import all months mode
-          setIsImportingAllMonths(true);
-          const importedData = {};
-          
-          // Process each sheet as a month
-          workbook.SheetNames.forEach(sheetName => {
-            const worksheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-            
-            // Skip empty sheets
-            if (jsonData.length < 2) return;
-            
-            // Parse the sheet data
-            const monthKey = sheetName.toLowerCase().trim();
-            const entries = [];
-            
-            // Assuming first row is headers
+      reader.onload = async (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+
+          if (importAllMonths) {
+            // Import all months mode
+            setIsImportingAllMonths(true);
+            const importedData = {};
+
+            // Process each sheet as a month
+            workbook.SheetNames.forEach(sheetName => {
+              const worksheet = workbook.Sheets[sheetName];
+              const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+              // Skip empty sheets
+              if (jsonData.length < 2) return;
+
+              // Parse the sheet data
+              const monthKey = sheetName.toLowerCase().trim();
+              const entries = [];
+
+              // Assuming first row is headers
+              const headers = jsonData[0];
+              for (let i = 1; i < jsonData.length; i++) {
+                const row = jsonData[i];
+                if (!row || row.length === 0) continue;
+
+                const entry = {};
+                headers.forEach((header, index) => {
+                  const headerStr = String(header).toLowerCase().trim();
+                  const value = row[index];
+
+                  // Map common column names
+                  if (headerStr.includes('date')) {
+                    entry.date = parseExcelDateToKey(value) || value;
+                  } else if (headerStr.includes('barangay')) {
+                    entry.barangay = value;
+                  } else if (headerStr.includes('concern') || headerStr.includes('type')) {
+                    entry.concernType = value;
+                  } else if (headerStr.includes('action')) {
+                    entry.actionTaken = value;
+                  } else if (headerStr.includes('remark')) {
+                    entry.remarks = value;
+                  } else if (headerStr.includes('municipal')) {
+                    entry.municipality = value;
+                  }
+                });
+
+                if (entry.date) {
+                  entries.push(entry);
+                }
+              }
+
+              if (entries.length > 0) {
+                importedData[monthKey] = entries;
+              }
+            });
+
+            setAllMonthsData(importedData);
+            setIsImportingAllMonths(false);
+            toast.success(`Imported ${Object.keys(importedData).length} months from Excel. Click "Save All Months" to save to database.`);
+
+          } else {
+            // Import single month mode (current month)
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+            if (jsonData.length < 2) {
+              toast.error('Excel file is empty or has no data');
+              return;
+            }
+
             const headers = jsonData[0];
+            const entries = [];
+
             for (let i = 1; i < jsonData.length; i++) {
               const row = jsonData[i];
               if (!row || row.length === 0) continue;
-              
+
               const entry = {};
               headers.forEach((header, index) => {
                 const headerStr = String(header).toLowerCase().trim();
                 const value = row[index];
-                
-                // Map common column names
+
                 if (headerStr.includes('date')) {
                   entry.date = parseExcelDateToKey(value) || value;
                 } else if (headerStr.includes('barangay')) {
@@ -4107,201 +4233,150 @@ const handleExcelFileSelect = async (event) => {
                   entry.municipality = value;
                 }
               });
-              
+
               if (entry.date) {
                 entries.push(entry);
               }
             }
-            
-            if (entries.length > 0) {
-              importedData[monthKey] = entries;
-            }
-          });
-          
-          setAllMonthsData(importedData);
-          setIsImportingAllMonths(false);
-          toast.success(`Imported ${Object.keys(importedData).length} months from Excel. Click "Save All Months" to save to database.`);
-          
-        } else {
-          // Import single month mode (current month)
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
-          
-          if (jsonData.length < 2) {
-            toast.error('Excel file is empty or has no data');
-            return;
-          }
-          
-          const headers = jsonData[0];
-          const entries = [];
-          
-          for (let i = 1; i < jsonData.length; i++) {
-            const row = jsonData[i];
-            if (!row || row.length === 0) continue;
-            
-            const entry = {};
-            headers.forEach((header, index) => {
-              const headerStr = String(header).toLowerCase().trim();
-              const value = row[index];
-              
-              if (headerStr.includes('date')) {
-                entry.date = parseExcelDateToKey(value) || value;
-              } else if (headerStr.includes('barangay')) {
-                entry.barangay = value;
-              } else if (headerStr.includes('concern') || headerStr.includes('type')) {
-                entry.concernType = value;
-              } else if (headerStr.includes('action')) {
-                entry.actionTaken = value;
-              } else if (headerStr.includes('remark')) {
-                entry.remarks = value;
-              } else if (headerStr.includes('municipal')) {
-                entry.municipality = value;
+
+            // Group entries by date and add to weeklyReportData
+            const newWeeklyData = { ...weeklyReportData };
+            entries.forEach(entry => {
+              if (!newWeeklyData[entry.date]) {
+                newWeeklyData[entry.date] = [];
               }
+              newWeeklyData[entry.date].push({
+                id: Date.now() + Math.random(),
+                barangay: entry.barangay || '',
+                concernType: entry.concernType || '',
+                actionTaken: entry.actionTaken || '',
+                remarks: entry.remarks || '',
+                municipality: entry.municipality || activeMunicipalityTab
+              });
             });
-            
-            if (entry.date) {
-              entries.push(entry);
-            }
+
+            setWeeklyReportData(newWeeklyData);
+            toast.success(`Imported ${entries.length} entries from Excel for ${selectedMonth}`);
           }
-          
-          // Group entries by date and add to weeklyReportData
-          const newWeeklyData = { ...weeklyReportData };
-          entries.forEach(entry => {
-            if (!newWeeklyData[entry.date]) {
-              newWeeklyData[entry.date] = [];
-            }
-            newWeeklyData[entry.date].push({
-              id: Date.now() + Math.random(),
-              barangay: entry.barangay || '',
-              concernType: entry.concernType || '',
-              actionTaken: entry.actionTaken || '',
-              remarks: entry.remarks || '',
-              municipality: entry.municipality || activeMunicipalityTab
-            });
-          });
-          
-          setWeeklyReportData(newWeeklyData);
-          toast.success(`Imported ${entries.length} entries from Excel for ${selectedMonth}`);
+
+        } catch (error) {
+          console.error('Error parsing Excel file:', error);
+          toast.error('Error parsing Excel file: ' + error.message);
+        } finally {
+          setIsImportingExcel(false);
+          // Reset file input
+          event.target.value = '';
         }
-        
-      } catch (error) {
-        console.error('Error parsing Excel file:', error);
-        toast.error('Error parsing Excel file: ' + error.message);
-      } finally {
+      };
+
+      reader.onerror = () => {
+        toast.error('Error reading Excel file');
         setIsImportingExcel(false);
-        // Reset file input
         event.target.value = '';
-      }
-    };
-    
-    reader.onerror = () => {
-      toast.error('Error reading Excel file');
+      };
+
+      reader.readAsArrayBuffer(file);
+
+    } catch (error) {
+      console.error('Error importing Excel:', error);
+      toast.error('Error importing Excel file');
       setIsImportingExcel(false);
       event.target.value = '';
-    };
-    
-    reader.readAsArrayBuffer(file);
-    
-  } catch (error) {
-    console.error('Error importing Excel:', error);
-    toast.error('Error importing Excel file');
-    setIsImportingExcel(false);
-    event.target.value = '';
-  }
-};
+    }
+  };
 
-// Save all imported months (from local storage import) to Firestore
-const handleSaveAllMonths = async () => {
-  if (isReadOnly) {
-    const message = 'View-only access: you do not have permission to save imported months.';
-    toast.error(message);
-    showError(message);
-    return;
-  }
-  try {
-    const monthKeys = Object.keys(allMonthsData || {});
-    if (!monthKeys.length) {
-      toast.error("No months data to save");
-      showError('No months data to save');
+  // Save all imported months (from local storage import) to Firestore
+  const handleSaveAllMonths = async () => {
+    if (isReadOnly) {
+      const message = 'View-only access: you do not have permission to save imported months.';
+      toast.error(message);
+      showError(message);
       return;
     }
+    try {
+      const monthKeys = Object.keys(allMonthsData || {});
+      if (!monthKeys.length) {
+        toast.error("No months data to save");
+        showError('No months data to save');
+        return;
+      }
 
-    setIsSavingAllMonths(true);
-    setSaveAllProgress({ current: 0, total: monthKeys.length });
+      setIsSavingAllMonths(true);
+      setSaveAllProgress({ current: 0, total: monthKeys.length });
 
-    for (let i = 0; i < monthKeys.length; i++) {
-      const monthKeyLower = monthKeys[i];
-      const monthEntries = allMonthsData[monthKeyLower] || [];
-      if (!monthEntries.length) continue;
+      for (let i = 0; i < monthKeys.length; i++) {
+        const monthKeyLower = monthKeys[i];
+        const monthEntries = allMonthsData[monthKeyLower] || [];
+        if (!monthEntries.length) continue;
 
-      // Derive displayed month name (capitalize first letter)
-      const displayMonth = monthKeyLower.charAt(0).toUpperCase() + monthKeyLower.slice(1);
+        // Derive displayed month name (capitalize first letter)
+        const displayMonth = monthKeyLower.charAt(0).toUpperCase() + monthKeyLower.slice(1);
 
-      // Derive year from first entry date like "January 5, 2025"
-      let derivedYear = selectedYear;
-      try {
-        const sampleDate = monthEntries.find(e => e && e.date)?.date;
-        if (sampleDate) {
-          const yearMatch = /\b(20\d{2}|19\d{2})\b/.exec(String(sampleDate));
-          if (yearMatch) derivedYear = yearMatch[1];
-        }
-      } catch (_) {}
+        // Derive year from first entry date like "January 5, 2025"
+        let derivedYear = selectedYear;
+        try {
+          const sampleDate = monthEntries.find(e => e && e.date)?.date;
+          if (sampleDate) {
+            const yearMatch = /\b(20\d{2}|19\d{2})\b/.exec(String(sampleDate));
+            if (yearMatch) derivedYear = yearMatch[1];
+          }
+        } catch (_) { }
 
-      // Convert entries into weeklyReportData shape: { [dateKey]: [rows] }
-      const aggregated = {};
-      monthEntries.forEach((entry) => {
-        if (!entry || !entry.date) return;
-        const dateKey = entry.date;
-        if (!aggregated[dateKey]) aggregated[dateKey] = [];
-        aggregated[dateKey].push(entry);
-      });
-
-      // Group entries by municipality and save per municipality
-      const municipalityToEntries = {};
-      monthEntries.forEach((entry) => {
-        const muni = entry?.municipality || 'All';
-        if (!municipalityToEntries[muni]) municipalityToEntries[muni] = [];
-        municipalityToEntries[muni].push(entry);
-      });
-
-      const municipalities = Object.keys(municipalityToEntries);
-      for (let m = 0; m < municipalities.length; m++) {
-        const municipality = municipalities[m];
-
-        // Aggregate per municipality into weeklyReportData shape
-        const muniAggregated = {};
-        municipalityToEntries[municipality].forEach((entry) => {
+        // Convert entries into weeklyReportData shape: { [dateKey]: [rows] }
+        const aggregated = {};
+        monthEntries.forEach((entry) => {
           if (!entry || !entry.date) return;
           const dateKey = entry.date;
-          if (!muniAggregated[dateKey]) muniAggregated[dateKey] = [];
-          muniAggregated[dateKey].push(entry);
+          if (!aggregated[dateKey]) aggregated[dateKey] = [];
+          aggregated[dateKey].push(entry);
         });
 
-        const reportData = {
-          selectedMonth: displayMonth,
-          selectedYear: derivedYear,
-          activeMunicipalityTab: municipality,
-          selectedBarangay: '',
-          selectedConcernType: '',
-          actionTaken: '',
-          remarks: '',
-          weeklyReportData: muniAggregated,
-          savedAt: new Date().toISOString()
-        };
+        // Group entries by municipality and save per municipality
+        const municipalityToEntries = {};
+        monthEntries.forEach((entry) => {
+          const muni = entry?.municipality || 'All';
+          if (!municipalityToEntries[muni]) municipalityToEntries[muni] = [];
+          municipalityToEntries[muni].push(entry);
+        });
 
-        const reportKey = `${displayMonth}_${derivedYear}`;
+        const municipalities = Object.keys(municipalityToEntries);
+        for (let m = 0; m < municipalities.length; m++) {
+          const municipality = municipalities[m];
 
-        try {
-          // Only save to nested structure with quota check
-          const muniSaveResult = await saveWithQuotaCheck(
-            () => saveWeeklyReportByMunicipality(reportData),
-            "Save Weekly Report"
-          );
-          if (muniSaveResult.success) {
-            toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
-          } else {
-            const msg = `byMunicipality: ${muniSaveResult.error || 'failed'}`;
-            toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
+          // Aggregate per municipality into weeklyReportData shape
+          const muniAggregated = {};
+          municipalityToEntries[municipality].forEach((entry) => {
+            if (!entry || !entry.date) return;
+            const dateKey = entry.date;
+            if (!muniAggregated[dateKey]) muniAggregated[dateKey] = [];
+            muniAggregated[dateKey].push(entry);
+          });
+
+          const reportData = {
+            selectedMonth: displayMonth,
+            selectedYear: derivedYear,
+            activeMunicipalityTab: municipality,
+            selectedBarangay: '',
+            selectedConcernType: '',
+            actionTaken: '',
+            remarks: '',
+            weeklyReportData: muniAggregated,
+            savedAt: new Date().toISOString()
+          };
+
+          const reportKey = `${displayMonth}_${derivedYear}`;
+
+          try {
+            // Only save to nested structure with quota check
+            const muniSaveResult = await saveWithQuotaCheck(
+              () => saveWeeklyReportByMunicipality(reportData),
+              "Save Weekly Report"
+            );
+            if (muniSaveResult.success) {
+              toast.success(`Saved ${displayMonth} ${derivedYear} - ${municipality}`);
+            } else {
+              const msg = `byMunicipality: ${muniSaveResult.error || 'failed'}`;
+              toast.warning(`Partial save for ${displayMonth} ${derivedYear} - ${municipality} (${msg})`);
             }
           } catch (err) {
             console.error('Error saving month by municipality', displayMonth, derivedYear, municipality, err);
@@ -4383,60 +4458,57 @@ const handleSaveAllMonths = async () => {
                       id="commandcenter-menu-dropdown"
                       className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-xl border border-gray-200 z-50 overflow-hidden"
                     >
-                    <div className="py-1">
-                    <div className="px-3 py-2">
-                      <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                      <div className="py-1">
+                        <div className="px-3 py-2">
+                          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Navigation</h3>
+                        </div>
+
+                        <button
+                          onClick={() => {
+                            setActiveTab("weekly-report");
+                            setShowMenuDropdown(false);
+                          }}
+                          className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${activeTab === "weekly-report"
+                            ? "bg-green-50 text-green-700"
+                            : "text-gray-700 hover:bg-green-50 hover:text-green-700"
+                            }`}
+                        >
+                          <FileText className="w-4 h-4 text-green-600" />
+                          <span>Weekly Report</span>
+                        </button>
+
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setActiveTab("barangays");
+                              setShowMenuDropdown(false);
+                            }}
+                            className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${activeTab === "barangays"
+                              ? "bg-purple-50 text-purple-700"
+                              : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
+                              }`}
+                          >
+                            <Building2 className="w-4 h-4 text-purple-600" />
+                            <span>Barangay Management</span>
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => {
+                            setActiveTab("concern-types");
+                            setShowMenuDropdown(false);
+                          }}
+                          className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${activeTab === "concern-types"
+                            ? "bg-orange-50 text-orange-700"
+                            : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                            }`}
+                        >
+                          <AlertTriangle className="w-4 h-4 text-orange-600" />
+                          <span>Concern Types</span>
+                        </button>
+
+                      </div>
                     </div>
-
-                    <button
-                      onClick={() => {
-                        setActiveTab("weekly-report");
-                        setShowMenuDropdown(false);
-                      }}
-                      className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                        activeTab === "weekly-report"
-                          ? "bg-green-50 text-green-700"
-                          : "text-gray-700 hover:bg-green-50 hover:text-green-700"
-                      }`}
-                    >
-                      <FileText className="w-4 h-4 text-green-600" />
-                      <span>Weekly Report</span>
-                    </button>
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => {
-                          setActiveTab("barangays");
-                          setShowMenuDropdown(false);
-                        }}
-                        className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                          activeTab === "barangays"
-                            ? "bg-purple-50 text-purple-700"
-                            : "text-gray-700 hover:bg-purple-50 hover:text-purple-700"
-                        }`}
-                      >
-                        <Building2 className="w-4 h-4 text-purple-600" />
-                        <span>Barangay Management</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        setActiveTab("concern-types");
-                        setShowMenuDropdown(false);
-                      }}
-                      className={`flex items-center gap-3 w-full px-4 py-3 text-sm transition-colors duration-200 ${
-                        activeTab === "concern-types"
-                          ? "bg-orange-50 text-orange-700"
-                          : "text-gray-700 hover:bg-orange-50 hover:text-orange-700"
-                      }`}
-                    >
-                      <AlertTriangle className="w-4 h-4 text-orange-600" />
-                      <span>Concern Types</span>
-                    </button>
-
-                    </div>
-                  </div>
                   )}
                 </>
               )}
@@ -4445,49 +4517,49 @@ const handleSaveAllMonths = async () => {
         </div>
 
         <section className={`flex-1 overflow-y-auto ${isCommandUser ? 'p-2 md:p-4 space-y-3 md:space-y-4' : 'p-3 md:p-6 space-y-4 md:space-y-6'}`}>
-        {/* Firestore Quota Warning Banner */}
-        {isBlocked && blockedUntil && (
-          <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-4 shadow-md">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <h3 className="font-bold text-red-900 text-lg mb-1">
-                  ⚠️ Firestore Quota Exceeded
-                </h3>
-                <p className="text-red-800 text-sm mb-2">
-                  You have reached the daily Firestore write limit. All save operations are temporarily disabled.
-                </p>
-                <div className="bg-white/50 rounded-md p-3 space-y-1">
-                  <p className="text-sm text-red-900">
-                    <strong>Pwede ka ulit mag-save sa:</strong>{" "}
-                    <span className="font-mono font-semibold">
-                      {blockedUntil.toLocaleString("en-PH", {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </span>
+          {/* Firestore Quota Warning Banner */}
+          {isBlocked && blockedUntil && (
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-300 rounded-lg p-4 shadow-md">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-6 w-6 text-red-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h3 className="font-bold text-red-900 text-lg mb-1">
+                    ⚠️ Firestore Quota Exceeded
+                  </h3>
+                  <p className="text-red-800 text-sm mb-2">
+                    You have reached the daily Firestore write limit. All save operations are temporarily disabled.
                   </p>
-                  <p className="text-sm text-red-900">
-                    <Clock className="inline h-4 w-4 mr-1" />
-                    <strong>Time remaining:</strong>{" "}
-                    <span className="font-mono font-semibold">{timeLeft}</span>
-                  </p>
+                  <div className="bg-white/50 rounded-md p-3 space-y-1">
+                    <p className="text-sm text-red-900">
+                      <strong>Pwede ka ulit mag-save sa:</strong>{" "}
+                      <span className="font-mono font-semibold">
+                        {blockedUntil.toLocaleString("en-PH", {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        })}
+                      </span>
+                    </p>
+                    <p className="text-sm text-red-900">
+                      <Clock className="inline h-4 w-4 mr-1" />
+                      <strong>Time remaining:</strong>{" "}
+                      <span className="font-mono font-semibold">{timeLeft}</span>
+                    </p>
+                  </div>
+                  {isAdmin && (
+                    <button
+                      onClick={resetQuotaBlock}
+                      className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
+                    >
+                      Reset Quota Block (Admin Only)
+                    </button>
+                  )}
                 </div>
-                {isAdmin && (
-                  <button
-                    onClick={resetQuotaBlock}
-                    className="mt-3 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-md transition-colors"
-                  >
-                    Reset Quota Block (Admin Only)
-                  </button>
-                )}
               </div>
             </div>
-          </div>
-        )}
-        
-        {isCommandUser && (
-          <style>{`
+          )}
+
+          {isCommandUser && (
+            <style>{`
             /* Compact table for command-center users */
             .cc-compact table thead th { padding: 0.5rem 0.5rem; }
             .cc-compact table tbody td { padding: 0.375rem 0.5rem; }
@@ -4499,9 +4571,9 @@ const handleSaveAllMonths = async () => {
             }
             .cc-compact .add-entry-row td { padding-top: 0.25rem; padding-bottom: 0.25rem; }
           `}</style>
-        )}
-        
-        <style>{`
+          )}
+
+          <style>{`
           /* Hover tooltip for table cells */
           .table-cell-hover {
             position: relative;
@@ -4581,1708 +4653,1791 @@ const handleSaveAllMonths = async () => {
             }
           }
         `}</style>
-        <Dialog open={showCommandCenterHelp} onOpenChange={(open) => {
-          if (!open && dontShowAgain) {
-            localStorage.setItem('ccHelpDismissed', '1');
-          }
-          setShowCommandCenterHelp(open);
-        }}>
-          <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
-            <DialogHeader className="gap-4 pb-6 border-b border-gray-200">
-              <div className="flex items-center gap-4">
-                <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg">
-                  <Shield className="h-8 w-8" />
+          <Dialog open={showCommandCenterHelp} onOpenChange={(open) => {
+            if (!open && dontShowAgain) {
+              localStorage.setItem('ccHelpDismissed', '1');
+            }
+            setShowCommandCenterHelp(open);
+          }}>
+            <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto bg-gradient-to-br from-white to-gray-50">
+              <DialogHeader className="gap-4 pb-6 border-b border-gray-200">
+                <div className="flex items-center gap-4">
+                  <div className="h-16 w-16 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white flex items-center justify-center shadow-lg">
+                    <Shield className="h-8 w-8" />
+                  </div>
+                  <div>
+                    <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
+                      Command Center Guide
+                    </DialogTitle>
+                    <DialogDescription className="text-base text-gray-600 mt-1">
+                      Your complete guide to recording and managing incident reports
+                    </DialogDescription>
+                  </div>
                 </div>
+              </DialogHeader>
+
+              <div className="space-y-8 py-6 text-base text-gray-700">
+                {/* Overview */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 shadow-sm">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2 text-lg">
+                    <Activity className="h-6 w-6" />
+                    What is Command Center?
+                  </h3>
+                  <p className="text-sm text-blue-800 leading-relaxed">
+                    Command Center is your central hub for recording and managing weekly incident reports across all barangays in your municipality.
+                    You can track different types of concerns, generate reports, and export data for analysis.
+                  </p>
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">STEP-BY-STEP GUIDE</span>
+                  </div>
+                </div>
+
+                {/* Step-by-step instructions */}
                 <div>
-                  <DialogTitle className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent">
-                    Command Center Guide
-                  </DialogTitle>
-                  <DialogDescription className="text-base text-gray-600 mt-1">
-                    Your complete guide to recording and managing incident reports
-                  </DialogDescription>
-                </div>
-              </div>
-            </DialogHeader>
-            
-            <div className="space-y-8 py-6 text-base text-gray-700">
-              {/* Overview */}
-              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl p-6 shadow-sm">
-                <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2 text-lg">
-                  <Activity className="h-6 w-6" />
-                  What is Command Center?
-                </h3>
-                <p className="text-sm text-blue-800 leading-relaxed">
-                  Command Center is your central hub for recording and managing weekly incident reports across all barangays in your municipality. 
-                  You can track different types of concerns, generate reports, and export data for analysis.
-                </p>
-              </div>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t-2 border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">STEP-BY-STEP GUIDE</span>
-                </div>
-              </div>
-
-              {/* Step-by-step instructions */}
-              <div>
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md">
-                    <FileText className="h-5 w-5 text-white" />
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md">
+                      <FileText className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-xl">How to Record Daily Incidents</h3>
                   </div>
-                  <h3 className="font-bold text-gray-900 text-xl">How to Record Daily Incidents</h3>
-                </div>
-                <ol className="space-y-4">
-                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">1</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Select Barangay</p>
-                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Choose the barangay where the incident occurred from the dropdown menu.</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">2</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Select Type of Concern</p>
-                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Select a concern type from the dropdown menu based on the incident.</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">3</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Input Weekly Data or Counts</p>
-                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Enter the number of incidents for each week (Week 1-4). Input at least one week's data.</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">4</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Add Entry (If Needed)</p>
-                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Click <span className="font-semibold text-green-600">"Add Entry"</span> to create another record for the same date. You can add multiple entries per day for different barangays or concern types.</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">5</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Action Taken</p>
-                      <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Based on the action taken by the barangay (e.g., "Issued verbal warning", "Confiscated items", "Conducted roving patrol", "Coordinated with PNP", "Apprehended violators", "Repaired street lights", "Cleared road obstruction", "Impounded stray animals").</p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg shadow-md">6</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Upload Photos (Optional)</p>
-                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB.
-                      </p>
-                    </div>
-                  </li>
-                  <li className="flex gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl hover:border-green-400 hover:shadow-md transition-all duration-200">
-                    <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">7</span>
-                    <div className="flex-1">
-                      <p className="font-bold text-gray-900 text-base">Save Data (Required)</p>
-                      <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
-                        <span className="font-bold text-green-600">IMPORTANT:</span> After filling entries and uploading photos (if any), click the <span className="font-semibold text-green-600">"Save Data"</span> button (blue button at top) to save all your changes to the database. Without clicking this button, your data will NOT be saved!
-                      </p>
-                    </div>
-                  </li>
-                </ol>
-              </div>
-
-              {/* Divider */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t-2 border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">ADDITIONAL FEATURES</span>
-                </div>
-              </div>
-
-              {/* Managing Concern Types */}
-              <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md">
-                    <AlertTriangle className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-lg">Managing Concern Types</h3>
-                </div>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">View Concern Types:</span> Click <span className="font-semibold">"View Options"</span> (top-right) → <span className="font-semibold">"Concern Types"</span></p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Add New Type:</span> Click the <span className="font-semibold">"+ Add Concern Type"</span> button and enter the concern name</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Edit/Delete:</span> Use the action buttons next to each concern type to modify or remove them</p>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Exporting Reports */}
-              <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-md">
-                    <Download className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-lg">Exporting Reports</h3>
-                </div>
-                <ul className="space-y-3">
-                  <li className="flex items-start gap-3">
-                    <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-700">Click the <span className="font-semibold text-purple-700">"Export to Excel"</span> button to download your weekly report as a spreadsheet</p>
-                    </div>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
-                    <div>
-                      <p className="text-sm text-gray-700">The exported file includes all barangays, daily counts, and totals for easy analysis</p>
-                    </div>
-                  </li>
-                </ul>
-              </div>
-
-              {/* Tips */}
-              <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-xl p-6 shadow-sm">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-md">
-                    <Zap className="h-5 w-5 text-white" />
-                  </div>
-                  <h3 className="font-bold text-gray-900 text-lg">💡 Quick Tips</h3>
-                </div>
-                <ul className="space-y-3 text-sm text-gray-700">
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>You can add multiple entries per day for different barangays or concern types</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>Your municipality is automatically selected - you only see data for your area</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>Photos and remarks are optional but helpful for detailed documentation</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-red-600 font-bold text-lg">⚠</span>
-                    <span className="font-bold text-red-700">IMPORTANT: Always click "Save Data" button after adding entries or uploading photos! Data is NOT automatically saved.</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>To see updates from other devices, simply refresh the page (F5 or Ctrl+R)</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>Use View Options menu to manage Concern Types or switch views</span>
-                  </li>
-                  <li className="flex items-start gap-3">
-                    <span className="text-yellow-600 font-bold text-lg">✓</span>
-                    <span>You can reopen this guide anytime by clicking "View Instructions" in the sidebar</span>
-                  </li>
-                </ul>
-              </div>
-
-              <label className="mt-4 flex items-center gap-2 text-sm text-gray-600">
-                <input
-                  id="dont-show-again"
-                  name="dont-show-again"
-                  type="checkbox"
-                  checked={dontShowAgain}
-                  onChange={(e) => setDontShowAgain(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
-                />
-                Don't show this again on login
-              </label>
-            </div>
-            
-            <DialogFooter className="border-t border-gray-200 pt-6">
-              <button
-                onClick={() => {
-                  if (dontShowAgain) localStorage.setItem('ccHelpDismissed', '1');
-                  setShowCommandCenterHelp(false);
-                }}
-                className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-white hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
-              >
-                <Check className="h-5 w-5" />
-                Got it, let's start!
-              </button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-
-      {/* Main Dashboard */}
-      <div className="space-y-1 sm:space-y-2">
-
-
-
-        {/* Weekly Report Section */}
-        {activeTab === "weekly-report" && (
-          <div className="flex flex-col h-full">
-            {/* Sticky Filter Section */}
-            <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
-              {/* Weekly Report Header */}
-              <div>
-                <div className={`${isCommandUser ? 'p-1 sm:p-2' : 'p-1 sm:p-2'} pb-0`}>
-                  <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
-                    <div className="flex items-start gap-3 w-full lg:w-auto">
-                      <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                        <FileText className="w-5 h-5 text-green-600" />
+                  <ol className="space-y-4">
+                    <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">1</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Select Barangay</p>
+                        <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Choose the barangay where the incident occurred from the dropdown menu.</p>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
-                        {activeMunicipalityTab && (
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-0.5">
-                            <div className="flex items-center gap-2">
-                              <Building2 className="w-4 h-4 text-green-600" />
-                              <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
-                            </div>
-                            <div className="text-xs sm:text-sm text-gray-600">
-                              {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types • 
-                              {importedBarangays.filter(b => {
-                                if (!activeMunicipalityTab) return false;
-                                const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
-                                const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                                return normalizedBarangay === normalizedTab;
-                              }).length} barangays
-                            </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">2</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Select Type of Concern</p>
+                        <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Select a concern type from the dropdown menu based on the incident.</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">3</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Input Weekly Data or Counts</p>
+                        <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Enter the number of incidents for each week (Week 1-4). Input at least one week's data.</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">4</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Add Entry (If Needed)</p>
+                        <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Click <span className="font-semibold text-green-600">"Add Entry"</span> to create another record for the same date. You can add multiple entries per day for different barangays or concern types.</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-white border-2 border-green-100 rounded-xl hover:border-green-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">5</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Action Taken</p>
+                        <p className="text-sm text-gray-600 mt-1.5 leading-relaxed">Based on the action taken by the barangay (e.g., "Issued verbal warning", "Confiscated items", "Conducted roving patrol", "Coordinated with PNP", "Apprehended violators", "Repaired street lights", "Cleared road obstruction", "Impounded stray animals").</p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl hover:border-blue-300 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg shadow-md">6</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Upload Photos (Optional)</p>
+                        <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                          <span className="font-bold text-blue-600">After completing all fields above</span>, click the <span className="font-semibold text-blue-600">"Upload"</span> button to add before and after photos of the action taken. Photos are auto-compressed to under 2MB.
+                        </p>
+                      </div>
+                    </li>
+                    <li className="flex gap-4 p-4 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300 rounded-xl hover:border-green-400 hover:shadow-md transition-all duration-200">
+                      <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 text-white font-bold text-lg shadow-md">7</span>
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-base">Save Data (Required)</p>
+                        <p className="text-sm text-gray-700 mt-1.5 leading-relaxed">
+                          <span className="font-bold text-green-600">IMPORTANT:</span> After filling entries and uploading photos (if any), click the <span className="font-semibold text-green-600">"Save Data"</span> button (blue button at top) to save all your changes to the database. Without clicking this button, your data will NOT be saved!
+                        </p>
+                      </div>
+                    </li>
+                  </ol>
+                </div>
+
+                {/* Divider */}
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t-2 border-gray-300"></div>
+                  </div>
+                  <div className="relative flex justify-center">
+                    <span className="bg-gradient-to-br from-white to-gray-50 px-4 text-sm font-semibold text-gray-500">ADDITIONAL FEATURES</span>
+                  </div>
+                </div>
+
+                {/* Managing Concern Types */}
+                <div className="bg-gradient-to-r from-orange-50 to-amber-50 border-2 border-orange-200 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-orange-500 to-amber-600 flex items-center justify-center shadow-md">
+                      <AlertTriangle className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-lg">Managing Concern Types</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">View Concern Types:</span> Click <span className="font-semibold">"View Options"</span> (top-right) → <span className="font-semibold">"Concern Types"</span></p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Add New Type:</span> Click the <span className="font-semibold">"+ Add Concern Type"</span> button and enter the concern name</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 text-orange-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-700"><span className="font-semibold text-orange-700">Edit/Delete:</span> Use the action buttons next to each concern type to modify or remove them</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Exporting Reports */}
+                <div className="bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-md">
+                      <Download className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-lg">Exporting Reports</h3>
+                  </div>
+                  <ul className="space-y-3">
+                    <li className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-700">Click the <span className="font-semibold text-purple-700">"Export to Excel"</span> button to download your weekly report as a spreadsheet</p>
+                      </div>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <Check className="mt-1 h-5 w-5 text-purple-600 flex-shrink-0" />
+                      <div>
+                        <p className="text-sm text-gray-700">The exported file includes all barangays, daily counts, and totals for easy analysis</p>
+                      </div>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Tips */}
+                <div className="bg-gradient-to-r from-yellow-50 to-amber-50 border-2 border-yellow-300 rounded-xl p-6 shadow-sm">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-yellow-500 to-amber-600 flex items-center justify-center shadow-md">
+                      <Zap className="h-5 w-5 text-white" />
+                    </div>
+                    <h3 className="font-bold text-gray-900 text-lg">💡 Quick Tips</h3>
+                  </div>
+                  <ul className="space-y-3 text-sm text-gray-700">
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>You can add multiple entries per day for different barangays or concern types</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>Your municipality is automatically selected - you only see data for your area</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>Photos and remarks are optional but helpful for detailed documentation</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-red-600 font-bold text-lg">⚠</span>
+                      <span className="font-bold text-red-700">IMPORTANT: Always click "Save Data" button after adding entries or uploading photos! Data is NOT automatically saved.</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>To see updates from other devices, simply refresh the page (F5 or Ctrl+R)</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>Use View Options menu to manage Concern Types or switch views</span>
+                    </li>
+                    <li className="flex items-start gap-3">
+                      <span className="text-yellow-600 font-bold text-lg">✓</span>
+                      <span>You can reopen this guide anytime by clicking "View Instructions" in the sidebar</span>
+                    </li>
+                  </ul>
+                </div>
+
+                <label className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                  <input
+                    id="dont-show-again"
+                    name="dont-show-again"
+                    type="checkbox"
+                    checked={dontShowAgain}
+                    onChange={(e) => setDontShowAgain(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                  Don't show this again on login
+                </label>
+              </div>
+
+              <DialogFooter className="border-t border-gray-200 pt-6">
+                <button
+                  onClick={() => {
+                    if (dontShowAgain) localStorage.setItem('ccHelpDismissed', '1');
+                    setShowCommandCenterHelp(false);
+                  }}
+                  className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-8 py-3 text-white hover:from-blue-700 hover:to-indigo-700 font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                >
+                  <Check className="h-5 w-5" />
+                  Got it, let's start!
+                </button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Main Dashboard */}
+          <div className="space-y-1 sm:space-y-2">
+
+
+
+            {/* Weekly Report Section */}
+            {activeTab === "weekly-report" && (
+              <div className="flex flex-col h-full">
+                {/* Sticky Filter Section */}
+                <div className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+                  {/* Weekly Report Header */}
+                  <div>
+                    <div className={`${isCommandUser ? 'p-1 sm:p-2' : 'p-1 sm:p-2'} pb-0`}>
+                      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-1 sm:gap-2">
+                        <div className="flex items-start gap-3 w-full lg:w-auto">
+                          <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
+                            <FileText className="w-5 h-5 text-green-600" />
                           </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {(isAdmin || isReadOnly || isCommandUser) && (
-                      <div className="w-full lg:w-auto lg:ml-auto flex flex-col lg:flex-row gap-3 lg:items-start">
-                        {/* Action Taken Count Card */}
-                        <div className="lg:w-72 flex-shrink-0">
-                          <div 
-                            onClick={() => setShowActionTakenModal(true)}
-                            className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all cursor-pointer h-full"
-                          >
-                            <div className="flex items-center gap-4">
-                              <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md flex-shrink-0">
-                                <CheckCircle className="h-7 w-7 text-white" />
-                              </div>
-                              <div className="flex-1">
-                                <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
-                                <div className="flex items-baseline gap-2 mb-1">
-                                  <p className="text-3xl font-bold text-green-700 leading-none">
-                                    {getActionTakenCount().count}
-                                  </p>
-                                  {activeMunicipalityTab && (
-                                    <p className="text-lg font-bold text-blue-600 leading-none">
-                                      {getCriteriaOverallPercentage()}%
-                                    </p>
-                                  )}
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">Weekly Report - {selectedMonth} {selectedYear}</h3>
+                            {activeMunicipalityTab && (
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mt-0.5">
+                                <div className="flex items-center gap-2">
+                                  <Building2 className="w-4 h-4 text-green-600" />
+                                  <span className="text-xs sm:text-sm font-medium text-green-600">{activeMunicipalityTab}</span>
                                 </div>
-                                <p className="text-xs text-gray-500">
-                                  with after photos
-                                  {activeMunicipalityTab && (
-                                    <span className="text-blue-600"> • overall avg ({activeMunicipalityTab})</span>
-                                  )}
-                                </p>
+                                <div className="text-xs sm:text-sm text-gray-600">
+                                  {getConcernTypesForMunicipality(activeMunicipalityTab).length} concern types •
+                                  {importedBarangays.filter(b => {
+                                    if (!activeMunicipalityTab) return false;
+                                    const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                                    const normalizedBarangay = b.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                                    return normalizedBarangay === normalizedTab;
+                                  }).length} barangays
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
                         </div>
-                        
-                        {/* Municipality Tabs */}
-                        {(isAdmin || isReadOnly) && (
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="text-sm font-medium text-gray-700">Municipality</div>
-                              {!Object.values(municipalitiesByDistrict).flat().length && (
-                                <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
-                              )}
-                            </div>
 
-                            <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
-                              {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
-                                const isActive = activeMunicipalityTab === municipality;
-                                return (
-                                  <button
-                                    key={municipality}
-                                    type="button"
-                                    onClick={() => handleMunicipalityTabChange(municipality)}
-                                    className={`${
-                                      isActive
-                                        ? 'bg-green-600 text-white border-green-600'
-                                        : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
-                                    } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
-                                    title={municipality}
-                                  >
-                                    <span className="block truncate">{municipality}</span>
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-2`}>
-                {/* Month/Year Selection */}
-                <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-1 mb-0">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
-                    <div className="lg:w-[220px]">
-                      <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
-                      <select 
-                        id="month-select"
-                        name="month-select"
-                        value={selectedMonth}
-                        onChange={(e) => {
-                          const newMonth = e.target.value;
-                          console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
-                          setSelectedMonth(newMonth);
-                          // Data will be loaded from Firestore via useEffect for month changes
-                        }}
-                        disabled={isFilterReadOnly}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
-                        style={{ color: '#000' }}
-                      >
-                        {months.map((month) => (
-                          <option key={month} value={month}>{month}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="lg:w-[220px]">
-                      <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
-                      <select 
-                        id="year-select"
-                        name="year-select"
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(e.target.value)}
-                        disabled={isFilterReadOnly}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
-                        style={{ color: '#000' }}
-                      >
-                        {years.map((year) => (
-                          <option key={year} value={year}>{year}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="lg:w-[260px]">
-                      <label htmlFor="barangay-filter" className="block text-sm font-medium text-gray-700 mb-1">Select Barangay</label>
-                      <select
-                        id="barangay-filter"
-                        name="barangay-filter"
-                        value={selectedBarangayFilter}
-                        onChange={(e) => setSelectedBarangayFilter(e.target.value)}
-                        disabled={isFilterReadOnly}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
-                        style={{ color: '#000' }}
-                      >
-                        <option value="">All Barangays</option>
-                        {importedBarangays
-                          .filter(barangay => {
-                            if (!activeMunicipalityTab) return true;
-                            const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
-                            const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                            return normalizedBarangay === normalizedTab;
-                          })
-                          .map((barangay) => (
-                            <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
-                              {barangay.name} ({barangay.municipality})
-                            </option>
-                          ))}
-                      </select>
-                    </div>
-                    
-                    {/* Search Bar */}
-                    <div className="lg:w-[280px]">
-                      <label htmlFor="search-entries" className="block text-sm font-medium text-gray-700 mb-1">Search</label>
-                      <div className="relative">
-                        <input
-                          id="search-entries"
-                          type="text"
-                          placeholder="Search entries..."
-                          value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        />
-                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                          <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                          </svg>
-                        </div>
-                        {searchTerm && (
-                          <button
-                            onClick={() => setSearchTerm('')}
-                            className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col items-start lg:items-end gap-2 w-full lg:w-auto">
-                    {isAdmin && (
-                      <div className="flex items-center gap-3">
-                        <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
-                          <input
-                            id="import-all-months"
-                            name="import-all-months"
-                            type="checkbox"
-                            checked={importAllMonths}
-                            onChange={(e) => setImportAllMonths(e.target.checked)}
-                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <span>Import all months at once</span>
-                        </label>
-                      </div>
-                    )}
-
-                    <div className="flex flex-wrap gap-2 sm:gap-3 w-full lg:w-auto lg:justify-end">
-                      {isAdmin && (
-                        <button 
-                          onClick={() => document.getElementById('excel-file-input').click()}
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0 disabled:opacity-50"
-                          title={importAllMonths ? "Import All Months" : "Import Excel"}
-                          disabled={isImportingExcel || isImportingAllMonths}
-                        >
-                        {(isImportingExcel || isImportingAllMonths) ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <FileSpreadsheet className="h-4 w-4" />
-                        )}
-                          <span className="text-sm font-medium">
-                            {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
-                          </span>
-                        </button>
-                      )}
-
-                      {isAdmin && (
-                        <button
-                          onClick={() => setShowDuplicateJanModal(true)}
-                          disabled={isDuplicatingJan}
-                          className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                          title={`Duplicate ${duplicateFromMonth} ${duplicateFromYear} → ${duplicateToMonth} ${duplicateToYear}`}
-                        >
-                          {isDuplicatingJan ? (
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                          ) : (
-                            <Copy className="h-4 w-4" />
-                          )}
-                          <span className="text-sm font-medium">
-                            {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
-                          </span>
-                        </button>
-                      )}
-
-                      {isAdmin && (
-                        <Dialog open={showDuplicateJanModal} onOpenChange={setShowDuplicateJanModal}>
-                          <DialogContent className="max-w-md">
-                            <DialogHeader>
-                              <DialogTitle>Duplicate Monthly Data</DialogTitle>
-                              <DialogDescription>
-                                Select the year range to duplicate. This will copy all municipalities' January data.
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">From month</label>
-                                  <select
-                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={duplicateFromMonth}
-                                    onChange={(e) => setDuplicateFromMonth(e.target.value)}
-                                  >
-                                    {months.map(m => (
-                                      <option key={`from-m-${m}`} value={m}>{m}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">From year</label>
-                                  <select
-                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={duplicateFromYear}
-                                    onChange={(e) => setDuplicateFromYear(e.target.value)}
-                                  >
-                                    {years.map(y => (
-                                      <option key={`from-${y}`} value={y}>{y}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">To month</label>
-                                  <select
-                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={duplicateToMonth}
-                                    onChange={(e) => setDuplicateToMonth(e.target.value)}
-                                  >
-                                    {months.map(m => (
-                                      <option key={`to-m-${m}`} value={m}>{m}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-medium text-gray-700 mb-1">To year</label>
-                                  <select
-                                    className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                    value={duplicateToYear}
-                                    onChange={(e) => setDuplicateToYear(e.target.value)}
-                                  >
-                                    {years.map(y => (
-                                      <option key={`to-${y}`} value={y}>{y}</option>
-                                    ))}
-                                  </select>
-                                </div>
-                              </div>
-                              {(duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear) && (
-                                <p className="text-sm text-red-600">From and To must not be the same month and year.</p>
-                              )}
-                            </div>
-                            <DialogFooter>
-                              <button
-                                className="px-4 py-2 rounded-md border text-gray-700 hover:text-gray-800 transition-colors duration-200"
-                                onClick={() => setShowDuplicateJanModal(false)}
+                        {(isAdmin || isReadOnly || isCommandUser) && (
+                          <div className="w-full lg:w-auto lg:ml-auto flex flex-col lg:flex-row gap-3 lg:items-start">
+                            {/* Action Taken Count Card */}
+                            <div className="lg:w-72 flex-shrink-0">
+                              <div
+                                onClick={() => setShowActionTakenModal(true)}
+                                className="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg p-4 shadow-sm hover:shadow-lg transition-all cursor-pointer h-full"
                               >
-                                Cancel
-                              </button>
+                                <div className="flex items-center gap-4">
+                                  <div className="h-14 w-14 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-md flex-shrink-0">
+                                    <CheckCircle className="h-7 w-7 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm text-gray-600 font-medium mb-1">Action Taken</p>
+                                    <div className="flex items-baseline gap-2 mb-1">
+                                      <p className="text-3xl font-bold text-green-700 leading-none">
+                                        {getActionTakenCount().count}
+                                      </p>
+                                      {activeMunicipalityTab && (
+                                        <p className="text-lg font-bold text-blue-600 leading-none">
+                                          {getCriteriaOverallPercentage()}%
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="text-xs text-gray-500">
+                                      with after photos
+                                      {activeMunicipalityTab && (
+                                        <span className="text-blue-600"> • overall avg ({activeMunicipalityTab})</span>
+                                      )}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Municipality Tabs */}
+                            {(isAdmin || isReadOnly) && (
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <div className="text-sm font-medium text-gray-700">Municipality</div>
+                                  {!Object.values(municipalitiesByDistrict).flat().length && (
+                                    <div className="ml-auto text-xs text-red-600">No municipalities configured</div>
+                                  )}
+                                </div>
+
+                                <div className="mt-1 grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-1 justify-items-stretch">
+                                  {Object.values(municipalitiesByDistrict).flat().map((municipality) => {
+                                    const isActive = activeMunicipalityTab === municipality;
+                                    return (
+                                      <button
+                                        key={municipality}
+                                        type="button"
+                                        onClick={() => handleMunicipalityTabChange(municipality)}
+                                        className={`${isActive
+                                          ? 'bg-green-600 text-white border-green-600'
+                                          : 'bg-white text-gray-700 border-gray-300 hover:bg-green-50 hover:border-green-300'
+                                          } h-10 w-full min-w-0 rounded-lg border text-sm font-medium transition-colors duration-200 px-3`}
+                                        title={municipality}
+                                      >
+                                        <span className="block truncate">{municipality}</span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className={`${isCommandUser ? 'p-1' : 'p-1 md:p-2'} pt-0 pb-2`}>
+                      {/* Month/Year Selection */}
+                      <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-1 mb-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-1 sm:gap-2 w-full lg:w-auto lg:max-w-none">
+                          <div className="lg:w-[220px]">
+                            <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">Select Month</label>
+                            <select
+                              id="month-select"
+                              name="month-select"
+                              value={selectedMonth}
+                              onChange={(e) => {
+                                const newMonth = e.target.value;
+                                console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
+                                setSelectedMonth(newMonth);
+                                // Data will be loaded from Firestore via useEffect for month changes
+                              }}
+                              disabled={isFilterReadOnly}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                              style={{ color: '#000' }}
+                            >
+                              {months.map((month) => (
+                                <option key={month} value={month}>{month}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="lg:w-[220px]">
+                            <label htmlFor="year-select" className="block text-sm font-medium text-gray-700 mb-1">Select Year</label>
+                            <select
+                              id="year-select"
+                              name="year-select"
+                              value={selectedYear}
+                              onChange={(e) => setSelectedYear(e.target.value)}
+                              disabled={isFilterReadOnly}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                              style={{ color: '#000' }}
+                            >
+                              {years.map((year) => (
+                                <option key={year} value={year}>{year}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="lg:w-[260px]">
+                            <label htmlFor="barangay-filter" className="block text-sm font-medium text-gray-700 mb-1">Select Barangay</label>
+                            <select
+                              id="barangay-filter"
+                              name="barangay-filter"
+                              value={selectedBarangayFilter}
+                              onChange={(e) => setSelectedBarangayFilter(e.target.value)}
+                              disabled={isFilterReadOnly}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
+                              style={{ color: '#000' }}
+                            >
+                              <option value="">All Barangays</option>
+                              {importedBarangays
+                                .filter(barangay => {
+                                  if (!activeMunicipalityTab) return true;
+                                  const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
+                                  const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
+                                  return normalizedBarangay === normalizedTab;
+                                })
+                                .map((barangay) => (
+                                  <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
+                                    {barangay.name} ({barangay.municipality})
+                                  </option>
+                                ))}
+                            </select>
+                          </div>
+
+                          {/* Search Bar */}
+                          <div className="lg:w-[280px]">
+                            <label htmlFor="search-entries" className="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                            <div className="relative">
+                              <input
+                                id="search-entries"
+                                type="text"
+                                placeholder="Search entries..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-full px-3 py-2 pl-9 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                              />
+                              <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                              </div>
+                              {searchTerm && (
+                                <button
+                                  onClick={() => setSearchTerm('')}
+                                  className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-col items-start lg:items-end gap-2 w-full lg:w-auto">
+                          {isAdmin && (
+                            <div className="flex items-center gap-3">
+                              <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-700">
+                                <input
+                                  id="import-all-months"
+                                  name="import-all-months"
+                                  type="checkbox"
+                                  checked={importAllMonths}
+                                  onChange={(e) => setImportAllMonths(e.target.checked)}
+                                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                />
+                                <span>Import all months at once</span>
+                              </label>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-2 sm:gap-3 w-full lg:w-auto lg:justify-end">
+                            {isAdmin && (
                               <button
-                                className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400"
-                                disabled={isDuplicatingJan || (duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear)}
-                                onClick={async () => {
-                                  await duplicateMonthFromTo(duplicateFromMonth, duplicateFromYear, duplicateToMonth, duplicateToYear);
-                                  setShowDuplicateJanModal(false);
-                                }}
+                                onClick={() => document.getElementById('excel-file-input').click()}
+                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0 disabled:opacity-50"
+                                title={importAllMonths ? "Import All Months" : "Import Excel"}
+                                disabled={isImportingExcel || isImportingAllMonths}
+                              >
+                                {(isImportingExcel || isImportingAllMonths) ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <FileSpreadsheet className="h-4 w-4" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {isImportingExcel ? 'Importing...' : isImportingAllMonths ? 'Importing All...' : importAllMonths ? 'Import All Months' : 'Import Excel'}
+                                </span>
+                              </button>
+                            )}
+
+                            {isAdmin && (
+                              <button
+                                onClick={() => setShowDuplicateJanModal(true)}
+                                disabled={isDuplicatingJan}
+                                className="bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
                                 title={`Duplicate ${duplicateFromMonth} ${duplicateFromYear} → ${duplicateToMonth} ${duplicateToYear}`}
                               >
-                                {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
+                                {isDuplicatingJan ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <Copy className="h-4 w-4" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
+                                </span>
                               </button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      )}
-                      
-                      {isAdmin && (
-                        <button
-                          onClick={handleSaveAllMonths}
-                          disabled={isSavingAllMonths || !Object.keys(allMonthsData || {}).length}
-                          className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                          title="Save All Imported Months"
-                        >
-                        {isSavingAllMonths ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                          <span className="text-sm font-medium">
-                            {isSavingAllMonths
-                              ? `Saving ${saveAllProgress.current}/${saveAllProgress.total}`
-                              : 'Save All Months'}
-                          </span>
-                        </button>
-                      )}
+                            )}
 
-                      {/* MANUAL SAVE DATA BUTTON - Added back for cross-device sync */}
-                      <button
-                        onClick={() => handleSaveWeeklyReport(false)}
-                        disabled={isLoadingWeeklyReports || !selectedMonth || !selectedYear || !activeMunicipalityTab}
-                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                        title="Save current data to Firestore for cross-device sync"
-                      >
-                        {isLoadingWeeklyReports ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <Save className="h-4 w-4" />
-                        )}
-                        <span className="text-sm font-medium">
-                          Save Data
-                        </span>
-                      </button>
-
-                      {isAdmin && (
-                        <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
-                          <DialogTrigger asChild>
-                            <button 
-                              className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
-                              title="Clear Data"
-                            >
-                              <AlertTriangle className="h-4 w-4" />
-                              <span className="text-sm font-medium">Clear Data</span>
-                            </button>
-                          </DialogTrigger>
-                        
-                        <DialogContent className="sm:max-w-md bg-white">
-                          <DialogHeader>
-                            <DialogTitle className="flex items-center gap-2">
-                              <AlertTriangle className="h-5 w-5 text-red-600" />
-                              Clear Data Options
-                            </DialogTitle>
-                            <DialogDescription>
-                              Choose which data you want to clear. This action cannot be undone.
-                            </DialogDescription>
-                          </DialogHeader>
-                          
-                          <div className="space-y-4">
-                            {/* Clear Active Municipality */}
-                            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium text-red-800">Clear Active Municipality</h4>
-                                  <p className="text-xs text-red-600 mt-1">Clear data for {activeMunicipalityTab}</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    handleClearActiveMunicipalityData();
-                                    setShowClearModal(false);
-                                  }}
-                                  className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors duration-200"
-                                >
-                                  Clear
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* Clear Selected Municipality */}
-                            <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                              <h4 className="text-sm font-medium text-gray-800 mb-3">Clear Selected Municipality</h4>
-                              <div className="space-y-3">
-                                <select 
-                                  id="clear-municipality-select"
-                                  name="clear-municipality-select"
-                                  value={selectedClearMunicipality}
-                                  onChange={(e) => setSelectedClearMunicipality(e.target.value)}
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
-                                >
-                                  <option value="">Choose municipality...</option>
-                                  {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
-                                    <option key={municipality} value={municipality}>{municipality}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => {
-                                    handleClearSelectedMunicipalityData();
-                                    setShowClearModal(false);
-                                  }}
-                                  disabled={!selectedClearMunicipality}
-                                  className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2"
-                                >
-                                  <AlertTriangle className="h-4 w-4" />
-                                  Clear Selected
-                                </button>
-                              </div>
-                            </div>
-                            
-                            {/* Clear All Entries */}
-                            <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
-                              <div className="flex items-center gap-3">
-                                <AlertTriangle className="h-5 w-5 text-red-700 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <h4 className="text-sm font-medium text-red-900">Clear All Entries</h4>
-                                  <p className="text-xs text-red-700 mt-1">Reset ALL data for ALL municipalities across ALL months and years but keep dropdown options</p>
-                                </div>
-                                <button
-                                  onClick={() => {
-                                    handleClearAllData();
-                                    setShowClearModal(false);
-                                  }}
-                                  className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md text-sm font-medium transition-colors duration-200"
-                                >
-                                  Clear All
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                          
-                          <DialogFooter>
-                            <button
-                              onClick={() => setShowClearModal(false)}
-                              className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
-                            >
-                              Cancel
-                            </button>
-                          </DialogFooter>
-                        </DialogContent>
-                        </Dialog>
-                      )}
-                      
-                      
-                    </div>
-                    
-                    <input
-                      id="excel-file-input"
-                      name="excel-file-input"
-                      type="file"
-                      accept=".xlsx,.xls,.csv"
-                      onChange={handleExcelFileSelect}
-                      className="hidden"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Scrollable Table Section */}
-            <div className="flex-1 overflow-auto">
-              <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
-                <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
-                  {/* Table with sticky header */}
-                  <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
-                    <table className="command-center-table w-full min-w-[1200px]">
-                      <thead className="sticky top-0 z-40 bg-white">
-                      <tr className="bg-white border-b-2 border-gray-300">
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">DATE</th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32 bg-white">
-                          <div className="flex items-center gap-2">
-                            <MapPinIcon className="h-4 w-4 text-blue-500" />
-                            BARANGAY
-                          </div>
-                          <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
-                        </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">
-                          <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-orange-500" />
-                            CONCERN TYPE
-                          </div>
-                          <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
-                        </th>
-                        <th className="px-3 py-2 text-center text-sm font-bold text-gray-800 border-r border-gray-200 bg-white" colSpan="4">
-                          <div className="flex items-center justify-center gap-2">
-                            <BarChart3 className="h-4 w-4 text-purple-500" />
-                            WEEKLY REPORT
-                          </div>
-                        </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing bg-white">
-                          <div className="flex items-center gap-2">
-                            <MessageSquare className="h-4 w-4 text-gray-500" />
-                            REMARKS
-                          </div>
-                        </th>
-                        <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 table-cell-spacing bg-white">
-                          <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-green-500" />
-                            ACTION TAKEN
-                          </div>
-                        </th>
-                      </tr>
-                      <tr className="bg-gray-100 border-b border-gray-300">
-                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
-                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
-                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
-                          <div className="font-bold">Week 1</div>
-                          <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200 whitespace-nowrap">
-                          <div className="font-bold">Week 2</div>
-                          <div className="text-xs opacity-90">{selectedMonth} 8-14</div>
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200 whitespace-nowrap">
-                          <div className="font-bold">Week 3</div>
-                          <div className="text-xs opacity-90">{selectedMonth} 15-21</div>
-                        </th>
-                        <th className="px-3 py-2 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200 whitespace-nowrap">
-                          <div className="font-bold">Week 4</div>
-                          <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
-                        </th>
-                        <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
-                        <th className="px-3 py-2 bg-gray-100"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200 bg-white">
-                      {currentDates.map((date, index) => {
-                        const weekNumber = getWeekNumber(date);
-                        const isWeekend = index % 7 >= 5; // Saturday and Sunday
-                        const dateEntries = getSearchFilteredEntries(date);
-                        
-                        // Debug logging for first few dates
-                        if (index < 3) {
-                          console.log(`🔍 Table Debug - Date: ${date}, Entries:`, dateEntries, 'WeeklyReportData keys:', Object.keys(weeklyReportData));
-                        }
-                        
-                        return (
-                          <React.Fragment key={index}>
-                            {dateEntries.length === 0 ? (
-                              // Empty row when no entries
-                              <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
-                                <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight">
-                                  <div className="flex items-center gap-2 leading-tight">
-                                    <Clock className="h-3 w-3 text-gray-400" />
-                                    {date}
-                                  </div>
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <select 
-                                    id={`barangay-select-${date}`}
-                                    name={`barangay-select-${date}`}
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
-                                    style={{ color: '#000' }}
-                                    value={selectedBarangayFilter || ""}
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'barangay', e.target.value);
-                                      }
-                                    }}
-                                  >
-                                    <option value="">Select Barangay</option>
-                                    {importedBarangays
-                                      .filter(barangay => {
-                                        if (!activeMunicipalityTab) return true;
-                                        // Normalize municipality names for comparison (handle "Balanga" vs "Balanga City")
-                                        const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
-                                        const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                                        return normalizedBarangay === normalizedTab;
-                                      })
-                                      .map((barangay) => (
-                                        <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
-                                          {barangay.name} ({barangay.municipality})
-                                        </option>
-                                      ))}
-                                  </select>
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <select 
-                                    id={`concern-type-select-${date}`}
-                                    name={`concern-type-select-${date}`}
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
-                                    style={{ color: '#000' }}
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'concernType', e.target.value);
-                                      }
-                                    }}
-                                  >
-                                    <option value="">Select Concern Type</option>
-                                    {importedConcernTypes.length > 0 ? (
-                                      getConcernTypesForMunicipality(activeMunicipalityTab)
-                                        .map((type) => (
-                                          <option key={type.id} value={type.name}>
-                                            {type.name}
-                                          </option>
-                                        ))
-                                    ) : (
-                                      concernTypes.map((type) => (
-                                        <option key={type} value={type}>
-                                          {type}
-                                        </option>
-                                      ))
+                            {isAdmin && (
+                              <Dialog open={showDuplicateJanModal} onOpenChange={setShowDuplicateJanModal}>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Duplicate Monthly Data</DialogTitle>
+                                    <DialogDescription>
+                                      Select the year range to duplicate. This will copy all municipalities' January data.
+                                    </DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">From month</label>
+                                        <select
+                                          className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          value={duplicateFromMonth}
+                                          onChange={(e) => setDuplicateFromMonth(e.target.value)}
+                                        >
+                                          {months.map(m => (
+                                            <option key={`from-m-${m}`} value={m}>{m}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">From year</label>
+                                        <select
+                                          className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          value={duplicateFromYear}
+                                          onChange={(e) => setDuplicateFromYear(e.target.value)}
+                                        >
+                                          {years.map(y => (
+                                            <option key={`from-${y}`} value={y}>{y}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">To month</label>
+                                        <select
+                                          className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          value={duplicateToMonth}
+                                          onChange={(e) => setDuplicateToMonth(e.target.value)}
+                                        >
+                                          {months.map(m => (
+                                            <option key={`to-m-${m}`} value={m}>{m}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                      <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">To year</label>
+                                        <select
+                                          className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                          value={duplicateToYear}
+                                          onChange={(e) => setDuplicateToYear(e.target.value)}
+                                        >
+                                          {years.map(y => (
+                                            <option key={`to-${y}`} value={y}>{y}</option>
+                                          ))}
+                                        </select>
+                                      </div>
+                                    </div>
+                                    {(duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear) && (
+                                      <p className="text-sm text-red-600">From and To must not be the same month and year.</p>
                                     )}
-                                  </select>
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <input 
-                                    id={`week1-${date}`}
-                                    name={`week1-${date}`}
-                                    type="number" 
-                                    min="0"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                    placeholder="0"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'week1', e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <input 
-                                    id={`week2-${date}`}
-                                    name={`week2-${date}`}
-                                    type="number" 
-                                    min="0"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                    placeholder="0"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'week2', e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <input 
-                                    id={`week3-${date}`}
-                                    name={`week3-${date}`}
-                                    type="number" 
-                                    min="0"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                    placeholder="0"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'week3', e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-0.5">
-                                  <input 
-                                    id={`week4-${date}`}
-                                    name={`week4-${date}`}
-                                    type="number" 
-                                    min="0"
-                                    step="1"
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                    placeholder="0"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'week4', e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip="">
-                                  <input 
-                                    id={`action-taken-${date}`}
-                                    name={`action-taken-${date}`}
-                                    type="text" 
-                                    disabled={isReadOnly}
-                                    className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
-                                    placeholder=""
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) {
-                                        addDateEntry(date);
-                                        updateDateData(date, 0, 'actionTaken', e.target.value);
-                                      }
-                                    }}
-                                  />
-                                </td>
-                                <td className="px-3 py-0.5 table-cell-spacing">
-                                  <div className="flex items-center justify-center">
-                                    <span className="text-xs text-black italic">Add entry to upload</span>
                                   </div>
-                                </td>
+                                  <DialogFooter>
+                                    <button
+                                      className="px-4 py-2 rounded-md border text-gray-700 hover:text-gray-800 transition-colors duration-200"
+                                      onClick={() => setShowDuplicateJanModal(false)}
+                                    >
+                                      Cancel
+                                    </button>
+                                    <button
+                                      className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:bg-indigo-400"
+                                      disabled={isDuplicatingJan || (duplicateFromMonth === duplicateToMonth && duplicateFromYear === duplicateToYear)}
+                                      onClick={async () => {
+                                        await duplicateMonthFromTo(duplicateFromMonth, duplicateFromYear, duplicateToMonth, duplicateToYear);
+                                        setShowDuplicateJanModal(false);
+                                      }}
+                                      title={`Duplicate ${duplicateFromMonth} ${duplicateFromYear} → ${duplicateToMonth} ${duplicateToYear}`}
+                                    >
+                                      {isDuplicatingJan ? 'Duplicating…' : 'Duplicate'}
+                                    </button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+
+                            {isAdmin && (
+                              <button
+                                onClick={handleSaveAllMonths}
+                                disabled={isSavingAllMonths || !Object.keys(allMonthsData || {}).length}
+                                className="bg-purple-600 hover:bg-purple-700 disabled:bg-purple-400 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                                title="Save All Imported Months"
+                              >
+                                {isSavingAllMonths ? (
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                                ) : (
+                                  <Save className="h-4 w-4" />
+                                )}
+                                <span className="text-sm font-medium">
+                                  {isSavingAllMonths
+                                    ? `Saving ${saveAllProgress.current}/${saveAllProgress.total}`
+                                    : 'Save All Months'}
+                                </span>
+                              </button>
+                            )}
+
+                            {/* MANUAL SAVE DATA BUTTON - Added back for cross-device sync */}
+                            <button
+                              onClick={() => handleSaveWeeklyReport(false)}
+                              disabled={isLoadingWeeklyReports || !selectedMonth || !selectedYear || !activeMunicipalityTab}
+                              className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                              title="Save current data to Firestore for cross-device sync"
+                            >
+                              {isLoadingWeeklyReports ? (
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              ) : (
+                                <Save className="h-4 w-4" />
+                              )}
+                              <span className="text-sm font-medium">
+                                Save Data
+                              </span>
+                            </button>
+
+                            {isAdmin && (
+                              <Dialog open={showClearModal} onOpenChange={setShowClearModal}>
+                                <DialogTrigger asChild>
+                                  <button
+                                    className="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 min-h-[40px] whitespace-nowrap flex-shrink-0"
+                                    title="Clear Data"
+                                  >
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span className="text-sm font-medium">Clear Data</span>
+                                  </button>
+                                </DialogTrigger>
+
+                                <DialogContent className="sm:max-w-md bg-white">
+                                  <DialogHeader>
+                                    <DialogTitle className="flex items-center gap-2">
+                                      <AlertTriangle className="h-5 w-5 text-red-600" />
+                                      Clear Data Options
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                      Choose which data you want to clear. This action cannot be undone.
+                                    </DialogDescription>
+                                  </DialogHeader>
+
+                                  <div className="space-y-4">
+                                    {/* Clear Active Municipality */}
+                                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                                      <div className="flex items-center gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                                        <div className="flex-1">
+                                          <h4 className="text-sm font-medium text-red-800">Clear Active Municipality</h4>
+                                          <p className="text-xs text-red-600 mt-1">Clear data for {activeMunicipalityTab}</p>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            handleClearActiveMunicipalityData();
+                                            setShowClearModal(false);
+                                          }}
+                                          className="px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium transition-colors duration-200"
+                                        >
+                                          Clear
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Clear Selected Municipality */}
+                                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                                      <h4 className="text-sm font-medium text-gray-800 mb-3">Clear Selected Municipality</h4>
+                                      <div className="space-y-3">
+                                        <select
+                                          id="clear-municipality-select"
+                                          name="clear-municipality-select"
+                                          value={selectedClearMunicipality}
+                                          onChange={(e) => setSelectedClearMunicipality(e.target.value)}
+                                          className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                                        >
+                                          <option value="">Choose municipality...</option>
+                                          {Object.values(municipalitiesByDistrict).flat().map((municipality) => (
+                                            <option key={municipality} value={municipality}>{municipality}</option>
+                                          ))}
+                                        </select>
+                                        <button
+                                          onClick={() => {
+                                            handleClearSelectedMunicipalityData();
+                                            setShowClearModal(false);
+                                          }}
+                                          disabled={!selectedClearMunicipality}
+                                          className="w-full px-3 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white rounded-md text-sm font-medium transition-colors duration-200 flex items-center justify-center gap-2"
+                                        >
+                                          <AlertTriangle className="h-4 w-4" />
+                                          Clear Selected
+                                        </button>
+                                      </div>
+                                    </div>
+
+                                    {/* Clear All Entries */}
+                                    <div className="p-4 bg-red-100 border border-red-300 rounded-lg">
+                                      <div className="flex items-center gap-3">
+                                        <AlertTriangle className="h-5 w-5 text-red-700 flex-shrink-0" />
+                                        <div className="flex-1">
+                                          <h4 className="text-sm font-medium text-red-900">Clear All Entries</h4>
+                                          <p className="text-xs text-red-700 mt-1">Reset ALL data for ALL municipalities across ALL months and years but keep dropdown options</p>
+                                        </div>
+                                        <button
+                                          onClick={() => {
+                                            handleClearAllData();
+                                            setShowClearModal(false);
+                                          }}
+                                          className="px-3 py-2 bg-red-700 hover:bg-red-800 text-white rounded-md text-sm font-medium transition-colors duration-200"
+                                        >
+                                          Clear All
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <DialogFooter>
+                                    <button
+                                      onClick={() => setShowClearModal(false)}
+                                      className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors duration-200"
+                                    >
+                                      Cancel
+                                    </button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            )}
+
+
+                          </div>
+
+                          <input
+                            id="excel-file-input"
+                            name="excel-file-input"
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={handleExcelFileSelect}
+                            className="hidden"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Scrollable Table Section */}
+                  <div className="flex-1 overflow-auto">
+                    <div className={`${isCommandUser ? 'p-3' : 'p-4 md:p-6'} pt-0`}>
+                      <div className={`relative rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden ${isCommandUser ? 'cc-compact' : ''}`}>
+                        {/* Table with sticky header */}
+                        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-400px)]" style={{ paddingBottom: '72px', paddingRight: '12px' }}>
+                          <table className="command-center-table w-full min-w-[1200px]">
+                            <thead className="sticky top-0 z-40 bg-white">
+                              <tr className="bg-white border-b-2 border-gray-300">
+                                <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">DATE</th>
+                                <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 w-32 bg-white">
+                                  <div className="flex items-center gap-2">
+                                    <MapPinIcon className="h-4 w-4 text-blue-500" />
+                                    BARANGAY
+                                  </div>
+                                  <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
+                                </th>
+                                <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 bg-white">
+                                  <div className="flex items-center gap-2">
+                                    <AlertTriangle className="h-4 w-4 text-orange-500" />
+                                    CONCERN TYPE
+                                  </div>
+                                  <div className="text-xs text-gray-500 font-normal mt-1">Select from dropdown</div>
+                                </th>
+                                <th className="px-3 py-2 text-center text-sm font-bold text-gray-800 border-r border-gray-200 bg-white" colSpan="4">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <BarChart3 className="h-4 w-4 text-purple-500" />
+                                    WEEKLY REPORT
+                                  </div>
+                                </th>
+                                <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 border-r border-gray-200 table-cell-spacing bg-white">
+                                  <div className="flex items-center gap-2">
+                                    <MessageSquare className="h-4 w-4 text-gray-500" />
+                                    REMARKS
+                                  </div>
+                                </th>
+                                <th className="px-3 py-2 text-left text-sm font-bold text-gray-800 table-cell-spacing bg-white">
+                                  <div className="flex items-center gap-2">
+                                    <CheckCircle className="h-4 w-4 text-green-500" />
+                                    ACTION TAKEN
+                                  </div>
+                                </th>
                               </tr>
-                            ) : (
-                              // Render existing entries
-                              dateEntries.map(({ entry, entryIndex }, filteredIndex) => {
-                                const shouldHighlight =
-                                  isViewingUser &&
-                                  !!selectedBarangayFilter &&
-                                  entry?.barangay === selectedBarangayFilter &&
-                                  isEntryCompleteForViewingHighlight(entry);
+                              <tr className="bg-gray-100 border-b border-gray-300">
+                                <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                                <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                                <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                                <th className="px-3 py-2 text-center text-xs font-bold text-white bg-yellow-500 border-r border-gray-200 whitespace-nowrap">
+                                  <div className="font-bold">Week 1</div>
+                                  <div className="text-xs opacity-90">{selectedMonth} 1-7</div>
+                                </th>
+                                <th className="px-3 py-2 text-center text-xs font-bold text-white bg-green-500 border-r border-gray-200 whitespace-nowrap">
+                                  <div className="font-bold">Week 2</div>
+                                  <div className="text-xs opacity-90">{selectedMonth} 8-14</div>
+                                </th>
+                                <th className="px-3 py-2 text-center text-xs font-bold text-white bg-blue-500 border-r border-gray-200 whitespace-nowrap">
+                                  <div className="font-bold">Week 3</div>
+                                  <div className="text-xs opacity-90">{selectedMonth} 15-21</div>
+                                </th>
+                                <th className="px-3 py-2 text-center text-xs font-bold text-white bg-purple-500 border-r border-gray-200 whitespace-nowrap">
+                                  <div className="font-bold">Week 4</div>
+                                  <div className="text-xs opacity-90">{selectedMonth} 22-{new Date(selectedYear, months.indexOf(selectedMonth) + 1, 0).getDate()}</div>
+                                </th>
+                                <th className="px-3 py-2 border-r border-gray-200 bg-gray-100"></th>
+                                <th className="px-3 py-2 bg-gray-100"></th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 bg-white">
+                              {currentDates.map((date, index) => {
+                                const weekNumber = getWeekNumber(date);
+                                const isWeekend = index % 7 >= 5; // Saturday and Sunday
+                                const dateEntries = getSearchFilteredEntries(date);
 
                                 return (
-                                  <tr
-                                    key={`${date}-${entryIndex}`}
-                                    className={`transition-colors duration-200 border-b border-gray-200 ${
-                                      shouldHighlight
-                                        ? 'bg-yellow-50 hover:bg-yellow-100'
-                                        : isWeekend
-                                          ? 'bg-blue-50 hover:bg-blue-100'
-                                          : 'bg-white hover:bg-gray-50'
-                                    }`}
-                                  >
-                                  {filteredIndex === 0 && (
-                                    <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight" rowSpan={dateEntries.length}>
-                                      <div className="flex items-center gap-2 leading-tight">
-                                        <Clock className="h-3 w-3 text-gray-400" />
-                                        {date}
-                                      </div>
-                                    </td>
-                                  )}
-                                  <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.barangay || "Select barangay"}>
-                                    <div className="flex items-center gap-2">
-                                      <select 
-                                        id={`existing-barangay-${date}-${entryIndex}`}
-                                        name={`existing-barangay-${date}-${entryIndex}`}
-                                        disabled={isReadOnly}
-                                        className="flex-1 px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
-                                        style={{ color: '#000' }}
-                                        value={entry.barangay}
-                                        onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
-                                      >
-                                        <option value="">Select Barangay</option>
-                                        {importedBarangays
-                                          .filter(barangay => {
-                                            if (!activeMunicipalityTab) return true;
-                                            // Normalize municipality names for comparison (handle "Balanga" vs "Balanga City")
-                                            const normalizedTab = activeMunicipalityTab.toLowerCase().replace(/\s+city$/i, '').trim();
-                                            const normalizedBarangay = barangay.municipality.toLowerCase().replace(/\s+city$/i, '').trim();
-                                            return normalizedBarangay === normalizedTab;
-                                          })
-                                          .map((barangay) => (
-                                            <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
-                                              {barangay.name} ({barangay.municipality})
-                                            </option>
-                                          ))}
-                                      </select>
-                                      {!isReadOnly && (
-                                        <button
-                                          onClick={() => removeDateEntry(date, entryIndex)}
-                                          className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
-                                          title="Remove entry"
-                                        >
-                                          <X className="w-4 h-4" />
-                                        </button>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
-                                    <select 
-                                      id={`existing-concern-type-${date}-${entryIndex}`}
-                                      name={`existing-concern-type-${date}-${entryIndex}`}
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
-                                      style={{ color: '#000' }}
-                                      value={entry.concernType}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
-                                    >
-                                      <option value="">Select Concern Type</option>
-                                      {importedConcernTypes.length > 0 ? (
-                                        getConcernTypesForMunicipality(activeMunicipalityTab)
-                                          .map((type) => (
-                                            <option key={type.id} value={type.name}>
-                                              {type.name}
-                                            </option>
-                                          ))
-                                      ) : (
-                                        concernTypes.map((type) => (
-                                          <option key={type} value={type}>
-                                            {type}
-                                          </option>
-                                        ))
-                                      )}
-                                    </select>
-                                  </td>
-                                  <td className="px-3 py-0.5">
-                                    <input 
-                                      id={`existing-week1-${date}-${entryIndex}`}
-                                      name={`existing-week1-${date}-${entryIndex}`}
-                                      type="number" 
-                                      min="0"
-                                      step="1"
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
-                                      placeholder="0"
-                                      value={entry.week1}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'week1', e.target.value)}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-0.5">
-                                    <input 
-                                      id={`existing-week2-${date}-${entryIndex}`}
-                                      name={`existing-week2-${date}-${entryIndex}`}
-                                      type="number" 
-                                      min="0"
-                                      step="1"
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                      placeholder="0"
-                                      value={entry.week2}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-0.5">
-                                    <input 
-                                      id={`existing-week3-${date}-${entryIndex}`}
-                                      name={`existing-week3-${date}-${entryIndex}`}
-                                      type="number" 
-                                      min="0"
-                                      step="1"
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                      placeholder="0"
-                                      value={entry.week3}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-0.5">
-                                    <input 
-                                      id={`existing-week4-${date}-${entryIndex}`}
-                                      name={`existing-week4-${date}-${entryIndex}`}
-                                      type="number" 
-                                      min="0"
-                                      step="1"
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
-                                      placeholder="0"
-                                      value={entry.week4}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
-                                    <input 
-                                      id={`existing-action-taken-${date}-${entryIndex}`}
-                                      name={`existing-action-taken-${date}-${entryIndex}`}
-                                      type="text" 
-                                      disabled={isReadOnly}
-                                      className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
-                                      placeholder=""
-                                      value={entry.actionTaken}
-                                      onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
-                                    />
-                                  </td>
-                                  <td className="px-3 py-0.5 table-cell-spacing">
-                                    <div className="flex items-center justify-center gap-2 h-full">
-                                      {entry.photos && (
-                                        (entry.photos.before || entry.photos.after) ||
-                                        (entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.length > 0)
-                                      ) ? (
-                                        <>
-                                          {/* View button when photos exist */}
-                                          <button
-                                            onClick={() => handleViewPhotos(date, entryIndex)}
-                                            className="flex items-center gap-2 px-4 py-1 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
-                                            title="View Photos"
-                                          >
-                                            <Eye className="w-4 h-4" />
-                                            <span className="text-sm font-medium">View</span>
-                                          </button>
-                                          {/* Edit button - command users can add/update; admin can also remove */}
-                                          {!isReadOnly && canUserEditPhotos(entry) && (
-                                            <button
-                                              onClick={() => handleOpenPhotoUpload(date, entryIndex)}
-                                              className="flex items-center gap-2 px-4 py-1 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
-                                              title={isAdmin ? 'Edit Photos (Admin)' : 'Edit / Add Photos'}
-                                            >
-                                              <Edit className="w-4 h-4" />
-                                              <span className="text-sm font-medium">Edit</span>
-                                            </button>
-                                          )}
-                                          {/* Reset button for administrators only */}
-                                          {isAdmin && (
-                                            <button
-                                              onClick={() => handleResetPhotos(date, entryIndex)}
-                                              className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 rounded-md transition-colors duration-200 border border-red-300 hover:border-red-600"
-                                              title="Reset Photos (Admin Only)"
-                                            >
-                                              <X className="w-4 h-4" />
-                                            </button>
-                                          )}
-                                        </>
-                                      ) : (
-                                        // Show Upload button only when no photos exist (non-readonly users)
-                                        !isReadOnly && (
-                                          <button
-                                            onClick={() => handleOpenPhotoUpload(date, entryIndex)}
-                                            disabled={isEntryIncomplete(entry)}
-                                            className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-colors duration-200 border ${
-                                              isEntryIncomplete(entry)
-                                                ? 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed opacity-50'
-                                                : 'text-blue-600 hover:text-white hover:bg-blue-600 border-blue-300 hover:border-blue-600'
-                                            }`}
-                                            title={
-                                              isEntryIncomplete(entry)
-                                                ? 'Complete all required fields first: Barangay, Concern Type, at least one Week, and Action Taken'
-                                                : 'Upload Photos & Add Remarks'
-                                            }
-                                          >
-                                            <Upload className="w-4 h-4" />
-                                            <span className="text-sm font-medium">Upload</span>
-                                          </button>
-                                        )
-                                      )}
-                                      {entry.remarks && (
-                                        (entry.photos?.after && Array.isArray(entry.photos.after) && entry.photos.after.length > 0) ||
-                                        (entry.photos?.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
-                                      ) && (
-                                        <div className="relative group">
-                                          <div className="px-2.5 py-1 bg-yellow-100 border-l-4 border-yellow-400 rounded-r-md shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-1">
-                                            <span className="text-yellow-600 text-sm">📝</span>
-                                            <span className="text-xs font-medium text-yellow-800">Action Taken</span>
+                                  <React.Fragment key={index}>
+                                    {dateEntries.length === 0 ? (
+                                      // Empty row when no entries
+                                      <tr className={`hover:bg-gray-50 transition-colors duration-200 ${isWeekend ? 'bg-blue-50' : 'bg-white'} border-b border-gray-200`}>
+                                        <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight">
+                                          <div className="flex items-center gap-2 leading-tight">
+                                            <Clock className="h-3 w-3 text-gray-400" />
+                                            {date}
                                           </div>
-                                          {/* Tooltip on hover - positioned above and aligned to right, extends to the left */}
-                                          <div className="absolute right-0 bottom-full mb-2 min-w-[200px] max-w-[280px] p-3 bg-white border-2 border-yellow-400 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] pointer-events-none">
-                                            <div className="flex items-center gap-2 mb-2 pb-2 border-b border-yellow-200">
-                                              <span className="text-base">📝</span>
-                                              <span className="text-xs font-bold text-yellow-900">Action Taken</span>
-                                            </div>
-                                            <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap max-h-32 overflow-y-auto pr-1">{entry.remarks}</p>
-                                            {/* Arrow pointing down to the button */}
-                                            <div className="absolute right-6 -bottom-2 w-3 h-3 bg-white border-r-2 border-b-2 border-yellow-400 transform rotate-45"></div>
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <select
+                                            id={`barangay-select-${date}`}
+                                            name={`barangay-select-${date}`}
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                            style={{ color: '#000' }}
+                                            value={selectedBarangayFilter || ""}
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'barangay', e.target.value);
+                                              }
+                                            }}
+                                          >
+                                            <option value="">Select Barangay</option>
+                                            {availableBarangays.map((barangay) => (
+                                              <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
+                                                {barangay.name} ({barangay.municipality})
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <select
+                                            id={`concern-type-select-${date}`}
+                                            name={`concern-type-select-${date}`}
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                            style={{ color: '#000' }}
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'concernType', e.target.value);
+                                              }
+                                            }}
+                                          >
+                                            <option value="">Select Concern Type</option>
+                                            {availableConcernTypes.map((type) => (
+                                              <option key={type.id || type} value={type.name || type}>
+                                                {type.name || type}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <input
+                                            id={`week1-${date}`}
+                                            name={`week1-${date}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                            placeholder="0"
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'week1', e.target.value);
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <input
+                                            id={`week2-${date}`}
+                                            name={`week2-${date}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                            placeholder="0"
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'week2', e.target.value);
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <input
+                                            id={`week3-${date}`}
+                                            name={`week3-${date}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                            placeholder="0"
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'week3', e.target.value);
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-3 py-0.5">
+                                          <input
+                                            id={`week4-${date}`}
+                                            name={`week4-${date}`}
+                                            type="number"
+                                            min="0"
+                                            step="1"
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                            placeholder="0"
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'week4', e.target.value);
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip="">
+                                          <input
+                                            id={`action-taken-${date}`}
+                                            name={`action-taken-${date}`}
+                                            type="text"
+                                            disabled={isReadOnly}
+                                            className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
+                                            placeholder=""
+                                            value=""
+                                            onChange={(e) => {
+                                              if (e.target.value) {
+                                                addDateEntryWithField(date, 'actionTaken', e.target.value);
+                                              }
+                                            }}
+                                          />
+                                        </td>
+                                        <td className="px-3 py-0.5 table-cell-spacing">
+                                          <div className="flex items-center justify-center">
+                                            <span className="text-xs text-black italic">Add entry to upload</span>
                                           </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                  </tr>
+                                        </td>
+                                      </tr>
+                                    ) : (
+                                      // Render existing entries
+                                      dateEntries.map(({ entry, entryIndex }, filteredIndex) => {
+                                        const shouldHighlight =
+                                          isViewingUser &&
+                                          !!selectedBarangayFilter &&
+                                          entry?.barangay === selectedBarangayFilter &&
+                                          isEntryCompleteForViewingHighlight(entry);
+
+                                        return (
+                                          <tr
+                                            key={`${date}-${entryIndex}`}
+                                            className={`transition-colors duration-200 border-b border-gray-200 ${shouldHighlight
+                                              ? 'bg-yellow-50 hover:bg-yellow-100'
+                                              : isWeekend
+                                                ? 'bg-blue-50 hover:bg-blue-100'
+                                                : 'bg-white hover:bg-gray-50'
+                                              }`}
+                                          >
+                                            {filteredIndex === 0 && (
+                                              <td className="px-3 py-0.5 text-xs font-medium text-gray-700 bg-white/30 leading-tight" rowSpan={dateEntries.length}>
+                                                <div className="flex items-center gap-2 leading-tight">
+                                                  <Clock className="h-3 w-3 text-gray-400" />
+                                                  {date}
+                                                </div>
+                                              </td>
+                                            )}
+                                            <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.barangay || "Select barangay"}>
+                                              <div className="flex items-center gap-2">
+                                                <select
+                                                  id={`existing-barangay-${date}-${entryIndex}`}
+                                                  name={`existing-barangay-${date}-${entryIndex}`}
+                                                  disabled={isReadOnly}
+                                                  className="flex-1 px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 !text-black"
+                                                  style={{ color: '#000' }}
+                                                  value={entry.barangay}
+                                                  onChange={(e) => updateDateData(date, entryIndex, 'barangay', e.target.value)}
+                                                >
+                                                  <option value="">Select Barangay</option>
+                                                  {availableBarangays.map((barangay) => (
+                                                    <option key={barangay.id} value={`${barangay.name}, ${barangay.municipality}`}>
+                                                      {barangay.name} ({barangay.municipality})
+                                                    </option>
+                                                  ))}
+                                                </select>
+                                                {!isReadOnly && (
+                                                  <button
+                                                    onClick={() => removeDateEntry(date, entryIndex)}
+                                                    className="p-1 text-red-500 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                                    title="Remove entry"
+                                                  >
+                                                    <X className="w-4 h-4" />
+                                                  </button>
+                                                )}
+                                              </div>
+                                            </td>
+                                            <td className="px-3 py-0.5 table-cell-hover" data-tooltip={entry.concernType || "Select concern type"}>
+                                              <select
+                                                id={`existing-concern-type-${date}-${entryIndex}`}
+                                                name={`existing-concern-type-${date}-${entryIndex}`}
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 bg-white transition-all duration-200 !text-black"
+                                                style={{ color: '#000' }}
+                                                value={entry.concernType}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'concernType', e.target.value)}
+                                              >
+                                                <option value="">Select Concern Type</option>
+                                                {availableConcernTypes.map((type) => (
+                                                  <option key={type.id || type} value={type.name || type}>
+                                                    {type.name || type}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </td>
+                                            <td className="px-3 py-0.5">
+                                              <input
+                                                id={`existing-week1-${date}-${entryIndex}`}
+                                                name={`existing-week1-${date}-${entryIndex}`}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-transparent bg-white shadow-sm transition-all duration-200 text-center font-medium !text-black caret-black"
+                                                placeholder="0"
+                                                value={entry.week1}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'week1', e.target.value)}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-0.5">
+                                              <input
+                                                id={`existing-week2-${date}-${entryIndex}`}
+                                                name={`existing-week2-${date}-${entryIndex}`}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                                placeholder="0"
+                                                value={entry.week2}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'week2', e.target.value)}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-0.5">
+                                              <input
+                                                id={`existing-week3-${date}-${entryIndex}`}
+                                                name={`existing-week3-${date}-${entryIndex}`}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                                placeholder="0"
+                                                value={entry.week3}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'week3', e.target.value)}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-0.5">
+                                              <input
+                                                id={`existing-week4-${date}-${entryIndex}`}
+                                                name={`existing-week4-${date}-${entryIndex}`}
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 bg-white transition-all duration-200 text-center font-medium !text-black caret-black"
+                                                placeholder="0"
+                                                value={entry.week4}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'week4', e.target.value)}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-0.5 table-cell-spacing table-cell-hover" data-tooltip={entry.actionTaken || ""}>
+                                              <input
+                                                id={`existing-action-taken-${date}-${entryIndex}`}
+                                                name={`existing-action-taken-${date}-${entryIndex}`}
+                                                type="text"
+                                                disabled={isReadOnly}
+                                                className="w-full px-2 py-0.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white transition-all duration-200 !text-black caret-black"
+                                                placeholder=""
+                                                value={entry.actionTaken}
+                                                onChange={(e) => updateDateData(date, entryIndex, 'actionTaken', e.target.value)}
+                                              />
+                                            </td>
+                                            <td className="px-3 py-0.5 table-cell-spacing">
+                                              <div className="flex items-center justify-center gap-2 h-full">
+                                                {entry.photos && (
+                                                  (entry.photos.before || entry.photos.after) ||
+                                                  (entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.length > 0)
+                                                ) ? (
+                                                  <>
+                                                    {/* View button when photos exist */}
+                                                    <button
+                                                      onClick={() => handleViewPhotos(date, entryIndex)}
+                                                      className="flex items-center gap-2 px-4 py-1 text-green-600 hover:text-white hover:bg-green-600 rounded-md transition-colors duration-200 border border-green-300 hover:border-green-600"
+                                                      title="View Photos"
+                                                    >
+                                                      <Eye className="w-4 h-4" />
+                                                      <span className="text-sm font-medium">View</span>
+                                                    </button>
+                                                    {/* Edit button - command users can add/update; admin can also remove */}
+                                                    {!isReadOnly && canUserEditPhotos(entry) && (
+                                                      <button
+                                                        onClick={() => handleOpenPhotoUpload(date, entryIndex)}
+                                                        className="flex items-center gap-2 px-4 py-1 text-blue-600 hover:text-white hover:bg-blue-600 rounded-md transition-colors duration-200 border border-blue-300 hover:border-blue-600"
+                                                        title={isAdmin ? 'Edit Photos (Admin)' : 'Edit / Add Photos'}
+                                                      >
+                                                        <Edit className="w-4 h-4" />
+                                                        <span className="text-sm font-medium">Edit</span>
+                                                      </button>
+                                                    )}
+                                                    {/* Reset button for administrators only */}
+                                                    {isAdmin && (
+                                                      <button
+                                                        onClick={() => handleResetPhotos(date, entryIndex)}
+                                                        className="p-1.5 text-red-600 hover:text-white hover:bg-red-600 rounded-md transition-colors duration-200 border border-red-300 hover:border-red-600"
+                                                        title="Reset Photos (Admin Only)"
+                                                      >
+                                                        <X className="w-4 h-4" />
+                                                      </button>
+                                                    )}
+                                                  </>
+                                                ) : (
+                                                  // Show Upload button only when no photos exist (non-readonly users)
+                                                  !isReadOnly && (
+                                                    <button
+                                                      onClick={() => handleOpenPhotoUpload(date, entryIndex)}
+                                                      disabled={isEntryIncomplete(entry)}
+                                                      className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-colors duration-200 border ${isEntryIncomplete(entry)
+                                                        ? 'text-gray-400 bg-gray-100 border-gray-300 cursor-not-allowed opacity-50'
+                                                        : 'text-blue-600 hover:text-white hover:bg-blue-600 border-blue-300 hover:border-blue-600'
+                                                        }`}
+                                                      title={
+                                                        isEntryIncomplete(entry)
+                                                          ? 'Complete all required fields first: Barangay, Concern Type, at least one Week, and Action Taken'
+                                                          : 'Upload Photos & Add Remarks'
+                                                      }
+                                                    >
+                                                      <Upload className="w-4 h-4" />
+                                                      <span className="text-sm font-medium">Upload</span>
+                                                    </button>
+                                                  )
+                                                )}
+                                                {entry.remarks && (
+                                                  (entry.photos?.after && Array.isArray(entry.photos.after) && entry.photos.after.length > 0) ||
+                                                  (entry.photos?.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
+                                                ) && (
+                                                    <div className="relative group">
+                                                      <div className="px-2.5 py-1 bg-yellow-100 border-l-4 border-yellow-400 rounded-r-md shadow-sm hover:shadow-md transition-all cursor-pointer flex items-center gap-1">
+                                                        <span className="text-yellow-600 text-sm">📝</span>
+                                                        <span className="text-xs font-medium text-yellow-800">Action Taken</span>
+                                                      </div>
+                                                      {/* Tooltip on hover - positioned above and aligned to right, extends to the left */}
+                                                      <div className="absolute right-0 bottom-full mb-2 min-w-[200px] max-w-[280px] p-3 bg-white border-2 border-yellow-400 rounded-lg shadow-2xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-[9999] pointer-events-none">
+                                                        <div className="flex items-center gap-2 mb-2 pb-2 border-b border-yellow-200">
+                                                          <span className="text-base">📝</span>
+                                                          <span className="text-xs font-bold text-yellow-900">Action Taken</span>
+                                                        </div>
+                                                        <p className="text-xs text-gray-700 leading-relaxed break-words whitespace-pre-wrap max-h-32 overflow-y-auto pr-1">{entry.remarks}</p>
+                                                        {/* Arrow pointing down to the button */}
+                                                        <div className="absolute right-6 -bottom-2 w-3 h-3 bg-white border-r-2 border-b-2 border-yellow-400 transform rotate-45"></div>
+                                                      </div>
+                                                    </div>
+                                                  )}
+                                              </div>
+                                            </td>
+                                          </tr>
+                                        );
+                                      })
+                                    )}
+                                    {/* Add new entry button */}
+                                    <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
+                                      <td colSpan="9" className="px-4 py-2 text-center">
+                                        {!isReadOnly && (
+                                          <button
+                                            onClick={() => addDateEntry(date)}
+                                            className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
+                                          >
+                                            <Plus className="h-4 w-4" />
+                                            + Add Entry for {date}
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  </React.Fragment>
                                 );
-                              })
-                            )}
-                            {/* Add new entry button */}
-                            <tr className={`${isWeekend ? 'bg-blue-50' : 'bg-gray-50'} border-b border-gray-200`}>
-                              <td colSpan="9" className="px-4 py-2 text-center">
-                                {!isReadOnly && (
-                                  <button
-                                    onClick={() => addDateEntry(date)}
-                                    className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-md transition-colors duration-200 flex items-center gap-2 mx-auto border border-blue-200 hover:border-blue-300"
-                                  >
-                                    <Plus className="h-4 w-4" />
-                                    + Add Entry for {date}
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          </React.Fragment>
-                        );
-                      })}
-                      <tr>
-                        <td colSpan="9" className="h-16"></td>
-                      </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            </div>
-            </div>
-          </div>
-        )}
-
-        {/* Barangay Management Section */}
-        {activeTab === "barangays" && (
-          <div className="space-y-6">
-            {/* Municipality Totals Section */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
-                    <Users className="h-4 w-4 text-green-600" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Barangay Totals per Municipality</h3>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 pt-0">
-                {isLoadingBarangays ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p>Loading barangays from database...</p>
-                  </div>
-                ) : importedBarangays.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No barangays imported yet</p>
-                    <p className="text-sm">Import barangays to see municipality totals</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {Object.keys(municipalitiesByDistrict).map((district) => {
-                      const districtBarangays = importedBarangays.filter(brgy => brgy.district === district);
-                      const municipalityCounts = districtBarangays.reduce((acc, barangay) => {
-                        acc[barangay.municipality] = (acc[barangay.municipality] || 0) + 1;
-                        return acc;
-                      }, {});
-
-                      return (
-                        <div key={district}>
-                          <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full bg-purple-500"></div>
-                            {district}
-                          </h4>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {municipalitiesByDistrict[district].map((municipality) => (
-                              <div key={municipality} className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
-                                    <p className="text-xs text-gray-600 mt-1">Total Barangays</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-2xl font-bold text-purple-600">{municipalityCounts[municipality] || 0}</div>
-                                    <div className="text-xs text-gray-500">barangays</div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                              })}
+                              <tr>
+                                <td colSpan="9" className="h-16"></td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Import Section */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
-                    <Upload className="h-4 w-4 text-blue-600" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Import Barangays</h3>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 pt-0 space-y-4">
-                <div className="space-y-2">
-                  <label htmlFor="district-select" className="block text-sm font-medium text-gray-700">Select District</label>
-                  <select 
-                    id="district-select"
-                    value={selectedDistrict} 
-                    onChange={(e) => setSelectedDistrict(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">Choose district</option>
-                    {Object.keys(municipalitiesByDistrict).map((district) => (
-                      <option key={district} value={district}>
-                        {district}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="municipality-select" className="block text-sm font-medium text-gray-700">Select Municipality</label>
-                  <select 
-                    id="municipality-select"
-                    value={selectedMunicipality} 
-                    onChange={(e) => setSelectedMunicipality(e.target.value)}
-                    disabled={!selectedDistrict}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
-                  >
-                    <option value="">Choose municipality</option>
-                    {selectedDistrict && municipalitiesByDistrict[selectedDistrict]?.map((municipality) => (
-                      <option key={municipality} value={municipality}>
-                        {municipality}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-2">
-                  <label htmlFor="barangay-data" className="block text-sm font-medium text-gray-700">Barangay Names</label>
-                  <textarea
-                    id="barangay-data"
-                    name="barangay-data"
-                    placeholder="Enter barangay names separated by commas or new lines&#10;Example:&#10;Barangay 1&#10;Barangay 2&#10;Barangay 3"
-                    value={barangayData}
-                    onChange={(e) => setBarangayData(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical text-sm !text-black caret-black"
-                  />
-                </div>
-
-                <button 
-                  onClick={handleBarangayImport}
-                  disabled={isImporting || !selectedDistrict || !selectedMunicipality || !barangayData.trim()}
-                  className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
-                >
-                  {isImporting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Importing...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="h-4 w-4 mr-2" />
-                      Import Barangays
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Barangays List Section */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                {/* Header with title and count */}
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
-                      <Building2 className="h-4 w-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Barangays</h3>
-                      <p className="text-sm text-gray-600">
-                      {barangayFilterMunicipality 
-                        ? `${getSortedBarangays().length} of ${importedBarangays.length} barangays (${barangayFilterMunicipality})`
-                        : `${importedBarangays.length} barangays across ${Object.keys(getGroupedBarangays()).length} municipalities`
-                      }
-                      </p>
+                      </div>
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
 
-                {/* Controls and Actions */}
-                                      {importedBarangays.length > 0 && (
-                  <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                    {/* Filter and Sort Controls */}
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Filter:</span>
+            {/* Barangay Management Section */}
+            {activeTab === "barangays" && (
+              <div className="space-y-6">
+                {/* Municipality Totals Section */}
+                <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                  <div className="p-4 md:p-6 pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-green-100">
+                        <Users className="h-4 w-4 text-green-600" />
+                      </div>
+                      <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Barangay Totals per Municipality</h3>
+                    </div>
+                  </div>
+                  <div className="p-4 md:p-6 pt-0">
+                    {isLoadingBarangays ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p>Loading barangays from database...</p>
+                      </div>
+                    ) : importedBarangays.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>No barangays imported yet</p>
+                        <p className="text-sm">Import barangays to see municipality totals</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {Object.keys(municipalitiesByDistrict).map((district) => {
+                          const districtBarangays = importedBarangays.filter(brgy => brgy.district === district);
+                          const municipalityCounts = districtBarangays.reduce((acc, barangay) => {
+                            acc[barangay.municipality] = (acc[barangay.municipality] || 0) + 1;
+                            return acc;
+                          }, {});
+
+                          return (
+                            <div key={district}>
+                              <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <div className="w-3 h-3 rounded-full bg-purple-500"></div>
+                                {district}
+                              </h4>
+                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {municipalitiesByDistrict[district].map((municipality) => (
+                                  <div key={municipality} className="p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
+                                        <p className="text-xs text-gray-600 mt-1">Total Barangays</p>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-2xl font-bold text-purple-600">{municipalityCounts[municipality] || 0}</div>
+                                        <div className="text-xs text-gray-500">barangays</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Import Section */}
+                  <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                    <div className="p-4 md:p-6 pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-blue-100">
+                          <Upload className="h-4 w-4 text-blue-600" />
+                        </div>
+                        <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Import Barangays</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 md:p-6 pt-0 space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="district-select" className="block text-sm font-medium text-gray-700">Select District</label>
                         <select
-                          value={barangayFilterMunicipality}
-                          onChange={(e) => setBarangayFilterMunicipality(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
+                          id="district-select"
+                          value={selectedDistrict}
+                          onChange={(e) => setSelectedDistrict(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         >
-                          <option value="">All Municipalities</option>
-                          {getUniqueMunicipalities().map(municipality => (
-                            <option key={municipality} value={municipality}>{municipality}</option>
+                          <option value="">Choose district</option>
+                          {Object.keys(municipalitiesByDistrict).map((district) => (
+                            <option key={district} value={district}>
+                              {district}
+                            </option>
                           ))}
                         </select>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-600">Sort by:</span>
-                        <select
-                          value={barangaySortBy}
-                          onChange={(e) => handleBarangaySort(e.target.value)}
-                          className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
-                        >
-                          <option value="name">Name</option>
-                          <option value="municipality">Municipality</option>
-                          <option value="district">District</option>
-                          <option value="importedAt">Import Date</option>
-                        </select>
-                        <button
-                          onClick={() => setBarangaySortOrder(barangaySortOrder === 'asc' ? 'desc' : 'asc')}
-                          className="p-1 hover:bg-gray-100 rounded transition-colors duration-200"
-                          title={`Sort ${barangaySortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-                        >
-                          {barangaySortOrder === 'asc' ? (
-                            <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                            </svg>
-                          ) : (
-                            <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                            </svg>
-                          )}
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                        <button 
-                          onClick={handleSelectAllBarangays}
-                          className={`border font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm ${
-                            selectedBarangays.length === importedBarangays.length
-                              ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
-                              : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
+                      <div className="space-y-2">
+                        <label htmlFor="municipality-select" className="block text-sm font-medium text-gray-700">Select Municipality</label>
+                        <select
+                          id="municipality-select"
+                          value={selectedMunicipality}
+                          onChange={(e) => setSelectedMunicipality(e.target.value)}
+                          disabled={!selectedDistrict}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                         >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          {selectedBarangays.length === importedBarangays.length ? 'Deselect All' : 'Select All'}
-                        </button>
-                        {selectedBarangays.length > 0 && (
+                          <option value="">Choose municipality</option>
+                          {selectedDistrict && municipalitiesByDistrict[selectedDistrict]?.map((municipality) => (
+                            <option key={municipality} value={municipality}>
+                              {municipality}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label htmlFor="barangay-data" className="block text-sm font-medium text-gray-700">Barangay Names</label>
+                        <textarea
+                          id="barangay-data"
+                          name="barangay-data"
+                          placeholder="Enter barangay names separated by commas or new lines&#10;Example:&#10;Barangay 1&#10;Barangay 2&#10;Barangay 3"
+                          value={barangayData}
+                          onChange={(e) => setBarangayData(e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical text-sm !text-black caret-black"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleBarangayImport}
+                        disabled={isImporting || !selectedDistrict || !selectedMunicipality || !barangayData.trim()}
+                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                      >
+                        {isImporting ? (
                           <>
-                            <button 
-                              onClick={handleEditSelectedBarangays}
-                              className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Importing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Import Barangays
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Barangays List Section */}
+                  <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                    <div className="p-4 md:p-6 pb-0">
+                      {/* Header with title and count */}
+                      <div className="flex items-center gap-3 mb-4">
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-purple-100">
+                          <Building2 className="h-4 w-4 text-purple-600" />
+                        </div>
+                        <div>
+                          <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Barangays</h3>
+                          <p className="text-sm text-gray-600">
+                            {barangayFilterMunicipality
+                              ? `${getSortedBarangays().length} of ${importedBarangays.length} barangays (${barangayFilterMunicipality})`
+                              : `${importedBarangays.length} barangays across ${Object.keys(getGroupedBarangays()).length} municipalities`
+                            }
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Controls and Actions */}
+                      {importedBarangays.length > 0 && (
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                          {/* Filter and Sort Controls */}
+                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Filter:</span>
+                              <select
+                                value={barangayFilterMunicipality}
+                                onChange={(e) => setBarangayFilterMunicipality(e.target.value)}
+                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
+                              >
+                                <option value="">All Municipalities</option>
+                                {getUniqueMunicipalities().map(municipality => (
+                                  <option key={municipality} value={municipality}>{municipality}</option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm text-gray-600">Sort by:</span>
+                              <select
+                                value={barangaySortBy}
+                                onChange={(e) => handleBarangaySort(e.target.value)}
+                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-sm !text-black caret-black"
+                              >
+                                <option value="name">Name</option>
+                                <option value="municipality">Municipality</option>
+                                <option value="district">District</option>
+                                <option value="importedAt">Import Date</option>
+                              </select>
+                              <button
+                                onClick={() => setBarangaySortOrder(barangaySortOrder === 'asc' ? 'desc' : 'asc')}
+                                className="p-1 hover:bg-gray-100 rounded transition-colors duration-200"
+                                title={`Sort ${barangaySortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                              >
+                                {barangaySortOrder === 'asc' ? (
+                                  <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                                  </svg>
+                                ) : (
+                                  <svg className="h-4 w-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons */}
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              onClick={handleSelectAllBarangays}
+                              className={`border font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm ${selectedBarangays.length === importedBarangays.length
+                                ? 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                                }`}
                             >
-                              <FileText className="h-4 w-4 mr-2" />
-                              Edit Selected
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              {selectedBarangays.length === importedBarangays.length ? 'Deselect All' : 'Select All'}
                             </button>
-                            <button 
-                              onClick={handleRemoveSelectedBarangays}
+                            {selectedBarangays.length > 0 && (
+                              <>
+                                <button
+                                  onClick={handleEditSelectedBarangays}
+                                  className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                                >
+                                  <FileText className="h-4 w-4 mr-2" />
+                                  Edit Selected
+                                </button>
+                                <button
+                                  onClick={handleRemoveSelectedBarangays}
+                                  className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                                >
+                                  <AlertTriangle className="h-4 w-4 mr-2" />
+                                  Remove Selected ({selectedBarangays.length})
+                                </button>
+                              </>
+                            )}
+                            <button
+                              onClick={handleExportBarangays}
+                              className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                            >
+                              <Download className="h-4 w-4 mr-2" />
+                              Export CSV
+                            </button>
+                            <button
+                              onClick={handleEditSelectedBarangays}
+                              disabled={selectedBarangays.length === 0}
+                              className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Edit Selected ({selectedBarangays.length})
+                            </button>
+                            <button
+                              onClick={handleClearSelectedBarangays}
+                              disabled={selectedBarangays.length === 0}
+                              className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Clear Selected ({selectedBarangays.length})
+                            </button>
+                            <button
+                              onClick={handleClearBarangays}
                               className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
                             >
                               <AlertTriangle className="h-4 w-4 mr-2" />
-                              Remove Selected ({selectedBarangays.length})
+                              Clear All
                             </button>
-                          </>
-                        )}
-                        <button 
-                          onClick={handleExportBarangays} 
-                          className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                        >
-                          <Download className="h-4 w-4 mr-2" />
-                          Export CSV
-                        </button>
-                        <button
-                          onClick={handleEditSelectedBarangays}
-                          disabled={selectedBarangays.length === 0}
-                          className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Selected ({selectedBarangays.length})
-                        </button>
-                        <button
-                          onClick={handleClearSelectedBarangays}
-                          disabled={selectedBarangays.length === 0}
-                          className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Clear Selected ({selectedBarangays.length})
-                        </button>
-                        <button 
-                          onClick={handleClearBarangays} 
-                          className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                        >
-                          <AlertTriangle className="h-4 w-4 mr-2" />
-                          Clear All
-                        </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                      </div>
-                    )}
-              </div>
-              <div className="p-4 md:p-6 pt-0">
-                {isLoadingBarangays ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                    <p>Loading barangays from database...</p>
-                  </div>
-                ) : importedBarangays.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No barangays imported yet</p>
-                    <p className="text-sm">Use the import form to add barangays</p>
-                  </div>
-                ) : (
-                                      <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {/* Expand/Collapse All Controls */}
-                      <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={expandAllMunicipalities}
-                            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
-                          >
-                            Expand All
-                          </button>
-                          <button
-                            onClick={collapseAllMunicipalities}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                          >
-                            Collapse All
-                          </button>
+                    <div className="p-4 md:p-6 pt-0">
+                      {isLoadingBarangays ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                          <p>Loading barangays from database...</p>
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {Object.keys(getGroupedBarangays()).length} municipalities
+                      ) : importedBarangays.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <p>No barangays imported yet</p>
+                          <p className="text-sm">Use the import form to add barangays</p>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                          {/* Expand/Collapse All Controls */}
+                          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={expandAllMunicipalities}
+                                className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                              >
+                                Expand All
+                              </button>
+                              <button
+                                onClick={collapseAllMunicipalities}
+                                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                              >
+                                Collapse All
+                              </button>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {Object.keys(getGroupedBarangays()).length} municipalities
+                            </div>
+                          </div>
 
-                      {/* Grouped Barangays by Municipality */}
-                      {Object.entries(getGroupedBarangays()).map(([municipality, barangays]) => {
-                        const isExpanded = expandedMunicipalities.has(municipality);
-                        const isAllSelected = barangays.every(barangay => selectedBarangays.includes(barangay.id));
-                        const isSomeSelected = barangays.some(barangay => selectedBarangays.includes(barangay.id));
-                        
-                        return (
-                          <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
-                            {/* Municipality Header */}
-                            <div 
-                              className="bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-3 cursor-pointer hover:from-purple-100 hover:to-blue-100 transition-colors"
-                              onClick={() => toggleMunicipality(municipality)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <input
-                                    id={`select-all-barangays-${municipality}`}
-                                    name={`select-all-barangays-${municipality}`}
-                                    type="checkbox"
-                                    checked={isAllSelected}
-                                    ref={(input) => {
-                                      if (input) input.indeterminate = isSomeSelected && !isAllSelected;
-                                    }}
-                                    onChange={(e) => {
-                                      e.stopPropagation();
-                                      barangays.forEach(barangay => {
-                                        handleBarangaySelection(barangay.id, e.target.checked);
-                                      });
-                                    }}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
-                                  />
-                                  <Building2 className="h-5 w-5 text-purple-600" />
-                                  <div>
-                                    <div className="font-semibold text-gray-900">{municipality}</div>
-                                    <div className="text-sm text-gray-600">
-                                      {barangays.length} barangay{barangays.length !== 1 ? 's' : ''}
+                          {/* Grouped Barangays by Municipality */}
+                          {Object.entries(getGroupedBarangays()).map(([municipality, barangays]) => {
+                            const isExpanded = expandedMunicipalities.has(municipality);
+                            const isAllSelected = barangays.every(barangay => selectedBarangays.includes(barangay.id));
+                            const isSomeSelected = barangays.some(barangay => selectedBarangays.includes(barangay.id));
+
+                            return (
+                              <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
+                                {/* Municipality Header */}
+                                <div
+                                  className="bg-gradient-to-r from-purple-50 to-blue-50 px-4 py-3 cursor-pointer hover:from-purple-100 hover:to-blue-100 transition-colors"
+                                  onClick={() => toggleMunicipality(municipality)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <input
+                                        id={`select-all-barangays-${municipality}`}
+                                        name={`select-all-barangays-${municipality}`}
+                                        type="checkbox"
+                                        checked={isAllSelected}
+                                        ref={(input) => {
+                                          if (input) input.indeterminate = isSomeSelected && !isAllSelected;
+                                        }}
+                                        onChange={(e) => {
+                                          e.stopPropagation();
+                                          barangays.forEach(barangay => {
+                                            handleBarangaySelection(barangay.id, e.target.checked);
+                                          });
+                                        }}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
+                                      />
+                                      <Building2 className="h-5 w-5 text-purple-600" />
+                                      <div>
+                                        <div className="font-semibold text-gray-900">{municipality}</div>
+                                        <div className="text-sm text-gray-600">
+                                          {barangays.length} barangay{barangays.length !== 1 ? 's' : ''}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
+                                        {barangays[0]?.district || 'Unknown District'}
+                                      </span>
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                                      )}
                                     </div>
                                   </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full">
-                                    {barangays[0]?.district || 'Unknown District'}
-                                  </span>
-                                  {isExpanded ? (
-                                    <ChevronDown className="h-4 w-4 text-gray-500" />
-                                  ) : (
-                                    <ChevronRight className="h-4 w-4 text-gray-500" />
-                                  )}
-                                </div>
+
+                                {/* Barangays List */}
+                                {isExpanded && (
+                                  <div className="bg-white">
+                                    {barangays.map((barangay) => {
+                                      const isSelected = selectedBarangays.includes(barangay.id);
+                                      return (
+                                        <div
+                                          key={barangay.id}
+                                          className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${isSelected
+                                            ? 'bg-blue-50 border-l-4 border-l-blue-400'
+                                            : 'hover:bg-gray-50'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <input
+                                              id={`barangay-${barangay.id}`}
+                                              name={`barangay-${barangay.id}`}
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={(e) => handleBarangaySelection(barangay.id, e.target.checked)}
+                                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
+                                            />
+                                            <MapPinIcon className="h-4 w-4 text-blue-500" />
+                                            <div>
+                                              <div className="font-medium text-sm">{barangay.name}</div>
+                                              <div className="text-xs text-gray-600">
+                                                {barangay.district}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                            {new Date(barangay.importedAt).toLocaleDateString()}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Edit Barangay Modal */}
+                  {isEditingBarangays && editingBarangay && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+                      <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+                        <div className="p-6">
+                          <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                              {editingBarangay.isBulkEdit ? `Edit ${editingBarangay.selectedIds.length} Selected Barangays` : 'Edit Barangay'}
+                            </h3>
+                            <button
+                              onClick={handleCancelEdit}
+                              className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
+                            >
+                              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label htmlFor="edit-barangay-name" className="block text-sm font-medium text-gray-700 mb-2">
+                                {editingBarangay.isBulkEdit ? 'Barangay Names (comma-separated)' : 'Barangay Name'}
+                              </label>
+                              <input
+                                id="edit-barangay-name"
+                                name="edit-barangay-name"
+                                type="text"
+                                value={editingBarangay.name}
+                                onChange={(e) => setEditingBarangay({ ...editingBarangay, name: e.target.value })}
+                                placeholder={editingBarangay.isBulkEdit ? "Enter barangay names separated by commas" : "Enter barangay name"}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                              />
+                              {editingBarangay.isBulkEdit && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Separate multiple barangay names with commas. All selected barangays will be updated with the same municipality and district.
+                                </p>
+                              )}
                             </div>
 
-                            {/* Barangays List */}
-                            {isExpanded && (
-                              <div className="bg-white">
-                                {barangays.map((barangay) => {
-                        const isSelected = selectedBarangays.includes(barangay.id);
-                        return (
-                          <div 
-                            key={barangay.id} 
-                                      className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${
-                              isSelected 
-                                          ? 'bg-blue-50 border-l-4 border-l-blue-400' 
-                                          : 'hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <input
-                                id={`barangay-${barangay.id}`}
-                                name={`barangay-${barangay.id}`}
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={(e) => handleBarangaySelection(barangay.id, e.target.checked)}
-                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
-                              />
-                              <MapPinIcon className="h-4 w-4 text-blue-500" />
-                              <div>
-                                <div className="font-medium text-sm">{barangay.name}</div>
-                                <div className="text-xs text-gray-600">
-                                            {barangay.district}
-                                </div>
-                              </div>
+                            <div>
+                              <label htmlFor="edit-barangay-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                              <select
+                                id="edit-barangay-district"
+                                name="edit-barangay-district"
+                                value={editingBarangay.district}
+                                onChange={(e) => setEditingBarangay({ ...editingBarangay, district: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                              >
+                                {Object.keys(municipalitiesByDistrict).map((district) => (
+                                  <option key={district} value={district}>
+                                    {district}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
-                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                              {new Date(barangay.importedAt).toLocaleDateString()}
-                            </span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+
+                            <div>
+                              <label htmlFor="edit-barangay-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
+                              <select
+                                id="edit-barangay-municipality"
+                                name="edit-barangay-municipality"
+                                value={editingBarangay.municipality}
+                                onChange={(e) => setEditingBarangay({ ...editingBarangay, municipality: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                              >
+                                {editingBarangay.district && municipalitiesByDistrict[editingBarangay.district]?.map((municipality) => (
+                                  <option key={municipality} value={municipality}>
+                                    {municipality}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                              <button
+                                onClick={handleSaveEditedBarangay}
+                                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                Save Changes
+                              </button>
+                              <button
+                                onClick={handleCancelEdit}
+                                className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                              >
+                                Cancel
+                              </button>
+                            </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Statistics */}
+                {importedBarangays.length > 0 && (
+                  <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                    <div className="p-4 md:p-6 pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-indigo-100">
+                          <Activity className="h-4 w-4 text-indigo-600" />
+                        </div>
+                        <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Barangay Statistics</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 md:p-6 pt-0">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="text-center p-4 bg-blue-50 rounded-lg">
+                          <div className="text-2xl font-bold text-blue-600">
+                            {importedBarangays.length}
+                          </div>
+                          <div className="text-sm text-blue-800">Total Barangays</div>
+                        </div>
+                        <div className="text-center p-4 bg-green-50 rounded-lg">
+                          <div className="text-2xl font-bold text-green-600">
+                            {new Set(importedBarangays.map(b => b.municipality)).size}
+                          </div>
+                          <div className="text-sm text-green-800">Municipalities</div>
+                        </div>
+                        <div className="text-center p-4 bg-purple-50 rounded-lg">
+                          <div className="text-2xl font-bold text-purple-600">
+                            {new Set(importedBarangays.map(b => b.district)).size}
+                          </div>
+                          <div className="text-sm text-purple-800">Districts</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
-            </div>
+            )}
 
-            {/* Edit Barangay Modal */}
-            {isEditingBarangays && editingBarangay && (
+            {/* Edit Concern Type Modal */}
+            {isEditingConcernTypes && editingConcernType && (
               <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
                 <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
                   <div className="p-6">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-lg font-semibold text-gray-900">
-                        {editingBarangay.isBulkEdit ? `Edit ${editingBarangay.selectedIds.length} Selected Barangays` : 'Edit Barangay'}
+                        {editingConcernType.isBulkEdit ? `Edit ${editingConcernType.selectedIds.length} Selected Concern Types` : 'Edit Concern Type'}
                       </h3>
                       <button
-                        onClick={handleCancelEdit}
+                        onClick={() => setIsEditingConcernTypes(false)}
                         className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
                       >
                         <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -6293,33 +6448,33 @@ const handleSaveAllMonths = async () => {
 
                     <div className="space-y-4">
                       <div>
-                        <label htmlFor="edit-barangay-name" className="block text-sm font-medium text-gray-700 mb-2">
-                          {editingBarangay.isBulkEdit ? 'Barangay Names (comma-separated)' : 'Barangay Name'}
+                        <label htmlFor="edit-concern-type-name" className="block text-sm font-medium text-gray-700 mb-2">
+                          {editingConcernType.isBulkEdit ? 'Concern Type Names (comma-separated)' : 'Concern Type Name'}
                         </label>
                         <input
-                          id="edit-barangay-name"
-                          name="edit-barangay-name"
+                          id="edit-concern-type-name"
+                          name="edit-concern-type-name"
                           type="text"
-                          value={editingBarangay.name}
-                          onChange={(e) => setEditingBarangay({...editingBarangay, name: e.target.value})}
-                          placeholder={editingBarangay.isBulkEdit ? "Enter barangay names separated by commas" : "Enter barangay name"}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                          value={editingConcernType.name}
+                          onChange={(e) => setEditingConcernType({ ...editingConcernType, name: e.target.value })}
+                          placeholder={editingConcernType.isBulkEdit ? "Enter concern type names separated by commas" : "Enter concern type name"}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                         />
-                        {editingBarangay.isBulkEdit && (
+                        {editingConcernType.isBulkEdit && (
                           <p className="text-xs text-gray-500 mt-1">
-                            Separate multiple barangay names with commas. All selected barangays will be updated with the same municipality and district.
+                            Separate multiple concern type names with commas. All selected concern types will be updated with the same municipality and district.
                           </p>
                         )}
                       </div>
 
                       <div>
-                        <label htmlFor="edit-barangay-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
+                        <label htmlFor="edit-concern-type-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
                         <select
-                          id="edit-barangay-district"
-                          name="edit-barangay-district"
-                          value={editingBarangay.district}
-                          onChange={(e) => setEditingBarangay({...editingBarangay, district: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                          id="edit-concern-type-district"
+                          name="edit-concern-type-district"
+                          value={editingConcernType.district}
+                          onChange={(e) => setEditingConcernType({ ...editingConcernType, district: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                         >
                           {Object.keys(municipalitiesByDistrict).map((district) => (
                             <option key={district} value={district}>
@@ -6330,15 +6485,15 @@ const handleSaveAllMonths = async () => {
                       </div>
 
                       <div>
-                        <label htmlFor="edit-barangay-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
+                        <label htmlFor="edit-concern-type-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
                         <select
-                          id="edit-barangay-municipality"
-                          name="edit-barangay-municipality"
-                          value={editingBarangay.municipality}
-                          onChange={(e) => setEditingBarangay({...editingBarangay, municipality: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                          id="edit-concern-type-municipality"
+                          name="edit-concern-type-municipality"
+                          value={editingConcernType.municipality}
+                          onChange={(e) => setEditingConcernType({ ...editingConcernType, municipality: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
                         >
-                          {editingBarangay.district && municipalitiesByDistrict[editingBarangay.district]?.map((municipality) => (
+                          {editingConcernType.district && municipalitiesByDistrict[editingConcernType.district]?.map((municipality) => (
                             <option key={municipality} value={municipality}>
                               {municipality}
                             </option>
@@ -6348,14 +6503,14 @@ const handleSaveAllMonths = async () => {
 
                       <div className="flex gap-3 pt-4">
                         <button
-                          onClick={handleSaveEditedBarangay}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                          onClick={handleSaveEditedConcernType}
+                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
                         >
                           <CheckCircle className="h-4 w-4 mr-2" />
                           Save Changes
                         </button>
                         <button
-                          onClick={handleCancelEdit}
+                          onClick={() => setIsEditingConcernTypes(false)}
                           className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
                         >
                           Cancel
@@ -6366,1486 +6521,1347 @@ const handleSaveAllMonths = async () => {
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Statistics */}
-          {importedBarangays.length > 0 && (
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-indigo-100">
-                    <Activity className="h-4 w-4 text-indigo-600" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Barangay Statistics</h3>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 pt-0">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <div className="text-2xl font-bold text-blue-600">
-                      {importedBarangays.length}
-                    </div>
-                    <div className="text-sm text-blue-800">Total Barangays</div>
-                  </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <div className="text-2xl font-bold text-green-600">
-                      {new Set(importedBarangays.map(b => b.municipality)).size}
-                    </div>
-                    <div className="text-sm text-green-800">Municipalities</div>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <div className="text-2xl font-bold text-purple-600">
-                      {new Set(importedBarangays.map(b => b.district)).size}
-                    </div>
-                    <div className="text-sm text-purple-800">Districts</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          </div>
-        )}
-
-        {/* Edit Concern Type Modal */}
-        {isEditingConcernTypes && editingConcernType && (
-          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {editingConcernType.isBulkEdit ? `Edit ${editingConcernType.selectedIds.length} Selected Concern Types` : 'Edit Concern Type'}
-                  </h3>
-                  <button
-                    onClick={() => setIsEditingConcernTypes(false)}
-                    className="text-gray-400 hover:text-gray-600 transition-colors duration-200"
-                  >
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="edit-concern-type-name" className="block text-sm font-medium text-gray-700 mb-2">
-                      {editingConcernType.isBulkEdit ? 'Concern Type Names (comma-separated)' : 'Concern Type Name'}
-                    </label>
-                    <input
-                      id="edit-concern-type-name"
-                      name="edit-concern-type-name"
-                      type="text"
-                      value={editingConcernType.name}
-                      onChange={(e) => setEditingConcernType({...editingConcernType, name: e.target.value})}
-                      placeholder={editingConcernType.isBulkEdit ? "Enter concern type names separated by commas" : "Enter concern type name"}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    />
-                    {editingConcernType.isBulkEdit && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Separate multiple concern type names with commas. All selected concern types will be updated with the same municipality and district.
-                      </p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="edit-concern-type-district" className="block text-sm font-medium text-gray-700 mb-2">District</label>
-                    <select
-                      id="edit-concern-type-district"
-                      name="edit-concern-type-district"
-                      value={editingConcernType.district}
-                      onChange={(e) => setEditingConcernType({...editingConcernType, district: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    >
-                      {Object.keys(municipalitiesByDistrict).map((district) => (
-                        <option key={district} value={district}>
-                          {district}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label htmlFor="edit-concern-type-municipality" className="block text-sm font-medium text-gray-700 mb-2">Municipality</label>
-                    <select
-                      id="edit-concern-type-municipality"
-                      name="edit-concern-type-municipality"
-                      value={editingConcernType.municipality}
-                      onChange={(e) => setEditingConcernType({...editingConcernType, municipality: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    >
-                      {editingConcernType.district && municipalitiesByDistrict[editingConcernType.district]?.map((municipality) => (
-                        <option key={municipality} value={municipality}>
-                          {municipality}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex gap-3 pt-4">
-                    <button
-                      onClick={handleSaveEditedConcernType}
-                      className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
-                    >
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Save Changes
-                    </button>
-                    <button
-                      onClick={() => setIsEditingConcernTypes(false)}
-                      className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Type of Concern Management Section */}
-        {activeTab === "concern-types" && (
-          <div className="space-y-6">
-            {/* Concern Type Totals Card */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-              <div className="p-4 md:p-6 pb-0">
-                <div className="flex items-center gap-3">
-                  <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                    <AlertTriangle className="h-4 w-4 text-orange-600" />
-                  </div>
-                  <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Concern Type Totals</h3>
-                </div>
-              </div>
-              <div className="p-4 md:p-6 pt-0">
-                {isLoadingConcernTypes ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-                    <p>Loading concern types from database...</p>
-                  </div>
-                ) : importedConcernTypes.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                    <p>No concern types imported yet</p>
-                    <p className="text-sm">Import concern types to see municipality totals</p>
-                  </div>
-                ) : (
-                  <div className="space-y-6">
-                    {/* Show only user's municipality for non-admin users */}
-                    {!isAdmin && userMunicipality ? (
-                      // Non-admin users see only their municipality
-                      (() => {
-                        const userMunicipalityConcernTypes = importedConcernTypes.filter(ct => 
-                          ct.municipality.toLowerCase() === userMunicipality.toLowerCase()
-                        );
-                        const userDistrict = userMunicipalityConcernTypes.length > 0 ? userMunicipalityConcernTypes[0].district : null;
-                        
-                        return userDistrict ? (
-                          <div>
-                            <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              {userDistrict}
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <h5 className="font-semibold text-gray-900 text-sm">{userMunicipality}</h5>
-                                    <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-2xl font-bold text-orange-600">{userMunicipalityConcernTypes.length}</div>
-                                    <div className="text-xs text-gray-500">types</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-center py-8 text-gray-500">
-                            <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                            <p>No concern types found for {userMunicipality}</p>
-                          </div>
-                        );
-                      })()
-                    ) : (
-                      // Admin users see all municipalities
-                      Object.keys(municipalitiesByDistrict).map((district) => {
-                        const districtConcernTypes = importedConcernTypes.filter(ct => ct.district === district);
-                        const municipalityCounts = districtConcernTypes.reduce((acc, concernType) => {
-                          acc[concernType.municipality] = (acc[concernType.municipality] || 0) + 1;
-                          return acc;
-                        }, {});
-
-                        return (
-                          <div key={district}>
-                            <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                              <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                              {district}
-                            </h4>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {municipalitiesByDistrict[district].map((municipality) => (
-                                <div key={municipality} className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
-                                  <div className="flex items-center justify-between">
-                                    <div>
-                                      <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
-                                      <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-2xl font-bold text-orange-600">{municipalityCounts[municipality] || 0}</div>
-                                      <div className="text-xs text-gray-500">types</div>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Import Section */}
-              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-                <div className="p-4 md:p-6 pb-0">
-                  <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
-                      <Upload className="h-4 w-4 text-orange-600" />
-                    </div>
-                    <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Import Concern Types</h3>
-                  </div>
-                </div>
-                <div className="p-4 md:p-6 pt-0 space-y-4">
-                  <div className="space-y-2">
-                    <label htmlFor="concern-district-select" className="block text-sm font-medium text-gray-700">Select District</label>
-                    <select 
-                      id="concern-district-select"
-                      value={selectedDistrict} 
-                      onChange={(e) => setSelectedDistrict(e.target.value)}
-                      disabled={!!userMunicipality}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    >
-                      <option value="">Choose district</option>
-                      {Object.keys(municipalitiesByDistrict).map((district) => (
-                        <option key={district} value={district}>
-                          {district}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="concern-municipality-select" className="block text-sm font-medium text-gray-700">Select Municipality</label>
-                    <select 
-                      id="concern-municipality-select"
-                      value={selectedMunicipality} 
-                      onChange={(e) => setSelectedMunicipality(e.target.value)}
-                      disabled={!selectedDistrict || !!userMunicipality}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    >
-                      <option value="">Choose municipality</option>
-                      {selectedDistrict && municipalitiesByDistrict[selectedDistrict]?.map((municipality) => (
-                        <option key={municipality} value={municipality}>
-                          {municipality}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label htmlFor="concern-type-data" className="block text-sm font-medium text-gray-700">Concern Type Names</label>
-                    <textarea
-                      id="concern-type-data"
-                      name="concern-type-data"
-                      placeholder={`Enter concern types separated by commas or new lines\nExample:\nSecurity Issue\nTraffic Violation\nPublic Disturbance\nEmergency Response\nCommunity Service`}
-                      value={concernTypeData}
-                      onChange={(e) => setConcernTypeData(e.target.value)}
-                      className="w-full h-48 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                    />
-                  </div>
-
-                  <button 
-                    onClick={handleConcernTypeImport}
-                    disabled={isImporting || !selectedDistrict || !selectedMunicipality || !concernTypeData.trim()}
-                    className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
-                  >
-                    {isImporting ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Importing...
-                      </>
-                    ) : (
-                      <>
-                        <Upload className="h-4 w-4 mr-2" />
-                        Import Concern Types
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
-              {/* Concern Types List Section */}
-              <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
-                <div className="p-4 md:p-6 pb-0">
-                  <div className="flex items-center justify-between">
+            {/* Type of Concern Management Section */}
+            {activeTab === "concern-types" && (
+              <div className="space-y-6">
+                {/* Concern Type Totals Card */}
+                <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                  <div className="p-4 md:p-6 pb-0">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
                         <AlertTriangle className="h-4 w-4 text-orange-600" />
                       </div>
-                      <div>
-                        <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Concern Types</h3>
-                        <p className="text-sm text-gray-600">
-                          {!isAdmin && userMunicipality 
-                            ? `${getSortedConcernTypes().length} types in ${userMunicipality}`
-                            : concernTypeFilterMunicipality 
-                              ? `${getSortedConcernTypes().length} of ${importedConcernTypes.length} types (${concernTypeFilterMunicipality})`
-                              : `${importedConcernTypes.length} types across ${Object.keys(getGroupedConcernTypes()).length} municipalities`
-                          }
-                        </p>
-                      </div>
+                      <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Concern Type Totals</h3>
                     </div>
-                    {importedConcernTypes.length > 0 && (
-                      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-                        {/* Filter and Sort Controls */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
-                          {/* Show filter dropdown only for admin users */}
-                          {isAdmin && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">Filter:</span>
-                              <select 
-                                value={concernTypeFilterMunicipality}
-                                onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
-                                className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                              >
-                                <option value="">All Municipalities</option>
-                                {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
-                                  <option key={municipality} value={municipality}>{municipality}</option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          {/* Show municipality info for non-admin users */}
-                          {!isAdmin && userMunicipality && (
-                            <div className="flex items-center gap-2">
-                              <span className="text-sm text-gray-600">Municipality:</span>
-                              <span className="text-sm font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">{userMunicipality}</span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm text-gray-600">Sort by:</span>
-                            <select
-                              value={concernTypeSortBy}
-                              onChange={(e) => handleConcernTypeSort(e.target.value)}
-                              className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
-                            >
-                              <option value="name">Name</option>
-                              <option value="municipality">Municipality</option>
-                              <option value="district">District</option>
-                              <option value="importedAt">Import Date</option>
-                            </select>
-                            <button
-                              onClick={() => setConcernTypeSortOrder(concernTypeSortOrder === 'asc' ? 'desc' : 'asc')}
-                              className="p-1 hover:bg-gray-100 rounded transition-colors"
-                              title={`Sort ${concernTypeSortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
-                            >
-                              {concernTypeSortOrder === 'asc' ? (
-                                <ChevronDown className="h-4 w-4 text-gray-500" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-gray-500" />
-                              )}
-                            </button>
-                          </div>
-                        </div>
+                  </div>
+                  <div className="p-4 md:p-6 pt-0">
+                    {isLoadingConcernTypes ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+                        <p>Loading concern types from database...</p>
+                      </div>
+                    ) : importedConcernTypes.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                        <p>No concern types imported yet</p>
+                        <p className="text-sm">Import concern types to see municipality totals</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-6">
+                        {/* Show only user's municipality for non-admin users */}
+                        {!isAdmin && userMunicipality ? (
+                          // Non-admin users see only their municipality
+                          (() => {
+                            const userMunicipalityConcernTypes = importedConcernTypes.filter(ct =>
+                              ct.municipality.toLowerCase() === userMunicipality.toLowerCase()
+                            );
+                            const userDistrict = userMunicipalityConcernTypes.length > 0 ? userMunicipalityConcernTypes[0].district : null;
 
-                        {/* Action Buttons */}
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            onClick={selectedConcernTypes.length === getSortedConcernTypes().length ? handleDeselectAllConcernTypes : handleSelectAllConcernTypes}
-                            className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                          >
-                            <Check className="h-4 w-4 mr-2" />
-                            {selectedConcernTypes.length === getSortedConcernTypes().length ? 'Deselect All' : 'Select All'}
-                          </button>
-                          {/* Show Export CSV button only for admin users */}
-                          {isAdmin && (
-                            <button
-                              onClick={handleExportConcernTypesCSV}
-                              className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                            >
-                              <Download className="h-4 w-4 mr-2" />
-                              Export CSV
-                            </button>
-                          )}
-                        <button
-                          onClick={handleEditSelectedConcernTypes}
-                          disabled={selectedConcernTypes.length === 0}
-                          className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit Selected ({selectedConcernTypes.length})
-                        </button>
-                        <button
-                          onClick={handleClearSelectedConcernTypes}
-                          disabled={selectedConcernTypes.length === 0}
-                          className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          <X className="h-4 w-4 mr-2" />
-                          Clear Selected ({selectedConcernTypes.length})
-                        </button>
-                        {/* Show Clear All Data button only for admin users */}
-                        {isAdmin && (
-                          <button 
-                            onClick={handleClearConcernTypes} 
-                            className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
-                          >
-                            <AlertTriangle className="h-4 w-4 mr-2" />
-                            Clear All Data
-                          </button>
+                            return userDistrict ? (
+                              <div>
+                                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                  {userDistrict}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  <div className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                                    <div className="flex items-center justify-between">
+                                      <div>
+                                        <h5 className="font-semibold text-gray-900 text-sm">{userMunicipality}</h5>
+                                        <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-2xl font-bold text-orange-600">{userMunicipalityConcernTypes.length}</div>
+                                        <div className="text-xs text-gray-500">types</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="text-center py-8 text-gray-500">
+                                <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                                <p>No concern types found for {userMunicipality}</p>
+                              </div>
+                            );
+                          })()
+                        ) : (
+                          // Admin users see all municipalities
+                          Object.keys(municipalitiesByDistrict).map((district) => {
+                            const districtConcernTypes = importedConcernTypes.filter(ct => ct.district === district);
+                            const municipalityCounts = districtConcernTypes.reduce((acc, concernType) => {
+                              acc[concernType.municipality] = (acc[concernType.municipality] || 0) + 1;
+                              return acc;
+                            }, {});
+
+                            return (
+                              <div key={district}>
+                                <h4 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                  <div className="w-3 h-3 rounded-full bg-orange-500"></div>
+                                  {district}
+                                </h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                  {municipalitiesByDistrict[district].map((municipality) => (
+                                    <div key={municipality} className="p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
+                                      <div className="flex items-center justify-between">
+                                        <div>
+                                          <h5 className="font-semibold text-gray-900 text-sm">{municipality}</h5>
+                                          <p className="text-xs text-gray-600 mt-1">Total Concern Types</p>
+                                        </div>
+                                        <div className="text-right">
+                                          <div className="text-2xl font-bold text-orange-600">{municipalityCounts[municipality] || 0}</div>
+                                          <div className="text-xs text-gray-500">types</div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })
                         )}
-                        </div>
                       </div>
                     )}
                   </div>
                 </div>
-                <div className="p-4 md:p-6 pt-0">
-                  {isLoadingConcernTypes ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
-                      <p>Loading concern types from database...</p>
-                    </div>
-                  ) : importedConcernTypes.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>No concern types imported yet</p>
-                      <p className="text-sm">Use the import form to add concern types</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-4 max-h-96 overflow-y-auto">
-                      {/* Expand/Collapse All Controls */}
-                      <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={expandAllConcernTypeMunicipalities}
-                            className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
-                          >
-                            Expand All
-                          </button>
-                          <button
-                            onClick={collapseAllConcernTypeMunicipalities}
-                            className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                          >
-                            Collapse All
-                          </button>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Import Section */}
+                  <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                    <div className="p-4 md:p-6 pb-0">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
+                          <Upload className="h-4 w-4 text-orange-600" />
                         </div>
-                        <div className="text-xs text-gray-500">
-                          {Object.keys(getGroupedConcernTypes()).length} municipalities
-                        </div>
+                        <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Import Concern Types</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 md:p-6 pt-0 space-y-4">
+                      <div className="space-y-2">
+                        <label htmlFor="concern-district-select" className="block text-sm font-medium text-gray-700">Select District</label>
+                        <select
+                          id="concern-district-select"
+                          value={selectedDistrict}
+                          onChange={(e) => setSelectedDistrict(e.target.value)}
+                          disabled={!!userMunicipality}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
+                        >
+                          <option value="">Choose district</option>
+                          {Object.keys(municipalitiesByDistrict).map((district) => (
+                            <option key={district} value={district}>
+                              {district}
+                            </option>
+                          ))}
+                        </select>
                       </div>
 
-                      {/* Grouped Concern Types by Municipality */}
-                      {Object.entries(getGroupedConcernTypes()).map(([municipality, concernTypes]) => {
-                        const isExpanded = expandedConcernTypeMunicipalities.has(municipality);
-                        const isForCurrentMunicipality = activeMunicipalityTab && 
-                          (municipality === activeMunicipalityTab || municipality === "All Municipalities");
-                        
-                        return (
-                          <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
-                            {/* Municipality Header */}
-                            <div 
-                              className={`px-4 py-3 cursor-pointer transition-colors ${
-                                isForCurrentMunicipality
-                                  ? 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
-                                  : 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
-                              }`}
-                              onClick={() => toggleConcernTypeMunicipality(municipality)}
-                            >
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                  <AlertTriangle className={`h-5 w-5 ${
-                                    isForCurrentMunicipality 
-                                      ? 'text-orange-600' 
-                                      : 'text-orange-500'
-                                  }`} />
-                                  <div>
-                                    <div className="font-semibold text-gray-900">{municipality}</div>
-                                    <div className="text-sm text-gray-600">
-                                      {concernTypes.length} concern type{concernTypes.length !== 1 ? 's' : ''}
-                                      {isForCurrentMunicipality && (
-                                        <span className="ml-2 text-orange-600 font-medium">• Available for {activeMunicipalityTab}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
+                      <div className="space-y-2">
+                        <label htmlFor="concern-municipality-select" className="block text-sm font-medium text-gray-700">Select Municipality</label>
+                        <select
+                          id="concern-municipality-select"
+                          value={selectedMunicipality}
+                          onChange={(e) => setSelectedMunicipality(e.target.value)}
+                          disabled={!selectedDistrict || !!userMunicipality}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
+                        >
+                          <option value="">Choose municipality</option>
+                          {selectedDistrict && municipalitiesByDistrict[selectedDistrict]?.map((municipality) => (
+                            <option key={municipality} value={municipality}>
+                              {municipality}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label htmlFor="concern-type-data" className="block text-sm font-medium text-gray-700">Concern Type Names</label>
+                        <textarea
+                          id="concern-type-data"
+                          name="concern-type-data"
+                          placeholder={`Enter concern types separated by commas or new lines\nExample:\nSecurity Issue\nTraffic Violation\nPublic Disturbance\nEmergency Response\nCommunity Service`}
+                          value={concernTypeData}
+                          onChange={(e) => setConcernTypeData(e.target.value)}
+                          className="w-full h-48 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
+                        />
+                      </div>
+
+                      <button
+                        onClick={handleConcernTypeImport}
+                        disabled={isImporting || !selectedDistrict || !selectedMunicipality || !concernTypeData.trim()}
+                        className="w-full bg-orange-600 hover:bg-orange-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center"
+                      >
+                        {isImporting ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            Importing...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Import Concern Types
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Concern Types List Section */}
+                  <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 rounded-lg">
+                    <div className="p-4 md:p-6 pb-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 rounded-full flex items-center justify-center transition-colors duration-300 bg-orange-100">
+                            <AlertTriangle className="h-4 w-4 text-orange-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg md:text-xl font-bold transition-colors duration-300 text-gray-900">Imported Concern Types</h3>
+                            <p className="text-sm text-gray-600">
+                              {!isAdmin && userMunicipality
+                                ? `${getSortedConcernTypes().length} types in ${userMunicipality}`
+                                : concernTypeFilterMunicipality
+                                  ? `${getSortedConcernTypes().length} of ${importedConcernTypes.length} types (${concernTypeFilterMunicipality})`
+                                  : `${importedConcernTypes.length} types across ${Object.keys(getGroupedConcernTypes()).length} municipalities`
+                              }
+                            </p>
+                          </div>
+                        </div>
+                        {importedConcernTypes.length > 0 && (
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                            {/* Filter and Sort Controls */}
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                              {/* Show filter dropdown only for admin users */}
+                              {isAdmin && (
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
-                                    {concernTypes[0]?.district || 'Unknown District'}
-                                  </span>
-                                  {isExpanded ? (
+                                  <span className="text-sm text-gray-600">Filter:</span>
+                                  <select
+                                    value={concernTypeFilterMunicipality}
+                                    onChange={(e) => setConcernTypeFilterMunicipality(e.target.value)}
+                                    className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
+                                  >
+                                    <option value="">All Municipalities</option>
+                                    {[...new Set(importedConcernTypes.map(type => type.municipality))].sort().map(municipality => (
+                                      <option key={municipality} value={municipality}>{municipality}</option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                              {/* Show municipality info for non-admin users */}
+                              {!isAdmin && userMunicipality && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm text-gray-600">Municipality:</span>
+                                  <span className="text-sm font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">{userMunicipality}</span>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-gray-600">Sort by:</span>
+                                <select
+                                  value={concernTypeSortBy}
+                                  onChange={(e) => handleConcernTypeSort(e.target.value)}
+                                  className="text-sm border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-sm !text-black caret-black"
+                                >
+                                  <option value="name">Name</option>
+                                  <option value="municipality">Municipality</option>
+                                  <option value="district">District</option>
+                                  <option value="importedAt">Import Date</option>
+                                </select>
+                                <button
+                                  onClick={() => setConcernTypeSortOrder(concernTypeSortOrder === 'asc' ? 'desc' : 'asc')}
+                                  className="p-1 hover:bg-gray-100 rounded transition-colors"
+                                  title={`Sort ${concernTypeSortOrder === 'asc' ? 'Descending' : 'Ascending'}`}
+                                >
+                                  {concernTypeSortOrder === 'asc' ? (
                                     <ChevronDown className="h-4 w-4 text-gray-500" />
                                   ) : (
                                     <ChevronRight className="h-4 w-4 text-gray-500" />
                                   )}
-                                </div>
+                                </button>
                               </div>
                             </div>
 
-                            {/* Concern Types List */}
-                            {isExpanded && (
-                              <div className="bg-white">
-                                {concernTypes.map((type) => {
-                        const isForCurrentMunicipality = activeMunicipalityTab && 
-                          (type.municipality === activeMunicipalityTab || type.municipality === "All Municipalities");
-                                  const isSelected = selectedConcernTypes.includes(type.id);
-                                  
-                        return (
-                          <div 
-                            key={type.id} 
-                                      className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${
-                                        isSelected
-                                          ? 'bg-blue-50 border-l-4 border-l-blue-400' 
-                                          : isForCurrentMunicipality 
-                                            ? 'bg-orange-50 border-l-4 border-l-orange-400' 
-                                            : 'hover:bg-gray-50'
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                                        <input
-                                          id={`concern-type-${type.id}`}
-                                          name={`concern-type-${type.id}`}
-                                          type="checkbox"
-                                          checked={isSelected}
-                                          onChange={(e) => handleConcernTypeSelection(type.id, e.target.checked)}
-                                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
-                                        />
-                              <AlertTriangle className={`h-4 w-4 ${
-                                          isForCurrentMunicipality 
-                                  ? 'text-orange-600' 
-                                  : 'text-orange-500'
-                              }`} />
-                              <div>
-                                <div className="font-medium text-sm">{type.name}</div>
-                                <div className="text-xs text-gray-600">
-                                            {type.district}
-                                </div>
-                              </div>
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap gap-2">
+                              <button
+                                onClick={selectedConcernTypes.length === getSortedConcernTypes().length ? handleDeselectAllConcernTypes : handleSelectAllConcernTypes}
+                                className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                              >
+                                <Check className="h-4 w-4 mr-2" />
+                                {selectedConcernTypes.length === getSortedConcernTypes().length ? 'Deselect All' : 'Select All'}
+                              </button>
+                              {/* Show Export CSV button only for admin users */}
+                              {isAdmin && (
+                                <button
+                                  onClick={handleExportConcernTypesCSV}
+                                  className="bg-green-50 border border-green-200 hover:bg-green-100 text-green-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  Export CSV
+                                </button>
+                              )}
+                              <button
+                                onClick={handleEditSelectedConcernTypes}
+                                disabled={selectedConcernTypes.length === 0}
+                                className="bg-blue-50 border border-blue-200 hover:bg-blue-100 text-blue-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Edit className="h-4 w-4 mr-2" />
+                                Edit Selected ({selectedConcernTypes.length})
+                              </button>
+                              <button
+                                onClick={handleClearSelectedConcernTypes}
+                                disabled={selectedConcernTypes.length === 0}
+                                className="bg-orange-50 border border-orange-200 hover:bg-orange-100 text-orange-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <X className="h-4 w-4 mr-2" />
+                                Clear Selected ({selectedConcernTypes.length})
+                              </button>
+                              {/* Show Clear All Data button only for admin users */}
+                              {isAdmin && (
+                                <button
+                                  onClick={handleClearConcernTypes}
+                                  className="bg-red-50 border border-red-200 hover:bg-red-100 text-red-700 font-medium py-1 px-3 rounded-md transition-colors duration-200 flex items-center text-sm"
+                                >
+                                  <AlertTriangle className="h-4 w-4 mr-2" />
+                                  Clear All Data
+                                </button>
+                              )}
                             </div>
-                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                              {new Date(type.importedAt).toLocaleDateString()}
-                            </span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-      </section>
-
-
-      {/* Weekly Reports Collection Modal */}
-      {showCollectionView && (
-        <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
-            <div className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
-                    <Database className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-900">Weekly Reports Collection</h2>
-                    <p className="text-sm text-gray-600">View and manage all weekly reports stored in Firestore</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowCollectionView(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
-                >
-                  <X className="h-5 w-5 text-gray-500" />
-                </button>
-              </div>
-
-              {/* Filters */}
-              <div className="p-3 mb-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Month</label>
-                    <select
-                      value={selectedMonth}
-                      onChange={(e) => setSelectedMonth(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
-                    >
-                      <option value="">All Months</option>
-                      <option value="January">January</option>
-                      <option value="February">February</option>
-                      <option value="March">March</option>
-                      <option value="April">April</option>
-                      <option value="May">May</option>
-                      <option value="June">June</option>
-                      <option value="July">July</option>
-                      <option value="August">August</option>
-                      <option value="September">September</option>
-                      <option value="October">October</option>
-                      <option value="November">November</option>
-                      <option value="December">December</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Year</label>
-                    <select
-                      value={selectedYear}
-                      onChange={(e) => setSelectedYear(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
-                    >
-                      <option value="">All Years</option>
-                      <option value="2024">2024</option>
-                      <option value="2025">2025</option>
-                      <option value="2026">2026</option>
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Actions</label>
-                    <div className="space-y-2">
-                      <button
-                        onClick={() => {
-                          // Reload current weekly report data
-                          loadWeeklyReportData();
-                        }}
-                        disabled={isLoadingWeeklyReports}
-                        className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                      >
-                        {isLoadingWeeklyReports ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <CheckCircle className="w-4 h-4" />
                         )}
-                        <span className="text-sm font-medium">Filter</span>
-                      </button>
-                      
-                      <button
-                        onClick={handleDeleteAllWeeklyReports}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                        title="Delete ALL weekly reports from ALL locations in Firestore"
-                      >
-                        <AlertTriangle className="w-4 h-4" />
-                        <span className="text-sm font-medium">Delete All Reports</span>
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Collection Data */}
-              <div className="space-y-4">
-                {isLoadingCollection ? (
-                  <div className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-3 text-gray-600">Loading collection data...</span>
-                  </div>
-                ) : weeklyReportsCollection.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No Reports Found</h3>
-                    <p className="text-gray-600">No weekly reports found in the collection with the current filters.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600">
-                        Showing {weeklyReportsCollection.length} report(s)
-                      </p>
-                    </div>
-                    
-                    {weeklyReportsCollection.map((report) => (
-                      <div key={report.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <h3 className="text-lg font-semibold text-gray-900">
-                                {report.selectedMonth} {report.selectedYear}
-                              </h3>
-                              <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
-                                {report.activeMunicipalityTab || 'All Municipalities'}
-                              </span>
+                    <div className="p-4 md:p-6 pt-0">
+                      {isLoadingConcernTypes ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600 mx-auto mb-4"></div>
+                          <p>Loading concern types from database...</p>
+                        </div>
+                      ) : importedConcernTypes.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                          <p>No concern types imported yet</p>
+                          <p className="text-sm">Use the import form to add concern types</p>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 max-h-96 overflow-y-auto">
+                          {/* Expand/Collapse All Controls */}
+                          <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={expandAllConcernTypeMunicipalities}
+                                className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
+                              >
+                                Expand All
+                              </button>
+                              <button
+                                onClick={collapseAllConcernTypeMunicipalities}
+                                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                              >
+                                Collapse All
+                              </button>
                             </div>
-                            
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
-                              <div>
-                                <p className="text-sm text-gray-600">Created:</p>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {new Date(report.createdAt).toLocaleDateString()} {new Date(report.createdAt).toLocaleTimeString()}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Last Updated:</p>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {new Date(report.lastUpdated).toLocaleDateString()} {new Date(report.lastUpdated).toLocaleTimeString()}
-                                </p>
-                              </div>
-                              <div>
-                                <p className="text-sm text-gray-600">Created By:</p>
-                                <p className="text-sm font-medium text-gray-900">{report.createdBy}</p>
-                              </div>
+                            <div className="text-xs text-gray-500">
+                              {Object.keys(getGroupedConcernTypes()).length} municipalities
                             </div>
+                          </div>
 
-                            <div className="mb-3">
-                              <p className="text-sm text-gray-600">Report Data Summary:</p>
-                              <div className="mt-1 text-sm text-gray-900">
-                                {report.weeklyReportData && Object.keys(report.weeklyReportData).length > 0 ? (
-                                  <div className="flex flex-wrap gap-2">
-                                    {Object.entries(report.weeklyReportData).map(([date, entries]) => (
-                                      <span key={date} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                                        {date}: {Array.isArray(entries) ? entries.length : 0} entries
+                          {/* Grouped Concern Types by Municipality */}
+                          {Object.entries(getGroupedConcernTypes()).map(([municipality, concernTypes]) => {
+                            const isExpanded = expandedConcernTypeMunicipalities.has(municipality);
+                            const isForCurrentMunicipality = activeMunicipalityTab &&
+                              (municipality === activeMunicipalityTab || municipality === "All Municipalities");
+
+                            return (
+                              <div key={municipality} className="border border-gray-200 rounded-lg overflow-hidden">
+                                {/* Municipality Header */}
+                                <div
+                                  className={`px-4 py-3 cursor-pointer transition-colors ${isForCurrentMunicipality
+                                    ? 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
+                                    : 'bg-gradient-to-r from-orange-50 to-yellow-50 hover:from-orange-100 hover:to-yellow-100'
+                                    }`}
+                                  onClick={() => toggleConcernTypeMunicipality(municipality)}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <AlertTriangle className={`h-5 w-5 ${isForCurrentMunicipality
+                                        ? 'text-orange-600'
+                                        : 'text-orange-500'
+                                        }`} />
+                                      <div>
+                                        <div className="font-semibold text-gray-900">{municipality}</div>
+                                        <div className="text-sm text-gray-600">
+                                          {concernTypes.length} concern type{concernTypes.length !== 1 ? 's' : ''}
+                                          {isForCurrentMunicipality && (
+                                            <span className="ml-2 text-orange-600 font-medium">• Available for {activeMunicipalityTab}</span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                                        {concernTypes[0]?.district || 'Unknown District'}
                                       </span>
-                                    ))}
+                                      {isExpanded ? (
+                                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                                      ) : (
+                                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                                      )}
+                                    </div>
                                   </div>
-                                ) : (
-                                  <span className="text-gray-500">No data entries</span>
+                                </div>
+
+                                {/* Concern Types List */}
+                                {isExpanded && (
+                                  <div className="bg-white">
+                                    {concernTypes.map((type) => {
+                                      const isForCurrentMunicipality = activeMunicipalityTab &&
+                                        (type.municipality === activeMunicipalityTab || type.municipality === "All Municipalities");
+                                      const isSelected = selectedConcernTypes.includes(type.id);
+
+                                      return (
+                                        <div
+                                          key={type.id}
+                                          className={`flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-b-0 transition-colors duration-200 ${isSelected
+                                            ? 'bg-blue-50 border-l-4 border-l-blue-400'
+                                            : isForCurrentMunicipality
+                                              ? 'bg-orange-50 border-l-4 border-l-orange-400'
+                                              : 'hover:bg-gray-50'
+                                            }`}
+                                        >
+                                          <div className="flex items-center gap-3">
+                                            <input
+                                              id={`concern-type-${type.id}`}
+                                              name={`concern-type-${type.id}`}
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={(e) => handleConcernTypeSelection(type.id, e.target.checked)}
+                                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded text-sm !text-black caret-black"
+                                            />
+                                            <AlertTriangle className={`h-4 w-4 ${isForCurrentMunicipality
+                                              ? 'text-orange-600'
+                                              : 'text-orange-500'
+                                              }`} />
+                                            <div>
+                                              <div className="font-medium text-sm">{type.name}</div>
+                                              <div className="text-xs text-gray-600">
+                                                {type.district}
+                                              </div>
+                                            </div>
+                                          </div>
+                                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
+                                            {new Date(type.importedAt).toLocaleDateString()}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
                                 )}
                               </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+
+        {/* Weekly Reports Collection Modal */}
+        {showCollectionView && (
+          <div className="fixed inset-0 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-6xl w-full max-h-[90vh] overflow-y-auto border border-gray-200">
+              <div className="p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Database className="h-5 w-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-gray-900">Weekly Reports Collection</h2>
+                      <p className="text-sm text-gray-600">View and manage all weekly reports stored in Firestore</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCollectionView(false)}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors duration-200"
+                  >
+                    <X className="h-5 w-5 text-gray-500" />
+                  </button>
+                </div>
+
+                {/* Filters */}
+                <div className="p-3 mb-3">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Month</label>
+                      <select
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                      >
+                        <option value="">All Months</option>
+                        <option value="January">January</option>
+                        <option value="February">February</option>
+                        <option value="March">March</option>
+                        <option value="April">April</option>
+                        <option value="May">May</option>
+                        <option value="June">June</option>
+                        <option value="July">July</option>
+                        <option value="August">August</option>
+                        <option value="September">September</option>
+                        <option value="October">October</option>
+                        <option value="November">November</option>
+                        <option value="December">December</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Year</label>
+                      <select
+                        value={selectedYear}
+                        onChange={(e) => setSelectedYear(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm !text-black caret-black"
+                      >
+                        <option value="">All Years</option>
+                        <option value="2024">2024</option>
+                        <option value="2025">2025</option>
+                        <option value="2026">2026</option>
+                      </select>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">Actions</label>
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => {
+                            // Reload current weekly report data
+                            loadWeeklyReportData();
+                          }}
+                          disabled={isLoadingWeeklyReports}
+                          className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                        >
+                          {isLoadingWeeklyReports ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                          ) : (
+                            <CheckCircle className="w-4 h-4" />
+                          )}
+                          <span className="text-sm font-medium">Filter</span>
+                        </button>
+
+                        <button
+                          onClick={handleDeleteAllWeeklyReports}
+                          className="w-full bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
+                          title="Delete ALL weekly reports from ALL locations in Firestore"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          <span className="text-sm font-medium">Delete All Reports</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Collection Data */}
+                <div className="space-y-4">
+                  {isLoadingCollection ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                      <span className="ml-3 text-gray-600">Loading collection data...</span>
+                    </div>
+                  ) : weeklyReportsCollection.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Database className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Reports Found</h3>
+                      <p className="text-gray-600">No weekly reports found in the collection with the current filters.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm text-gray-600">
+                          Showing {weeklyReportsCollection.length} report(s)
+                        </p>
+                      </div>
+
+                      {weeklyReportsCollection.map((report) => (
+                        <div key={report.id} className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow duration-200">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                  {report.selectedMonth} {report.selectedYear}
+                                </h3>
+                                <span className="px-2 py-1 bg-purple-100 text-purple-800 text-xs font-medium rounded-full">
+                                  {report.activeMunicipalityTab || 'All Municipalities'}
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-3">
+                                <div>
+                                  <p className="text-sm text-gray-600">Created:</p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {new Date(report.createdAt).toLocaleDateString()} {new Date(report.createdAt).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-gray-600">Last Updated:</p>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {new Date(report.lastUpdated).toLocaleDateString()} {new Date(report.lastUpdated).toLocaleTimeString()}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-sm text-gray-600">Created By:</p>
+                                  <p className="text-sm font-medium text-gray-900">{report.createdBy}</p>
+                                </div>
+                              </div>
+
+                              <div className="mb-3">
+                                <p className="text-sm text-gray-600">Report Data Summary:</p>
+                                <div className="mt-1 text-sm text-gray-900">
+                                  {report.weeklyReportData && Object.keys(report.weeklyReportData).length > 0 ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {Object.entries(report.weeklyReportData).map(([date, entries]) => (
+                                        <span key={date} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                          {date}: {Array.isArray(entries) ? entries.length : 0} entries
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-gray-500">No data entries</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="text-xs text-gray-500">
+                                ID: {report.id}
+                              </div>
                             </div>
 
-                            <div className="text-xs text-gray-500">
-                              ID: {report.id}
-                            </div>
-                          </div>
-                          
-                          <div className="flex items-center gap-2 ml-4">
-                            {/* Delete button temporarily disabled - function needs to be implemented */}
-                            {/* <button
+                            <div className="flex items-center gap-2 ml-4">
+                              {/* Delete button temporarily disabled - function needs to be implemented */}
+                              {/* <button
                               onClick={() => handleDeleteWeeklyReport(report.id)}
                               className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors duration-200"
                               title="Delete Report"
                             >
                               <X className="h-4 w-4" />
                             </button> */}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      <NotificationContainer notifications={notifications} onRemove={removeNotification} />
-
-      {/* Photo Upload Dialog */}
-      <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
-        <DialogContent className="sm:max-w-[900px]">
-          {(() => {
-            const isEditingExistingPhotos = entryHasExistingPhotos(currentPhotoEntry?.entry);
-            const isAdminPhotoEdit = isAdmin;
-            const canSavePhotos = isEditingExistingPhotos || photoRows.some(
-              (row) => row.beforePhotos.length > 0 || row.afterPhotos.length > 0 || row.beforePreviews.length > 0 || row.afterPreviews.length > 0
-            );
-
-            return (
-          <>
-          <div className="flex items-start justify-between gap-2">
-
-            <div className="flex-1">
-              <DialogHeader>
-                <DialogTitle className="text-2xl font-bold text-gray-900">
-                  {isEditingExistingPhotos ? 'Edit Before & After Photos' : 'Upload Before & After Photos'}
-                </DialogTitle>
-                <DialogDescription className="text-gray-600">
-                  {isEditingExistingPhotos
-                    ? isAdminPhotoEdit
-                      ? 'Remove, replace, or add photos then save your changes.'
-                      : 'Add or update photos. Only administrators can remove existing photos.'
-                    : 'Document the before and after state of your action with photos.'}
-                </DialogDescription>
-              </DialogHeader>
-            </div>
-            <button
-              onClick={() => setShowInstructionsModal(true)}
-              className="mt-[0.66rem] flex items-center px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm flex-shrink-0 mr-2"
-              title="View Quick Instructions"
-            >
-
-              <HelpCircle className="w-4 h-4" />
-            </button>
-          </div>
-
-          {/* Paired Photo Upload - Multiple Rows */}
-          <div className="space-y-4">
-            {/* Photo Rows */}
-            <div className="space-y-4 max-h-[500px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
-              {photoRows.map((row, rowIndex) => (
-                <div key={row.id} className="bg-white rounded-lg border-2 border-gray-300 p-4">
-                  {/* Row Header */}
-                  <div className="flex items-center justify-between mb-4 pb-3 border-b">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</span>
+                      ))}
                     </div>
-                    {photoRows.length > 1 && isAdminPhotoEdit && (
-                      <button
-                        onClick={() => {
-                          setPhotoRows(photoRows.filter(r => r.id !== row.id));
-                        }}
-                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                        title="Delete this row"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        <NotificationContainer notifications={notifications} onRemove={removeNotification} />
 
-                  {/* Row Content - Before and After side by side */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Before Photos */}
-                    <div className="bg-blue-50 rounded-lg border-2 border-blue-200 p-3 min-h-[260px]">
+        {/* Photo Upload Dialog */}
+        <Dialog open={showPhotoUploadDialog} onOpenChange={setShowPhotoUploadDialog}>
+          <DialogContent className="sm:max-w-[900px]">
+            {(() => {
+              const isEditingExistingPhotos = entryHasExistingPhotos(currentPhotoEntry?.entry);
+              const isAdminPhotoEdit = isAdmin;
+              const canSavePhotos = isEditingExistingPhotos || photoRows.some(
+                (row) => row.beforePhotos.length > 0 || row.afterPhotos.length > 0 || row.beforePreviews.length > 0 || row.afterPreviews.length > 0
+              );
 
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">B</div>
-                        <label className="text-xs font-semibold text-blue-700">Before Photos</label>
-                      </div>
-                      <div className="space-y-2">
-                        {row.beforePreviews.length > 0 && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {row.beforePreviews.map((preview, index) => (
-                              <div key={index} className="relative aspect-square border-2 border-blue-300 rounded-lg overflow-hidden bg-gray-100 group">
-                                <img src={preview} alt={`Before ${index + 1}`} className="w-full h-full object-cover" />
-                                <div className="absolute top-1 right-1 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
-                                {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <button
-                                    onClick={() => {
-                                      const newRows = photoRows.map(r => {
-                                        if (r.id !== row.id) return r;
+              return (
+                <>
+                  <div className="flex items-start justify-between gap-2">
 
-                                        const previewToRemove = r.beforePreviews[index];
-                                        if (isUrlPreview(previewToRemove)) {
-                                          return {
-                                            ...r,
-                                            beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index)
-                                          };
-                                        }
-
-                                        const existingCountBefore = r.beforePreviews
-                                          .slice(0, index)
-                                          .filter(isUrlPreview).length;
-                                        const newFileIndex = index - existingCountBefore;
-
-                                        return {
-                                          ...r,
-                                          beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index),
-                                          beforePhotos: r.beforePhotos.filter((_, idx) => idx !== newFileIndex)
-                                        };
-                                      });
-                                      setPhotoRows(newRows);
-                                    }}
-                                    className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <label
-                          htmlFor={`before-photo-input-${row.id}`}
-                          className="aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all"
-                        >
-                          <Plus className="w-5 h-5 text-blue-400 mb-1" />
-                          <span className="text-xs font-medium text-blue-600">+ Add 1 or more photos</span>
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => {
-                            const files = Array.from(e.target.files || []);
-                            if (files.length > 0) {
-                              Promise.all(files.map(file => {
-                                return new Promise((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => resolve(event.target.result);
-                                  reader.readAsDataURL(file);
-                                });
-                              })).then(previews => {
-                                const newRows = photoRows.map(r => {
-                                  if (r.id === row.id) {
-                                    return {
-                                      ...r,
-                                      beforePreviews: [...r.beforePreviews, ...previews],
-                                      beforePhotos: [...r.beforePhotos, ...files]
-                                    };
-                                  }
-                                  return r;
-                                });
-                                setPhotoRows(newRows);
-                              });
-                            }
-                          }}
-                          className="hidden"
-                          id={`before-photo-input-${row.id}`}
-                        />
-                      </div>
+                    <div className="flex-1">
+                      <DialogHeader>
+                        <DialogTitle className="text-2xl font-bold text-gray-900">
+                          {isEditingExistingPhotos ? 'Edit Before & After Photos' : 'Upload Before & After Photos'}
+                        </DialogTitle>
+                        <DialogDescription className="text-gray-600">
+                          {isEditingExistingPhotos
+                            ? isAdminPhotoEdit
+                              ? 'Remove, replace, or add photos then save your changes.'
+                              : 'Add or update photos. Only administrators can remove existing photos.'
+                            : 'Document the before and after state of your action with photos.'}
+                        </DialogDescription>
+                      </DialogHeader>
                     </div>
+                    <button
+                      onClick={() => setShowInstructionsModal(true)}
+                      className="mt-[0.66rem] flex items-center px-2 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors font-medium text-sm flex-shrink-0 mr-2"
+                      title="View Quick Instructions"
+                    >
 
-                    {/* After Photos */}
-                    <div className="bg-green-50 rounded-lg border-2 border-green-200 p-3 min-h-[260px]">
-
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">A</div>
-                        <label className="text-xs font-semibold text-green-700">After Photos</label>
-                      </div>
-                      <div className="space-y-2">
-                        {row.afterPreviews.length > 0 && (
-                          <div className="grid grid-cols-2 gap-2">
-                            {row.afterPreviews.map((preview, index) => (
-                              <div key={index} className="relative aspect-square border-2 border-green-300 rounded-lg overflow-hidden bg-gray-100 group">
-                                <img src={preview} alt={`After ${index + 1}`} className="w-full h-full object-cover" />
-                                <div className="absolute top-1 right-1 bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
-                                {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
-                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                  <button
-                                    onClick={() => {
-                                      const newRows = photoRows.map(r => {
-                                        if (r.id !== row.id) return r;
-
-                                        const previewToRemove = r.afterPreviews[index];
-                                        if (isUrlPreview(previewToRemove)) {
-                                          return {
-                                            ...r,
-                                            afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index)
-                                          };
-                                        }
-
-                                        const existingCountBefore = r.afterPreviews
-                                          .slice(0, index)
-                                          .filter(isUrlPreview).length;
-                                        const newFileIndex = index - existingCountBefore;
-
-                                        return {
-                                          ...r,
-                                          afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index),
-                                          afterPhotos: r.afterPhotos.filter((_, idx) => idx !== newFileIndex)
-                                        };
-                                      });
-                                      setPhotoRows(newRows);
-                                    }}
-                                    className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
-                                  >
-                                    <X className="w-2.5 h-2.5" />
-                                  </button>
-                                </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        <label
-                          htmlFor={`after-photo-input-${row.id}`}
-                          className={`aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${
-                            row.beforePreviews.length > 0
-                              ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-100'
-                              : 'cursor-not-allowed border-gray-300 bg-gray-100 opacity-50'
-                          }`}
-                          onClick={(e) => {
-                            if (row.beforePreviews.length === 0) {
-                              e.preventDefault();
-                              showError('Please upload before photos first');
-                            }
-                          }}
-                        >
-                          <Plus className="w-5 h-5 text-green-400 mb-1" />
-                          <span className="text-xs font-medium text-green-600">+ Add 1 or more photos</span>
-                        </label>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          multiple
-                          onChange={(e) => {
-                            if (row.beforePreviews.length === 0) {
-                              showError('Please upload before photos first');
-                              return;
-                            }
-                            const files = Array.from(e.target.files || []);
-                            if (files.length > 0) {
-                              Promise.all(files.map(file => {
-                                return new Promise((resolve) => {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => resolve(event.target.result);
-                                  reader.readAsDataURL(file);
-                                });
-                              })).then(previews => {
-                                const newRows = photoRows.map(r => {
-                                  if (r.id === row.id) {
-                                    return {
-                                      ...r,
-                                      afterPreviews: [...r.afterPreviews, ...previews],
-                                      afterPhotos: [...r.afterPhotos, ...files]
-                                    };
-                                  }
-                                  return r;
-                                });
-                                setPhotoRows(newRows);
-                              });
-                            }
-                          }}
-                          className="hidden"
-                          id={`after-photo-input-${row.id}`}
-                        />
-                      </div>
-                    </div>
+                      <HelpCircle className="w-4 h-4" />
+                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
-          </div>
 
-          {/* Action Taken Section - Only show when both before and after photos exist */}
-          {(photoRows.some(row => row.beforePreviews.length > 0) && photoRows.some(row => row.afterPreviews.length > 0)) && (
-            <div className="mt-4 border-t pt-4">
-              <label className="block text-sm font-semibold text-gray-900 mb-2">
-                <MessageSquare className="w-4 h-4 inline mr-1" />
-                Action Taken <span className="text-red-500">*</span>
-              </label>
-              <textarea
-                value={currentPhotoEntry?.entry?.remarks || ''}
-                onChange={(e) => {
-                  if (currentPhotoEntry) {
-                    const newValue = e.target.value;
-                    
-                    // Update currentPhotoEntry immediately for responsive UI
-                    setCurrentPhotoEntry(prev => ({
-                      ...prev,
-                      entry: { ...prev.entry, remarks: newValue }
-                    }));
-                    
-                    // Debounce the weeklyReportData update to prevent slowness
-                    if (remarksDebounceRef.current) {
-                      clearTimeout(remarksDebounceRef.current);
-                    }
-                    
-                    remarksDebounceRef.current = setTimeout(() => {
-                      updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
-                    }, 300); // Wait 300ms after user stops typing
-                  }
-                }}
-                placeholder="Add any additional notes or action taken about this concern..."
-                rows={3}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm !text-black caret-black placeholder:text-gray-400"
-                required
-              />
-              <p className="text-xs text-gray-500 mt-1">Required: Please add action taken after uploading after photos</p>
-            </div>
-          )}
-
-          <DialogFooter className="mt-6 flex items-center gap-3">
-            <button
-              onClick={() => {
-                const newId = Math.max(...photoRows.map(r => r.id), 0) + 1;
-                setPhotoRows([...photoRows, { id: newId, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
-              }}
-              className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors font-medium"
-            >
-              <Plus className="w-4 h-4" />
-              Add Row
-            </button>
-            <div className="flex gap-3 ml-auto">
-              <button
-                onClick={() => setShowPhotoUploadDialog(false)}
-                className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-                disabled={isUploadingPhotos}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleUploadPhotos}
-                disabled={isUploadingPhotos || !canSavePhotos}
-                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
-              >
-                {isUploadingPhotos ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                    {isEditingExistingPhotos ? 'Saving...' : 'Uploading...'}
-                  </>
-                ) : (
-                  <>
-                    {isEditingExistingPhotos ? <Save className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
-                    {isEditingExistingPhotos ? 'Save Changes' : 'Upload Photos'}
-                  </>
-                )}
-              </button>
-            </div>
-          </DialogFooter>
-          </>
-            );
-          })()}
-        </DialogContent>
-      </Dialog>
-
-      {/* Photo View Dialog */}
-      <Dialog open={showPhotoViewDialog} onOpenChange={setShowPhotoViewDialog}>
-        <DialogContent className="sm:max-w-[800px]">
-          <DialogHeader>
-            <DialogTitle>Before & After Photos</DialogTitle>
-            <DialogDescription>
-              View the before and after photos for this entry.
-            </DialogDescription>
-          </DialogHeader>
-          
-          {/* Fixed Header Section - Barangay and Municipality */}
-          {viewingPhotos?.barangay && (
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              {/* Barangay - Left Side */}
-              <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-purple-700 mb-1">Barangay</p>
-                <p className="text-sm text-gray-800 font-medium">
-                  {viewingPhotos.barangay.split(',')[0].trim()}
-                </p>
-              </div>
-              
-              {/* Municipality - Right Side */}
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-blue-700 mb-1">Municipality</p>
-                <p className="text-sm text-gray-800 font-medium">
-                  {viewingPhotos.barangay.includes(',') ? `${viewingPhotos.barangay.split(',')[1].trim().toUpperCase()}, BATAAN` : 'N/A'}
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {/* Scrollable Photos Section */}
-          <div className="max-h-[500px] overflow-y-auto border-t border-b space-y-6 p-4">
-            {/* Display photos by row if available */}
-            {viewingPhotos?.rows && viewingPhotos.rows.length > 0 ? (
-              viewingPhotos.rows.map((row, rowIndex) => (
-                <div key={rowIndex} className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50">
-                  <div className="mb-4 pb-2 border-b">
-                    <h3 className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</h3>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Before Photos for this row */}
-                    {row.before && Array.isArray(row.before) && row.before.length > 0 && (
-                      <PhotoCarousel
-                        photos={row.before}
-                        timestamps={row.beforeUploadedAt || []}
-                        title={`Before Photos (Row ${rowIndex + 1})`}
-                      />
-                    )}
-
-                    {/* After Photos for this row */}
-                    {row.after && Array.isArray(row.after) && row.after.length > 0 && (
-                      <PhotoCarousel
-                        photos={row.after}
-                        timestamps={row.afterUploadedAt || []}
-                        title={`After Photos (Row ${rowIndex + 1})`}
-                      />
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              // Fallback for old format (backward compatibility)
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Before Photos Carousel */}
-                {viewingPhotos?.before && Array.isArray(viewingPhotos.before) && viewingPhotos.before.length > 0 && (
-                  <PhotoCarousel
-                    photos={viewingPhotos.before}
-                    timestamps={viewingPhotos.beforeUploadedAt || []}
-                    title="Before Photos"
-                  />
-                )}
-
-                {/* After Photos Carousel */}
-                {viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0 && (
-                  <PhotoCarousel
-                    photos={viewingPhotos.after}
-                    timestamps={viewingPhotos.afterUploadedAt || []}
-                    title="After Photos"
-                  />
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Fixed Footer Section - Concern Type and Action Taken */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            {/* Concern Type - Left Side */}
-            {viewingPhotos?.concernType && (
-              <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
-                <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
-              </div>
-            )}
-
-            {/* Action Taken - Right Side - Only show if after photos exist */}
-            {viewingPhotos?.remarks && (
-              (viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0) ||
-              (viewingPhotos?.rows && viewingPhotos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
-            ) && (
-              <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
-                <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter>
-            <button
-              onClick={() => setShowPhotoViewDialog(false)}
-              className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
-            >
-              Close
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Action Taken Entries Modal */}
-      <Dialog open={showActionTakenModal} onOpenChange={setShowActionTakenModal}>
-        <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-2xl">
-              <CheckCircle className="h-6 w-6 text-green-600" />
-              Mga May Action Taken (with After Photos)
-            </DialogTitle>
-            <DialogDescription>
-              List of all entries na may action taken at may after photos
-              {activeMunicipalityTab && (
-                <span className="block mt-1 text-blue-600 font-medium">
-                  {activeMunicipalityTab} — Overall Average: {getCriteriaOverallPercentage()}%
-                </span>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            {getActionTakenCount().entries.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
-                  <CheckCircle className="h-8 w-8 text-gray-400" />
-                </div>
-                <p className="text-gray-500">Walang entries na may action taken at after photos</p>
-              </div>
-            ) : (
-              getActionTakenCount().entries.map(({ date, entry, entryIndex, afterPhotosCount }, index) => (
-                <div key={`${date}-${entryIndex}`} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex-1 space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <Clock className="h-4 w-4" />
-                        <span className="font-medium">{date}</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium">Barangay</p>
-                          <p className="text-sm font-semibold text-gray-900">{entry.barangay || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 font-medium">Concern Type</p>
-                          <p className="text-sm font-semibold text-orange-600">{entry.concernType || 'N/A'}</p>
-                        </div>
-                      </div>
-                      
-                      <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                        <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
-                        <p className="text-sm text-gray-800">{entry.actionTaken}</p>
-                      </div>
-                      
-                      {entry.remarks && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                          <p className="text-xs font-semibold text-blue-700 mb-1">Remarks</p>
-                          <p className="text-sm text-gray-800">{entry.remarks}</p>
-                        </div>
-                      )}
-                      
-                      {entry.photos && (
-                        <div className="pt-2">
-                          <div className="flex items-center gap-2">
-                            <p className="text-xs text-gray-500 font-medium">After Photos:</p>
-                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm">
-                              {afterPhotosCount}
-                            </span>
-                          </div>
-                          <div className="flex gap-2 text-xs mt-1 flex-wrap">
-                            {/* New format: rows structure */}
-                            {entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.map((row, rowIndex) => (
-                              <div key={rowIndex} className="flex gap-2">
-                                {row.before && Array.isArray(row.before) && row.before.length > 0 && (
-                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                                    Row {rowIndex + 1}: {row.before.length} before
-                                  </span>
-                                )}
-                                {row.after && Array.isArray(row.after) && row.after.length > 0 && (
-                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                                    {row.after.length} after
-                                  </span>
-                                )}
-                              </div>
-                            ))}
-                            {/* Old format: direct before/after */}
-                            {!entry.photos.rows && (
-                              <>
-                                {entry.photos.before && (
-                                  <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                                    1 before
-                                  </span>
-                                )}
-                                {entry.photos.after && (
-                                  <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
-                                    {Array.isArray(entry.photos.after) ? entry.photos.after.length : 1} after
-                                  </span>
-                                )}
-                              </>
+                  {/* Paired Photo Upload - Multiple Rows */}
+                  <div className="space-y-4">
+                    {/* Photo Rows */}
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto border rounded-lg p-4 bg-gray-50">
+                      {photoRows.map((row, rowIndex) => (
+                        <div key={row.id} className="bg-white rounded-lg border-2 border-gray-300 p-4">
+                          {/* Row Header */}
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</span>
+                            </div>
+                            {photoRows.length > 1 && isAdminPhotoEdit && (
+                              <button
+                                onClick={() => {
+                                  setPhotoRows(photoRows.filter(r => r.id !== row.id));
+                                }}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                title="Delete this row"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
                             )}
                           </div>
+
+                          {/* Row Content - Before and After side by side */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Before Photos */}
+                            <div className="bg-blue-50 rounded-lg border-2 border-blue-200 p-3 min-h-[260px]">
+
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-4 h-4 bg-blue-500 rounded-full flex items-center justify-center text-white text-xs font-bold">B</div>
+                                <label className="text-xs font-semibold text-blue-700">Before Photos</label>
+                              </div>
+                              <div className="space-y-2">
+                                {row.beforePreviews.length > 0 && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {row.beforePreviews.map((preview, index) => (
+                                      <div key={index} className="relative aspect-square border-2 border-blue-300 rounded-lg overflow-hidden bg-gray-100 group">
+                                        <img src={preview} alt={`Before ${index + 1}`} className="w-full h-full object-cover" />
+                                        <div className="absolute top-1 right-1 bg-blue-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                        {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
+                                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <button
+                                              onClick={() => {
+                                                const newRows = photoRows.map(r => {
+                                                  if (r.id !== row.id) return r;
+
+                                                  const previewToRemove = r.beforePreviews[index];
+                                                  if (isUrlPreview(previewToRemove)) {
+                                                    return {
+                                                      ...r,
+                                                      beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index)
+                                                    };
+                                                  }
+
+                                                  const existingCountBefore = r.beforePreviews
+                                                    .slice(0, index)
+                                                    .filter(isUrlPreview).length;
+                                                  const newFileIndex = index - existingCountBefore;
+
+                                                  return {
+                                                    ...r,
+                                                    beforePreviews: r.beforePreviews.filter((_, idx) => idx !== index),
+                                                    beforePhotos: r.beforePhotos.filter((_, idx) => idx !== newFileIndex)
+                                                  };
+                                                });
+                                                setPhotoRows(newRows);
+                                              }}
+                                              className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                                            >
+                                              <X className="w-2.5 h-2.5" />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <label
+                                  htmlFor={`before-photo-input-${row.id}`}
+                                  className="aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-100 transition-all"
+                                >
+                                  <Plus className="w-5 h-5 text-blue-400 mb-1" />
+                                  <span className="text-xs font-medium text-blue-600">+ Add 1 or more photos</span>
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => {
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length > 0) {
+                                      Promise.all(files.map(file => {
+                                        return new Promise((resolve) => {
+                                          const reader = new FileReader();
+                                          reader.onload = (event) => resolve(event.target.result);
+                                          reader.readAsDataURL(file);
+                                        });
+                                      })).then(previews => {
+                                        const newRows = photoRows.map(r => {
+                                          if (r.id === row.id) {
+                                            return {
+                                              ...r,
+                                              beforePreviews: [...r.beforePreviews, ...previews],
+                                              beforePhotos: [...r.beforePhotos, ...files]
+                                            };
+                                          }
+                                          return r;
+                                        });
+                                        setPhotoRows(newRows);
+                                      });
+                                    }
+                                  }}
+                                  className="hidden"
+                                  id={`before-photo-input-${row.id}`}
+                                />
+                              </div>
+                            </div>
+
+                            {/* After Photos */}
+                            <div className="bg-green-50 rounded-lg border-2 border-green-200 p-3 min-h-[260px]">
+
+                              <div className="flex items-center gap-2 mb-3">
+                                <div className="w-4 h-4 bg-green-500 rounded-full flex items-center justify-center text-white text-xs font-bold">A</div>
+                                <label className="text-xs font-semibold text-green-700">After Photos</label>
+                              </div>
+                              <div className="space-y-2">
+                                {row.afterPreviews.length > 0 && (
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {row.afterPreviews.map((preview, index) => (
+                                      <div key={index} className="relative aspect-square border-2 border-green-300 rounded-lg overflow-hidden bg-gray-100 group">
+                                        <img src={preview} alt={`After ${index + 1}`} className="w-full h-full object-cover" />
+                                        <div className="absolute top-1 right-1 bg-green-500 text-white px-1.5 py-0.5 rounded text-xs font-medium">{index + 1}</div>
+                                        {(isAdminPhotoEdit || !isUrlPreview(preview)) && (
+                                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                            <button
+                                              onClick={() => {
+                                                const newRows = photoRows.map(r => {
+                                                  if (r.id !== row.id) return r;
+
+                                                  const previewToRemove = r.afterPreviews[index];
+                                                  if (isUrlPreview(previewToRemove)) {
+                                                    return {
+                                                      ...r,
+                                                      afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index)
+                                                    };
+                                                  }
+
+                                                  const existingCountBefore = r.afterPreviews
+                                                    .slice(0, index)
+                                                    .filter(isUrlPreview).length;
+                                                  const newFileIndex = index - existingCountBefore;
+
+                                                  return {
+                                                    ...r,
+                                                    afterPreviews: r.afterPreviews.filter((_, idx) => idx !== index),
+                                                    afterPhotos: r.afterPhotos.filter((_, idx) => idx !== newFileIndex)
+                                                  };
+                                                });
+                                                setPhotoRows(newRows);
+                                              }}
+                                              className="px-1.5 py-0.5 bg-red-600 text-white rounded hover:bg-red-700 transition-colors flex items-center gap-1 text-xs"
+                                            >
+                                              <X className="w-2.5 h-2.5" />
+                                            </button>
+                                          </div>
+                                        )}
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                <label
+                                  htmlFor={`after-photo-input-${row.id}`}
+                                  className={`aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center transition-all ${row.beforePreviews.length > 0
+                                    ? 'cursor-pointer border-green-300 hover:border-green-500 hover:bg-green-100'
+                                    : 'cursor-not-allowed border-gray-300 bg-gray-100 opacity-50'
+                                    }`}
+                                  onClick={(e) => {
+                                    if (row.beforePreviews.length === 0) {
+                                      e.preventDefault();
+                                      showError('Please upload before photos first');
+                                    }
+                                  }}
+                                >
+                                  <Plus className="w-5 h-5 text-green-400 mb-1" />
+                                  <span className="text-xs font-medium text-green-600">+ Add 1 or more photos</span>
+                                </label>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  onChange={(e) => {
+                                    if (row.beforePreviews.length === 0) {
+                                      showError('Please upload before photos first');
+                                      return;
+                                    }
+                                    const files = Array.from(e.target.files || []);
+                                    if (files.length > 0) {
+                                      Promise.all(files.map(file => {
+                                        return new Promise((resolve) => {
+                                          const reader = new FileReader();
+                                          reader.onload = (event) => resolve(event.target.result);
+                                          reader.readAsDataURL(file);
+                                        });
+                                      })).then(previews => {
+                                        const newRows = photoRows.map(r => {
+                                          if (r.id === row.id) {
+                                            return {
+                                              ...r,
+                                              afterPreviews: [...r.afterPreviews, ...previews],
+                                              afterPhotos: [...r.afterPhotos, ...files]
+                                            };
+                                          }
+                                          return r;
+                                        });
+                                        setPhotoRows(newRows);
+                                      });
+                                    }
+                                  }}
+                                  className="hidden"
+                                  id={`after-photo-input-${row.id}`}
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex flex-col gap-2">
-                      <button
-                        onClick={() => {
-                          // Handle both photo formats
-                          const photoData = entry.photos || {};
-                          
-                          // Check if it's the new rows format
-                          const hasRows = photoData.rows && Array.isArray(photoData.rows) && photoData.rows.length > 0;
-                          
-                          setViewingPhotos({
-                            date: date,
-                            barangay: entry.barangay,
-                            concernType: entry.concernType,
-                            actionTaken: entry.actionTaken,
-                            remarks: entry.remarks,
-                            rows: hasRows ? photoData.rows : null,
-                            before: !hasRows && photoData.before ? (Array.isArray(photoData.before) ? photoData.before : [photoData.before]) : [],
-                            after: !hasRows && photoData.after ? (Array.isArray(photoData.after) ? photoData.after : [photoData.after]) : []
-                          });
-                          setShowPhotoViewDialog(true);
-                          setShowActionTakenModal(false);
-                        }}
-                        className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center gap-2 text-sm"
-                      >
-                        <Eye className="h-4 w-4" />
-                        View Photos
-                      </button>
-                      
-                      <button
-                        onClick={() => {
-                          // Copy to clipboard
-                          const text = `Date: ${date}\nBarangay: ${entry.barangay}\nConcern: ${entry.concernType}\nAction Taken: ${entry.actionTaken}${entry.remarks ? `\nRemarks: ${entry.remarks}` : ''}`;
-                          navigator.clipboard.writeText(text);
-                          toast.success('Copied to clipboard!');
-                        }}
-                        className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors flex items-center gap-2 text-sm"
-                        title="Copy details"
-                      >
-                        <Copy className="h-4 w-4" />
-                      </button>
+                      ))}
                     </div>
                   </div>
+
+                  {/* Action Taken Section - Only show when both before and after photos exist */}
+                  {(photoRows.some(row => row.beforePreviews.length > 0) && photoRows.some(row => row.afterPreviews.length > 0)) && (
+                    <div className="mt-4 border-t pt-4">
+                      <label className="block text-sm font-semibold text-gray-900 mb-2">
+                        <MessageSquare className="w-4 h-4 inline mr-1" />
+                        Action Taken <span className="text-red-500">*</span>
+                      </label>
+                      <textarea
+                        value={currentPhotoEntry?.entry?.remarks || ''}
+                        onChange={(e) => {
+                          if (currentPhotoEntry) {
+                            const newValue = e.target.value;
+
+                            // Update currentPhotoEntry immediately for responsive UI
+                            setCurrentPhotoEntry(prev => ({
+                              ...prev,
+                              entry: { ...prev.entry, remarks: newValue }
+                            }));
+
+                            // Debounce the weeklyReportData update to prevent slowness
+                            if (remarksDebounceRef.current) {
+                              clearTimeout(remarksDebounceRef.current);
+                            }
+
+                            remarksDebounceRef.current = setTimeout(() => {
+                              updateDateData(currentPhotoEntry.date, currentPhotoEntry.entryIndex, 'remarks', newValue);
+                            }, 300); // Wait 300ms after user stops typing
+                          }
+                        }}
+                        placeholder="Add any additional notes or action taken about this concern..."
+                        rows={3}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none text-sm !text-black caret-black placeholder:text-gray-400"
+                        required
+                      />
+                      <p className="text-xs text-gray-500 mt-1">Required: Please add action taken after uploading after photos</p>
+                    </div>
+                  )}
+
+                  <DialogFooter className="mt-6 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        const newId = Math.max(...photoRows.map(r => r.id), 0) + 1;
+                        setPhotoRows([...photoRows, { id: newId, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
+                      }}
+                      className="px-5 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg flex items-center gap-2 transition-colors font-medium"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Add Row
+                    </button>
+                    <div className="flex gap-3 ml-auto">
+                      <button
+                        onClick={() => setShowPhotoUploadDialog(false)}
+                        className="px-5 py-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                        disabled={isUploadingPhotos}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleUploadPhotos}
+                        disabled={isUploadingPhotos || !canSavePhotos}
+                        className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
+                      >
+                        {isUploadingPhotos ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            {isEditingExistingPhotos ? 'Saving...' : 'Uploading...'}
+                          </>
+                        ) : (
+                          <>
+                            {isEditingExistingPhotos ? <Save className="w-4 h-4" /> : <Upload className="w-4 h-4" />}
+                            {isEditingExistingPhotos ? 'Save Changes' : 'Upload Photos'}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </DialogFooter>
+                </>
+              );
+            })()}
+          </DialogContent>
+        </Dialog>
+
+        {/* Photo View Dialog */}
+        <Dialog open={showPhotoViewDialog} onOpenChange={setShowPhotoViewDialog}>
+          <DialogContent className="sm:max-w-[800px]">
+            <DialogHeader>
+              <DialogTitle>Before & After Photos</DialogTitle>
+              <DialogDescription>
+                View the before and after photos for this entry.
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* Fixed Header Section - Barangay and Municipality */}
+            {viewingPhotos?.barangay && (
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                {/* Barangay - Left Side */}
+                <div className="bg-purple-50 border border-purple-200 rounded-md p-3">
+                  <p className="text-xs font-semibold text-purple-700 mb-1">Barangay</p>
+                  <p className="text-sm text-gray-800 font-medium">
+                    {viewingPhotos.barangay.split(',')[0].trim()}
+                  </p>
                 </div>
-              ))
-            )}
-          </div>
-          
-          <DialogFooter className="border-t pt-4">
-            <div className="flex items-center justify-between w-full">
-              <div className="text-sm text-gray-600">
-                <span className="font-bold text-gray-900">{getActionTakenCount().entryCount}</span> entries • 
-                <span className="font-bold text-green-700 ml-1">{getActionTakenCount().count}</span> after photos
+
+                {/* Municipality - Right Side */}
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">Municipality</p>
+                  <p className="text-sm text-gray-800 font-medium">
+                    {viewingPhotos.barangay.includes(',') ? `${viewingPhotos.barangay.split(',')[1].trim().toUpperCase()}, BATAAN` : 'N/A'}
+                  </p>
+                </div>
               </div>
+            )}
+
+            {/* Scrollable Photos Section */}
+            <div className="max-h-[500px] overflow-y-auto border-t border-b space-y-6 p-4">
+              {/* Display photos by row if available */}
+              {viewingPhotos?.rows && viewingPhotos.rows.length > 0 ? (
+                viewingPhotos.rows.map((row, rowIndex) => (
+                  <div key={rowIndex} className="border-2 border-gray-300 rounded-lg p-4 bg-gray-50">
+                    <div className="mb-4 pb-2 border-b">
+                      <h3 className="text-sm font-semibold text-gray-700">Row {rowIndex + 1}</h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Before Photos for this row */}
+                      {row.before && Array.isArray(row.before) && row.before.length > 0 && (
+                        <PhotoCarousel
+                          photos={row.before}
+                          timestamps={row.beforeUploadedAt || []}
+                          title={`Before Photos (Row ${rowIndex + 1})`}
+                        />
+                      )}
+
+                      {/* After Photos for this row */}
+                      {row.after && Array.isArray(row.after) && row.after.length > 0 && (
+                        <PhotoCarousel
+                          photos={row.after}
+                          timestamps={row.afterUploadedAt || []}
+                          title={`After Photos (Row ${rowIndex + 1})`}
+                        />
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                // Fallback for old format (backward compatibility)
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Before Photos Carousel */}
+                  {viewingPhotos?.before && Array.isArray(viewingPhotos.before) && viewingPhotos.before.length > 0 && (
+                    <PhotoCarousel
+                      photos={viewingPhotos.before}
+                      timestamps={viewingPhotos.beforeUploadedAt || []}
+                      title="Before Photos"
+                    />
+                  )}
+
+                  {/* After Photos Carousel */}
+                  {viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0 && (
+                    <PhotoCarousel
+                      photos={viewingPhotos.after}
+                      timestamps={viewingPhotos.afterUploadedAt || []}
+                      title="After Photos"
+                    />
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Fixed Footer Section - Concern Type and Action Taken */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              {/* Concern Type - Left Side */}
+              {viewingPhotos?.concernType && (
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                  <p className="text-xs font-semibold text-blue-700 mb-1">Concern Type</p>
+                  <p className="text-sm text-gray-800">{viewingPhotos.concernType}</p>
+                </div>
+              )}
+
+              {/* Action Taken - Right Side - Only show if after photos exist */}
+              {viewingPhotos?.remarks && (
+                (viewingPhotos?.after && Array.isArray(viewingPhotos.after) && viewingPhotos.after.length > 0) ||
+                (viewingPhotos?.rows && viewingPhotos.rows.some(row => row.after && Array.isArray(row.after) && row.after.length > 0))
+              ) && (
+                  <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                    <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{viewingPhotos.remarks}</p>
+                  </div>
+                )}
+            </div>
+
+            <DialogFooter>
               <button
-                onClick={() => setShowActionTakenModal(false)}
+                onClick={() => setShowPhotoViewDialog(false)}
                 className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
               >
                 Close
               </button>
-            </div>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Instructions Modal */}
-      <Dialog open={showInstructionsModal} onOpenChange={setShowInstructionsModal}>
-        <DialogContent className="sm:max-w-[420px]">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-bold text-gray-900">Quick Instructions</DialogTitle>
-            <DialogDescription className="text-gray-600">
-              Step-by-step guide for uploading before and after photos
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4 max-h-[500px] overflow-y-auto">
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white font-bold text-sm">1</div>
+        {/* Action Taken Entries Modal */}
+        <Dialog open={showActionTakenModal} onOpenChange={setShowActionTakenModal}>
+          <DialogContent className="sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <CheckCircle className="h-6 w-6 text-green-600" />
+                Mga May Action Taken (with After Photos)
+              </DialogTitle>
+              <DialogDescription>
+                List of all entries na may action taken at may after photos
+                {activeMunicipalityTab && (
+                  <span className="block mt-1 text-blue-600 font-medium">
+                    {activeMunicipalityTab} — Overall Average: {getCriteriaOverallPercentage()}%
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-4">
+              {getActionTakenCount().entries.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="inline-flex items-center justify-center h-16 w-16 rounded-full bg-gray-100 mb-4">
+                    <CheckCircle className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <p className="text-gray-500">Walang entries na may action taken at after photos</p>
+                </div>
+              ) : (
+                getActionTakenCount().entries.map(({ date, entry, entryIndex, afterPhotosCount }) => (
+                  <div key={`${date}-${entryIndex}`} className="border border-gray-200 rounded-lg p-4 bg-white hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 space-y-2">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Clock className="h-4 w-4" />
+                          <span className="font-medium">{date}</span>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <p className="text-xs text-gray-500 font-medium">Barangay</p>
+                            <p className="text-sm font-semibold text-gray-900">{entry.barangay || 'N/A'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500 font-medium">Concern Type</p>
+                            <p className="text-sm font-semibold text-orange-600">{entry.concernType || 'N/A'}</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                          <p className="text-xs font-semibold text-green-700 mb-1">Action Taken</p>
+                          <p className="text-sm text-gray-800">{entry.actionTaken}</p>
+                        </div>
+
+                        {entry.remarks && (
+                          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                            <p className="text-xs font-semibold text-blue-700 mb-1">Remarks</p>
+                            <p className="text-sm text-gray-800">{entry.remarks}</p>
+                          </div>
+                        )}
+
+                        {entry.photos && (
+                          <div className="pt-2">
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-gray-500 font-medium">After Photos:</p>
+                              <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full font-bold text-sm">
+                                {afterPhotosCount}
+                              </span>
+                            </div>
+                            <div className="flex gap-2 text-xs mt-1 flex-wrap">
+                              {/* New format: rows structure */}
+                              {entry.photos.rows && Array.isArray(entry.photos.rows) && entry.photos.rows.map((row, rowIndex) => (
+                                <div key={rowIndex} className="flex gap-2">
+                                  {row.before && Array.isArray(row.before) && row.before.length > 0 && (
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                      Row {rowIndex + 1}: {row.before.length} before
+                                    </span>
+                                  )}
+                                  {row.after && Array.isArray(row.after) && row.after.length > 0 && (
+                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                                      {row.after.length} after
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                              {/* Old format: direct before/after */}
+                              {!entry.photos.rows && (
+                                <>
+                                  {entry.photos.before && (
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded">
+                                      1 before
+                                    </span>
+                                  )}
+                                  {entry.photos.after && (
+                                    <span className="px-2 py-1 bg-green-100 text-green-700 rounded">
+                                      {Array.isArray(entry.photos.after) ? entry.photos.after.length : 1} after
+                                    </span>
+                                  )}
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                        <button
+                          onClick={() => {
+                            // Handle both photo formats
+                            const photoData = entry.photos || {};
+
+                            // Check if it's the new rows format
+                            const hasRows = photoData.rows && Array.isArray(photoData.rows) && photoData.rows.length > 0;
+
+                            setViewingPhotos({
+                              date: date,
+                              barangay: entry.barangay,
+                              concernType: entry.concernType,
+                              actionTaken: entry.actionTaken,
+                              remarks: entry.remarks,
+                              rows: hasRows ? photoData.rows : null,
+                              before: !hasRows && photoData.before ? (Array.isArray(photoData.before) ? photoData.before : [photoData.before]) : [],
+                              after: !hasRows && photoData.after ? (Array.isArray(photoData.after) ? photoData.after : [photoData.after]) : []
+                            });
+                            setShowPhotoViewDialog(true);
+                            setShowActionTakenModal(false);
+                          }}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors flex items-center gap-2 text-sm"
+                        >
+                          <Eye className="h-4 w-4" />
+                          View Photos
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            // Copy to clipboard
+                            const text = `Date: ${date}\nBarangay: ${entry.barangay}\nConcern: ${entry.concernType}\nAction Taken: ${entry.actionTaken}${entry.remarks ? `\nRemarks: ${entry.remarks}` : ''}`;
+                            navigator.clipboard.writeText(text);
+                            toast.success('Copied to clipboard!');
+                          }}
+                          className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors flex items-center gap-2 text-sm"
+                          title="Copy details"
+                        >
+                          <Copy className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <DialogFooter className="border-t pt-4">
+              <div className="flex items-center justify-between w-full">
+                <div className="text-sm text-gray-600">
+                  <span className="font-bold text-gray-900">{getActionTakenCount().entryCount}</span> entries •
+                  <span className="font-bold text-green-700 ml-1">{getActionTakenCount().count}</span> after photos
+                </div>
+                <button
+                  onClick={() => setShowActionTakenModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-colors"
+                >
+                  Close
+                </button>
               </div>
-              <div>
-                <h4 className="font-semibold text-gray-900">Before Photo</h4>
-                <p className="text-sm text-gray-600">Capture the situation/area BEFORE taking action</p>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Instructions Modal */}
+        <Dialog open={showInstructionsModal} onOpenChange={setShowInstructionsModal}>
+          <DialogContent className="sm:max-w-[420px]">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">Quick Instructions</DialogTitle>
+              <DialogDescription className="text-gray-600">
+                Step-by-step guide for uploading before and after photos
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 max-h-[500px] overflow-y-auto">
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-blue-500 text-white font-bold text-sm">1</div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Before Photo</h4>
+                  <p className="text-sm text-gray-600">Capture the situation/area BEFORE taking action</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-green-500 text-white font-bold text-sm">2</div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">After Photo</h4>
+                  <p className="text-sm text-gray-600">Capture the same area AFTER action completed</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-500 text-white font-bold text-sm">3</div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Multiple Rows</h4>
+                  <p className="text-sm text-gray-600">Click "Add Row" to upload photos for different areas/concerns</p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <div className="flex-shrink-0">
+                  <div className="flex items-center justify-center h-8 w-8 rounded-full bg-orange-500 text-white font-bold text-sm">4</div>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-gray-900">Action Taken</h4>
+                  <p className="text-sm text-gray-600">Describe what action was taken (required when after photos exist)</p>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-900">
+                  <strong>💡 Tips:</strong> Photos auto-compress to under 2MB • Upload both before & after for complete documentation
+                </p>
               </div>
             </div>
 
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-green-500 text-white font-bold text-sm">2</div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900">After Photo</h4>
-                <p className="text-sm text-gray-600">Capture the same area AFTER action completed</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-purple-500 text-white font-bold text-sm">3</div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900">Multiple Rows</h4>
-                <p className="text-sm text-gray-600">Click "Add Row" to upload photos for different areas/concerns</p>
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <div className="flex-shrink-0">
-                <div className="flex items-center justify-center h-8 w-8 rounded-full bg-orange-500 text-white font-bold text-sm">4</div>
-              </div>
-              <div>
-                <h4 className="font-semibold text-gray-900">Action Taken</h4>
-                <p className="text-sm text-gray-600">Describe what action was taken (required when after photos exist)</p>
-              </div>
-            </div>
-
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <p className="text-sm text-blue-900">
-                <strong>💡 Tips:</strong> Photos auto-compress to under 2MB • Upload both before & after for complete documentation
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <button
-              onClick={() => setShowInstructionsModal(false)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-            >
-              Got it!
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <DialogFooter>
+              <button
+                onClick={() => setShowInstructionsModal(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                Got it!
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </Layout>
   );
