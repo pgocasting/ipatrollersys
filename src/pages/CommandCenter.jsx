@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import Layout from "../components/Layout";
 import { commandCenterLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import { useFirebase } from "../hooks/useFirebase";
@@ -1557,12 +1557,21 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   // Count entries with action taken (after photos) - memoized to prevent lag on typing
+  // Only counts entries matching the currently selected month and year
   const actionTakenMemo = useMemo(() => {
     let entryCount = 0;
     let totalAfterPhotosCount = 0;
     const entriesWithActionTaken = [];
 
     Object.keys(weeklyReportData).forEach(date => {
+      // Filter: only include dates that belong to the selected month and year
+      if (selectedMonth && selectedYear) {
+        const dateMatchesMonthYear =
+          date.startsWith(selectedMonth + ' ') &&
+          date.endsWith(', ' + selectedYear);
+        if (!dateMatchesMonthYear) return;
+      }
+
       const entries = weeklyReportData[date] || [];
       entries.forEach((entry, index) => {
         if (entry.actionTaken && entry.actionTaken.trim() !== '') {
@@ -1602,7 +1611,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       entryCount: entryCount, // Number of entries
       entries: entriesWithActionTaken
     };
-  }, [weeklyReportData]);
+  }, [weeklyReportData, selectedMonth, selectedYear]);
 
   const getActionTakenCount = useCallback(() => actionTakenMemo, [actionTakenMemo]);
 
@@ -1654,8 +1663,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     Object.entries(weeklyReportData).forEach(([dateKey, entries]) => {
       if (!Array.isArray(entries)) return;
 
+      // Filter: only include dates that belong to the selected month and year
+      const dateMatchesMonthYear =
+        dateKey.startsWith(selectedMonth + ' ') &&
+        dateKey.endsWith(', ' + selectedYear);
+      if (!dateMatchesMonthYear) return;
+
       const entryDate = new Date(dateKey);
       if (Number.isNaN(entryDate.getTime())) return;
+
+      // Extra guard: verify month/year match after parsing
+      if (entryDate.getMonth() !== monthIndex || entryDate.getFullYear() !== year) return;
 
       const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
       if (weekIndex < 0 || weekIndex >= 4) return;
