@@ -5,17 +5,17 @@
 const CLOUDINARY_ACCOUNTS = {
   primary: {
     id: 'primary',
-    cloud_name: 'drr2jwqv8',
-    api_key: '319342433492267',
-    upload_preset: 'ipatrollersys',
-    upload_url: 'https://api.cloudinary.com/v1_1/drr2jwqv8/image/upload'
-  },
-  fallback: {
-    id: 'fallback',
     cloud_name: 'duooicxyl',
     api_key: '193961254783825',
     upload_preset: 'Files_Upload',
     upload_url: 'https://api.cloudinary.com/v1_1/duooicxyl/image/upload'
+  },
+  fallback: {
+    id: 'fallback',
+    cloud_name: 'drr2jwqv8',
+    api_key: '319342433492267',
+    upload_preset: 'ipatrollersys',
+    upload_url: 'https://api.cloudinary.com/v1_1/drr2jwqv8/image/upload'
   }
 };
 
