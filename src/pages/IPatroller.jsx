@@ -3615,9 +3615,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
                       onChange={(e) => setSelectedTopPerformersYear(parseInt(e.target.value))}
                       className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                     >
-                      <option value={2024}>2024</option>
-                      <option value={2025}>2025</option>
-                      <option value={2026}>2026</option>
+                      {[2024, 2025, 2026, 2027, 2028, 2029, 2030].map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
                     </select>
                   </div>
                   {/* Signature Toggle */}

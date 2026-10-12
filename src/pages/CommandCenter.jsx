@@ -307,7 +307,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   ];
 
   // Fixed list to ensure 2025 is always available in the dropdown
-  const years = ["2024", "2025", "2026", "2027"];
+  const years = ["2024", "2025", "2026", "2027", "2028", "2029", "2030"];
 
   // Duplicate January 2025 data to January 2026 for all municipalities
   const duplicateJan2025To2026 = async () => {
@@ -1627,7 +1627,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const getEntryActionCountValue = (entry, monthIndex, year) => {
     const isAprilToDecember2026OrLater =
       (year === 2026 && monthIndex >= 3) ||
-      (year > 2026 && monthIndex >= 3);
+      (year > 2026);
     const isMarchToOctober = monthIndex >= 2 && monthIndex <= 9;
 
     const countAfterPhotos = () => {

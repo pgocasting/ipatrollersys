@@ -182,7 +182,7 @@ export function calculateWeeklyActionCounts(weeklyReportData, monthIndex, year) 
 
   const isAprilToDecember2026OrLater =
     (parsedYear === 2026 && parsedMonthIndex >= 3) ||
-    (parsedYear > 2026 && parsedMonthIndex >= 3);
+    (parsedYear > 2026);
   const isMarchToOctober = parsedMonthIndex >= 2 && parsedMonthIndex <= 9;
 
   Object.entries(weeklyReportData).forEach(([dateKey, entries]) => {
