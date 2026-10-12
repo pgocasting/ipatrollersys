@@ -1142,22 +1142,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         let rawPercentage; // Uncapped value — used for sorting
 
         if (isJan2026OrLater) {
-          // Jan 2026 onwards: Use Overall Average from Criteria tab
-          // Calculate weekly attended counts
-          const weeklyAttended = [];
-          for (let week = 0; week < 4; week++) {
-            const weekStart = week * 7;
-            if (weekStart < totalDays) {
-              const attended = municipalityActionCounts[week] || 0;
-              weeklyAttended.push(attended);
-            } else {
-              weeklyAttended.push(0);
-            }
-          }
-          
-          // Calculate Overall Average using Criteria tab formula:
+          // Jan 2026 onwards: Use Overall Average from Criteria tab / Command Center formula:
           // Overall % = (Total Attended / Total Minimum) × 100, capped at 100%
-          const totalAttended = weeklyAttended.reduce((sum, attended) => sum + attended, 0);
+          const totalAttended = municipalityActionCounts.slice(0, 4).reduce((sum, attended) => sum + (attended || 0), 0);
           const totalMinimum = WEEKLY_MIN * 4; // 98 × 4 = 392
           rawPercentage = Math.min(Math.floor((totalAttended / totalMinimum) * 100), 100);
 

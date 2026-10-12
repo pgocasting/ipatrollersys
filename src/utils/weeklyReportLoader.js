@@ -1,5 +1,10 @@
 import { doc, getDoc } from 'firebase/firestore';
 
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 /**
  * Loads a municipality's weekly report from Firestore, handling:
  * 1. Split document format (${monthYear}_summary with _week1, _week2, etc.)
@@ -139,61 +144,103 @@ export function getWeekIndexFromDate(dateKey) {
     day = match ? parseInt(match[1], 10) : 1;
   }
 
-  if (day <= 7) return 0;
-  if (day <= 14) return 1;
-  if (day <= 21) return 2;
-  return 3;
+  return Math.min(Math.floor((day - 1) / 7), 3);
 }
 
 /**
  * Calculates weekly action counts [week1, week2, week3, week4] and totalActionTaken
  * for a municipality's weekly report data according to the system's counting rules.
+ * Strictly filters dates to the specified month and year, matching CommandCenter.jsx.
  */
 export function calculateWeeklyActionCounts(weeklyReportData, monthIndex, year) {
   const counts = [0, 0, 0, 0];
   if (!weeklyReportData || typeof weeklyReportData !== 'object') {
-    return { counts, totalActionTaken: 0 };
+    return { counts, totalActionTaken: 0, performancePercentage: 0 };
   }
 
+  let parsedMonthIndex = 0;
+  let monthName = "";
+
+  if (typeof monthIndex === 'string') {
+    const idx = MONTH_NAMES.findIndex(m => m.toLowerCase() === monthIndex.toLowerCase());
+    if (idx !== -1) {
+      parsedMonthIndex = idx;
+      monthName = MONTH_NAMES[idx];
+    } else {
+      const num = parseInt(monthIndex, 10);
+      if (!isNaN(num)) {
+        parsedMonthIndex = num > 0 && num <= 12 ? num - 1 : num;
+        monthName = MONTH_NAMES[parsedMonthIndex] || "";
+      }
+    }
+  } else if (typeof monthIndex === 'number') {
+    parsedMonthIndex = monthIndex;
+    monthName = MONTH_NAMES[monthIndex] || "";
+  }
+
+  const parsedYear = parseInt(year, 10);
+
   const isAprilToDecember2026OrLater =
-    (year === 2026 && monthIndex >= 3) ||
-    (year > 2026 && monthIndex >= 3);
-  const isMarchToOctober = monthIndex >= 2 && monthIndex <= 9;
+    (parsedYear === 2026 && parsedMonthIndex >= 3) ||
+    (parsedYear > 2026 && parsedMonthIndex >= 3);
+  const isMarchToOctober = parsedMonthIndex >= 2 && parsedMonthIndex <= 9;
 
   Object.entries(weeklyReportData).forEach(([dateKey, entries]) => {
     if (!Array.isArray(entries)) return;
 
-    const weekIndex = getWeekIndexFromDate(dateKey);
+    // Filter: STRICTLY only include dates that belong to the selected month and year
+    const dateMatchesString =
+      monthName &&
+      parsedYear &&
+      dateKey.startsWith(monthName + ' ') &&
+      dateKey.endsWith(', ' + parsedYear);
+
+    const entryDate = new Date(dateKey);
+    const dateMatchesParsed =
+      !isNaN(entryDate.getTime()) &&
+      entryDate.getMonth() === parsedMonthIndex &&
+      entryDate.getFullYear() === parsedYear;
+
+    if (!dateMatchesString && !dateMatchesParsed) {
+      return; // Skip dates from other months or years!
+    }
+
+    const day = !isNaN(entryDate.getTime())
+      ? entryDate.getDate()
+      : parseInt(dateKey.match(/\b(\d{1,2})\b/)?.[1] || '1', 10);
+
+    const weekIndex = Math.min(Math.floor((day - 1) / 7), 3);
     if (weekIndex < 0 || weekIndex > 3) return;
 
     entries.forEach((entry) => {
       if (!entry) return;
 
-      let shouldCount = false;
+      // Must have actionTaken specified (same as CommandCenter)
+      if (!entry.actionTaken || String(entry.actionTaken).trim() === '') return;
+
       let countValue = 0;
 
       if (isAprilToDecember2026OrLater) {
         // Count based on after-photos
-        const totalAfter = countEntryAfterPhotos(entry);
-        shouldCount = totalAfter > 0;
-        countValue = totalAfter;
+        countValue = countEntryAfterPhotos(entry);
       } else if (isMarchToOctober) {
         // March to October (2025 and earlier): count based on actionTaken text
-        shouldCount = entry.actionTaken && String(entry.actionTaken).trim() !== '';
-        countValue = shouldCount ? 1 : 0;
+        countValue = 1;
       } else {
         // Legacy months: count based on after-photos
-        const totalAfter = countEntryAfterPhotos(entry);
-        shouldCount = totalAfter > 0;
-        countValue = totalAfter;
+        countValue = countEntryAfterPhotos(entry);
       }
 
-      if (shouldCount) {
+      if (countValue > 0) {
         counts[weekIndex] += countValue;
       }
     });
   });
 
   const totalActionTaken = counts.reduce((sum, c) => sum + (c || 0), 0);
-  return { counts, totalActionTaken };
+  const WEEKLY_MIN = 98;
+  const totalMinimum = WEEKLY_MIN * 4; // 392
+  const performancePercentage = Math.min(Math.floor((totalActionTaken / totalMinimum) * 100), 100);
+
+  return { counts, totalActionTaken, performancePercentage };
 }

@@ -1684,8 +1684,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       // Extra guard: verify month/year match after parsing
       if (entryDate.getMonth() !== monthIndex || entryDate.getFullYear() !== year) return;
 
-      const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
-      if (weekIndex < 0 || weekIndex >= 4) return;
+      const weekIndex = Math.min(Math.floor((entryDate.getDate() - 1) / 7), 3);
+      if (weekIndex < 0) return;
 
       entries.forEach((entry) => {
         const countValue = getEntryActionCountValue(entry, monthIndex, year);
