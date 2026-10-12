@@ -12,6 +12,7 @@ import { useData } from "../contexts/DataContext";
 import { useFirebase } from "../hooks/useFirebase";
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { fetchMunicipalWeeklyReport } from '../utils/weeklyReportLoader';
 import { logReportAccess } from '../utils/adminLogger';
 import { useAuth } from '../contexts/AuthContext';
 import { jsPDF } from 'jspdf';
@@ -182,10 +183,9 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
       const [municipalityResults, barangaysResult, concernTypesResult] = await Promise.all([
         Promise.all(allMunicipalities.map(async (municipality) => {
           try {
-            const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
-              return { municipality, data: docSnap.data() };
+            const report = await fetchMunicipalWeeklyReport(db, municipality, monthYear);
+            if (report.success && report.data) {
+              return { municipality, data: report.data };
             }
             return null;
           } catch (error) {
@@ -1041,8 +1041,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
         for (const monthIndex of monthsToQuery) {
           const monthName = MONTH_NAMES[monthIndex];
           const monthYear = `${monthName}_${yearFilter}`;
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          allQueries.push(getDoc(docRef));
+          allQueries.push(
+            fetchMunicipalWeeklyReport(db, municipality, monthYear).then(res => ({
+              exists: () => res.success && !!res.data,
+              data: () => res.data || {}
+            }))
+          );
           queryMap.push({ municipality, monthName });
         }
       }
@@ -2133,8 +2137,10 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
 
       // Create all Firebase queries in parallel
       const municipalityQueries = allMunicipalities.map(municipality => {
-        const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-        return getDoc(docRef);
+        return fetchMunicipalWeeklyReport(db, municipality, monthYear).then(res => ({
+          exists: () => res.success && !!res.data,
+          data: () => res.data || {}
+        }));
       });
 
       // Load all data in parallel
@@ -2659,8 +2665,12 @@ export default function Reports({ onLogout, onNavigate, currentPage }) {
           const monthName = months[monthIndex];
           const monthYear = `${monthName}_${selectedYear}`;
 
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          allQueries.push(getDoc(docRef));
+          allQueries.push(
+            fetchMunicipalWeeklyReport(db, municipality, monthYear).then(res => ({
+              exists: () => res.success && !!res.data,
+              data: () => res.data || {}
+            }))
+          );
           queryMap.push({ municipality, monthName });
         }
       }

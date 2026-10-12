@@ -28,6 +28,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from "xlsx";
 import { toPng, toJpeg } from 'html-to-image';
 import { ipatrollerLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
+import { fetchMunicipalWeeklyReport, calculateWeeklyActionCounts } from '../utils/weeklyReportLoader';
 import {
   Plus,
   Save,
@@ -460,87 +461,12 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         (selectedYear > 2026 && selectedMonth >= 3);
       const isMarchToOctober = selectedMonth >= 2 && selectedMonth <= 9;
 
-      // OPTIMIZED: Load all municipalities in PARALLEL instead of sequential loop
+      // OPTIMIZED: Load all municipalities in PARALLEL using unified weeklyReportLoader (supports split docs)
       const fetchPromises = municipalities.map(async (municipality) => {
         try {
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-          const docSnap = await getDoc(docRef);
-
-          if (!docSnap.exists()) {
-            return { municipality, counts: [0, 0, 0, 0] };
-          }
-
-          const data = docSnap.data();
-          const weeklyReportData = data.weeklyReportData || {};
-          const weeklyActionCounts = [0, 0, 0, 0]; // Week 1, 2, 3, 4
-
-          Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
-            if (Array.isArray(dateEntries)) {
-              dateEntries.forEach(entry => {
-                let shouldCount = false;
-                let countValue = 0;
-
-                // NEW LOGIC: April to December 2026 and future years count based on after photos
-                if (isAprilToDecember2026OrLater) {
-                  // Count total number of all after photos
-                  let totalAfterPhotos = 0;
-
-                  if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                    // Count total number of all after photos across all rows
-                    totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                      if (row.after && Array.isArray(row.after)) {
-                        return sum + row.after.length;
-                      }
-                      return sum;
-                    }, 0);
-                  } else {
-                    const hasBeforePhoto = entry.photos && entry.photos.before;
-                    const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
-                    if (hasAfterPhoto) totalAfterPhotos = 1;
-                  }
-
-                  shouldCount = totalAfterPhotos > 0;
-                  countValue = totalAfterPhotos;
-                } else {
-                  // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
-                  if (isMarchToOctober) {
-                    shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
-                    countValue = shouldCount ? 1 : 0;
-                  } else {
-                    let totalAfterPhotos = 0;
-
-                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      // Count total number of all after photos across all rows
-                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                        if (row.after && Array.isArray(row.after)) {
-                          return sum + row.after.length;
-                        }
-                        return sum;
-                      }, 0);
-                    } else {
-                      const hasBeforePhoto = entry.photos && entry.photos.before;
-                      const hasAfterPhoto = entry.photos && entry.photos.after && hasBeforePhoto;
-                      if (hasAfterPhoto) totalAfterPhotos = 1;
-                    }
-
-                    shouldCount = totalAfterPhotos > 0;
-                    countValue = totalAfterPhotos;
-                  }
-                }
-
-                // Add to weekly count if shouldCount is true
-                if (shouldCount) {
-                  const entryDate = new Date(dateKey);
-                  const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
-                  if (weekIndex >= 0 && weekIndex < 4) {
-                    weeklyActionCounts[weekIndex] += countValue;
-                  }
-                }
-              });
-            }
-          });
-
-          return { municipality, counts: weeklyActionCounts };
+          const report = await fetchMunicipalWeeklyReport(db, municipality, monthYear);
+          const { counts } = calculateWeeklyActionCounts(report.weeklyReportData, selectedMonth, selectedYear);
+          return { municipality, counts };
         } catch (error) {
           actionDataGroup.error(`❌ Error loading data for ${municipality}:`, error);
           return { municipality, counts: [0, 0, 0, 0] };
@@ -1140,73 +1066,14 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         (year > 2026 && month >= 3);
       const isMarchToOctober = month >= 2 && month <= 9;
 
-      // Load patrol data AND Command Center action data IN PARALLEL for the correct month/year
+      // Load patrol data AND Command Center action data IN PARALLEL for the correct month/year (supports split docs)
       const [querySnapshot, ccResults] = await Promise.all([
         getDocs(collection(db, 'patrolData', monthYearId, 'municipalities')),
         Promise.all(municipalities.map(async (municipality) => {
           try {
-            const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-            const docSnap = await getDoc(docRef);
-            if (!docSnap.exists()) return { municipality, counts: [0, 0, 0, 0] };
-            const data = docSnap.data();
-            const weeklyReportData = data.weeklyReportData || {};
-            const weeklyActionCounts = [0, 0, 0, 0];
-            Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
-              if (Array.isArray(dateEntries)) {
-                dateEntries.forEach(entry => {
-                  const entryDate = new Date(dateKey);
-                  const weekIndex = Math.floor((entryDate.getDate() - 1) / 7);
-                  if (weekIndex < 0 || weekIndex >= 4) return;
-                  
-                  let shouldCount = false;
-                  let countValue = 0;
-
-                  // NEW LOGIC: April to December 2026 and future years count based on after photos
-                  if (isAprilToDecember2026OrLater) {
-                    let totalAfterPhotos = 0;
-                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      // Count total number of all after photos across all rows
-                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                        if (row.after && Array.isArray(row.after)) {
-                          return sum + row.after.length;
-                        }
-                        return sum;
-                      }, 0);
-                    } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                      totalAfterPhotos = 1;
-                    }
-                    shouldCount = totalAfterPhotos > 0;
-                    countValue = totalAfterPhotos;
-                  } else {
-                    // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
-                    if (isMarchToOctober) {
-                      shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
-                      countValue = shouldCount ? 1 : 0;
-                    } else {
-                      let totalAfterPhotos = 0;
-                      if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                        // Count total number of all after photos across all rows
-                        totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                          if (row.after && Array.isArray(row.after)) {
-                            return sum + row.after.length;
-                          }
-                          return sum;
-                        }, 0);
-                      } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                        totalAfterPhotos = 1;
-                      }
-                      shouldCount = totalAfterPhotos > 0;
-                      countValue = totalAfterPhotos;
-                    }
-                  }
-
-                  if (shouldCount) {
-                    weeklyActionCounts[weekIndex] += countValue;
-                  }
-                });
-              }
-            });
-            return { municipality, counts: weeklyActionCounts };
+            const report = await fetchMunicipalWeeklyReport(db, municipality, monthYear);
+            const { counts } = calculateWeeklyActionCounts(report.weeklyReportData, month, year);
+            return { municipality, counts };
           } catch {
             return { municipality, counts: [0, 0, 0, 0] };
           }
@@ -2214,65 +2081,9 @@ export default function IPatroller({ onLogout, onNavigate, currentPage }) {
         getDocs(collection(monthDocRef, 'municipalities')),
         Promise.all(municipalities.map(async (municipality) => {
           try {
-            const ccDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
-            const ccDocSnap = await getDoc(ccDocRef);
-            if (!ccDocSnap.exists()) return { municipality, totalActionTaken: 0 };
-            const ccData = ccDocSnap.data();
-            const weeklyReportData = ccData.weeklyReportData || {};
-            let totalActionTakenCount = 0;
-
-            Object.entries(weeklyReportData).forEach(([dateKey, dateEntries]) => {
-              if (Array.isArray(dateEntries)) {
-                dateEntries.forEach(entry => {
-                  let shouldCount = false;
-                  let countValue = 0;
-
-                  // NEW LOGIC: April to December 2026 and future years count based on after photos
-                  if (isAprilToDecember2026OrLater) {
-                    let totalAfterPhotos = 0;
-                    if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                      // Count total number of all after photos across all rows
-                      totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                        if (row.after && Array.isArray(row.after)) {
-                          return sum + row.after.length;
-                        }
-                        return sum;
-                      }, 0);
-                    } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                      totalAfterPhotos = 1;
-                    }
-                    shouldCount = totalAfterPhotos > 0;
-                    countValue = totalAfterPhotos;
-                  } else {
-                    // EXISTING LOGIC FOR January to March (all years) and 2025 and earlier
-                    if (isMarchToOctoberCurrent) {
-                      shouldCount = entry.actionTaken && entry.actionTaken.trim() !== '';
-                      countValue = shouldCount ? 1 : 0;
-                    } else {
-                      let totalAfterPhotos = 0;
-                      if (entry.photos && entry.photos.rows && Array.isArray(entry.photos.rows)) {
-                        // Count total number of all after photos across all rows
-                        totalAfterPhotos = entry.photos.rows.reduce((sum, row) => {
-                          if (row.after && Array.isArray(row.after)) {
-                            return sum + row.after.length;
-                          }
-                          return sum;
-                        }, 0);
-                      } else if (entry.photos && entry.photos.after && entry.photos.before) {
-                        totalAfterPhotos = 1;
-                      }
-                      shouldCount = totalAfterPhotos > 0;
-                      countValue = totalAfterPhotos;
-                    }
-                  }
-
-                  if (shouldCount) {
-                    totalActionTakenCount += countValue;
-                  }
-                });
-              }
-            });
-            return { municipality, totalActionTaken: totalActionTakenCount };
+            const report = await fetchMunicipalWeeklyReport(db, municipality, monthYear);
+            const { totalActionTaken } = calculateWeeklyActionCounts(report.weeklyReportData, month, year);
+            return { municipality, totalActionTaken };
           } catch {
             return { municipality, totalActionTaken: 0 };
           }

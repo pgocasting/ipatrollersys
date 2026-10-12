@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useNotification, NotificationContainer } from '../components/ui/notification';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { fetchMunicipalWeeklyReport } from '../utils/weeklyReportLoader';
 import { dashboardLog, createSectionGroup, CONSOLE_GROUPS } from '../utils/consoleGrouping';
 import {
   Chart as ChartJS,
@@ -399,19 +400,18 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
       for (const municipality of municipalitiesToLoad) {
         for (const month of monthsToLoad) {
           const monthYear = `${month}_${currentYear}`;
-          const docRef = doc(db, 'commandCenter', 'weeklyReports', municipality, monthYear);
           
           // Add promise to array
           loadPromises.push(
-            getDoc(docRef)
-              .then(docSnap => {
-                if (docSnap.exists()) {
+            fetchMunicipalWeeklyReport(db, municipality, monthYear)
+              .then(report => {
+                if (report.success && report.data) {
                   return {
                     id: `${municipality}_${monthYear}`,
                     municipality,
                     month,
                     year: currentYear,
-                    ...docSnap.data()
+                    ...report.data
                   };
                 }
                 return null;
