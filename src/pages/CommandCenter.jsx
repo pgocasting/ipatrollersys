@@ -235,6 +235,8 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const lastSaveTime = useRef(0); // Track when we last saved to prevent immediate reload
   const weeklyReportCache = useRef({});
   const lastLoadedWeeklyRef = useRef({ month: null, year: null, municipality: null });
+  // Tracks what Firestore already has — only diff against this on Save Data
+  const firestoreBaselineRef = useRef({});
 
   // Keep ref synchronized with state
   useEffect(() => {
@@ -958,6 +960,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
                 if (data.weeklyReportData && Object.keys(data.weeklyReportData).length > 0) {
                   console.log('✅ Found available data! Loading...', Object.keys(data.weeklyReportData).slice(0, 3));
                   setWeeklyReportData(data.weeklyReportData);
+                  firestoreBaselineRef.current = JSON.parse(JSON.stringify(data.weeklyReportData));
 
                   // Extract month/year from document ID or data
                   const monthYearMatch = monthDocId.match(/([A-Za-z]+)_(\d{4})/);
@@ -1013,6 +1016,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
               if (weeklyData) {
                 console.log('✅ Found available data in old structure! Loading...', Object.keys(weeklyData).slice(0, 3));
                 setWeeklyReportData(weeklyData);
+                firestoreBaselineRef.current = JSON.parse(JSON.stringify(weeklyData));
                 return true;
               }
             }
@@ -1254,6 +1258,9 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           setDataVersion(prev => prev + 1); // Force re-render
           console.log('✅ State updated successfully with', Object.keys(finalData).length, 'dates and', loadedEntriesCount, 'entries');
 
+          // Snapshot what Firestore has so Save Data only sends NEW/changed entries
+          firestoreBaselineRef.current = JSON.parse(JSON.stringify(finalData));
+
           // Update the last loaded ref to prevent redundant loads
           lastLoadedWeeklyRef.current = {
             month: selectedMonth,
@@ -1310,6 +1317,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
       }
 
       initializeWeeklyReportData();
+      firestoreBaselineRef.current = {};
       // Clear form fields if no data found
       setSelectedBarangay("");
       setSelectedConcernType("");
@@ -1327,6 +1335,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     } catch (error) {
       console.error('❌ Error loading weekly report data:', error);
       initializeWeeklyReportData();
+      firestoreBaselineRef.current = {};
     } finally {
       setIsLoadingWeeklyReports(false);
     }
@@ -3965,22 +3974,38 @@ Are you absolutely sure you want to proceed?`;
         return;
       }
 
-      // Count actual entries (not just dates)
-      const totalEntries = Object.values(latestWeeklyReportData).reduce((sum, entries) =>
+      // ── DIFF: Only save dates that are new or changed vs the Firestore baseline ──
+      const baseline = firestoreBaselineRef.current || {};
+      const changedDates = {};
+      Object.entries(latestWeeklyReportData).forEach(([date, entries]) => {
+        const baselineEntries = baseline[date];
+        const baselineStr = JSON.stringify(baselineEntries ?? []);
+        const currentStr = JSON.stringify(Array.isArray(entries) ? entries : []);
+        if (currentStr !== baselineStr) {
+          changedDates[date] = entries;
+        }
+      });
+
+      const totalEntries = Object.values(changedDates).reduce((sum, entries) =>
         sum + (Array.isArray(entries) ? entries.length : 0), 0
       );
 
-      console.log('📊 Total entries to save:', totalEntries);
-      console.log('📊 Dates with entries:', Object.entries(latestWeeklyReportData)
-        .filter(([date, entries]) => Array.isArray(entries) && entries.length > 0)
-        .map(([date, entries]) => `${date}: ${entries.length} entries`)
+      // Count total new/changed entries
+      const newEntryCount = Object.values(changedDates).reduce((sum, entries) =>
+        sum + (Array.isArray(entries) ? entries.length : 0), 0
+      );
+      const changedDateCount = Object.keys(changedDates).length;
+
+      console.log('📊 Changed dates (new/modified):', changedDateCount);
+      console.log('📊 New/changed entries to save:', newEntryCount);
+      console.log('📊 Changed dates detail:', Object.entries(changedDates)
+        .map(([date, entries]) => `${date}: ${Array.isArray(entries) ? entries.length : 0} entries`)
       );
 
-      // Check if we have actual entries (not just empty date arrays)
-      if (totalEntries === 0) {
-        console.error('❌ No entries found in data structure');
-        console.error('Data structure:', latestWeeklyReportData);
-        showError('No entries to save. Please add at least one entry with barangay and concern type.');
+      // Nothing changed — skip Firestore write
+      if (changedDateCount === 0) {
+        console.log('ℹ️ No new or changed entries — nothing to save.');
+        if (!isSilent) showInfo('No new changes to save. All entries are already saved.');
         setIsLoadingWeeklyReports(false);
         return;
       }
@@ -3989,21 +4014,23 @@ Are you absolutely sure you want to proceed?`;
       const municipalityKey = selectedReportMunicipality ? `_${selectedReportMunicipality}` : '';
       const reportKey = `${monthYear}${municipalityKey}`;
 
-      console.log('💾 Preparing to save:', {
+      console.log('💾 Preparing to save (NEW/CHANGED ONLY):', {
         monthYear,
         municipality: activeMunicipalityTab,
-        totalEntries,
-        dateCount: Object.keys(latestWeeklyReportData).length
+        changedDateCount,
+        newEntryCount
       });
 
-      // Sanitize using LATEST state
-      const sanitizedWeeklyReportData = Object.keys(latestWeeklyReportData || {}).reduce((acc, key) => {
+      // Sanitize — only changed dates
+      const sanitizedWeeklyReportData = Object.keys(changedDates).reduce((acc, key) => {
         if (key && key.trim().length > 0) {
-          acc[key] = latestWeeklyReportData[key];
+          acc[key] = changedDates[key];
         }
         return acc;
       }, {});
 
+      // Merge changed dates into the full current state for the Firestore payload
+      // (Firestore merge:true will only update these specific date fields)
       const finalWeeklyReportData = sanitizedWeeklyReportData;
 
       // NO localStorage - Save ONLY to Firestore for live sync across all devices
@@ -4090,7 +4117,15 @@ Are you absolutely sure you want to proceed?`;
         console.log('🔑 Month:', selectedMonth);
         console.log('🔑 Year:', selectedYear);
 
-        showSuccess(`Weekly report saved successfully! ${entriesCount} entries saved to ${activeMunicipalityTab}`);
+        const savedEntryCount = Object.values(finalWeeklyReportData).reduce((sum, entries) =>
+          sum + (Array.isArray(entries) ? entries.length : 0), 0
+        );
+        showSuccess(`Weekly report saved successfully! ${savedEntryCount} new/updated entries saved to ${activeMunicipalityTab}`);
+
+        // Update baseline so future saves only diff against the newly saved state
+        Object.entries(finalWeeklyReportData).forEach(([date, entries]) => {
+          firestoreBaselineRef.current[date] = JSON.parse(JSON.stringify(entries));
+        });
 
         // Update last loaded ref so next page load will find this data
         lastLoadedWeeklyRef.current = {
