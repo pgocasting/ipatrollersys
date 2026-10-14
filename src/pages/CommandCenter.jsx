@@ -1298,31 +1298,17 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         console.log('ℹ️ No document found for selected month/year/municipality - initializing empty form');
       }
 
-      // If no data anywhere, initialize empty structure
-      console.log('📝 No data found anywhere, initializing empty structure');
-      console.warn('⚠️ WARNING: Initializing empty data - this will replace current state!');
+      // If no data anywhere, initialize clean empty structure for current municipality/month/year
+      console.log('📝 No data found in Firestore for:', reportKey, '- initializing clean empty structure');
 
-      // CRITICAL: Check if we already have data in state before wiping it!
-      const currentEntriesCount = Object.values(weeklyReportData).reduce((sum, entries) =>
-        sum + (Array.isArray(entries) ? entries.length : 0), 0
-      );
-
-      if (currentEntriesCount > 0) {
-        console.error('🚨 CRITICAL: State already has', currentEntriesCount, 'entries!');
-        console.error('🚨 NOT initializing empty data to preserve existing entries!');
-        console.error('🚨 This means Firestore load failed but we have unsaved data in state!');
-        setIsLoadingWeeklyReports(false);
-        showWarning(`Could not load data from Firestore, but you have ${currentEntriesCount} unsaved entries. Please save your data!`);
-        return;
-      }
-
-      initializeWeeklyReportData();
+      initializeWeeklyReportData(true);
       firestoreBaselineRef.current = {};
       // Clear form fields if no data found
       setSelectedBarangay("");
       setSelectedConcernType("");
       setActionTaken("");
       setRemarks("");
+      setHasUnsavedChanges(false);
 
       // Update the last loaded ref
       lastLoadedWeeklyRef.current = {
@@ -1331,10 +1317,10 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
         municipality: activeMunicipalityTab
       };
 
-      console.log('📝 No existing weekly report data found for:', reportKey);
+      console.log('📝 Initialized clean weekly report data for:', reportKey);
     } catch (error) {
       console.error('❌ Error loading weekly report data:', error);
-      initializeWeeklyReportData();
+      initializeWeeklyReportData(true);
       firestoreBaselineRef.current = {};
     } finally {
       setIsLoadingWeeklyReports(false);
@@ -1342,16 +1328,16 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   };
 
   // Initialize weekly report data structure for all dates
-  const initializeWeeklyReportData = () => {
-    // CRITICAL: Check if we already have data before wiping!
-    const currentEntriesCount = Object.values(weeklyReportData).reduce((sum, entries) =>
-      sum + (Array.isArray(entries) ? entries.length : 0), 0
-    );
+  const initializeWeeklyReportData = (force = true) => {
+    if (!force) {
+      const currentEntriesCount = Object.values(weeklyReportData).reduce((sum, entries) =>
+        sum + (Array.isArray(entries) ? entries.length : 0), 0
+      );
 
-    if (currentEntriesCount > 0) {
-      console.warn('⚠️ Skipping initialization - state already has', currentEntriesCount, 'entries!');
-      console.warn('⚠️ Will keep existing data to prevent data loss!');
-      return; // DON'T wipe existing data!
+      if (currentEntriesCount > 0) {
+        console.warn('⚠️ Skipping initialization - state already has', currentEntriesCount, 'entries!');
+        return;
+      }
     }
 
     console.log('🔧 Initializing empty weekly report data structure...');
@@ -1365,6 +1351,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     console.log('✅ Initialized', Object.keys(initialData).length, 'dates with empty arrays');
     console.log('📋 Sample dates:', Object.keys(initialData).slice(0, 5));
     setWeeklyReportData(initialData);
+    weeklyReportDataRef.current = initialData;
     setDataVersion(prev => prev + 1); // Force re-render
   };
 
@@ -2877,7 +2864,26 @@ Are you absolutely sure you want to proceed?`;
   };
 
   // Handle municipality tab switching
-  const handleMunicipalityTabChange = (municipality) => {
+  const handleMunicipalityTabChange = async (municipality) => {
+    if (municipality === activeMunicipalityTab) return;
+
+    // If user has unsaved changes in current municipality, auto-save before switching
+    if (hasUnsavedChanges && activeMunicipalityTab) {
+      console.log(`💾 Auto-saving changes for ${activeMunicipalityTab} before switching to ${municipality}...`);
+      await handleSaveWeeklyReport(true, true);
+    }
+
+    // Reset weekly report data immediately to prevent flashing/showing old municipality's data
+    const dates = generateDates(selectedMonth, selectedYear);
+    const initialData = {};
+    dates.forEach(date => {
+      initialData[date] = [];
+    });
+    setWeeklyReportData(initialData);
+    weeklyReportDataRef.current = initialData;
+    firestoreBaselineRef.current = {};
+    setHasUnsavedChanges(false);
+
     setActiveMunicipalityTab(municipality);
     setSelectedReportMunicipality(municipality);
   };
@@ -5069,11 +5075,24 @@ Are you absolutely sure you want to proceed?`;
                               id="month-select"
                               name="month-select"
                               value={selectedMonth}
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const newMonth = e.target.value;
+                                if (newMonth === selectedMonth) return;
+                                if (hasUnsavedChanges && activeMunicipalityTab) {
+                                  console.log(`💾 Auto-saving changes for ${activeMunicipalityTab} before month switch...`);
+                                  await handleSaveWeeklyReport(true, true);
+                                }
+                                const dates = generateDates(newMonth, selectedYear);
+                                const initialData = {};
+                                dates.forEach(date => {
+                                  initialData[date] = [];
+                                });
+                                setWeeklyReportData(initialData);
+                                weeklyReportDataRef.current = initialData;
+                                firestoreBaselineRef.current = {};
+                                setHasUnsavedChanges(false);
                                 console.log('📅 Month dropdown changed from:', selectedMonth, 'to:', newMonth);
                                 setSelectedMonth(newMonth);
-                                // Data will be loaded from Firestore via useEffect for month changes
                               }}
                               disabled={isFilterReadOnly}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
@@ -5090,7 +5109,24 @@ Are you absolutely sure you want to proceed?`;
                               id="year-select"
                               name="year-select"
                               value={selectedYear}
-                              onChange={(e) => setSelectedYear(e.target.value)}
+                              onChange={async (e) => {
+                                const newYear = e.target.value;
+                                if (newYear === selectedYear) return;
+                                if (hasUnsavedChanges && activeMunicipalityTab) {
+                                  console.log(`💾 Auto-saving changes for ${activeMunicipalityTab} before year switch...`);
+                                  await handleSaveWeeklyReport(true, true);
+                                }
+                                const dates = generateDates(selectedMonth, newYear);
+                                const initialData = {};
+                                dates.forEach(date => {
+                                  initialData[date] = [];
+                                });
+                                setWeeklyReportData(initialData);
+                                weeklyReportDataRef.current = initialData;
+                                firestoreBaselineRef.current = {};
+                                setHasUnsavedChanges(false);
+                                setSelectedYear(newYear);
+                              }}
                               disabled={isFilterReadOnly}
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent !text-black"
                               style={{ color: '#000' }}
