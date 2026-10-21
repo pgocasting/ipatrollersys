@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from '../components/Layout';
+import ExecutiveHub from '../components/ExecutiveHub';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -42,8 +43,26 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
+  ChevronUp,
   X,
-  Database
+  Database,
+  Car,
+  Command,
+  Radio,
+  TrendingUp,
+  Activity,
+  Calendar,
+  Search,
+  Filter,
+  Clock,
+  ArrowUpRight,
+  Sparkles,
+  Layers,
+  Eye,
+  ExternalLink,
+  AlertCircle,
+  ArrowRight,
+  Info
 } from 'lucide-react';
 
 export default function Dashboard({ onLogout, onNavigate, currentPage }) {
@@ -317,6 +336,19 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   const [expandedLocations, setExpandedLocations] = useState({});
   const { notifications, showSuccess, removeNotification } = useNotification();
   
+  // Executive Hub Tab & Filter States
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'ipatroller' | 'commandcenter' | 'incidents'
+  const [ipatrollerSearch, setIpatrollerSearch] = useState('');
+  const [ipatrollerDistrictFilter, setIpatrollerDistrictFilter] = useState('ALL');
+  const [ipatrollerStatusFilter, setIpatrollerStatusFilter] = useState('ALL');
+
+  const [commandCenterSearch, setCommandCenterSearch] = useState('');
+  const [commandCenterDistrictFilter, setCommandCenterDistrictFilter] = useState('ALL');
+
+  const [incidentsSearch, setIncidentsSearch] = useState('');
+  const [incidentsTypeFilter, setIncidentsTypeFilter] = useState('ALL');
+  const [incidentsSeverityFilter, setIncidentsSeverityFilter] = useState('ALL');
+
   // Command Center data states
   const [realCommandCenterData, setRealCommandCenterData] = useState({
     barangays: [],
@@ -328,20 +360,50 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
   });
   const [isLoadingCommandCenter, setIsLoadingCommandCenter] = useState(false);
 
+  // Helper to calculate total yesterday patrols across all municipalities
+  const getTotalYesterdayPatrols = () => {
+    if (!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) return 0;
+    const { dayIndex: referenceIndex } = getDashboardReferenceDate();
+    return ipatrollerPatrolData.reduce((sum, item) => {
+      if (item.data && Array.isArray(item.data) && referenceIndex >= 0 && referenceIndex < item.data.length) {
+        return sum + (Number(item.data[referenceIndex]) || 0);
+      }
+      return sum;
+    }, 0);
+  };
+
+  // Helper to get unique recent incidents sorted by date
+  const getRecentIncidentsList = () => {
+    const dataToUse = realIncidentsData.length > 0 ? realIncidentsData : incidents || [];
+    const uniqueIncidents = dataToUse.reduce((acc, incident) => {
+      const existingIndex = acc.findIndex(existing => existing.id === incident.id);
+      if (existingIndex === -1) {
+        acc.push(incident);
+      } else {
+        const existing = acc[existingIndex];
+        const existingTime = existing.updatedAt || existing.createdAt || '';
+        const newTime = incident.updatedAt || incident.createdAt || '';
+        if (newTime > existingTime) {
+          acc[existingIndex] = incident;
+        }
+      }
+      return acc;
+    }, []);
+
+    return uniqueIncidents.sort((a, b) => {
+      const dateA = getReportDate(a) || new Date(0);
+      const dateB = getReportDate(b) || new Date(0);
+      return dateB - dateA;
+    });
+  };
+
   // Fetch real Command Center data from Firebase
   const fetchCommandCenterData = async () => {
     const commandCenterGroup = createSectionGroup(CONSOLE_GROUPS.COMMAND_CENTER, false);
     commandCenterGroup.log('🔄 Dashboard fetchCommandCenterData called:', {
       userAccessLevel,
-      userMunicipality,
-      shouldFetch: userAccessLevel === 'command-center'
+      userMunicipality
     });
-    
-    if (userAccessLevel !== 'command-center') {
-      commandCenterGroup.log('⚠️ Not fetching Command Center data - user access level is:', userAccessLevel);
-      commandCenterGroup.end();
-      return;
-    }
     
     setIsLoadingCommandCenter(true);
     commandCenterGroup.log('📡 Starting Command Center data fetch...');
@@ -516,24 +578,20 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
 
   // Load Command Center data when component mounts or user changes (non-blocking)
   useEffect(() => {
-    if (userAccessLevel === 'command-center') {
-      // Load in background without blocking UI
-      setTimeout(() => {
-        fetchCommandCenterData();
-      }, 0);
-    }
-  }, [userAccessLevel, userMunicipality]);
+    // Load in background without blocking UI
+    setTimeout(() => {
+      fetchCommandCenterData();
+    }, 150);
+  }, [userAccessLevel, userMunicipality, isAdmin]);
 
-  // Auto-refresh Command Center data every 60 seconds for command-center users
+  // Auto-refresh Command Center data every 60 seconds
   useEffect(() => {
-    if (userAccessLevel === 'command-center') {
-      const refreshInterval = setInterval(() => {
-        dashboardLog('🔄 Auto-refreshing Command Center data...');
-        fetchCommandCenterData();
-      }, 60000); // 60 seconds
+    const refreshInterval = setInterval(() => {
+      dashboardLog('🔄 Auto-refreshing Command Center data...');
+      fetchCommandCenterData();
+    }, 60000); // 60 seconds
 
-      return () => clearInterval(refreshInterval);
-    }
+    return () => clearInterval(refreshInterval);
   }, [userAccessLevel, userMunicipality]);
 
   // Load IPatroller data when component mounts (non-blocking)
@@ -1988,946 +2046,192 @@ export default function Dashboard({ onLogout, onNavigate, currentPage }) {
         </div>
       )}
 
-      <div className="h-full flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className={`flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 ${isAdmin ? 'sticky top-0 z-40 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80 py-3 border-b border-slate-200' : ''} w-full px-4 sm:px-6 lg:px-8`}>
-          <div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-1 sm:mt-2">
-              {userAccessLevel === 'quarry-monitoring' 
-                ? 'Overview of quarry site operations and compliance monitoring'
-                : userAccessLevel === 'command-center'
-                ? 'Overview of Command Center operations with barangay reports and concern types'
-                : `Overview of IPatroller system performance based on ${summaryStats.yesterdayDate ? `patrol data from ${summaryStats.yesterdayDate}` : 'yesterday\'s patrol data'}`
-              }
-            </p>
-            {false && (
-              <p className="text-xs text-gray-400 mt-1 flex items-center gap-1 flex-wrap">
-                <RefreshCw className="w-3 h-3" />
-                Last updated: {lastDataUpdate?.toLocaleTimeString?.()} - Showing data for {currentMonthYearLabel}
+      <div className="h-full flex flex-col overflow-hidden bg-slate-50/60">
+        {/* Executive Header */}
+        <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-sm px-4 sm:px-6 lg:px-8 py-4 transition-all">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold tracking-wide uppercase bg-blue-100 text-blue-700">
+                  <Shield className="w-3 h-3 mr-1" />
+                  1Bataan Command
+                </span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse mr-1"></span>
+                  Operational
+                </span>
+                <span className="text-xs text-slate-400 font-medium hidden sm:inline">
+                  {currentMonthYearLabel}
+                </span>
+              </div>
+              <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+                Unified Provincial Dashboard
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Integrated monitoring for I-Patroller operations, Command Center dispatches, and emergency incidents.
               </p>
-            )}
-          </div>
-          
-          {/* Action Buttons for Admin Users */}
-          {userAccessLevel === 'admin' && (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            </div>
+
+            {/* Quick Actions & Meta */}
+            <div className="flex items-center flex-wrap gap-2.5">
+              <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-100/80 rounded-xl border border-slate-200/80 text-xs text-slate-600">
+                <Calendar className="w-3.5 h-3.5 text-blue-600" />
+                <span>Audit: <strong className="text-slate-800">{getDashboardReferenceDate().date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</strong></span>
+              </div>
+
               <Button
                 onClick={() => {
-                  dashboardLog('🔄 Refreshing all dashboard data...');
-                  // Refresh all data sources
-                  loadIPatrollerData(); // Load from IPatroller source
-                  refreshIPatrollerData(); // Also refresh DataContext
-                  fetchActionCenterData(); // Refresh Action Center data
-                  fetchIncidentsData(); // Refresh Incidents data
-                  if (userAccessLevel === 'command-center') {
-                    fetchCommandCenterData(); // Refresh Command Center data
-                  }
-                  showSuccess(`All dashboard data refreshed for current month (${currentMonthYearLabel})`);
+                  dashboardLog('🔄 Refreshing all dashboard systems...');
+                  loadIPatrollerData();
+                  refreshIPatrollerData();
+                  fetchActionCenterData();
+                  fetchIncidentsData();
+                  fetchCommandCenterData();
+                  showSuccess(`All systems refreshed for ${currentMonthYearLabel}`);
                 }}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm sm:text-base px-3 py-2"
+                disabled={ipatrollerLoading || isLoadingCommandCenter || isLoadingIncidents}
+                className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs sm:text-sm px-3.5 py-2 rounded-xl shadow-sm hover:shadow transition-all"
               >
-                <RefreshCw className="w-4 h-4" />
-                Refresh All Data
+                <RefreshCw className={`w-3.5 h-3.5 ${(ipatrollerLoading || isLoadingCommandCenter || isLoadingIncidents) ? 'animate-spin' : ''}`} />
+                <span>{(ipatrollerLoading || isLoadingCommandCenter || isLoadingIncidents) ? 'Refreshing...' : 'Refresh All'}</span>
               </Button>
-              
+
+              {instructionContent && (
+                <Button
+                  onClick={() => setShowInstructions(true)}
+                  variant="outline"
+                  className="flex items-center gap-1.5 text-xs text-slate-600 hover:text-slate-900 border-slate-200 px-3 py-2 rounded-xl"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Guide</span>
+                </Button>
+              )}
+
               {(!ipatrollerPatrolData || ipatrollerPatrolData.length === 0) && (
                 <Button
                   onClick={() => {
-                    dashboardLog('🧪 Creating sample IPatroller data for testing...');
                     createSampleIPatrollerData();
-                    showSuccess('Sample IPatroller data created for testing');
+                    showSuccess('Sample IPatroller data populated');
                   }}
-                  className="flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm sm:text-base px-3 py-2"
+                  variant="outline"
+                  className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 px-3 py-2 rounded-xl"
                 >
-                  <FileText className="w-4 h-4" />
-                  Create Sample Data
+                  <FileText className="w-3.5 h-3.5 mr-1" />
+                  Load Sample
                 </Button>
               )}
             </div>
-          )}
-          
-          {/* Action Buttons for Command Center Users */}
-          {userAccessLevel === 'command-center' && (
-            <div className="flex items-center gap-2 w-full sm:w-auto">
-              <Button
-                onClick={() => {
-                  dashboardLog('🔄 Refreshing Command Center, Action, and Incidents data...');
-                  fetchCommandCenterData();
-                  fetchActionCenterData(); // Also refresh action data
-                  fetchIncidentsData(); // Also refresh incidents data
-                  showSuccess(`Command Center data refreshed for current month (${currentMonthYearLabel})`);
-                }}
-                disabled={isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents}
-                className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 text-sm sm:text-base px-3 py-2 w-full sm:w-auto"
+          </div>
+
+          {/* Tab Navigation Switcher */}
+          {userAccessLevel !== 'quarry-monitoring' && (
+            <div className="flex items-center gap-2 mt-4 pt-3 border-t border-slate-100 overflow-x-auto no-scrollbar">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'overview'
+                    ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
               >
-                <RefreshCw className={`w-4 h-4 ${(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'animate-spin' : ''}`} />
-                {(isLoadingCommandCenter || isLoadingActionCenter || isLoadingIncidents) ? 'Refreshing...' : 'Refresh Data'}
-              </Button>
-            </div>
-          )}
-        </div>
-        <div className="flex-1 min-h-0 overflow-y-auto">
-        <div className="pb-8">
-          {/* Quick Stats */}
-        {userAccessLevel === 'quarry-monitoring' ? (
-          /* Quarry Monitoring Stats */
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Total Sites</p>
-                    <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                      {quarryData.totalSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-1.5 sm:p-2 bg-blue-100 rounded-lg">
-                    <Mountain className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                <Sparkles className={`w-4 h-4 ${activeTab === 'overview' ? 'text-amber-400' : 'text-slate-400'}`} />
+                <span>Overview Hub</span>
+              </button>
 
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Active Sites</p>
-                    <p className="text-xl sm:text-2xl font-bold text-green-600">
-                      {quarryData.activeSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-1.5 sm:p-2 bg-green-100 rounded-lg">
-                    <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Compliant</p>
-                    <p className="text-xl sm:text-2xl font-bold text-emerald-600">
-                      {quarryData.compliantSites.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-1.5 sm:p-2 bg-emerald-100 rounded-lg">
-                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-sm border border-gray-200">
-              <CardContent className="p-3 sm:p-4 lg:p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-gray-500 mb-1 truncate">Violations</p>
-                    <p className="text-xl sm:text-2xl font-bold text-red-600">
-                      {quarryData.violations.toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="p-1.5 sm:p-2 bg-red-100 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : userAccessLevel === 'command-center' ? (
-          /* Command Center Stats - Modern shadcn Design */
-          <div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-5 lg:mt-6 mb-4 sm:mb-6 lg:mb-8">
-            {/* 1. Total Reports - WHITE THEME */}
-            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-violet-500"></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-violet-50 rounded-lg">
-                        <FileText className="w-5 h-5 text-violet-600" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Reports</p>
-                    </div>
-                    <p className="text-5xl font-black text-slate-900 tracking-tight">
-                      {commandCenterData.totalReports.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-slate-400 font-medium">{userMunicipality || 'All municipalities'} • Mar-Sep 2025</p>
-                  </div>
-                  <div className="p-3 bg-violet-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                    <FileText className="w-10 h-10 text-violet-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 2. Total Barangays - WHITE THEME */}
-            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-blue-500"></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-blue-50 rounded-lg">
-                        <Building2 className="w-5 h-5 text-blue-600" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Total Barangays</p>
-                    </div>
-                    <p className="text-5xl font-black text-slate-900 tracking-tight">
-                      {commandCenterData.totalBarangays.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-slate-400 font-medium">In {userMunicipality || 'all municipalities'}</p>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                    <Building2 className="w-10 h-10 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 3. Concern Types - WHITE THEME */}
-            <Card className="border-none shadow-md hover:shadow-lg transition-all duration-300 bg-white overflow-hidden relative group">
-              <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
-              <CardContent className="p-6 relative z-10">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-2 bg-emerald-50 rounded-lg">
-                        <AlertTriangle className="w-5 h-5 text-emerald-600" />
-                      </div>
-                      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Concern Types</p>
-                    </div>
-                    <p className="text-5xl font-black text-slate-900 tracking-tight">
-                      {commandCenterData.totalConcernTypes.toLocaleString()}
-                    </p>
-                    <p className="text-sm text-slate-400 font-medium">Active categories</p>
-                  </div>
-                  <div className="p-3 bg-emerald-50 rounded-2xl group-hover:scale-110 transition-transform duration-300">
-                    <AlertTriangle className="w-10 h-10 text-emerald-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          </div>
-        ) : (
-          /* Regular Dashboard Stats */
-          <div>
-          <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div>
-          <div className={`grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6 mt-4 sm:mt-5 lg:mt-6 mb-4 sm:mb-6 lg:mb-8 ${userAccessLevel === 'ipatroller' ? 'lg:grid-cols-2' : 'lg:grid-cols-4'}`}>
-          <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
-            <CardContent className="p-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-500 mb-1 truncate">Active Municipalities</p>
-                  <p className="text-xl sm:text-2xl font-bold text-emerald-600">
-                    {activeCount.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 sm:p-2.5 bg-emerald-100 rounded-lg flex-shrink-0">
-                  <CheckCircle className="w-5 h-5 sm:w-6 sm:h-6 text-emerald-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
-            <CardContent className="p-5 sm:p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-slate-500 mb-1 truncate">Inactive Municipalities</p>
-                  <p className="text-xl sm:text-2xl font-bold text-red-600">
-                    {inactiveCount.toLocaleString()}
-                  </p>
-                </div>
-                <div className="p-2 sm:p-2.5 bg-red-100 rounded-lg flex-shrink-0">
-                  <XCircle className="w-5 h-5 sm:w-6 sm:h-6 text-red-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {userAccessLevel !== 'ipatroller' && (
-            <>
-              <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
-                <CardContent className="p-5 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Actions ({currentMonthYearLabel})</p>
-                      <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {getCurrentMonthActionsCount().toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="p-2 sm:p-2.5 bg-blue-100 rounded-lg flex-shrink-0">
-                      <Target className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
-                <CardContent className="p-5 sm:p-6">
-                  <div className="flex items-center justify-between">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium text-slate-500 mb-1 truncate">Total Incidents ({currentMonthYearLabel})</p>
-                      <p className="text-xl sm:text-2xl font-bold text-orange-600">
-                        {getCurrentMonthIncidentsCount().toLocaleString()}
-                      </p>
-                    </div>
-                    <div className="p-2 sm:p-2.5 bg-orange-100 rounded-lg flex-shrink-0">
-                      <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-          </div>
-          </div>
-          </div>
-          </div>
-        )}
-
-        {/* Analytics Section */}
-        <div className="w-full px-4 sm:px-6 lg:px-8">
-        {userAccessLevel === 'quarry-monitoring' ? (
-          /* Quarry Monitoring Analytics */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Quarry Sites List */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-blue-100 rounded-lg">
-                    <Mountain className="w-5 h-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Quarry Sites</CardTitle>
-                    <p className="text-sm text-gray-600">Active quarry operations and compliance status</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {quarryData.sites.map((site, index) => (
-                    <div key={index} className={`p-4 rounded-lg border transition-colors ${
-                      site.compliance === 'Compliant' ? 'bg-green-50 border-green-200 hover:bg-green-100' :
-                      site.compliance === 'Non-Compliant' ? 'bg-red-50 border-red-200 hover:bg-red-100' :
-                      'bg-yellow-50 border-yellow-200 hover:bg-yellow-100'
-                    }`}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Pickaxe className={`w-4 h-4 ${
-                              site.status === 'Active' ? 'text-green-600' : 'text-gray-400'
-                            }`} />
-                            <h3 className="text-sm font-semibold text-gray-900">{site.name}</h3>
-                          </div>
-                          <p className="text-xs text-gray-600 mb-1">{site.operator}</p>
-                          <p className="text-xs text-gray-500 mb-2">{site.location}</p>
-                          <div className="flex items-center gap-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              site.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                            }`}>
-                              {site.status}
-                            </span>
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              site.permitStatus === 'Valid' ? 'bg-blue-100 text-blue-700' :
-                              site.permitStatus === 'Expired' ? 'bg-red-100 text-red-700' :
-                              'bg-yellow-100 text-yellow-700'
-                            }`}>
-                              {site.permitStatus}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="text-right flex flex-col items-end">
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium mb-1 ${
-                            site.compliance === 'Compliant' ? 'bg-green-100 text-green-700' :
-                            site.compliance === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            <Shield className={`w-3 h-3 ${
-                              site.compliance === 'Compliant' ? 'text-green-600' :
-                              site.compliance === 'Non-Compliant' ? 'text-red-600' :
-                              'text-yellow-600'
-                            }`} />
-                            <span>{site.compliance}</span>
-                          </div>
-                          <p className="text-xs text-gray-500">Last: {new Date(site.lastInspection).toLocaleDateString()}</p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Compliance Overview */}
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-emerald-100 rounded-lg">
-                    <FileCheck className="w-5 h-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Compliance Overview</CardTitle>
-                    <p className="text-sm text-gray-600">Environmental and operational compliance status</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                <div className="space-y-4">
-                  {/* Compliance Rate */}
-                  <div className="p-4 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="text-sm font-semibold text-emerald-800">Overall Compliance Rate</h3>
-                      <span className="text-2xl font-bold text-emerald-600">
-                        {Math.round((quarryData.compliantSites / quarryData.totalSites) * 100)}%
-                      </span>
-                    </div>
-                    <div className="w-full bg-emerald-200 rounded-full h-2">
-                      <div 
-                        className="bg-emerald-600 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${(quarryData.compliantSites / quarryData.totalSites) * 100}%` }}
-                      ></div>
-                    </div>
-                  </div>
-
-                  {/* Permit Status Breakdown */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Permit Status Breakdown</h3>
-                    <div className="grid grid-cols-1 gap-2">
-                      <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-blue-600 rounded-full"></div>
-                          <span className="text-sm text-gray-700">Valid Permits</span>
-                        </div>
-                        <span className="text-sm font-semibold text-blue-600">18</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-yellow-600 rounded-full"></div>
-                          <span className="text-sm text-gray-700">Pending Renewal</span>
-                        </div>
-                        <span className="text-sm font-semibold text-yellow-600">3</span>
-                      </div>
-                      <div className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
-                        <div className="flex items-center gap-2">
-                          <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-                          <span className="text-sm text-gray-700">Expired</span>
-                        </div>
-                        <span className="text-sm font-semibold text-red-600">3</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Recent Inspections */}
-                  <div className="space-y-3">
-                    <h3 className="text-sm font-semibold text-gray-900">Recent Inspections</h3>
-                    <div className="space-y-2">
-                      {quarryData.sites.slice(0, 3).map((site, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                          <div>
-                            <p className="text-xs font-medium text-gray-900">{site.name}</p>
-                            <p className="text-xs text-gray-500">{new Date(site.lastInspection).toLocaleDateString()}</p>
-                          </div>
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            site.compliance === 'Compliant' ? 'bg-green-100 text-green-700' :
-                            site.compliance === 'Non-Compliant' ? 'bg-red-100 text-red-700' :
-                            'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {site.compliance}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : userAccessLevel === 'command-center' ? (
-          /* Command Center Analytics - Modern shadcn Design */
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* All Barangays - Modern Card */}
-            <Card className="border border-slate-200 shadow-xl hover:shadow-2xl transition-all duration-300 bg-white overflow-hidden">
-              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-blue-500 rounded-xl shadow-lg">
-                      <Building2 className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl font-bold text-slate-900">All Barangays</CardTitle>
-                      <p className="text-sm text-slate-500 mt-0.5">Complete registry with activity tracking</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700 hover:bg-blue-200 font-semibold">
-                    {commandCenterData.barangays.length}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="max-h-[650px] overflow-y-auto">
-                  <div className="divide-y divide-slate-100">
-                    {commandCenterData.barangays.length > 0 ? (
-                      commandCenterData.barangays.map((barangay, index) => (
-                        <div key={index} className="group p-5 hover:bg-slate-50/80 transition-all duration-200 cursor-pointer">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2.5 mb-2">
-                                <div className="p-1.5 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                                  <MapPin className="w-4 h-4 text-blue-600" />
-                                </div>
-                                <h3 className="text-sm font-bold text-slate-900 truncate">{barangay.name}</h3>
-                              </div>
-                              <div className="ml-8 space-y-1">
-                                <p className="text-xs text-slate-600 font-medium">{barangay.municipality}</p>
-                                <p className="text-xs text-slate-400">{barangay.district}</p>
-                              </div>
-                              <div className="ml-8 mt-3">
-                                <Badge 
-                                  variant={barangay.reports > 0 ? "default" : "secondary"}
-                                  className={barangay.reports > 0 ? "bg-blue-500 hover:bg-blue-600" : "bg-slate-200 text-slate-600"}
-                                >
-                                  {barangay.reports} {barangay.reports === 1 ? 'Report' : 'Reports'}
-                                </Badge>
-                              </div>
-                            </div>
-                            <div className="text-right flex flex-col items-end gap-1">
-                              <div className="text-xs font-medium text-slate-500">Last Report</div>
-                              <div className="text-xs font-semibold text-slate-700">
-                                {barangay.lastReport === 'No reports' 
-                                  ? <span className="text-slate-400">No reports</span>
-                                  : new Date(barangay.lastReport).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                                }
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="p-8 text-center">
-                        <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-                        <p className="text-sm text-slate-500">No barangays found</p>
-                        <p className="text-xs text-slate-400 mt-1">Please check Firebase data</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                {commandCenterData.barangays.length > 0 && (
-                  <div className="p-4 border-t border-slate-100 bg-slate-50">
-                    <p className="text-xs text-center text-slate-500">
-                      Showing <span className="font-semibold text-slate-700">all barangays</span> in {userMunicipality || 'all municipalities'}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* All Concern Types - Modern Card */}
-            <Card className="border border-slate-200 shadow-xl hover:shadow-2xl transition-all duration-300 bg-white overflow-hidden">
-              <CardHeader className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white p-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-emerald-500 rounded-xl shadow-lg">
-                      <AlertTriangle className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-xl font-bold text-slate-900">All Concern Types</CardTitle>
-                      <p className="text-sm text-slate-500 mt-0.5">Complete list of reported categories</p>
-                    </div>
-                  </div>
-                  <Badge variant="secondary" className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 font-semibold">
-                    {commandCenterData.concernTypes.length}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6">
-                <div className="space-y-4">
-                  {commandCenterData.concernTypes.map((concern, index) => (
-                    <div key={index} className="group relative">
-                      <div className="flex items-center gap-4 p-4 rounded-xl border border-slate-200 bg-white hover:border-slate-300 hover:shadow-md transition-all duration-200">
-                        <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-gradient-to-br from-slate-100 to-slate-200 group-hover:from-slate-200 group-hover:to-slate-300 transition-all">
-                          <span className="text-lg font-black text-slate-700">#{index + 1}</span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-bold text-slate-900 truncate uppercase tracking-wide">
-                            {concern.type}
-                          </p>
-                          <div className="mt-1 h-2 bg-slate-100 rounded-full overflow-hidden">
-                            <div 
-                              className={`h-full transition-all duration-500 ${
-                                concern.color === 'green' ? 'bg-emerald-500' :
-                                concern.color === 'blue' ? 'bg-blue-500' :
-                                concern.color === 'red' ? 'bg-red-500' :
-                                concern.color === 'orange' ? 'bg-orange-500' :
-                                'bg-violet-500'
-                              }`}
-                              style={{ width: `${Math.min((concern.count / Math.max(...commandCenterData.concernTypes.map(c => c.count))) * 100, 100)}%` }}
-                            ></div>
-                          </div>
-                        </div>
-                        <Badge 
-                          className={`font-bold text-sm px-3 py-1.5 ${
-                            concern.color === 'green' ? 'bg-emerald-500 hover:bg-emerald-600' :
-                            concern.color === 'blue' ? 'bg-blue-500 hover:bg-blue-600' :
-                            concern.color === 'red' ? 'bg-red-500 hover:bg-red-600' :
-                            concern.color === 'orange' ? 'bg-orange-500 hover:bg-orange-600' :
-                            'bg-violet-500 hover:bg-violet-600'
-                          }`}
-                        >
-                          {concern.count}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* District Breakdown */}
-                <div className="space-y-3 mt-6 pt-6 border-t-2 border-slate-200">
-                  <div className="flex items-center gap-2 mb-3">
-                    <MapPin className="w-4 h-4 text-slate-700" />
-                    <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide">District Breakdown</h3>
-                  </div>
-                  <div className="space-y-2">
-                    {commandCenterData.districtBreakdown.map((district, index) => (
-                      <div key={index} className="flex items-center justify-between p-4 bg-gradient-to-br from-slate-50 to-slate-100 rounded-xl border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all duration-200">
-                        <div>
-                          <p className="text-sm font-bold text-slate-900">{district.district}</p>
-                          <p className="text-xs text-slate-500 mt-1">{district.barangays} barangays</p>
-                        </div>
-                        <div className="text-right flex flex-col items-end gap-1">
-                          <Badge className="bg-blue-500 hover:bg-blue-600">
-                            {district.reports} reports
-                          </Badge>
-                          <p className="text-xs text-slate-600 font-semibold">{district.percentage}%</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          /* Regular Dashboard Analytics */
-          <div>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Municipality Lists */}
-          <Card className="lg:col-span-2 bg-white shadow-sm border border-slate-200 rounded-xl">
-            <CardHeader className="p-6 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <List className="w-5 h-5 text-blue-600" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg font-semibold text-slate-900">Municipality List</CardTitle>
-                  <p className="text-sm text-slate-600">
-                    {`Active, warning, and inactive municipalities for ${getDashboardReferenceDate().date.toDateString()}`}
-                  </p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-6 pt-0">
-              {/* Instructions */}
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <div className="p-1 bg-blue-100 rounded mt-0.5">
-                    <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-medium text-blue-900 mb-1">How to read this data:</p>
-                    <ul className="text-xs text-blue-800 space-y-0.5">
-                      <li>• <span className="font-semibold">Active:</span> 14 or more patrols</li>
-                      <li>• <span className="font-semibold">Warning:</span> exactly 13 patrols</li>
-                      <li>• <span className="font-semibold">Inactive:</span> 12 or fewer patrols or no entry</li>
-                      <li>• Numbers shown represent the total patrol count for yesterday</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-auto">
-                  
-                {/* Active Municipalities */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <CheckCircle className="w-4 h-4 text-emerald-600" />
-                    <h3 className="text-sm font-semibold text-emerald-600">Active ({municipalityLists.active.length})</h3>
-                  </div>
-                  <div className="space-y-1 max-h-80 overflow-y-auto pr-2">
-                    {municipalityLists.active.length > 0 ? (
-                      municipalityLists.active.map((municipality, index) => (
-                        <div key={index} className="flex items-center justify-between p-2.5 bg-emerald-50 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-slate-500">{municipality.district}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-semibold text-emerald-600">{municipality.patrols}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
-                        <p className="text-xs">No active municipalities</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Warning Municipalities */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <AlertTriangle className="w-4 h-4 text-yellow-600" />
-                    <h3 className="text-sm font-semibold text-yellow-600">Warning ({municipalityLists.warning?.length || 0})</h3>
-                  </div>
-                  <div className="space-y-1 max-h-80 overflow-y-auto pr-2">
-                    {(municipalityLists.warning?.length || 0) > 0 ? (
-                      (municipalityLists.warning || []).map((municipality, index) => (
-                        <div key={index} className="flex items-center justify-between p-2.5 bg-yellow-50 rounded-lg border border-yellow-100 hover:bg-yellow-100 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-slate-500">{municipality.district}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-semibold text-yellow-700">{municipality.patrols}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
-                        <p className="text-xs">No warning municipalities</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Inactive Municipalities */}
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 mb-3">
-                    <XCircle className="w-4 h-4 text-red-600" />
-                    <h3 className="text-sm font-semibold text-red-600">Inactive ({municipalityLists.inactive.length})</h3>
-                  </div>
-                  <div className="space-y-1 max-h-80 overflow-y-auto pr-2">
-                    {municipalityLists.inactive.length > 0 ? (
-                      municipalityLists.inactive.map((municipality, index) => (
-                        <div key={index} className="flex items-center justify-between p-2.5 bg-red-50 rounded-lg border border-red-100 hover:bg-red-100 transition-colors">
-                          <div className="flex items-center gap-2">
-                            <Building2 className="w-3.5 h-3.5 text-red-600 flex-shrink-0" />
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium text-slate-900 truncate">{municipality.name}</p>
-                              <p className="text-xs text-slate-500">{municipality.district}</p>
-                            </div>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="text-xs font-semibold text-red-600">{municipality.patrols}</p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-6 text-gray-500">
-                        <Building2 className="w-6 h-6 mx-auto mb-1 text-gray-300" />
-                        <p className="text-xs">No inactive municipalities</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-            </CardContent>
-          </Card>
-
-        {/* District Distribution Cards */}
-        <Card className="bg-white shadow-sm border border-slate-200 rounded-xl">
-          <CardHeader className="p-6 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <MapPin className="w-4 h-4 text-emerald-600" />
-              </div>
-              <div>
-                <CardTitle className="text-sm font-semibold text-slate-900">District Distribution</CardTitle>
-                <p className="text-xs text-slate-600">
-                  {`Municipality status by district (${getDashboardReferenceDate().date.toDateString()})`}
-                </p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-0">
-            {/* Instructions */}
-            <div className="mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <div className="p-1 bg-emerald-100 rounded mt-0.5">
-                  <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-xs font-medium text-emerald-900 mb-1">District Summary:</p>
-                  <ul className="text-xs text-emerald-800 space-y-0.5">
-                    <li>• Shows active vs inactive count per district</li>
-                    <li>• <span className="font-semibold">Percentage:</span> Active municipalities / Total municipalities</li>
-                    <li>• Each district has 4 municipalities total</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {districtStats.map((district, index) => (
-                <div key={index} className={`p-3 rounded-lg border hover:shadow-sm transition-all duration-200 ${
-                  district.color === 'blue' ? 'bg-blue-50 border-blue-200 hover:bg-blue-100' :
-                  district.color === 'emerald' ? 'bg-emerald-50 border-emerald-200 hover:bg-emerald-100' :
-                  'bg-orange-50 border-orange-200 hover:bg-orange-100'
+              <button
+                onClick={() => setActiveTab('ipatroller')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'ipatroller'
+                    ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Car className="w-4 h-4" />
+                <span>I-Patroller</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  activeTab === 'ipatroller' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700'
                 }`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded ${
-                        district.color === 'blue' ? 'bg-blue-100' :
-                        district.color === 'emerald' ? 'bg-emerald-100' :
-                        'bg-orange-100'
-                      }`}>
-                        <Building2 className={`w-3.5 h-3.5 ${
-                          district.color === 'blue' ? 'text-blue-600' :
-                          district.color === 'emerald' ? 'text-emerald-600' :
-                          'text-orange-600'
-                        }`} />
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-slate-900">{district.name}</h3>
-                        <p className="text-xs text-slate-600">{district.total} municipalities</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className={`text-xl font-bold ${
-                        district.color === 'blue' ? 'text-blue-600' :
-                        district.color === 'emerald' ? 'text-emerald-600' :
-                        'text-orange-600'
-                      }`}>
-                        {district.active}
-                      </p>
-                      <p className="text-xs text-slate-500">Active</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-1">
-                        <CheckCircle className="w-3 h-3 text-emerald-500" />
-                        <span className="text-xs text-emerald-600 font-medium">{district.active}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <AlertTriangle className="w-3 h-3 text-yellow-500" />
-                        <span className="text-xs text-yellow-700 font-medium">{district.warning || 0}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <XCircle className="w-3 h-3 text-red-500" />
-                        <span className="text-xs text-red-600 font-medium">{district.inactive}</span>
-                      </div>
-                    </div>
-                    <div className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      district.color === 'blue' ? 'bg-blue-100 text-blue-700' :
-                      district.color === 'emerald' ? 'bg-emerald-100 text-emerald-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>
-                      {district.percentage}%
-                    </div>
-                  </div>
-                </div>
-              ))}
-                  
-              {districtStats.length === 0 && (
-                <div className="text-center py-6 text-gray-500">
-                  <MapPin className="w-6 h-6 mx-auto mb-1 text-gray-300" />
-                  <p className="text-xs">No district data available</p>
-                </div>
-              )}
+                  {activeCount}/12 Active
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('commandcenter')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'commandcenter'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Building2 className="w-4 h-4" />
+                <span>Command Center</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  activeTab === 'commandcenter' ? 'bg-white/20 text-white' : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {commandCenterData.totalReports.toLocaleString()}
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('incidents')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all duration-200 whitespace-nowrap ${
+                  activeTab === 'incidents'
+                    ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <AlertTriangle className="w-4 h-4" />
+                <span>Incidents</span>
+                <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${
+                  activeTab === 'incidents' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-700'
+                }`}>
+                  {getCurrentMonthIncidentsCount()} Logged
+                </span>
+              </button>
             </div>
-          </CardContent>
-        </Card>
-          </div>
-
-          {/* Incidents Breakdown */}
-          <div className="mt-6">
-            <Card className="bg-white shadow-sm border border-gray-200 rounded-xl">
-              <CardHeader className="p-6 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <AlertTriangle className="w-5 h-5 text-red-600" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-lg font-semibold text-gray-900">Incidents Breakdown</CardTitle>
-                    <p className="text-sm text-gray-600">Recent incidents by type and severity</p>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 pt-0">
-                {/* Instructions */}
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-                  <div className="flex items-start gap-2">
-                    <div className="p-1 bg-red-100 rounded mt-0.5">
-                      <svg className="w-3.5 h-3.5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-xs font-medium text-red-900 mb-1">Understanding Incidents:</p>
-                      <ul className="text-xs text-red-800 space-y-0.5">
-                        <li>• <span className="font-semibold">By Incident Type:</span> Categories of reported incidents</li>
-                        <li>• Numbers indicate total count of each incident type</li>
-                        <li>• Monitor trends to identify areas needing attention</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-                <div className="space-y-4">
-                  {/* Incident Types */}
-                  <div>
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">By Incident Type</h4>
-                    <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                      {getIncidentBreakdown().types.map((type, index) => (
-                        <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 bg-red-500 rounded-full"></div>
-                            <span className="text-sm text-gray-700">{type.name}</span>
-                          </div>
-                          <span className="text-sm font-semibold text-red-600">{type.count}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-
-                  {/* Total Incidents */}
-                  <div className="pt-3 border-t border-gray-200">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-semibold text-gray-700">Total Incidents ({currentMonthYearLabel})</span>
-                      <span className="text-lg font-bold text-red-600">{getCurrentMonthIncidentsCount()}</span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-          </div>
-        )}
-        </div>
-        </div>
+          )}
         </div>
 
+        {/* Scrollable Content Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-6 lg:px-8 py-6">
+          <ExecutiveHub
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            activeCount={activeCount}
+            warningCount={warningCount}
+            inactiveCount={inactiveCount}
+            totalMunicipalities={totalMunicipalities}
+            activePercentage={activePercentage}
+            ipatrollerPatrolData={ipatrollerPatrolData}
+            getTotalYesterdayPatrols={getTotalYesterdayPatrols}
+            getDashboardReferenceDate={getDashboardReferenceDate}
+            municipalitiesByDistrict={municipalitiesByDistrict}
+            commandCenterData={commandCenterData}
+            userMunicipality={userMunicipality}
+            getCurrentMonthIncidentsCount={getCurrentMonthIncidentsCount}
+            getIncidentBreakdown={getIncidentBreakdown}
+            getRecentIncidentsList={getRecentIncidentsList}
+            currentMonthYearLabel={currentMonthYearLabel}
+            districtStats={districtStats}
+            onNavigate={onNavigate}
+            ipatrollerSearch={ipatrollerSearch}
+            setIpatrollerSearch={setIpatrollerSearch}
+            ipatrollerDistrictFilter={ipatrollerDistrictFilter}
+            setIpatrollerDistrictFilter={setIpatrollerDistrictFilter}
+            commandCenterSearch={commandCenterSearch}
+            setCommandCenterSearch={setCommandCenterSearch}
+            commandCenterDistrictFilter={commandCenterDistrictFilter}
+            setCommandCenterDistrictFilter={setCommandCenterDistrictFilter}
+            incidentsSearch={incidentsSearch}
+            setIncidentsSearch={setIncidentsSearch}
+            incidentsSeverityFilter={incidentsSeverityFilter}
+            setIncidentsSeverityFilter={setIncidentsSeverityFilter}
+            DAILY_ACTIVE_COUNT={DAILY_ACTIVE_COUNT}
+            DAILY_WARNING_COUNT={DAILY_WARNING_COUNT}
+            userAccessLevel={userAccessLevel}
+            quarryData={quarryData}
+          />
+        </div>
       </div>
       <NotificationContainer notifications={notifications} onRemove={removeNotification} />
     </Layout>
