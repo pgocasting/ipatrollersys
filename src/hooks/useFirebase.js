@@ -354,6 +354,27 @@ export const useFirebase = () => {
     }
   };
 
+  // Helper to recursively remove all undefined values so Firestore setDoc never throws
+  const removeUndefined = (obj) => {
+    if (obj === null || obj === undefined) return null;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+      return obj
+        .filter((item) => item !== undefined)
+        .map((item) => removeUndefined(item));
+    }
+    const clean = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        const cleanedValue = removeUndefined(value);
+        if (cleanedValue !== undefined) {
+          clean[key] = cleanedValue;
+        }
+      }
+    }
+    return clean;
+  };
+
   // Save weekly report under commandCenter/weeklyReports/<Municipality>/<Month_Year>
   const saveWeeklyReportByMunicipality = async (reportData) => {
     try {
@@ -369,35 +390,108 @@ export const useFirebase = () => {
         return { success: false, error: "No user logged in" };
       }
 
-      const { selectedMonth, selectedYear, activeMunicipalityTab, weeklyReportData } = reportData;
-      const municipality = activeMunicipalityTab || 'All';
+      const { selectedMonth, selectedYear, activeMunicipalityTab } = reportData;
+      const municipality = activeMunicipalityTab || reportData.municipality || 'All';
       const docId = `${selectedMonth}_${selectedYear}`;
 
-      // Calculate document size to check if we need to split
-      const reportDataString = JSON.stringify(reportData);
+      // Use full weeklyReportData if provided (e.g. from handleSaveWeeklyReport), else weeklyReportData
+      const sourceWeeklyData = reportData.fullWeeklyReportData || reportData.weeklyReportData || {};
+
+      // Sanitize: strip any raw base64 images to prevent Firestore document inflation
+      const cleanWeeklyReportData = {};
+      Object.entries(sourceWeeklyData).forEach(([dateKey, entries]) => {
+        if (Array.isArray(entries)) {
+          cleanWeeklyReportData[dateKey] = entries
+            .filter((entry) => entry !== null && entry !== undefined)
+            .map((entry) => {
+              const cleanEntry = { ...entry };
+              if (cleanEntry.photos && typeof cleanEntry.photos === 'object') {
+                const cleanPhotos = { ...cleanEntry.photos };
+                if (typeof cleanPhotos.before === 'string' && cleanPhotos.before.startsWith('data:image')) {
+                  delete cleanPhotos.before;
+                }
+                if (Array.isArray(cleanPhotos.before)) {
+                  cleanPhotos.before = cleanPhotos.before.filter((url) => typeof url === 'string' && !url.startsWith('data:image'));
+                }
+                if (typeof cleanPhotos.after === 'string' && cleanPhotos.after.startsWith('data:image')) {
+                  delete cleanPhotos.after;
+                }
+                if (Array.isArray(cleanPhotos.after)) {
+                  cleanPhotos.after = cleanPhotos.after.filter((url) => typeof url === 'string' && !url.startsWith('data:image'));
+                }
+                if (Array.isArray(cleanPhotos.rows)) {
+                  cleanPhotos.rows = cleanPhotos.rows.map((row) => ({
+                    ...row,
+                    before: Array.isArray(row.before) ? row.before.filter((url) => typeof url === 'string' && !url.startsWith('data:image')) : (typeof row.before === 'string' && row.before.startsWith('data:image') ? [] : row.before),
+                    after: Array.isArray(row.after) ? row.after.filter((url) => typeof url === 'string' && !url.startsWith('data:image')) : (typeof row.after === 'string' && row.after.startsWith('data:image') ? [] : row.after)
+                  }));
+                }
+                cleanEntry.photos = cleanPhotos;
+              }
+              return cleanEntry;
+            });
+        } else if (entries !== undefined) {
+          cleanWeeklyReportData[dateKey] = entries;
+        }
+      });
+
+      // Calculate full document size to check if we need to split
+      const fullReportData = {
+        ...reportData,
+        weeklyReportData: cleanWeeklyReportData
+      };
+      delete fullReportData.fullWeeklyReportData;
+
+      const reportDataString = JSON.stringify(fullReportData);
       const estimatedSize = new TextEncoder().encode(reportDataString).length;
       const sizeInKB = (estimatedSize / 1024).toFixed(2);
 
       console.log(`📊 Document size for ${municipality}:`, {
         estimatedSize: `${estimatedSize} bytes`,
         sizeInKB: `${sizeInKB} KB`,
-        dateCount: Object.keys(weeklyReportData || {}).length,
-        totalEntries: Object.values(weeklyReportData || {}).reduce((sum, entries) =>
+        dateCount: Object.keys(cleanWeeklyReportData).length,
+        totalEntries: Object.values(cleanWeeklyReportData).reduce((sum, entries) =>
           sum + (Array.isArray(entries) ? entries.length : 0), 0
         ),
-        hasPhotos: Object.values(weeklyReportData || {}).some(entries =>
+        hasPhotos: Object.values(cleanWeeklyReportData).some(entries =>
           Array.isArray(entries) && entries.some(entry => entry.photos)
         )
       });
 
-      // CRITICAL: Per-municipality size check - only split if THIS municipality's data is too large
+      // Check if document was previously split
+      let isAlreadySplit = false;
+      try {
+        const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_summary`);
+        const summarySnap = await getDoc(summaryDocRef);
+        if (summarySnap.exists() && summarySnap.data()?.isSplit) {
+          isAlreadySplit = true;
+        }
+      } catch (e) {
+        console.warn('⚠️ Could not check summary document split status:', e);
+      }
+
+      // Check single doc status as well
+      if (!isAlreadySplit) {
+        try {
+          const singleDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
+          const singleDocSnap = await getDoc(singleDocRef);
+          if (singleDocSnap.exists() && singleDocSnap.data()?.isSplit) {
+            isAlreadySplit = true;
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+
       const FIRESTORE_MAX_SIZE = 1048576; // Firestore's hard limit (1MB)
-      const SAFE_SIZE_LIMIT = 900000; // 900KB - more generous limit (was 700KB)
+      const SAFE_SIZE_LIMIT = 500000; // 500KB - safe limit leaving ample headroom
 
-      if (estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE) {
-        console.log(`⚠️ ${municipality}: Document size (${sizeInKB} KB) exceeds safe limit. Splitting by weeks...`);
+      const shouldSplit = isAlreadySplit || estimatedSize > SAFE_SIZE_LIMIT || estimatedSize >= FIRESTORE_MAX_SIZE;
 
-        // Split weeklyReportData by weeks
+      if (shouldSplit) {
+        console.log(`⚠️ ${municipality}: Document size (${sizeInKB} KB) or split flag active. Splitting by weeks...`);
+
+        // Split cleanWeeklyReportData by weeks (1 to 5)
         const weeks = [
           { name: 'week1', dates: [] },
           { name: 'week2', dates: [] },
@@ -407,18 +501,23 @@ export const useFirebase = () => {
         ];
 
         // Group dates by week
-        Object.keys(weeklyReportData || {}).forEach(dateKey => {
+        Object.keys(cleanWeeklyReportData).forEach(dateKey => {
+          let day = NaN;
           try {
             const date = new Date(dateKey);
             if (!isNaN(date.getTime())) {
-              const dayOfMonth = date.getDate();
-              const weekIndex = Math.floor((dayOfMonth - 1) / 7);
-              if (weekIndex >= 0 && weekIndex < 5) {
-                weeks[weekIndex].dates.push(dateKey);
-              }
+              day = date.getDate();
             }
-          } catch (e) {
-            console.warn(`⚠️ Could not parse date: ${dateKey}`);
+          } catch (e) {}
+
+          if (isNaN(day)) {
+            const match = String(dateKey).match(/\b(\d{1,2})\b/);
+            day = match ? parseInt(match[1], 10) : 1;
+          }
+
+          const weekIndex = Math.min(Math.floor((day - 1) / 7), 4);
+          if (weekIndex >= 0 && weekIndex < 5) {
+            weeks[weekIndex].dates.push(dateKey);
           }
         });
 
@@ -429,24 +528,25 @@ export const useFirebase = () => {
           if (week.dates.length === 0) return { success: true };
 
           const weekData = week.dates.reduce((acc, dateKey) => {
-            acc[dateKey] = weeklyReportData[dateKey];
+            acc[dateKey] = cleanWeeklyReportData[dateKey];
             return acc;
           }, {});
 
           const weekReportData = {
-            ...reportData,
+            ...fullReportData,
             weeklyReportData: weekData,
             weekNumber: index + 1,
             isPartial: true,
             municipality: municipality,
             createdAt: new Date().toISOString(),
-            createdBy: user.email,
+            createdBy: user?.email || 'unknown',
             lastUpdated: new Date().toISOString(),
-            updatedBy: user.email
+            updatedBy: user?.email || 'unknown'
           };
 
+          const cleanPayload = removeUndefined(weekReportData);
           const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_week${index + 1}`);
-          await setDoc(weekDocRef, weekReportData, { merge: true });
+          await setDoc(weekDocRef, cleanPayload, { merge: true });
           console.log(`✅ ${municipality} Week ${index + 1}: Saved`);
           return { success: true };
         });
@@ -455,8 +555,8 @@ export const useFirebase = () => {
 
         // Save summary document
         const summaryData = {
-          selectedMonth,
-          selectedYear,
+          selectedMonth: selectedMonth || '',
+          selectedYear: selectedYear || '',
           activeMunicipalityTab: municipality,
           municipality: municipality,
           savedAt: new Date().toISOString(),
@@ -464,15 +564,33 @@ export const useFirebase = () => {
           originalSize: estimatedSize,
           originalSizeKB: parseFloat(sizeInKB),
           weeks: weeks.map((w, i) => ({ weekNumber: i + 1, dateCount: w.dates.length })).filter(w => w.dateCount > 0),
-          totalDates: Object.keys(weeklyReportData || {}).length,
+          totalDates: Object.keys(cleanWeeklyReportData).length,
           createdAt: new Date().toISOString(),
-          createdBy: user.email,
+          createdBy: user?.email || 'unknown',
           lastUpdated: new Date().toISOString(),
-          updatedBy: user.email
+          updatedBy: user?.email || 'unknown'
         };
 
+        const cleanSummary = removeUndefined(summaryData);
         const summaryDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${docId}_summary`);
-        await setDoc(summaryDocRef, summaryData, { merge: true });
+        await setDoc(summaryDocRef, cleanSummary, { merge: true });
+
+        // CRITICAL: Overwrite the single document (merge: false) to clear any existing bloated 1MB document!
+        try {
+          const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
+          await setDoc(municipalDocRef, {
+            isSplit: true,
+            replacedBySplit: true,
+            selectedMonth: selectedMonth || '',
+            selectedYear: selectedYear || '',
+            municipality: municipality,
+            lastUpdated: new Date().toISOString(),
+            updatedBy: user?.email || 'unknown'
+          }, { merge: false });
+          console.log(`✅ ${municipality}: Cleared oversized single document ${docId} (now using split documents)`);
+        } catch (clearErr) {
+          console.warn('⚠️ Could not reset single document:', clearErr);
+        }
 
         console.log(`✅ ${municipality}: Split save completed (${weeks.filter(w => w.dates.length > 0).length} weeks)`);
         return { success: true, wasSplit: true, docId };
@@ -482,32 +600,19 @@ export const useFirebase = () => {
 
         const municipalDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, docId);
 
-        // CRITICAL: Log the actual data being saved
-        console.log('💾 About to save this data to Firestore:', {
-          path: `commandCenter/weeklyReports/${municipality}/${docId}`,
-          totalDates: Object.keys(reportData.weeklyReportData || {}).length,
-          totalEntries: Object.values(reportData.weeklyReportData || {}).reduce((sum, entries) =>
-            sum + (Array.isArray(entries) ? entries.length : 0), 0
-          ),
-          sampleEntries: Object.entries(reportData.weeklyReportData || {})
-            .filter(([_, entries]) => Array.isArray(entries) && entries.length > 0)
-            .slice(0, 2)
-            .map(([date, entries]) => ({
-              date,
-              count: entries.length,
-              sample: entries[0]
-            }))
-        });
-
-        await setDoc(municipalDocRef, {
-          ...reportData,
+        const singleDocPayload = {
+          ...fullReportData,
           id: docId,
           municipality: municipality,
+          isSplit: false,
           createdAt: new Date().toISOString(),
-          createdBy: user.email,
+          createdBy: user?.email || 'unknown',
           lastUpdated: new Date().toISOString(),
-          updatedBy: user.email
-        }, { merge: true });
+          updatedBy: user?.email || 'unknown'
+        };
+
+        const cleanSingle = removeUndefined(singleDocPayload);
+        await setDoc(municipalDocRef, cleanSingle, { merge: true });
 
         // Update summary document if it exists so load function uses single document
         try {

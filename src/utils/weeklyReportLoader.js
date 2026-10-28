@@ -24,9 +24,11 @@ export async function fetchMunicipalWeeklyReport(db, municipality, monthYear) {
     if (summarySnap.exists() && summarySnap.data()?.isSplit) {
       const summaryData = summarySnap.data();
       const weeks = summaryData.weeks || [];
-      const weekPromises = weeks.map(async (weekInfo) => {
+      const weekList = (Array.isArray(weeks) && weeks.length > 0) ? weeks : [1, 2, 3, 4, 5];
+      const weekPromises = weekList.map(async (weekInfo) => {
         try {
-          const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekInfo.weekNumber}`);
+          const weekNum = typeof weekInfo === 'object' && weekInfo ? (weekInfo.weekNumber || 1) : weekInfo;
+          const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekNum}`);
           const weekSnap = await getDoc(weekDocRef);
           return weekSnap.exists() ? weekSnap.data() : null;
         } catch {
@@ -59,6 +61,32 @@ export async function fetchMunicipalWeeklyReport(db, municipality, monthYear) {
 
     if (docSnap.exists()) {
       const docData = docSnap.data();
+      if (docData.isSplit) {
+        // Document was marked as split: load week documents (weeks 1 to 5)
+        const weekPromises = [1, 2, 3, 4, 5].map(async (weekNum) => {
+          try {
+            const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekNum}`);
+            const weekSnap = await getDoc(weekDocRef);
+            return weekSnap.exists() ? weekSnap.data() : null;
+          } catch {
+            return null;
+          }
+        });
+        const weekDocs = await Promise.all(weekPromises);
+        const mergedWeeklyData = {};
+        weekDocs.forEach((weekDoc) => {
+          if (weekDoc?.weeklyReportData) {
+            Object.assign(mergedWeeklyData, weekDoc.weeklyReportData);
+          }
+        });
+        return {
+          success: true,
+          isSplit: true,
+          data: { ...docData, weeklyReportData: mergedWeeklyData },
+          weeklyReportData: mergedWeeklyData
+        };
+      }
+
       const weeklyData =
         docData.weeklyReportData ||
         docData.data?.weeklyReportData ||

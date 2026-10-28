@@ -56,6 +56,7 @@ import {
 } from "../components/ui/dialog";
 import { Badge } from "../components/ui/badge";
 import { cloudinaryUtils } from '../utils/cloudinary';
+import imageCompression from 'browser-image-compression';
 import PhotoCarousel from '../components/PhotoCarousel';
 
 export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
@@ -264,6 +265,7 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
   const [currentPhotoEntry, setCurrentPhotoEntry] = useState(null);
   const [photoRows, setPhotoRows] = useState([{ id: 1, beforePhotos: [], afterPhotos: [], beforePreviews: [], afterPreviews: [] }]);
   const [isUploadingPhotos, setIsUploadingPhotos] = useState(false);
+  const [isCompressingPhotos, setIsCompressingPhotos] = useState(false);
   const [showPhotoViewDialog, setShowPhotoViewDialog] = useState(false);
   const [viewingPhotos, setViewingPhotos] = useState(null);
   const [showInstructionsModal, setShowInstructionsModal] = useState(false);
@@ -1105,8 +1107,11 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
           if (summarySnap.exists() && summarySnap.data().isSplit) {
             console.log('📦 Found split data, loading all weeks...');
             const summaryData = summarySnap.data();
-            const weekPromises = summaryData.weeks.map(async (weekInfo) => {
-              const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekInfo.weekNumber}`);
+            const weeks = summaryData.weeks || [];
+            const weekList = (Array.isArray(weeks) && weeks.length > 0) ? weeks : [1, 2, 3, 4, 5];
+            const weekPromises = weekList.map(async (weekInfo) => {
+              const weekNum = typeof weekInfo === 'object' && weekInfo ? (weekInfo.weekNumber || 1) : weekInfo;
+              const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekNum}`);
               const weekSnap = await getDoc(weekDocRef);
               return weekSnap.exists() ? weekSnap.data() : null;
             });
@@ -1135,11 +1140,35 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
             const docSnap = await getDoc(docRef);
 
             if (docSnap.exists()) {
-              result = {
-                success: true,
-                data: docSnap.data()
-              };
-              console.log('✅ Found data in single document structure:', docSnap.data());
+              const docData = docSnap.data();
+              if (docData.isSplit) {
+                console.log('📦 Single doc marked as split, loading weeks 1 to 5...');
+                const weekPromises = [1, 2, 3, 4, 5].map(async (weekNum) => {
+                  const weekDocRef = doc(db, 'commandCenter', 'weeklyReports', municipality, `${monthYear}_week${weekNum}`);
+                  const weekSnap = await getDoc(weekDocRef);
+                  return weekSnap.exists() ? weekSnap.data() : null;
+                });
+                const weekDocs = await Promise.all(weekPromises);
+                const mergedWeeklyData = {};
+                weekDocs.forEach(weekDoc => {
+                  if (weekDoc && weekDoc.weeklyReportData) {
+                    Object.assign(mergedWeeklyData, weekDoc.weeklyReportData);
+                  }
+                });
+                result = {
+                  success: true,
+                  data: {
+                    ...docData,
+                    weeklyReportData: mergedWeeklyData
+                  }
+                };
+              } else {
+                result = {
+                  success: true,
+                  data: docData
+                };
+                console.log('✅ Found data in single document structure:', docData);
+              }
             } else {
               console.log('❌ No document found in nested structure');
               result = { success: false, data: null };
@@ -1833,68 +1862,27 @@ export default function CommandCenter({ onLogout, onNavigate, currentPage }) {
     setShowPhotoUploadDialog(true);
   };
 
-  // Compress image to under 2MB
-  const compressImage = async (file, maxSizeMB = 2) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.readAsDataURL(file);
-      reader.onload = (event) => {
-        // Use HTMLImageElement to avoid conflict with lucide-react Image icon
-        const img = document.createElement('img');
-        img.src = event.target.result;
-        img.onload = () => {
-          const canvas = document.createElement('canvas');
-          let width = img.width;
-          let height = img.height;
-
-          // Calculate new dimensions while maintaining aspect ratio
-          const maxDimension = 1920; // Max width or height
-          if (width > height && width > maxDimension) {
-            height = (height * maxDimension) / width;
-            width = maxDimension;
-          } else if (height > maxDimension) {
-            width = (width * maxDimension) / height;
-            height = maxDimension;
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          // Start with quality 0.9 and reduce if needed
-          let quality = 0.9;
-          const tryCompress = () => {
-            canvas.toBlob(
-              (blob) => {
-                const sizeMB = blob.size / 1024 / 1024;
-
-                if (sizeMB <= maxSizeMB || quality <= 0.5) {
-                  // Convert blob to file
-                  const compressedFile = new File([blob], file.name, {
-                    type: 'image/jpeg',
-                    lastModified: Date.now(),
-                  });
-                  console.log(`✅ Image compressed: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${sizeMB.toFixed(2)}MB (quality: ${quality})`);
-                  resolve(compressedFile);
-                } else {
-                  // Reduce quality and try again
-                  quality -= 0.1;
-                  tryCompress();
-                }
-              },
-              'image/jpeg',
-              quality
-            );
-          };
-
-          tryCompress();
-        };
-        img.onerror = reject;
+  // Compress image using browser-image-compression library (targets <1MB for Firestore safety)
+  const compressImage = async (file, maxSizeMB = 1) => {
+    try {
+      const originalSizeMB = file.size / 1024 / 1024;
+      const options = {
+        maxSizeMB,
+        maxWidthOrHeight: 1920,
+        useWebWorker: true,
+        fileType: 'image/jpeg',
+        initialQuality: 0.85,
+        onProgress: (progress) => {
+          console.log(`\uD83D\uDD04 Compressing... \%`);
+        },
       };
-      reader.onerror = reject;
-    });
+      const compressed = await imageCompression(file, options);
+      console.log(`\u2705 Image compressed: \MB \u2192 \MB`);
+      return new File([compressed], file.name, { type: 'image/jpeg', lastModified: Date.now() });
+    } catch (err) {
+      console.warn('\u26A0\uFE0F browser-image-compression failed, returning original file:', err);
+      return file;
+    }
   };
 
   const handleBeforePhotoChange = async (e) => {
@@ -4050,6 +4038,7 @@ Are you absolutely sure you want to proceed?`;
         actionTaken,
         remarks,
         weeklyReportData: finalWeeklyReportData,
+        fullWeeklyReportData: latestWeeklyReportData,
         savedAt: new Date().toISOString(),
         savedBy: user?.email || 'unknown',
         dataVersion: '2.0' // Mark this as new format
@@ -7375,28 +7364,34 @@ Are you absolutely sure you want to proceed?`;
                                   type="file"
                                   accept="image/*"
                                   multiple
-                                  onChange={(e) => {
+                                  onChange={async (e) => {
                                     const files = Array.from(e.target.files || []);
                                     if (files.length > 0) {
-                                      Promise.all(files.map(file => {
-                                        return new Promise((resolve) => {
+                                      try {
+                                        setIsCompressingPhotos(true);
+                                        // Compress all selected before photos using browser-image-compression
+                                        const compressed = await Promise.all(files.map(f => compressImage(f, 1)));
+                                        const previews = await Promise.all(compressed.map(f => new Promise((resolve) => {
                                           const reader = new FileReader();
-                                          reader.onload = (event) => resolve(event.target.result);
-                                          reader.readAsDataURL(file);
-                                        });
-                                      })).then(previews => {
-                                        const newRows = photoRows.map(r => {
+                                          reader.onload = (ev) => resolve(ev.target.result);
+                                          reader.readAsDataURL(f);
+                                        })));
+                                        setPhotoRows(photoRows.map(r => {
                                           if (r.id === row.id) {
                                             return {
                                               ...r,
                                               beforePreviews: [...r.beforePreviews, ...previews],
-                                              beforePhotos: [...r.beforePhotos, ...files]
+                                              beforePhotos: [...r.beforePhotos, ...compressed]
                                             };
                                           }
                                           return r;
-                                        });
-                                        setPhotoRows(newRows);
-                                      });
+                                        }));
+                                      } catch (err) {
+                                        console.error('Error compressing before photos:', err);
+                                        showError('Failed to compress image. Please try again.');
+                                      } finally {
+                                        setIsCompressingPhotos(false);
+                                      }
                                     }
                                   }}
                                   className="hidden"
@@ -7477,32 +7472,38 @@ Are you absolutely sure you want to proceed?`;
                                   type="file"
                                   accept="image/*"
                                   multiple
-                                  onChange={(e) => {
+                                  onChange={async (e) => {
                                     if (row.beforePreviews.length === 0) {
                                       showError('Please upload before photos first');
                                       return;
                                     }
                                     const files = Array.from(e.target.files || []);
                                     if (files.length > 0) {
-                                      Promise.all(files.map(file => {
-                                        return new Promise((resolve) => {
+                                      try {
+                                        setIsCompressingPhotos(true);
+                                        // Compress all selected after photos using browser-image-compression
+                                        const compressed = await Promise.all(files.map(f => compressImage(f, 1)));
+                                        const previews = await Promise.all(compressed.map(f => new Promise((resolve) => {
                                           const reader = new FileReader();
-                                          reader.onload = (event) => resolve(event.target.result);
-                                          reader.readAsDataURL(file);
-                                        });
-                                      })).then(previews => {
-                                        const newRows = photoRows.map(r => {
+                                          reader.onload = (ev) => resolve(ev.target.result);
+                                          reader.readAsDataURL(f);
+                                        })));
+                                        setPhotoRows(photoRows.map(r => {
                                           if (r.id === row.id) {
                                             return {
                                               ...r,
                                               afterPreviews: [...r.afterPreviews, ...previews],
-                                              afterPhotos: [...r.afterPhotos, ...files]
+                                              afterPhotos: [...r.afterPhotos, ...compressed]
                                             };
                                           }
                                           return r;
-                                        });
-                                        setPhotoRows(newRows);
-                                      });
+                                        }));
+                                      } catch (err) {
+                                        console.error('Error compressing after photos:', err);
+                                        showError('Failed to compress image. Please try again.');
+                                      } finally {
+                                        setIsCompressingPhotos(false);
+                                      }
                                     }
                                   }}
                                   className="hidden"
@@ -7575,10 +7576,15 @@ Are you absolutely sure you want to proceed?`;
                       </button>
                       <button
                         onClick={handleUploadPhotos}
-                        disabled={isUploadingPhotos || !canSavePhotos}
+                        disabled={isUploadingPhotos || isCompressingPhotos || !canSavePhotos}
                         className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:from-gray-400 disabled:to-gray-400 disabled:cursor-not-allowed transition-all flex items-center gap-2 font-medium shadow-lg"
                       >
-                        {isUploadingPhotos ? (
+                        {isCompressingPhotos ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            Compressing...
+                          </>
+                        ) : isUploadingPhotos ? (
                           <>
                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
                             {isEditingExistingPhotos ? 'Saving...' : 'Uploading...'}
